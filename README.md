@@ -13,30 +13,20 @@ Validar o fluxo completo de compra como usuário convidado (Guest Checkout), des
 - Page Object Model (POM)
 - Git / GitHub
 
-### Estrutura do Projeto
+## Estrutura do Projeto
 
-samsung-order-automation
-├── docs
-├── evidence
-│   └── screenshots
-├── fixtures
-│   ├── customer.json
-│   ├── address.json
-│   └── card.json
-├── pages
-│   ├── BasePage.js
-│   ├── ProductPage.js
-│   ├── CartPage.js
-│   ├── GuestLoginPage.js
-│   ├── CheckoutPage.js
-│   ├── PaymentPage.js
-│   └── OrderConfirmationPage.js
-├── tests
-│   └── guest-checkout.spec.js
-├── utils
-│   └── testData.js
-├── playwright.config.js
-└── README.md
+- `pages/` - Page Objects
+- `fixtures/` - Massa de dados
+- `tests/` - Cenários E2E
+- `utils/` - Utilitários
+- `docs/` - Documentação
+- `evidence/screenshots/` - Evidências
+
+## Executar o Projeto
+
+Instalar dependências:
+
+npm install
 
 ## Funcionalidades
 
@@ -56,11 +46,11 @@ bash npm install
 
 Executar testes:
 
-bash npx playwright test 
+npx playwright test 
 
 Abrir relatório:
 
-bash npx playwright show-report 
+npx playwright show-report 
 
 ## Evidências
 
