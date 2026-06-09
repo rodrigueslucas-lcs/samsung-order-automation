@@ -15,60 +15,93 @@ Validar o fluxo completo de compra como usuário convidado (Guest Checkout), des
 
 ## Estrutura do Projeto
 
-- `pages/` - Page Objects
-- `fixtures/` - Massa de dados
-- `tests/` - Cenários E2E
-- `utils/` - Utilitários
-- `docs/` - Documentação
-- `evidence/screenshots/` - Evidências
+- pages/ - Page Objects
+- fixtures/ - Massa de dados
+- tests/ - Cenários E2E
+- utils/ - Utilitários
+- docs/ - Documentação
+- evidence/screenshots/ - Evidências geradas durante a execução
 
-## Executar o Projeto
+## Instalação
 
-Instalar dependências:
+npm install 
 
-npm install
+## Execução
 
-## Funcionalidades
-
-- Fluxo Guest Checkout
-- Page Objects reutilizáveis
-- Massa de dados desacoplada
-- Screenshots automáticos
-- HTML Report nativo
-- Trace Viewer
-- Evidências de execução
-
-## Executar o Projeto
-
-Instalar dependências:
-
-bash npm install 
-
-Executar testes:
+Executar todos os testes:
 
 npx playwright test 
+
+Executar teste específico:
+
+npx playwright test tests/guest-checkout.spec.js 
 
 Abrir relatório:
 
 npx playwright show-report 
 
+## Resultado
+
+Fluxo validado com sucesso.
+
+Pedido criado:
+
+PE260608-72096115
+
+## Funcionalidades Implementadas
+
+- Guest Checkout
+- Adição de produto ao carrinho
+- Validação de carrinho
+- Preenchimento de dados do cliente
+- Preenchimento de endereço
+- Seleção de método de entrega
+- Aceite de termos e condições
+- Pagamento com cartão de crédito
+- Criação de pedido
+- Captura automática do número do pedido
+- Screenshots automáticos
+- Gravação de vídeo
+- Trace Viewer
+- HTML Report
+
+## Evidências Geradas
+
+A cada execução o framework gera automaticamente:
+
 ## Evidências
 
-O projeto gera automaticamente:
-
-- Screenshots
 - HTML Report
-- Trace Viewer
+- Screenshots automáticos
 - Vídeos de execução
+- Trace Viewer
+- Captura do número do pedido
+
+## Arquitetura
+
+O projeto utiliza o padrão Page Object Model (POM), promovendo:
+
+- Reutilização de código
+- Facilidade de manutenção
+- Separação de responsabilidades
+- Escalabilidade para novos fluxos
 
 ## Status Atual
 
-- Estrutura do framework concluída
-- Fluxo Guest Checkout implementado
-- Integração GitHub concluída
-- Ajustes de seletores em andamento devido a deploy/manutenção do ambiente Samsung
+✅ Framework concluído
+
+✅ Fluxo Guest Checkout implementado
+
+✅ Integração GitHub concluída
+
+✅ Evidências automáticas implementadas
+
+✅ Captura de número do pedido implementada
+
+✅ Fluxo E2E validado com criação real de pedido
 
 ## Autor
 
 Lucas Rodrigues
-QA Engineer
+
+QA Engineer.
