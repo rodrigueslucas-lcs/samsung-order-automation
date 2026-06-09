@@ -32,8 +32,18 @@ export default class CartPage extends BasePage {
   }
 
   async proceedToCheckout() {
-    await this.continueButton.click();
-    await this.waitForPageLoad();
-    await this.screenshot('03-proceed-to-checkout');
-  }
+  await this.continueButton.waitFor({ state: "visible", timeout: 30000 });
+  await this.continueButton.scrollIntoViewIfNeeded();
+
+  await this.continueButton.click();
+
+  await this.page.waitForLoadState("domcontentloaded").catch(() => {});
+  await this.page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+
+  await this.page
+    .getByPlaceholder(/ingresa tu correo/i)
+    .waitFor({ state: "visible", timeout: 60000 });
+
+  await this.screenshot("03-guest-login-page");
+}
 }
