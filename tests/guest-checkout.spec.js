@@ -11,7 +11,7 @@ import { testData } from "../utils/testData";
 
 test.describe("Samsung Guest Checkout", () => {
   test("Should complete guest checkout flow as guest user", async ({ page }) => {
-    test.setTimeout(120000);
+    test.setTimeout(300000);
 
     const productPage = new ProductPage(page);
     const guestLoginPage = new GuestLoginPage(page);

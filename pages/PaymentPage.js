@@ -27,42 +27,47 @@ export default class PaymentPage extends BasePage {
       .locator("#cardNumber")
       .waitFor({ state: "visible", timeout: 60000 });
 
-    await this.cardHolderInput.waitFor({
-      state: "visible",
-      timeout: 60000,
-    });
+    await this.cardHolderInput.waitFor({ state: "visible", timeout: 60000 });
 
     await this.screenshot("09-credit-card-selected");
   }
 
   async fillCardData(card) {
-    console.log("Mercado Pago Card =>", card);
+    await this.typeInMercadoPagoFrame(
+      'iframe[name="cardNumber"]',
+      "#cardNumber",
+      card.number
+    );
 
-    await this.page
-      .frameLocator('iframe[name="cardNumber"]')
-      .locator("#cardNumber")
-      .fill(card.number);
+    await this.cardHolderInput.fill("");
+    await this.cardHolderInput.pressSequentially(card.holderName, { delay: 50 });
 
-    await this.cardHolderInput.fill(card.holderName);
+    await this.typeInMercadoPagoFrame(
+      'iframe[name="expirationDate"]',
+      "#expirationDate",
+      card.expiry
+    );
 
-    await this.page
-      .frameLocator('iframe[name="expirationDate"]')
-      .locator("#expirationDate")
-      .fill(card.expiry);
-
-    await this.page
-      .frameLocator('iframe[name="securityCode"]')
-      .locator("#securityCode")
-      .fill(card.cvv);
+    await this.typeInMercadoPagoFrame(
+      'iframe[name="securityCode"]',
+      "#securityCode",
+      card.cvv
+    );
 
     await this.selectInstallments();
 
-    await this.placeOrderButton.waitFor({
-      state: "visible",
-      timeout: 30000,
-    });
-
     await this.screenshot("10-card-data-filled");
+  }
+
+  async typeInMercadoPagoFrame(frameSelector, inputSelector, value) {
+    const input = this.page.frameLocator(frameSelector).locator(inputSelector);
+
+    await input.waitFor({ state: "visible", timeout: 60000 });
+    await input.click();
+    await input.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+    await input.press("Backspace");
+    await input.pressSequentially(value, { delay: 80 });
+    await input.press("Tab");
   }
 
   async selectInstallments() {
@@ -71,31 +76,46 @@ export default class PaymentPage extends BasePage {
       timeout: 30000,
     });
 
-    await this.installmentsCombobox.click();
-
-    const option = this.page
-      .getByRole("option")
-      .filter({ hasText: /1|cuota|sin intereses/i })
-      .first();
-
-    if (await option.isVisible({ timeout: 10000 }).catch(() => false)) {
-      await option.click();
-    } else {
+    await this.installmentsCombobox.selectOption({ index: 0 }).catch(async () => {
+      await this.installmentsCombobox.click();
       await this.page.keyboard.press("ArrowDown");
       await this.page.keyboard.press("Enter");
-    }
+    });
   }
 
   async placeOrder() {
-    await this.placeOrderButton.scrollIntoViewIfNeeded();
+  await this.placeOrderButton.scrollIntoViewIfNeeded();
 
-    await this.placeOrderButton.waitFor({
-      state: "visible",
-      timeout: 30000,
-    });
+  await this.page.waitForFunction(() => {
+    const button = [...document.querySelectorAll("button")]
+      .find((btn) => /realizar pedido/i.test(btn.innerText));
 
-    await this.placeOrderButton.click();
+    return button && !button.disabled;
+  }, { timeout: 90000 });
 
-    await this.screenshot("11-place-order");
+  await this.screenshot("11-before-place-order");
+
+  await this.placeOrderButton.click();
+
+  const result = await Promise.race([
+    this.page.waitForURL(
+      /confirmation|confirmacion|order-confirmation|checkout\/order|success/i,
+      { timeout: 90000 }
+    ).then(() => "CONFIRMATION"),
+
+    this.page
+      .getByText(/error|rechazad|intenta|no pudimos|problema|inválid/i)
+      .first()
+      .waitFor({ state: "visible", timeout: 90000 })
+      .then(() => "ERROR_MESSAGE"),
+
+    this.page.waitForTimeout(90000).then(() => "TIMEOUT"),
+  ]);
+
+  await this.screenshot(`11-after-place-order-${result.toLowerCase()}`);
+
+  if (result !== "CONFIRMATION") {
+    throw new Error(`Pedido não foi confirmado. Resultado após clicar: ${result}`);
   }
+}
 }

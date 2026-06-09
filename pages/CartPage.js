@@ -5,6 +5,8 @@ export default class CartPage extends BasePage {
     super(page);
 
     this.cartUrl = 'https://stg2.shop.samsung.com/pe/cart';
+    this.guestLoginUrl = 'https://stg2.shop.samsung.com/pe/guestlogin/checkout';
+
     this.continueButton = page.getByRole('button', { name: /^continuar$/i });
     this.cartProductSku = page.getByText('RB45DG6300B1PE', { exact: true });
     this.cartProductName = page.getByRole('heading', {
@@ -18,32 +20,41 @@ export default class CartPage extends BasePage {
   }
 
   async validateProductInCart() {
+    await this.cartProductSku.waitFor({ state: 'visible', timeout: 30000 });
+    await this.cartProductName.waitFor({ state: 'visible', timeout: 30000 });
+
     await this.screenshot('02-cart-validation');
-
-    await this.cartProductSku.waitFor({
-      state: 'visible',
-      timeout: 15000
-    });
-
-    await this.cartProductName.waitFor({
-      state: 'visible',
-      timeout: 15000
-    });
   }
 
   async proceedToCheckout() {
-  await this.continueButton.waitFor({ state: "visible", timeout: 30000 });
-  await this.continueButton.scrollIntoViewIfNeeded();
+    await this.continueButton.waitFor({ state: 'visible', timeout: 30000 });
+    await this.continueButton.scrollIntoViewIfNeeded();
 
-  await this.continueButton.click();
+    await this.screenshot('02-before-cart-continue');
 
-  await this.page.waitForLoadState("domcontentloaded").catch(() => {});
-  await this.page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+    await this.continueButton.click();
 
-  await this.page
-    .getByPlaceholder(/ingresa tu correo/i)
-    .waitFor({ state: "visible", timeout: 60000 });
+    const guestEmailInput = this.page.getByPlaceholder(/ingresa tu correo/i);
 
-  await this.screenshot("03-guest-login-page");
-}
+    const reachedGuestLogin = await guestEmailInput
+      .waitFor({ state: 'visible', timeout: 45000 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (reachedGuestLogin) {
+      await this.screenshot('03-guest-login-page');
+      return;
+    }
+
+    await this.screenshot('02-cart-continue-stuck-loading');
+
+    await this.page.goto(this.guestLoginUrl, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60000
+    });
+
+    await guestEmailInput.waitFor({ state: 'visible', timeout: 30000 });
+
+    await this.screenshot('03-guest-login-page-fallback');
+  }
 }

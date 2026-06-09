@@ -46,14 +46,20 @@ export default class CheckoutPage extends BasePage {
   }
 
   async fillAddress(address) {
-    await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, { timeout: 30000 });
+  await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, { timeout: 30000 });
 
-    await this.page.reload({ waitUntil: "domcontentloaded" });
-    await this.page.waitForTimeout(5000);
+  const departamentoSelect = this.page.getByRole("combobox", {
+    name: /departamento/i,
+  });
 
-    await this.screenshot("05-delivery-section-loaded");
+  await departamentoSelect.waitFor({
+    state: "visible",
+    timeout: 60000,
+  });
 
-    await this.page.getByRole("combobox", { name: /departamento/i }).click();
+  await this.screenshot("05-delivery-section-loaded");
+
+  await departamentoSelect.click();
     await this.page
       .getByRole("option", { name: address.department, exact: true })
       .click();
