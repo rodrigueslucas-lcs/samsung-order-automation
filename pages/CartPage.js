@@ -4,30 +4,32 @@ export default class CartPage extends BasePage {
   constructor(page) {
     super(page);
 
-    this.cartUrl = '/pe/cart';
-    this.continueButton = page.getByRole('button', { name: /continuar/i });
-    this.cartProductText = page.getByText(/RB45DG6300B1PE/i);
+    this.cartUrl = 'https://stg2.shop.samsung.com/pe/cart';
+    this.continueButton = page.getByRole('button', { name: /^continuar$/i });
+    this.cartProductSku = page.getByText('RB45DG6300B1PE', { exact: true });
+    this.cartProductName = page.getByRole('heading', {
+      name: /Refrigeradora Bottom Freezer/i
+    });
   }
 
   async openCart() {
-    await this.page.goto(this.cartUrl);
-    await this.waitForPageLoad();
+    await this.page.goto(this.cartUrl, { waitUntil: 'domcontentloaded' });
     await this.screenshot('02-cart-page');
   }
 
   async validateProductInCart() {
-  await this.screenshot('02-cart-validation');
+    await this.screenshot('02-cart-validation');
 
-  const productVisible = await this.cartProductText
-    .isVisible({ timeout: 10000 })
-    .catch(() => false);
+    await this.cartProductSku.waitFor({
+      state: 'visible',
+      timeout: 15000
+    });
 
-  if (!productVisible) {
-    throw new Error(
-      'Product SKU RB45DG6300B1PE was not visible in cart. Environment may be under deployment/maintenance.'
-    );
+    await this.cartProductName.waitFor({
+      state: 'visible',
+      timeout: 15000
+    });
   }
-}
 
   async proceedToCheckout() {
     await this.continueButton.click();
