@@ -10,10 +10,10 @@ export default defineConfig({
 
   retries: process.env.CI ? 2 : 0,
 
-  workers: process.env.CI ? 1 : 1,
+  workers: 1,
 
   reporter: [
-    ['html'],
+    ['html', { open: 'always' }],
     ['list']
   ],
 
@@ -27,11 +27,11 @@ export default defineConfig({
       height: 900
     },
 
-    screenshot: 'only-on-failure',
+    screenshot: 'on',
 
-    video: 'retain-on-failure',
+    video: 'on',
 
-    trace: 'retain-on-failure',
+    trace: 'on',
 
     actionTimeout: 15000,
 

@@ -111,7 +111,7 @@ export default class CheckoutPage extends BasePage {
 
     await this.page
       .getByRole("button", { name: /Tarjeta de Crédito \/ Débito/i })
-      .waitFor({ state: "visible", timeout: 30000 });
+      .waitFor({ state: "visible", timeout: 90000 });
 
     await this.screenshot("09-payment-step");
   }

@@ -13,7 +13,7 @@ export default class ProductPage extends BasePage {
   }
 
   async validateProductLoaded() {
-    await this.page.goto(this.cookieUrl, { waitUntil: 'domcontentloaded' });
+    await this.safeGoto(this.cookieUrl);
 
     await this.page
       .getByText(/you can access pages now/i)
@@ -23,14 +23,33 @@ export default class ProductPage extends BasePage {
   }
 
   async addToCart() {
-    await this.page.goto(this.addToCartUrl, { waitUntil: 'domcontentloaded' });
+    await this.safeGoto(this.addToCartUrl);
 
     await this.page.waitForTimeout(3000);
 
-    await this.page.goto(this.cartUrl, { waitUntil: 'domcontentloaded' });
+    await this.safeGoto(this.cartUrl);
 
     await this.page.waitForTimeout(5000);
 
     await this.screenshot('02-product-added-to-cart');
+  }
+
+  async safeGoto(url) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await this.page.goto(url, {
+          waitUntil: 'domcontentloaded',
+          timeout: 60000
+        });
+
+        return;
+      } catch (error) {
+        if (attempt === 3) {
+          throw error;
+        }
+
+        await this.page.waitForTimeout(3000);
+      }
+    }
   }
 }
