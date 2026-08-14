@@ -109,10 +109,59 @@ export default class CheckoutPage extends BasePage {
     await this.paymentContinueButton.scrollIntoViewIfNeeded();
     await this.paymentContinueButton.click();
 
-    await this.page
-      .getByRole("button", { name: /Tarjeta de Crédito \/ Débito/i })
-      .waitFor({ state: "visible", timeout: 90000 });
+    const deliveryAlert = this.page.getByRole("alert").filter({
+      hasText: /Por favor, selecciona una opción de entrega/i,
+    });
+
+    const creditCardButton = this.page.getByRole("button", {
+      name: /Tarjeta de Crédito \/ Débito/i,
+    });
+
+    try {
+      await deliveryAlert.waitFor({
+        state: "visible",
+        timeout: 5000,
+      });
+
+      const shippingOption = this.page
+        .locator(".delivery-mode-tab.button-style")
+        .filter({ hasText: /Envío regular/i })
+        .first();
+
+      await shippingOption.scrollIntoViewIfNeeded();
+      await shippingOption.click();
+
+      await this.page
+        .locator(".delivery-mode-tab.button-style.selected-mode")
+        .filter({ hasText: /Envío regular/i })
+        .waitFor({
+          state: "visible",
+          timeout: 30000,
+        });
+
+      await this.paymentContinueButton.scrollIntoViewIfNeeded();
+      await this.paymentContinueButton.click();
+
+      try {
+        await creditCardButton.waitFor({
+          state: "visible",
+          timeout: 2000,
+        });
+      } catch {
+        await this.paymentContinueButton.scrollIntoViewIfNeeded();
+        await this.paymentContinueButton.click();
+      }
+
+    } catch {
+      // Segue normalmente se o alerta não aparecer.
+    }
+
+    await creditCardButton.waitFor({
+      state: "visible",
+      timeout: 90000,
+    });
 
     await this.screenshot("09-payment-step");
   }
+
 }
