@@ -1,13 +1,13 @@
 import { test } from "@playwright/test";
 
-import ProductPage from "../pages/ProductPage";
-import GuestLoginPage from "../pages/GuestLoginPage";
-import CartPage from "../pages/CartPage";
-import CheckoutPage from "../pages/CheckoutPage";
-import PaymentPage from "../pages/PaymentPage";
-import OrderConfirmationPage from "../pages/OrderConfirmationPage";
+import ProductPage from "../../../pages/ProductPage";
+import GuestLoginPage from "../../../pages/GuestLoginPage";
+import CartPage from "../../../pages/CartPage";
+import CheckoutPage from "../../../pages/CheckoutPage";
+import PaymentPage from "../../../pages/PaymentPage";
+import OrderConfirmationPage from "../../../pages/OrderConfirmationPage";
 
-import { testData } from "../utils/testData";
+import { testData } from "../../../utils/testData";
 
 test.describe("Samsung Guest Checkout", () => {
   test("Should complete guest checkout flow as guest user", async ({ page }) => {
