@@ -19,6 +19,43 @@ export default class PaymentPage extends BasePage {
     });
   }
 
+  async validatePaymentPage() {
+    await this.page.waitForURL(/CHECKOUT_STEP_PAYMENT/, {
+      timeout: 90000,
+    });
+
+    await this.creditCardOption.waitFor({
+      state: "visible",
+      timeout: 90000,
+    });
+
+    await this.screenshot("09-payment-page");
+  }
+
+  async validateAvailablePaymentModes() {
+    const paymentModes = [
+      this.page.getByRole("button", { name: /^Cuotéalo\b/i }),
+      this.page.getByRole("button", {
+        name: /^Tarjeta de Crédito \/ Débito/i,
+      }),
+      this.page.getByRole("button", {
+        name: /^Banca por Internet\b/i,
+      }),
+      this.page.getByRole("button", {
+        name: /^Pago Efectivo\b/i,
+      }),
+    ];
+
+    for (const paymentMode of paymentModes) {
+      await paymentMode.waitFor({
+        state: "visible",
+        timeout: 90000,
+      });
+    }
+
+    await this.screenshot("09-payment-modes");
+  }
+
   async selectCreditCard() {
     await this.creditCardOption.click();
 
