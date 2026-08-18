@@ -32,6 +32,80 @@ export default class PaymentPage extends BasePage {
     await this.screenshot("09-payment-page");
   }
 
+  async validatePriceBreakdown() {
+    const orderSummary = this.page.getByRole("heading", {
+      name: /Resumen de la orden/i,
+    });
+
+    const orderSummarySection = this.page
+      .getByRole("heading", { name: /Resumen de la orden/i })
+      .locator("..");
+
+    const subtotalLabel = orderSummarySection
+      .getByText("Subtotal", { exact: true })
+      .first();
+
+    const totalHeading = this.page.getByRole("heading", {
+      name: /^Total$/i,
+    });
+
+    await orderSummary.waitFor({
+      state: "visible",
+      timeout: 90000,
+    });
+
+    await subtotalLabel.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await totalHeading.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    const subtotalContainer = subtotalLabel.locator("..");
+    const totalContainer = totalHeading.locator("..");
+
+    const subtotalText = await subtotalContainer.textContent();
+    const totalText = await totalContainer.textContent();
+
+    const subtotal = subtotalText?.match(/S\/\s*[\d,.]+/)?.[0];
+    const total = totalText?.match(/S\/\s*[\d,.]+/)?.[0];
+
+    if (!subtotal) {
+      throw new Error("Subtotal value was not displayed on Payment Page.");
+    }
+
+    if (!total) {
+      throw new Error("Total value was not displayed on Payment Page.");
+    }
+
+    await this.screenshot("09-payment-price-breakdown");
+  }
+
+  async validateShippingAndBillingAddress(address) {
+    const deliverySummary = this.page
+      .getByText(/Dirección de entrega/i)
+      .first();
+
+    await deliverySummary.waitFor({
+      state: "visible",
+      timeout: 90000,
+    });
+
+    const addressText = this.page.getByText(
+      new RegExp(`${address.street}.*${address.number}`, "i")
+    ).first();
+
+    await addressText.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await this.screenshot("09-payment-shipping-billing-address");
+  }
+
   async validateAvailablePaymentModes() {
     const paymentModes = [
       this.page.getByRole("button", { name: /^Cuotéalo\b/i }),

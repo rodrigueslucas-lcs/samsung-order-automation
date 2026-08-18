@@ -52,6 +52,24 @@ test.describe("ST2 - Base Store - Payment Page", () => {
     await paymentPage.validatePaymentPage();
   });
 
+
+  test("TC55 - Customer able to see the price break down", async ({ page }) => {
+    test.setTimeout(300000);
+
+    const paymentPage = await reachPayment(page);
+
+    await paymentPage.validatePriceBreakdown();
+  });
+
+
+  test("TC56 - Customer able to see the address for Shipping and Billing", async ({ page }) => {
+    test.setTimeout(300000);
+
+    const paymentPage = await reachPayment(page);
+
+    await paymentPage.validateShippingAndBillingAddress(testData.address);
+  });
+
   test("TC57 - Customer able to see all available Payment mode", async ({ page }) => {
     test.setTimeout(300000);
 
