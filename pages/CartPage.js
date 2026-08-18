@@ -12,6 +12,16 @@ export default class CartPage extends BasePage {
     this.cartProductName = page.getByRole('heading', {
       name: /Refrigeradora Bottom Freezer/i
     });
+
+    this.orderSummaryTitle = page.getByRole('heading', {
+      name: /Resumen de la orden/i
+    });
+
+    this.subtotalLabel = page.getByText('Subtotal', { exact: true });
+
+    this.totalTitle = page.getByRole('heading', {
+      name: /^Total$/i
+    });
   }
 
   async openCart() {
@@ -24,6 +34,39 @@ export default class CartPage extends BasePage {
     await this.cartProductName.waitFor({ state: 'visible', timeout: 30000 });
 
     await this.screenshot('02-cart-validation');
+  }
+
+  async validateOrderSummary() {
+    await this.orderSummaryTitle.waitFor({
+      state: 'visible',
+      timeout: 30000
+    });
+
+    await this.subtotalLabel.waitFor({
+      state: 'visible',
+      timeout: 30000
+    });
+
+    await this.totalTitle.waitFor({
+      state: 'visible',
+      timeout: 30000
+    });
+
+    const subtotalContainer = this.subtotalLabel.locator('..');
+    const totalContainer = this.totalTitle.locator('..');
+
+    const subtotalText = await subtotalContainer.textContent();
+    const totalText = await totalContainer.textContent();
+
+    const subtotal = subtotalText?.match(/S\/\s*[\d,.]+/)?.[0];
+    const total = totalText?.match(/S\/\s*[\d,.]+/)?.[0];
+
+    await this.screenshot('cart-order-summary');
+
+    return {
+      subtotal,
+      total
+    };
   }
 
   async proceedToCheckout() {

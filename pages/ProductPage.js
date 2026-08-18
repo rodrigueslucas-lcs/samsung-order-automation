@@ -110,6 +110,28 @@ export default class ProductPage extends BasePage {
     });
   }
 
+  async validateSelectedColorVariant(pdpPage) {
+    await pdpPage
+      .getByText("Choose your color", { exact: true })
+      .waitFor({
+        state: "visible",
+        timeout: 30000,
+      });
+
+    await pdpPage
+      .getByText(/Black Doi/i)
+      .last()
+      .waitFor({
+        state: "visible",
+        timeout: 30000,
+      });
+
+    await pdpPage.screenshot({
+      path: "evidence/screenshots/st2-pdp-selected-variant.png",
+      fullPage: true,
+    });
+  }
+
   async safeGoto(url) {
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {

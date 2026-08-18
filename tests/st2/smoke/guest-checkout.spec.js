@@ -9,8 +9,9 @@ import OrderConfirmationPage from "../../../pages/OrderConfirmationPage";
 
 import { testData } from "../../../utils/testData";
 
-test.describe("Samsung Guest Checkout", () => {
-  test("Should complete guest checkout flow as guest user", async ({ page }) => {
+test.describe("ST2 - Guest Customer Order Journey", () => {
+
+  test("E2E - Guest checkout using Credit Card", async ({ page }) => {
     test.setTimeout(300000);
 
     const productPage = new ProductPage(page);
@@ -20,48 +21,47 @@ test.describe("Samsung Guest Checkout", () => {
     const paymentPage = new PaymentPage(page);
     const orderConfirmationPage = new OrderConfirmationPage(page);
 
-    await test.step("Open product/add-to-cart flow", async () => {
+    await test.step("TC15/TC16 - Cart Page and added product displayed correctly", async () => {
       await productPage.validateProductLoaded();
       await productPage.addToCart();
+
+      await cartPage.validateProductInCart();
     });
 
-    await test.step("Validate cart and proceed to checkout", async () => {
-      await cartPage.validateProductInCart();
+    await test.step("TC20/TC33 - Checkout button and navigation to Checkout", async () => {
       await cartPage.proceedToCheckout();
     });
 
-    await test.step("Checkout as guest user", async () => {
+    await test.step("TC34 - Checkout Login Page", async () => {
       await guestLoginPage.checkoutAsGuest(testData.customer.email);
     });
 
-    await test.step("Fill customer information", async () => {
+    await test.step("TC35/TC42-TC47 - Checkout Address Page and customer address data", async () => {
       await checkoutPage.fillCustomerData(testData.customer);
-    });
-
-    await test.step("Fill delivery address", async () => {
       await checkoutPage.fillAddress(testData.address);
     });
 
-    await test.step("Select shipping method", async () => {
+    await test.step("TC49/TC50 - Available delivery mode and delivery selection", async () => {
       await checkoutPage.selectShippingMethod();
     });
 
-    await test.step("Accept terms and continue to payment", async () => {
+    await test.step("TC53 - Navigate to Payment Page", async () => {
       await checkoutPage.acceptTerms();
       await checkoutPage.continueToPayment();
     });
 
-    await test.step("Fill credit card payment data", async () => {
+    await test.step("TC54/TC57 - Payment Page and Credit Card payment mode", async () => {
       await paymentPage.selectCreditCard();
       await paymentPage.fillCardData(testData.card);
     });
 
-    await test.step("Place order", async () => {
+    await test.step("TC58/TC77 - Complete order using Credit Card", async () => {
       await paymentPage.placeOrder();
     });
 
-    await test.step("Validate order confirmation", async () => {
+    await test.step("TC62 - Order Confirmation Page displayed", async () => {
       await orderConfirmationPage.validateOrderCreated();
     });
   });
+
 });
