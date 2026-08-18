@@ -5,8 +5,6 @@ export default class CartPage extends BasePage {
     super(page);
 
     this.cartUrl = 'https://stg2.shop.samsung.com/pe/cart';
-    this.guestLoginUrl = 'https://stg2.shop.samsung.com/pe/guestlogin/checkout';
-
     this.continueButton = page.getByRole('button', { name: /^continuar$/i });
 
     this.cartPageTitle = page.getByText(/Tienes 1 producto en tu carrito/i);
@@ -104,26 +102,9 @@ export default class CartPage extends BasePage {
     await this.continueButton.click();
 
     const guestEmailInput = this.page.getByPlaceholder(/ingresa tu correo/i);
+    await guestEmailInput.waitFor({ state: 'visible', timeout: 60000 });
+    await this.page.waitForURL(/\/pe\/guestlogin\/checkout/, { timeout: 60000 });
 
-    const reachedGuestLogin = await guestEmailInput
-      .waitFor({ state: 'visible', timeout: 45000 })
-      .then(() => true)
-      .catch(() => false);
-
-    if (reachedGuestLogin) {
-      await this.screenshot('03-guest-login-page');
-      return;
-    }
-
-    await this.screenshot('02-cart-continue-stuck-loading');
-
-    await this.page.goto(this.guestLoginUrl, {
-      waitUntil: 'domcontentloaded',
-      timeout: 60000
-    });
-
-    await guestEmailInput.waitFor({ state: 'visible', timeout: 30000 });
-
-    await this.screenshot('03-guest-login-page-fallback');
+    await this.screenshot('03-guest-login-page');
   }
 }
