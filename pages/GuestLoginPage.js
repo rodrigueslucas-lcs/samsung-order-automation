@@ -10,6 +10,20 @@ export default class GuestLoginPage extends BasePage {
     });
   }
 
+  async validateCheckoutLoginPage() {
+    await this.emailInput.waitFor({
+      state: 'visible',
+      timeout: 30000
+    });
+
+    await this.guestCheckoutButton.waitFor({
+      state: 'visible',
+      timeout: 30000
+    });
+
+    await this.screenshot('checkout-login-page');
+  }
+
   async checkoutAsGuest(email) {
     if (!email || typeof email !== 'string') {
       throw new Error(`Guest email inválido. Valor recebido: ${email}`);
