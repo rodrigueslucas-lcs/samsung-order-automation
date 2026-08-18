@@ -47,4 +47,27 @@ test.describe("ST2 - Checkout Page", () => {
     await checkoutPage.validateCheckoutAddressPage();
   });
 
+
+  test("TC36 - Customer able to see the Checkout Login button in the Checkout Address Page", async ({ page }) => {
+    test.setTimeout(180000);
+
+    const productPage = new ProductPage(page);
+    const cartPage = new CartPage(page);
+    const guestLoginPage = new GuestLoginPage(page);
+    const checkoutPage = new CheckoutPage(page);
+
+    await productPage.validateProductLoaded();
+    await productPage.addToCart();
+
+    await cartPage.validateProductInCart();
+    await cartPage.proceedToCheckout();
+
+    await guestLoginPage.checkoutAsGuest(testData.customer.email);
+
+    await checkoutPage.fillCustomerData(testData.customer);
+
+    await checkoutPage.validateCheckoutAddressPage();
+    await checkoutPage.validateCheckoutLoginButton();
+  });
+
 });

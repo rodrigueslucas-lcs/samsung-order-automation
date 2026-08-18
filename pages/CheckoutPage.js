@@ -71,6 +71,25 @@ export default class CheckoutPage extends BasePage {
     await this.screenshot("checkout-address-page");
   }
 
+  async validateCheckoutLoginButton() {
+    await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
+      timeout: 30000,
+    });
+
+    const loginMessage = this.page
+      .getByText(/Iniciar sesi.*n para ganar puntos Samsung Rewards/i)
+      .first();
+
+    await loginMessage.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await loginMessage.scrollIntoViewIfNeeded();
+
+    await this.screenshot("checkout-login-option");
+  }
+
   async fillAddress(address) {
   await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, { timeout: 30000 });
 
