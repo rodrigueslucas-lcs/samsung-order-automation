@@ -68,4 +68,49 @@ test.describe("ST2 - Cart Page", () => {
     await cartPage.validateCheckoutButton();
   });
 
+
+  test("TC15 - Customer able to see the Cart Page", async ({ page }) => {
+    test.setTimeout(120000);
+
+    const productPage = new ProductPage(page);
+    const cartPage = new CartPage(page);
+
+    await productPage.validateProductLoaded();
+    await productPage.addToCart();
+
+    await cartPage.validateCartPage();
+  });
+
+  test("TC16 - Customer able to verify cart page (Products added displays correctly)", async ({ page }) => {
+    test.setTimeout(120000);
+
+    const productPage = new ProductPage(page);
+    const cartPage = new CartPage(page);
+
+    await productPage.validateProductLoaded();
+    await productPage.addToCart();
+
+    await cartPage.validateProductInCart();
+  });
+
+  test("TC33 - Customer able to navigate to Checkout Page, when click the Checkout Button", async ({ page }) => {
+    test.setTimeout(150000);
+
+    const productPage = new ProductPage(page);
+    const cartPage = new CartPage(page);
+
+    await productPage.validateProductLoaded();
+    await productPage.addToCart();
+
+    await cartPage.validateProductInCart();
+    await cartPage.proceedToCheckout();
+
+    await page
+      .getByPlaceholder(/ingresa tu correo/i)
+      .waitFor({
+        state: "visible",
+        timeout: 30000
+      });
+  });
+
 });

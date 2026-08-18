@@ -8,6 +8,8 @@ export default class CartPage extends BasePage {
     this.guestLoginUrl = 'https://stg2.shop.samsung.com/pe/guestlogin/checkout';
 
     this.continueButton = page.getByRole('button', { name: /^continuar$/i });
+
+    this.cartPageTitle = page.getByText(/Tienes 1 producto en tu carrito/i);
     this.cartProductSku = page.getByText('RB45DG6300B1PE', { exact: true });
     this.cartProductName = page.getByRole('heading', {
       name: /Refrigeradora Bottom Freezer/i
@@ -27,6 +29,19 @@ export default class CartPage extends BasePage {
   async openCart() {
     await this.page.goto(this.cartUrl, { waitUntil: 'domcontentloaded' });
     await this.screenshot('02-cart-page');
+  }
+
+  async validateCartPage() {
+    await this.page.waitForURL(/\/pe\/cart/, {
+      timeout: 30000
+    });
+
+    await this.cartPageTitle.waitFor({
+      state: 'visible',
+      timeout: 30000
+    });
+
+    await this.screenshot('cart-page-visible');
   }
 
   async validateProductInCart() {
