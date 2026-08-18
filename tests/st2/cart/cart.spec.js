@@ -54,4 +54,18 @@ test.describe("ST2 - Cart Page", () => {
     expect(summary.total).toBe(summary.subtotal);
   });
 
+
+  test("TC20 - Customer able to see Checkout Button", async ({ page }) => {
+    test.setTimeout(120000);
+
+    const productPage = new ProductPage(page);
+    const cartPage = new CartPage(page);
+
+    await productPage.validateProductLoaded();
+    await productPage.addToCart();
+
+    await cartPage.validateProductInCart();
+    await cartPage.validateCheckoutButton();
+  });
+
 });

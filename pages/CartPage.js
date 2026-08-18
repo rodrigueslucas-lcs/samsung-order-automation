@@ -69,6 +69,17 @@ export default class CartPage extends BasePage {
     };
   }
 
+  async validateCheckoutButton() {
+    await this.continueButton.waitFor({
+      state: 'visible',
+      timeout: 30000
+    });
+
+    await this.continueButton.scrollIntoViewIfNeeded();
+
+    await this.screenshot('cart-checkout-button');
+  }
+
   async proceedToCheckout() {
     await this.continueButton.waitFor({ state: 'visible', timeout: 30000 });
     await this.continueButton.scrollIntoViewIfNeeded();
