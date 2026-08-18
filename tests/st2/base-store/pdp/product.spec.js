@@ -1,8 +1,8 @@
 import { test } from "@playwright/test";
 
-import ProductPage from "../../../pages/ProductPage";
+import ProductPage from "../../../../pages/ProductPage";
 
-test.describe("ST2 - PDP", () => {
+test.describe("ST2 - Base Store - PDP", () => {
 
   test("PDP - Customer able to navigate to and validate Product Detail Page", async ({ page }) => {
     test.setTimeout(120000);

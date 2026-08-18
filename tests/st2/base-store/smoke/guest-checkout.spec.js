@@ -1,15 +1,15 @@
 import { test } from "@playwright/test";
 
-import ProductPage from "../../../pages/ProductPage";
-import GuestLoginPage from "../../../pages/GuestLoginPage";
-import CartPage from "../../../pages/CartPage";
-import CheckoutPage from "../../../pages/CheckoutPage";
-import PaymentPage from "../../../pages/PaymentPage";
-import OrderConfirmationPage from "../../../pages/OrderConfirmationPage";
+import ProductPage from "../../../../pages/ProductPage";
+import GuestLoginPage from "../../../../pages/GuestLoginPage";
+import CartPage from "../../../../pages/CartPage";
+import CheckoutPage from "../../../../pages/CheckoutPage";
+import PaymentPage from "../../../../pages/PaymentPage";
+import OrderConfirmationPage from "../../../../pages/OrderConfirmationPage";
 
-import { testData } from "../../../utils/testData";
+import { testData } from "../../../../utils/testData";
 
-test.describe("ST2 - Guest Customer Order Journey", () => {
+test.describe("ST2 - Base Store - Guest Customer Order Journey", () => {
 
   test("E2E - Guest checkout using Credit Card", async ({ page }) => {
     test.setTimeout(300000);

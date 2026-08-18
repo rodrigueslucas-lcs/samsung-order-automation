@@ -1,13 +1,13 @@
 import { test } from "@playwright/test";
 
-import ProductPage from "../../../pages/ProductPage";
-import CartPage from "../../../pages/CartPage";
-import GuestLoginPage from "../../../pages/GuestLoginPage";
-import CheckoutPage from "../../../pages/CheckoutPage";
+import ProductPage from "../../../../pages/ProductPage";
+import CartPage from "../../../../pages/CartPage";
+import GuestLoginPage from "../../../../pages/GuestLoginPage";
+import CheckoutPage from "../../../../pages/CheckoutPage";
 
-import { testData } from "../../../utils/testData";
+import { testData } from "../../../../utils/testData";
 
-test.describe("ST2 - Checkout Page", () => {
+test.describe("ST2 - Base Store - Checkout Page", () => {
 
   test("TC34 - Customer able to see Checkout Login Page", async ({ page }) => {
     test.setTimeout(150000);

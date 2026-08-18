@@ -1,9 +1,9 @@
 import { test, expect } from "@playwright/test";
 
-import ProductPage from "../../../pages/ProductPage";
-import CartPage from "../../../pages/CartPage";
+import ProductPage from "../../../../pages/ProductPage";
+import CartPage from "../../../../pages/CartPage";
 
-test.describe("ST2 - Cart Page", () => {
+test.describe("ST2 - Base Store - Cart Page", () => {
 
   test("TC17 - Customer able to increase and decrease the quantity (or remove products)", async ({ page }) => {
     test.setTimeout(120000);
