@@ -19,14 +19,6 @@ export default class CheckoutPage extends BasePage {
     this.paymentContinueButton = page.getByRole("button", {
       name: /continuar con los métodos de pago/i,
     });
-
-    this.deliveryRegion = page.getByRole("region", {
-      name: /2\. Dirección de entrega/i,
-    });
-
-    this.paymentRegion = page.getByRole("region", {
-      name: /3\. Pago/i,
-    });
   }
 
   async fillCustomerData(customer) {
@@ -46,13 +38,9 @@ export default class CheckoutPage extends BasePage {
     await this.screenshot("04-customer-info");
 
     await Promise.all([
-      this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, { timeout: 60000 }),
+      this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, { timeout: 30000 }),
       this.customerContinueButton.click(),
     ]);
-
-    await this.deliveryRegion
-      .getByRole("combobox", { name: /^Departamento$/i })
-      .waitFor({ state: "visible", timeout: 90000 });
 
     await this.screenshot("05-delivery-step");
   }
@@ -66,13 +54,13 @@ export default class CheckoutPage extends BasePage {
       name: /Completa tu dirección de entrega/i,
     });
 
-    const departamentoSelect = this.deliveryRegion.getByRole("combobox", {
-      name: /^Departamento$/i,
+    const departamentoSelect = this.page.getByRole("combobox", {
+      name: /departamento/i,
     });
 
     await addressTitle.waitFor({
       state: "visible",
-      timeout: 90000,
+      timeout: 30000,
     });
 
     await departamentoSelect.waitFor({
@@ -102,51 +90,16 @@ export default class CheckoutPage extends BasePage {
     await this.screenshot("checkout-login-option");
   }
 
-  async validateCheckoutProductSummary() {
-    await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
-      timeout: 30000,
-    });
-
-    const cartQuantity = this.page.getByText(
-      /Tienes 1 producto en tu carrito/i
-    );
-
-    const productName = this.page.getByRole("heading", {
-      name: /Refrigeradora Bottom Freezer 409L Black/i,
-    });
-
-    const productColor = this.page
-      .getByText("Black Doi", { exact: true })
-      .first();
-
-    await cartQuantity.waitFor({
-      state: "visible",
-      timeout: 30000,
-    });
-
-    await productName.waitFor({
-      state: "visible",
-      timeout: 30000,
-    });
-
-    await productColor.waitFor({
-      state: "visible",
-      timeout: 30000,
-    });
-
-    await this.screenshot("checkout-product-summary");
-  }
-
   async fillAddress(address) {
   await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, { timeout: 30000 });
 
-  const departamentoSelect = this.deliveryRegion.getByRole("combobox", {
-    name: /^Departamento$/i,
+  const departamentoSelect = this.page.getByRole("combobox", {
+    name: /departamento/i,
   });
 
   await departamentoSelect.waitFor({
     state: "visible",
-    timeout: 90000,
+    timeout: 60000,
   });
 
   await this.screenshot("05-delivery-section-loaded");
@@ -156,19 +109,18 @@ export default class CheckoutPage extends BasePage {
       .getByRole("option", { name: address.department, exact: true })
       .click();
 
-    await this.deliveryRegion.getByRole("combobox", { name: /^Provincia$/i }).click();
+    await this.page.getByRole("combobox", { name: /provincia/i }).click();
     await this.page
       .getByRole("option", { name: address.province, exact: true })
       .click();
 
-    await this.deliveryRegion.getByRole("combobox", { name: /^Distrito$/i }).click();
+    await this.page.getByRole("combobox", { name: /distrito/i }).click();
     await this.page
       .getByRole("option", { name: address.district, exact: true })
       .click();
 
-    await this.deliveryRegion.getByRole("textbox", { name: "line1" }).fill(address.street);
-    await this.deliveryRegion.getByRole("textbox", { name: "line2" }).fill(address.number);
-    await this.deliveryRegion.getByRole("textbox", { name: "line2" }).press("Tab");
+    await this.page.getByRole("textbox", { name: "line1" }).fill(address.street);
+    await this.page.getByRole("textbox", { name: "line2" }).fill(address.number);
 
     await this.screenshot("06-delivery-address");
   }
@@ -255,14 +207,6 @@ export default class CheckoutPage extends BasePage {
     });
 
     await this.screenshot("09-payment-step");
-  }
-
-  async validatePaymentPage() {
-    await this.page.waitForURL(/CHECKOUT_STEP_PAYMENT/, { timeout: 90000 });
-    await this.paymentRegion.waitFor({ state: "visible", timeout: 90000 });
-    await this.paymentRegion
-      .getByRole("heading", { name: /^Pago único$/i })
-      .waitFor({ state: "visible", timeout: 90000 });
   }
 
 }

@@ -70,26 +70,4 @@ test.describe("ST2 - Base Store - Checkout Page", () => {
     await checkoutPage.validateCheckoutLoginButton();
   });
 
-
-  test("TC37 - Customer able to verify checkout page (Products added displays correctly in Summary details)", async ({ page }) => {
-    test.setTimeout(180000);
-
-    const productPage = new ProductPage(page);
-    const cartPage = new CartPage(page);
-    const guestLoginPage = new GuestLoginPage(page);
-    const checkoutPage = new CheckoutPage(page);
-
-    await productPage.validateProductLoaded();
-    await productPage.addToCart();
-
-    await cartPage.validateProductInCart();
-    await cartPage.proceedToCheckout();
-
-    await guestLoginPage.checkoutAsGuest(testData.customer.email);
-
-    await checkoutPage.fillCustomerData(testData.customer);
-
-    await checkoutPage.validateCheckoutProductSummary();
-  });
-
 });

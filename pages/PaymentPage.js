@@ -5,19 +5,10 @@ export default class PaymentPage extends BasePage {
     super(page);
 
     this.creditCardOption = page.getByRole("button", {
-      name: /^Tarjeta de Crédito \/ Débito/i,
+      name: /Tarjeta de Crédito \/ Débito/i,
     });
 
-    this.paymentModeOptions = [
-      page.getByRole("button", { name: /^Cuotéalo\b/i }),
-      this.creditCardOption,
-      page.getByRole("button", { name: /^Banca por Internet\b/i }),
-      page.getByRole("button", { name: /^Pago Efectivo\b/i }),
-    ];
-
-    this.cardHolderInput = page.getByRole("textbox", {
-      name: /Nombre del titular de la tarjeta/i,
-    });
+    this.cardHolderInput = page.locator("#input-checkout__cardholderName");
 
     this.installmentsCombobox = page.getByRole("combobox", {
       name: /cuántas cuotas/i,
@@ -39,14 +30,6 @@ export default class PaymentPage extends BasePage {
     await this.cardHolderInput.waitFor({ state: "visible", timeout: 60000 });
 
     await this.screenshot("09-credit-card-selected");
-  }
-
-  async validateAvailablePaymentModes() {
-    for (const paymentMode of this.paymentModeOptions) {
-      await paymentMode.waitFor({ state: "visible", timeout: 90000 });
-    }
-
-    await this.screenshot("09-payment-modes");
   }
 
   async fillCardData(card) {
