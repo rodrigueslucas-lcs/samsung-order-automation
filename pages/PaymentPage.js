@@ -130,6 +130,24 @@ export default class PaymentPage extends BasePage {
     await this.screenshot("09-payment-modes");
   }
 
+  async navigateBackToCart() {
+    const editCartLink = this.page.locator('a[href="/pe/cart"]').first();
+
+    await editCartLink.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await editCartLink.scrollIntoViewIfNeeded();
+
+    await Promise.all([
+      this.page.waitForURL(/\/pe\/cart/, {
+        timeout: 60000,
+      }),
+      editCartLink.click(),
+    ]);
+  }
+
   async selectCreditCard() {
     await this.creditCardOption.click();
 
