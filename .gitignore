@@ -13,3 +13,4 @@ evidence/screenshots/*.png
 
 # Playwright runtime evidence
 evidence/screenshots/*.png
+evidence/screenshots/
