@@ -36,7 +36,7 @@
 | 11 | MyAccount Page | Customer able to verify the populated address is same on what is default address for shipping & billing in the Profile Setting. | ⬜ Pending | — | — |
 | 12 | MyAccount Page | Customer able to see Order List/ Order Details in My Orders Page. | ⬜ Pending | — | — |
 | 13 | MyAccount Page | Customer able to verify Tracking Order Page (Includes Guest) | ⬜ Pending | — | — |
-| 14 | Home Page | Customer able to see Homepage Attributes (Header, Hero banner, Top seller carousel, Footer) | ⬜ Pending | — | — |
+| 14 | Home Page | Customer able to see Homepage Attributes (Header, Hero banner, Top seller carousel, Footer) | ⚠️ Partial | `tests/st2/base-store/home/home.spec.js` | Header and Footer available; Hero banner and Top seller carousel are not rendered in current ST2 Home |
 | 15 | Cart Page | Customer able to see the Cart Page | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
 | 16 | Cart Page | Customer able to verify cart page (Products added displays correctly) | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
 | 17 | Cart Page | Customer able to increase and decrease the quantity (or remove products) | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
