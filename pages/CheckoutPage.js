@@ -151,59 +151,86 @@ export default class CheckoutPage extends BasePage {
   }
 
   async continueToPayment() {
-    await this.paymentContinueButton.scrollIntoViewIfNeeded();
-    await this.paymentContinueButton.click();
+    const creditCardButton = this.page.getByRole("button", {
+      name: /Tarjeta de Crédito \/ Débito/i,
+    });
 
     const deliveryAlert = this.page.getByRole("alert").filter({
       hasText: /Por favor, selecciona una opción de entrega/i,
     });
 
-    const creditCardButton = this.page.getByRole("button", {
-      name: /Tarjeta de Crédito \/ Débito/i,
-    });
+    for (let attempt = 1; attempt <= 8; attempt++) {
+      // Payment já abriu.
+      if (await creditCardButton.isVisible().catch(() => false)) {
+        break;
+      }
 
-    try {
-      await deliveryAlert.waitFor({
-        state: "visible",
-        timeout: 5000,
-      });
+      // Se o ST2 reclamar da entrega, reseleciona o shipping.
+      if (await deliveryAlert.isVisible().catch(() => false)) {
+        const shippingOption = this.page
+          .getByRole("listitem")
+          .filter({ hasText: /Para envíos a provincias/i })
+          .first();
 
-      const shippingOption = this.page
-        .locator(".delivery-mode-tab.button-style")
-        .filter({ hasText: /Envío regular/i })
-        .first();
+        await shippingOption.scrollIntoViewIfNeeded();
 
-      await shippingOption.scrollIntoViewIfNeeded();
-      await shippingOption.click();
-
-      await this.page
-        .locator(".delivery-mode-tab.button-style.selected-mode")
-        .filter({ hasText: /Envío regular/i })
-        .waitFor({
-          state: "visible",
-          timeout: 30000,
+        await shippingOption.click({
+          force: true,
+          position: { x: 50, y: 20 },
         });
 
-      await this.paymentContinueButton.scrollIntoViewIfNeeded();
-      await this.paymentContinueButton.click();
+        await this.page
+          .locator(".delivery-mode-tab.button-style.selected-mode")
+          .filter({ hasText: /Envío regular/i })
+          .waitFor({
+            state: "visible",
+            timeout: 30000,
+          });
+      }
+
+      // A página pode ter mudado para Payment durante a reseleção.
+      if (await creditCardButton.isVisible().catch(() => false)) {
+        break;
+      }
+
+      const continueButton = this.page.getByRole("button", {
+        name: /continuar con los métodos de pago/i,
+      });
+
+      // Espera curta porque durante esse período Payment pode carregar.
+      try {
+        await continueButton.waitFor({
+          state: "visible",
+          timeout: 5000,
+        });
+      } catch {
+        if (await creditCardButton.isVisible().catch(() => false)) {
+          break;
+        }
+
+        continue;
+      }
+
+      await continueButton.scrollIntoViewIfNeeded();
+      await continueButton.click();
 
       try {
         await creditCardButton.waitFor({
           state: "visible",
-          timeout: 2000,
+          timeout: 5000,
         });
-      } catch {
-        await this.paymentContinueButton.scrollIntoViewIfNeeded();
-        await this.paymentContinueButton.click();
-      }
 
-    } catch {
-      // Segue normalmente se o alerta não aparecer.
+        break;
+      } catch {
+        // Continua o loop.
+        // Se aparecer alerta, reseleciona shipping.
+        // Se não, tenta o botão Continuar novamente.
+      }
     }
 
     await creditCardButton.waitFor({
       state: "visible",
-      timeout: 90000,
+      timeout: 30000,
     });
 
     await this.screenshot("09-payment-step");
