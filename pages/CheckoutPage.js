@@ -352,6 +352,118 @@ export default class CheckoutPage extends BasePage {
     await this.screenshot("checkout-postal-code-input");
   }
 
+  async validateGuestCannotSaveAddress() {
+    await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
+      timeout: 30000,
+    });
+
+    const deliveryRegion = this.page.getByRole("region", {
+      name: /2\. Dirección de entrega/i,
+    });
+
+    await deliveryRegion.waitFor({
+      state: "visible",
+      timeout: 60000,
+    });
+
+    const saveAddressCheckbox = deliveryRegion.getByRole("checkbox", {
+      name: /guardar.*direcci|save.*address/i,
+    });
+
+    const saveAddressButton = deliveryRegion.getByRole("button", {
+      name: /guardar.*direcci|save.*address/i,
+    });
+
+    const saveAddressText = deliveryRegion.getByText(
+      /guardar.*direcci|save.*address/i
+    );
+
+    const checkboxCount = await saveAddressCheckbox.count();
+    const buttonCount = await saveAddressButton.count();
+    const textCount = await saveAddressText.count();
+
+    if (checkboxCount > 0 || buttonCount > 0 || textCount > 0) {
+      throw new Error(
+        "Guest checkout exposes an option to save the address."
+      );
+    }
+
+    await this.screenshot("checkout-guest-no-save-address");
+  }
+
+  async validateAvailableDeliveryModes() {
+    await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
+      timeout: 30000,
+    });
+
+    const deliveryTitle = this.page.getByRole("heading", {
+      name: /Escoge tu método de envío/i,
+    });
+
+    await deliveryTitle.waitFor({
+      state: "visible",
+      timeout: 60000,
+    });
+
+    const regularLima = this.page
+      .getByRole("listitem")
+      .filter({ hasText: /Para envíos a Lima/i });
+
+    const regularProvince = this.page
+      .getByRole("listitem")
+      .filter({ hasText: /Para envíos a provincias/i });
+
+    const scheduledDelivery = this.page
+      .getByRole("listitem")
+      .filter({ hasText: /Agenda tu envío/i });
+
+    await regularLima.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await regularProvince.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await scheduledDelivery.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await this.screenshot("checkout-available-delivery-modes");
+  }
+
+  async validateDeliveryModeSelection() {
+    await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
+      timeout: 30000,
+    });
+
+    const shippingOption = this.page
+      .getByRole("listitem")
+      .filter({ hasText: /Para envíos a provincias/i })
+      .first();
+
+    await shippingOption.scrollIntoViewIfNeeded();
+
+    await shippingOption.click({
+      force: true,
+      position: { x: 50, y: 20 },
+    });
+
+    const selectedMode = this.page
+      .locator(".delivery-mode-tab.button-style.selected-mode")
+      .filter({ hasText: /Envío regular/i });
+
+    await selectedMode.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await this.screenshot("checkout-selected-delivery-mode");
+  }
+
   async validateCheckoutPriceBreakdown() {
     await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
       timeout: 30000,

@@ -70,9 +70,9 @@
 | 45 | Checkout Page | Customer able to input any City: | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed - Distrito validated as City for Peru |
 | 46 | Checkout Page | Customer able to input any Province: | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
 | 47 | Checkout Page | Customer able to input any Postal Code: | ➖ Not Applicable | — | Postal Code field is not available in ST2 Peru Delivery or Billing UI |
-| 48 | Checkout Page | Cannot save the address as a guest user | ⬜ Pending | — | — |
-| 49 | Checkout Page | Customer able see available delivery mode | ⬜ Pending | — | — |
-| 50 | Checkout Page | Customer able to select delivery mode | ⬜ Pending | — | — |
+| 48 | Checkout Page | Cannot save the address as a guest user | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed - Guest checkout does not expose save-address option |
+| 49 | Checkout Page | Customer able see available delivery mode | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
+| 50 | Checkout Page | Customer able to select delivery mode | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
 | 51 | Checkout Page | Customer able to select Date & Time to the delivery calendar (If applicable or there is available data) | ⬜ Pending | — | — |
 | 52 | Checkout Page | Customer able to see the Footer for Cart Page | ⬜ Pending | — | — |
 | 53 | Checkout Page | Customer able to navigate to Payment Page, when click the BuyNow Button. | ✅ Automated | `tests/st2/base-store/payment/payment.spec.js` | Passed |
