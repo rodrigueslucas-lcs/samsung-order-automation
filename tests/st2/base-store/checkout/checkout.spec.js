@@ -286,4 +286,33 @@ test.describe("ST2 - Base Store - Checkout Page", () => {
     await checkoutPage.validateDeliveryModeSelection();
   });
 
+
+  test("TC51 - Customer able to select Date & Time to the delivery calendar", async () => {
+    test.skip(
+      true,
+      "TC51 is not applicable with current ST2 Peru data: Agenda tu envío is available for supported Lima addresses, but ST2 returns no delivery dates or time slots."
+    );
+  });
+
+
+  test("TC52 - Customer able to see the Footer for Cart Page", async ({ page }) => {
+    test.setTimeout(180000);
+
+    const productPage = new ProductPage(page);
+    const cartPage = new CartPage(page);
+    const guestLoginPage = new GuestLoginPage(page);
+    const checkoutPage = new CheckoutPage(page);
+
+    await productPage.validateProductLoaded();
+    await productPage.addToCart();
+
+    await cartPage.validateProductInCart();
+    await cartPage.proceedToCheckout();
+
+    await guestLoginPage.checkoutAsGuest(testData.customer.email);
+    await checkoutPage.fillCustomerData(testData.customer);
+
+    await checkoutPage.validateCheckoutFooter();
+  });
+
 });

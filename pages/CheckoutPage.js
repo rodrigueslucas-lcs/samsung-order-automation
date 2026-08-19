@@ -464,6 +464,52 @@ export default class CheckoutPage extends BasePage {
     await this.screenshot("checkout-selected-delivery-mode");
   }
 
+  async validateCheckoutFooter() {
+    await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
+      timeout: 30000,
+    });
+
+    const paymentMethodsHeading = this.page.getByRole("heading", {
+      name: /Formas de pago:/i,
+    });
+
+    const supportText = this.page.getByText(
+      /Para cualquier consulta sobre su compra/i
+    );
+
+    const returnsLink = this.page.getByRole("link", {
+      name: /política de devolución o cancelación/i,
+    });
+
+    const deliveryLink = this.page.getByRole("link", {
+      name: /fecha estimada de entrega/i,
+    });
+
+    await paymentMethodsHeading.scrollIntoViewIfNeeded();
+
+    await paymentMethodsHeading.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await supportText.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await returnsLink.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await deliveryLink.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await this.screenshot("checkout-footer");
+  }
+
   async validateCheckoutPriceBreakdown() {
     await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
       timeout: 30000,

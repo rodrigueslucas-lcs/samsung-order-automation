@@ -70,11 +70,11 @@
 | 45 | Checkout Page | Customer able to input any City: | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed - Distrito validated as City for Peru |
 | 46 | Checkout Page | Customer able to input any Province: | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
 | 47 | Checkout Page | Customer able to input any Postal Code: | ➖ Not Applicable | — | Postal Code field is not available in ST2 Peru Delivery or Billing UI |
-| 48 | Checkout Page | Cannot save the address as a guest user | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed - Guest checkout does not expose save-address option |
+| 48 | Checkout Page | Cannot save the address as a guest user | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
 | 49 | Checkout Page | Customer able see available delivery mode | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
 | 50 | Checkout Page | Customer able to select delivery mode | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
-| 51 | Checkout Page | Customer able to select Date & Time to the delivery calendar (If applicable or there is available data) | ⬜ Pending | — | — |
-| 52 | Checkout Page | Customer able to see the Footer for Cart Page | ⬜ Pending | — | — |
+| 51 | Checkout Page | Customer able to select Date & Time to the delivery calendar (If applicable or there is available data) | ➖ Not Applicable | — | Current ST2 data returns no delivery dates or time slots for Agenda tu envío |
+| 52 | Checkout Page | Customer able to see the Footer for Cart Page | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
 | 53 | Checkout Page | Customer able to navigate to Payment Page, when click the BuyNow Button. | ✅ Automated | `tests/st2/base-store/payment/payment.spec.js` | Passed |
 | 54 | Payment Page | Customer able to see the Payment Page | ✅ Automated | `tests/st2/base-store/payment/payment.spec.js` | Passed |
 | 55 | Payment Page | Customer able to see the price break down. | ✅ Automated | `tests/st2/base-store/payment/payment.spec.js` | Passed |
