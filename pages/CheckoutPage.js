@@ -144,6 +144,214 @@ export default class CheckoutPage extends BasePage {
     await this.screenshot("checkout-product-summary");
   }
 
+  async validateAddressInput(address) {
+    await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
+      timeout: 30000,
+    });
+
+    const addressInput = this.page.getByRole("textbox", {
+      name: "line1",
+    });
+
+    await addressInput.waitFor({
+      state: "visible",
+      timeout: 60000,
+    });
+
+    await addressInput.fill("");
+    await addressInput.fill(address);
+
+    const value = await addressInput.inputValue();
+
+    if (value !== address) {
+      throw new Error(
+        `Address was not populated correctly. Expected: ${address} | Actual: ${value}`
+      );
+    }
+
+    await this.screenshot("checkout-address-input");
+  }
+
+  async validateAddressLine2Input(value) {
+    await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
+      timeout: 30000,
+    });
+
+    const addressLine2Input = this.page.getByRole("textbox", {
+      name: "apartment",
+    });
+
+    await addressLine2Input.waitFor({
+      state: "visible",
+      timeout: 60000,
+    });
+
+    await addressLine2Input.fill("");
+    await addressLine2Input.fill(value);
+
+    const actualValue = await addressLine2Input.inputValue();
+
+    if (actualValue !== value) {
+      throw new Error(
+        `Address line 2 was not populated correctly. Expected: ${value} | Actual: ${actualValue}`
+      );
+    }
+
+    await this.screenshot("checkout-address-line2-input");
+  }
+
+  async validateCityInput(address) {
+    await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
+      timeout: 30000,
+    });
+
+    const departamento = this.page.getByRole("combobox", {
+      name: "Departamento",
+    });
+
+    const provincia = this.page.getByRole("combobox", {
+      name: "Provincia",
+    });
+
+    const distrito = this.page.getByRole("combobox", {
+      name: "Distrito",
+    });
+
+    await departamento.waitFor({
+      state: "visible",
+      timeout: 60000,
+    });
+
+    await departamento.click();
+    await this.page
+      .getByRole("option", {
+        name: address.department,
+        exact: true,
+      })
+      .click();
+
+    await provincia.click();
+    await this.page
+      .getByRole("option", {
+        name: address.province,
+        exact: true,
+      })
+      .click();
+
+    await distrito.click();
+    await this.page
+      .getByRole("option", {
+        name: address.district,
+        exact: true,
+      })
+      .click();
+
+    const selectedDistrict = distrito.locator(
+      ".mat-mdc-select-min-line"
+    );
+
+    await selectedDistrict.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    const selectedDistrictText = (
+      await selectedDistrict.textContent()
+    )?.trim();
+
+    if (selectedDistrictText !== address.district) {
+      throw new Error(
+        `District was not selected correctly. Expected: ${address.district} | Actual: ${selectedDistrictText}`
+      );
+    }
+
+    await this.screenshot("checkout-city-input");
+  }
+
+  async validateProvinceInput(address) {
+    await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
+      timeout: 30000,
+    });
+
+    const departamento = this.page.getByRole("combobox", {
+      name: "Departamento",
+    });
+
+    const provincia = this.page.getByRole("combobox", {
+      name: "Provincia",
+    });
+
+    await departamento.waitFor({
+      state: "visible",
+      timeout: 60000,
+    });
+
+    await departamento.click();
+    await this.page
+      .getByRole("option", {
+        name: address.department,
+        exact: true,
+      })
+      .click();
+
+    await provincia.click();
+    await this.page
+      .getByRole("option", {
+        name: address.province,
+        exact: true,
+      })
+      .click();
+
+    const selectedProvince = provincia.locator(
+      ".mat-mdc-select-min-line"
+    );
+
+    await selectedProvince.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    const selectedProvinceText = (
+      await selectedProvince.textContent()
+    )?.trim();
+
+    if (selectedProvinceText !== address.province) {
+      throw new Error(
+        `Province was not selected correctly. Expected: ${address.province} | Actual: ${selectedProvinceText}`
+      );
+    }
+
+    await this.screenshot("checkout-province-input");
+  }
+
+  async validatePostalCodeInput(address) {
+    await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
+      timeout: 30000,
+    });
+
+    const postalCode = this.page.getByRole("textbox", {
+      name: /postal|código postal/i,
+    });
+
+    await postalCode.waitFor({
+      state: "visible",
+      timeout: 60000,
+    });
+
+    await postalCode.fill("");
+    await postalCode.fill(address.postalCode);
+
+    const actualValue = await postalCode.inputValue();
+
+    if (actualValue !== String(address.postalCode)) {
+      throw new Error(
+        `Postal Code was not populated correctly. Expected: ${address.postalCode} | Actual: ${actualValue}`
+      );
+    }
+
+    await this.screenshot("checkout-postal-code-input");
+  }
+
   async validateCheckoutPriceBreakdown() {
     await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
       timeout: 30000,

@@ -8,7 +8,7 @@
 
 | Scope | Total | Automated | Partial | Blocked | Pending |
 |---|---:|---:|---:|---:|---:|
-| Base Store | 83 | 17 | 1 | 1 | 64 |
+| Base Store | 83 | 21 | 1 | 1 | 59 |
 | EPP | ~60 | 0 | 0 | 0 | ~60 |
 
 ### Status Legend
@@ -65,11 +65,11 @@
 | 40 | Checkout Page | Customer able to saved address in checkout page and Verify it on the profile-setting. | ⬜ Pending | — | — |
 | 41 | Checkout Page | Customer Able to enter different addresses for shipping and billing: | ⬜ Pending | — | — |
 | 42 | Checkout Page | Customer able to input any Phone Number | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
-| 43 | Checkout Page | Customer able to input any Address: | ⬜ Pending | — | — |
-| 44 | Checkout Page | Customer able to input any Address line 2 (Optional): | ⬜ Pending | — | — |
-| 45 | Checkout Page | Customer able to input any City: | ⬜ Pending | — | — |
-| 46 | Checkout Page | Customer able to input any Province: | ⬜ Pending | — | — |
-| 47 | Checkout Page | Customer able to input any Postal Code: | ⬜ Pending | — | — |
+| 43 | Checkout Page | Customer able to input any Address: | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
+| 44 | Checkout Page | Customer able to input any Address line 2 (Optional): | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
+| 45 | Checkout Page | Customer able to input any City: | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed - Distrito validated as City for Peru |
+| 46 | Checkout Page | Customer able to input any Province: | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
+| 47 | Checkout Page | Customer able to input any Postal Code: | ➖ Not Applicable | — | Postal Code field is not available in ST2 Peru Delivery or Billing UI |
 | 48 | Checkout Page | Cannot save the address as a guest user | ⬜ Pending | — | — |
 | 49 | Checkout Page | Customer able see available delivery mode | ⬜ Pending | — | — |
 | 50 | Checkout Page | Customer able to select delivery mode | ⬜ Pending | — | — |
