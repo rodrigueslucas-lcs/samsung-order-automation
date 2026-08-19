@@ -90,6 +90,87 @@ export default class CheckoutPage extends BasePage {
     await this.screenshot("checkout-login-option");
   }
 
+  async validateCheckoutProductSummary() {
+    await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
+      timeout: 30000,
+    });
+
+    const cartQuantity = this.page
+      .getByText(/Tienes 1 producto en tu carrito/i)
+      .first();
+
+    const productName = this.page.getByRole("heading", {
+      name: /Refrigeradora Bottom Freezer 409L Black/i,
+    }).first();
+
+    const productColor = this.page
+      .getByText("Black Doi", { exact: true })
+      .first();
+
+    await cartQuantity.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await productName.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await productColor.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await this.screenshot("checkout-product-summary");
+  }
+
+  async validateCheckoutPriceBreakdown() {
+    await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
+      timeout: 30000,
+    });
+
+    const orderSummary = this.page.getByRole("heading", {
+      name: /Resumen de la orden/i,
+    });
+
+    const subtotalLabel = this.page
+      .getByText("Subtotal", { exact: true })
+      .first();
+
+    const totalHeading = this.page.getByRole("heading", {
+      name: /^Total$/i,
+    }).first();
+
+    await orderSummary.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await subtotalLabel.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await totalHeading.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    const subtotalText = await subtotalLabel.locator("..").textContent();
+    const totalText = await totalHeading.locator("..").textContent();
+
+    if (!subtotalText || !/S\/\s*[\d,.]+/.test(subtotalText)) {
+      throw new Error(`Subtotal inválido no Checkout: ${subtotalText}`);
+    }
+
+    if (!totalText || !/S\/\s*[\d,.]+/.test(totalText)) {
+      throw new Error(`Total inválido no Checkout: ${totalText}`);
+    }
+
+    await this.screenshot("checkout-price-breakdown");
+  }
+
   async fillAddress(address) {
   await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, { timeout: 30000 });
 
