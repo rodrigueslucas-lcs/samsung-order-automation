@@ -112,4 +112,24 @@ test.describe("ST2 - Base Store - Checkout Page", () => {
     await checkoutPage.validateCheckoutPriceBreakdown();
   });
 
+
+  test("TC42 - Customer able to input any Phone Number", async ({ page }) => {
+    test.setTimeout(180000);
+
+    const productPage = new ProductPage(page);
+    const cartPage = new CartPage(page);
+    const guestLoginPage = new GuestLoginPage(page);
+    const checkoutPage = new CheckoutPage(page);
+
+    await productPage.validateProductLoaded();
+    await productPage.addToCart();
+
+    await cartPage.validateProductInCart();
+    await cartPage.proceedToCheckout();
+
+    await guestLoginPage.checkoutAsGuest(testData.customer.email);
+
+    await checkoutPage.validatePhoneNumberInput(testData.customer.phone);
+  });
+
 });

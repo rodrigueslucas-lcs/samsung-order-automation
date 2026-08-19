@@ -45,6 +45,25 @@ export default class CheckoutPage extends BasePage {
     await this.screenshot("05-delivery-step");
   }
 
+  async validatePhoneNumberInput(phone) {
+    await this.page.waitForURL(/CHECKOUT_STEP_CONTACT_INFO/, {
+      timeout: 30000,
+    });
+
+    await this.phoneInput.fill("");
+    await this.phoneInput.fill(phone);
+
+    const value = await this.phoneInput.inputValue();
+
+    if (value !== phone) {
+      throw new Error(
+        `Phone number was not populated correctly. Expected: ${phone} | Actual: ${value}`
+      );
+    }
+
+    await this.screenshot("checkout-phone-number");
+  }
+
   async validateCheckoutAddressPage() {
     await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
       timeout: 30000,

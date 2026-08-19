@@ -302,3 +302,9 @@ The architecture is being prepared to expand coverage without duplicating the co
 
 **Lucas Rodrigues**  
 QA Engineer
+
+## Automation Coverage
+
+The current ST2 Peru Detailed Smoke automation status is tracked in:
+
+[Coverage Matrix](docs/COVERAGE_MATRIX.md)
