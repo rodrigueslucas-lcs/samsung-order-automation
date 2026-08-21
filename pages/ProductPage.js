@@ -150,4 +150,157 @@ export default class ProductPage extends BasePage {
       }
     }
   }
+
+
+  async validatePdpDetails() {
+
+    const main = this.page.getByRole("main");
+
+    const productTitle = main.getByRole("heading", {
+
+      name: /Refrigeradora Bottom Freezer 409L Black/i,
+
+    }).last();
+
+    const sku = main.getByText("RB45DG6300B1PE", {
+
+      exact: true,
+
+    });
+
+    const addToCartButton = main.getByRole("button", {
+
+      name: "Agregar al carrito",
+
+      exact: true,
+
+    }).first();
+
+    await productTitle.waitFor({
+
+      state: "visible",
+
+      timeout: 30000,
+
+    });
+
+    await sku.waitFor({
+
+      state: "visible",
+
+      timeout: 30000,
+
+    });
+
+    await addToCartButton.waitFor({
+
+      state: "visible",
+
+      timeout: 30000,
+
+    });
+
+    // =========================
+
+    // Product Gallery
+
+    // =========================
+
+    const gallerySlides = main.getByRole("tab", {
+
+      name: /Slide \d+ of \d+/i,
+
+    });
+
+    const slideCount = await gallerySlides.count();
+
+    if (slideCount < 1) {
+
+      throw new Error("PDP gallery slides were not found.");
+
+    }
+
+    const nextButton = main.getByRole("button", {
+
+      name: "Next",
+
+      exact: true,
+
+    });
+
+    await nextButton.waitFor({
+
+      state: "visible",
+
+      timeout: 30000,
+
+    });
+
+    // =========================
+
+    // Specifications
+
+    // =========================
+
+    const specifications = main.getByRole("heading", {
+
+      name: "Specifications",
+
+      exact: true,
+
+    });
+
+    await specifications.scrollIntoViewIfNeeded();
+
+    await specifications.waitFor({
+
+      state: "visible",
+
+      timeout: 30000,
+
+    });
+
+    // =========================
+
+    // Recommendations
+
+    // =========================
+
+    const recommendations = main.getByRole("heading", {
+
+      name: "Frequently bought together",
+
+      exact: true,
+
+    });
+
+    await recommendations.scrollIntoViewIfNeeded();
+
+    await recommendations.waitFor({
+
+      state: "visible",
+
+      timeout: 30000,
+
+    });
+
+    const recommendedMicrowave = main.getByRole("link", {
+
+      name: /MICROONDAS/i,
+
+    }).first();
+
+    await recommendedMicrowave.waitFor({
+
+      state: "visible",
+
+      timeout: 30000,
+
+    });
+
+    await this.screenshot("pdp-details-gallery-specifications-recommendations");
+
+  }
+
+
 }

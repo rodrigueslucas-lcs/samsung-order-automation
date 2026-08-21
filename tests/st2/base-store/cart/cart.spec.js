@@ -113,4 +113,76 @@ test.describe("ST2 - Base Store - Cart Page", () => {
       });
   });
 
+
+
+  test("TC22 - Customer able to see the Footer for Cart Page", async ({ page }) => {
+
+    test.setTimeout(180000);
+
+    const productPage = new ProductPage(page);
+
+    const cartPage = new CartPage(page);
+
+    await productPage.validateProductLoaded();
+
+    await productPage.addToCart();
+
+    await cartPage.validateProductInCart();
+
+    await cartPage.validateCartFooter();
+
+  });
+
+
+ test("TC21 - Customer able to see external services such Trade-in or Samsung Care Plus.", async ({ page }) => {
+   test.setTimeout(180000);
+   const productPage = new ProductPage(page);
+   const cartPage = new CartPage(page);
+   await productPage.validateProductLoaded();
+   await productPage.addToCart();
+   await cartPage.validateProductInCart();
+   await cartPage.validateExternalServicesVisible();
+ });
+
+
+  test("TC28 - Customer able to click the Samsung Care Plus Button", async ({ page }) => {
+
+    test.setTimeout(180000);
+
+    const productPage = new ProductPage(page);
+
+    const cartPage = new CartPage(page);
+
+    await productPage.validateProductLoaded();
+
+    await productPage.addToCart();
+
+    await cartPage.validateProductInCart();
+
+    await cartPage.validateSamsungCareButton();
+
+  });
+
+
+ test("TC29 - Customer able to navigate on Pop-up Customer Journey in adding Samsung Care Plus.", async ({ page }) => {
+   test.setTimeout(180000);
+   const productPage = new ProductPage(page);
+   const cartPage = new CartPage(page);
+   await productPage.validateProductLoaded();
+   await productPage.addToCart();
+   await cartPage.validateProductInCart();
+   await cartPage.validateSamsungCareJourney();
+ });
+
+ test("Cart - available payment methods are displayed", async ({ page }) => {
+   test.setTimeout(180000);
+   const productPage = new ProductPage(page);
+   const cartPage = new CartPage(page);
+   await productPage.validateProductLoaded();
+   await productPage.addToCart();
+   await cartPage.openCart();
+   await cartPage.validateCartPage();
+   await cartPage.validateProductInCart();
+   await cartPage.validateCartPaymentMethods();
+ });
 });

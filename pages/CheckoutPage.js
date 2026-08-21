@@ -702,4 +702,25 @@ export default class CheckoutPage extends BasePage {
     await this.screenshot("09-payment-step");
   }
 
+
+ async navigateBackToCartFromCheckout() {
+   const editCartLink = this.page.locator('a[href="/pe/cart"]').first();
+   await editCartLink.waitFor({
+     state: "visible",
+     timeout: 30000,
+   });
+   await editCartLink.click();
+   await this.page.waitForURL(/\/pe\/cart/, {
+     timeout: 30000,
+   });
+   const cartMessage = this.page.getByText(
+     /Tienes 1 producto en tu carrito/i
+   );
+   await cartMessage.waitFor({
+     state: "visible",
+     timeout: 30000,
+   });
+   await this.screenshot("checkout-edit-back-to-cart");
+ }
+
 }

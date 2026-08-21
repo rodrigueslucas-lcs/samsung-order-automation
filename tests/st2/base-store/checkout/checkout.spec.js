@@ -315,4 +315,18 @@ test.describe("ST2 - Base Store - Checkout Page", () => {
     await checkoutPage.validateCheckoutFooter();
   });
 
+
+ test("TC61 - Customer able to navigate back to cart from Checkout Page using the Edit button", async ({ page }) => {
+   test.setTimeout(180000);
+   const productPage = new ProductPage(page);
+   const cartPage = new CartPage(page);
+   const guestLoginPage = new GuestLoginPage(page);
+   const checkoutPage = new CheckoutPage(page);
+   await productPage.validateProductLoaded();
+   await productPage.addToCart();
+   await cartPage.validateProductInCart();
+   await cartPage.proceedToCheckout();
+   await guestLoginPage.checkoutAsGuest(testData.customer.email);
+   await checkoutPage.navigateBackToCartFromCheckout();
+ });
 });

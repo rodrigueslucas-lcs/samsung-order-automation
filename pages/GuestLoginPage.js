@@ -45,4 +45,35 @@ export default class GuestLoginPage extends BasePage {
 
     await this.screenshot('04-checkout-contact-info');
   }
+
+ async validateInvalidGuestEmail() {
+   const emailInput = this.page.getByPlaceholder(
+     "Ingresa tu correo para proceder al pago"
+   );
+   const guestCheckoutButton = this.page.getByRole("button", {
+     name: "Checkout como invitado",
+     exact: true,
+   });
+   await emailInput.waitFor({
+     state: "visible",
+     timeout: 30000,
+   });
+   await emailInput.fill("qa-invalid");
+   await emailInput.blur();
+   const validationMessage = this.page.getByText(
+     "Por favor, ingresa un correo válido",
+     { exact: true }
+   );
+   await validationMessage.waitFor({
+     state: "visible",
+     timeout: 30000,
+   });
+   if (await guestCheckoutButton.isEnabled()) {
+     throw new Error(
+       "Guest checkout button should remain disabled for invalid email."
+     );
+   }
+   await this.screenshot("guest-invalid-email-validation");
+ }
+
 }
