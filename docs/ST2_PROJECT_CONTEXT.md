@@ -39,6 +39,26 @@ The add-to-cart endpoint response is sufficient to continue to Cart; wait for SK
 - Do not change locators, waits or checkout flow to mask this response, and do not submit `Place Order` repeatedly looking for a different result.
 - Preserve failure evidence when the defect occurs. Reinvestigate the completion step only after there is evidence that the ST2 fix was deployed.
 
+## Authentication foundation
+
+- Anonymous Home Login uses a JavaScript-triggered OAuth navigation to `account.samsung.com/iam/oauth2/authorize`. The request contains `redirect_uri=https://stg2.shop.samsung.com/pe/login/authorize` and locale `es-PE`; this external navigation is expected.
+- The Samsung Account login page exposes textbox `Dirección de correo electrónico`, checkbox `Recordar mi ID`, button `Siguiente`, button `Iniciar sesión con Google`, QR login and a reCAPTCHA iframe. Google can invoke native Chrome FedCM, and MFA/approval/SMS may be required.
+- Anonymous Register navigates through `https://account.samsung.com/iam/sign-up` and currently settles on `/iam/sign-up/terms`.
+- Use `npm run auth:bootstrap` for a human-assisted login in a dedicated Chrome profile. It completes cookie setup and opens ST2 Home; the user clicks My Profile → Login and completes Samsung Account/FedCM/MFA. The script waits for the callback, verifies `Cerrar sesión`, then writes `playwright/.auth/user.json` with cookies, local storage and IndexedDB.
+- `playwright/.auth/`, `playwright/profiles/` and `.env` must remain ignored. Never store Samsung/Google credentials, MFA, SMS codes, cookies or tokens in fixtures or Git.
+- Authenticated specs should call `requireAuthState()` and configure `test.use({ storageState: AUTH_STATE_PATH })`, then call `validateAuthenticatedSession(page)` before business actions. Missing setup cookies, missing `Cerrar sesión` or a redirect back to Samsung Account mean the state must be regenerated manually.
+- Playwright storage state preserves cookies and local storage, plus IndexedDB when requested; it does not preserve session storage. The bootstrap exports the complete browser-context state, including any Samsung Account and final ST2 cookies, so treat the file as a secret even though no password/OTP is stored in it.
+- Whether the final storefront session is fully reusable without session storage is not yet proven. The dedicated persistent profile supports the human FedCM flow; do not run two bootstrap processes against the same profile because Chrome locks `userDataDir`.
+- Reuse of the generated state remains structurally prepared but unproven until a dedicated QA account completes the bootstrap. Do not mark authenticated TCs Automated before that execution succeeds.
+- Anonymous menu destinations observed on 2026-08-21: `Mis pedidos` → `shop.samsung.com/pe/mypage/orders/`; `Mis productos`, Samsung Rewards and subscriptions lead to `www.samsung.com` production content. Validate those destinations and stop unless an authenticated TC explicitly requires them.
+- Automated Login/Register clicks were not retained: the Angular CDK profile overlay is replaced during dynamic loading and intercepted both isolated tests. The same links worked in direct inspection after the menu animation, but not reliably enough for committed coverage. Keep TC6 Blocked and use the manual menu click in the auth bootstrap.
+
+## Additional product data
+
+- ST2 search autocomplete returned Galaxy S25 FE (`SM-S731BLBLLTP`) and Galaxy S25 Ultra (`SM-S938BZKLLTP`) as related products on 2026-08-21.
+- The S25 Ultra PDP loaded but was sold out and exposed no visible Trade-in, Samsung Care+, Additional Services or recommendation block, so it is not current mass for TC19 or TC23–TC27.
+- The S25 FE PDP was not viable: its ProductPage CMS request returned HTTP 400 and the main content remained empty. Do not retry these two SKUs as service/Trade-in candidates until their ST2 data changes.
+
 ## External services
 
 - The Cart service entry is visually associated with Samsung Care+ and currently has the accessible name `Añadir Servicios Adicionales`.

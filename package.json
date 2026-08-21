@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  "scripts": {},
+  "scripts": {
+    "auth:bootstrap": "node scripts/auth-bootstrap.cjs"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
