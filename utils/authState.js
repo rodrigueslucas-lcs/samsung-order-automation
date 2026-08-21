@@ -1,19 +1,57 @@
-import fs from "node:fs";
-import path from "node:path";
+const fs = require("node:fs");
+const path = require("node:path");
 
-export const AUTH_STATE_PATH = path.resolve("playwright/.auth/user.json");
+const AUTH_STATE_PATH = path.resolve("playwright/.auth/user.json");
+const AUTH_SESSION_STORAGE_PATH = path.resolve(
+  "playwright/.auth/session-storage.json"
+);
+const AUTH_REFRESH_INSTRUCTION =
+  "Run `npm run auth:open-profile`, complete the login in normal Chrome, keep that Chrome open, then run `npm run auth:export` from another terminal.";
 
-export function requireAuthState() {
-  if (!fs.existsSync(AUTH_STATE_PATH)) {
+function requireAuthState() {
+  if (
+    !fs.existsSync(AUTH_STATE_PATH) ||
+    !fs.existsSync(AUTH_SESSION_STORAGE_PATH)
+  ) {
     throw new Error(
-      "Authenticated ST2 state was not found. Run `npm run auth:bootstrap` and complete the Samsung Account login manually."
+      `Authenticated ST2 state was not found. ${AUTH_REFRESH_INSTRUCTION}`
     );
   }
 
   return AUTH_STATE_PATH;
 }
 
-export async function validateAuthenticatedSession(page) {
+async function applyAuthSessionStorage(context) {
+  requireAuthState();
+  const sessionStorage = JSON.parse(
+    fs.readFileSync(AUTH_SESSION_STORAGE_PATH, "utf8")
+  );
+
+  await context.addInitScript(
+    ({ hostname, state }) => {
+      if (window.location.hostname !== hostname) {
+        return;
+      }
+
+      for (const [key, value] of Object.entries(state)) {
+        window.sessionStorage.setItem(key, value);
+      }
+    },
+    {
+      hostname: "stg2.shop.samsung.com",
+      state: sessionStorage,
+    }
+  );
+}
+
+async function validateAuthenticatedSession(page) {
+  await page.goto("https://stg2.shop.samsung.com/getcookie.html", {
+    waitUntil: "domcontentloaded",
+  });
+  await page
+    .getByText(/You can access pages now/i)
+    .waitFor({ state: "visible", timeout: 60000 });
+
   await page.goto("https://stg2.shop.samsung.com/pe/", {
     waitUntil: "domcontentloaded",
   });
@@ -24,7 +62,7 @@ export async function validateAuthenticatedSession(page) {
 
   if (await maintenanceMessage.count()) {
     throw new Error(
-      "The saved ST2 setup cookie is no longer valid. Run `npm run auth:bootstrap` again."
+      `The saved ST2 setup cookie is no longer valid. ${AUTH_REFRESH_INSTRUCTION}`
     );
   }
 
@@ -36,23 +74,37 @@ export async function validateAuthenticatedSession(page) {
   await profileButton.waitFor({ state: "visible", timeout: 60000 });
   await profileButton.click();
 
-  const profileMenu = page
-    .locator(".cdk-overlay-pane")
-    .filter({ visible: true })
-    .getByRole("menu");
-  await profileMenu.waitFor({ state: "visible", timeout: 30000 });
+  const menus = page.getByRole("menu").filter({ visible: true });
+  const leafMenus = menus.filter({ hasNot: page.getByRole("menu") });
+  await leafMenus.waitFor({ state: "visible", timeout: 30000 });
 
-  await profileMenu
-    .locator(".mat-menu-panel-animating")
-    .waitFor({ state: "detached", timeout: 30000 });
+  const authenticatedMenu = leafMenus.filter({
+    has: page.getByText("Cerrar sesión", { exact: true }),
+  });
 
-  const logout = profileMenu.getByText("Cerrar sesión", { exact: true });
+  if (!(await authenticatedMenu.isVisible())) {
+    throw new Error(
+      `The saved Samsung storefront session is expired. ${AUTH_REFRESH_INSTRUCTION}`
+    );
+  }
+
+  const logout = authenticatedMenu.getByText("Cerrar sesión", {
+    exact: true,
+  });
 
   await logout
     .waitFor({ state: "visible", timeout: 30000 })
     .catch(() => {
       throw new Error(
-        "The saved Samsung storefront session is expired. Run `npm run auth:bootstrap` again."
+        `The saved Samsung storefront session is expired. ${AUTH_REFRESH_INSTRUCTION}`
       );
     });
 }
+
+module.exports = {
+  AUTH_STATE_PATH,
+  AUTH_SESSION_STORAGE_PATH,
+  applyAuthSessionStorage,
+  requireAuthState,
+  validateAuthenticatedSession,
+};

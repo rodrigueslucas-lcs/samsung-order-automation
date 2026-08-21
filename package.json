@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "auth:bootstrap": "node scripts/auth-bootstrap.cjs"
+    "auth:open-profile": "node scripts/auth-open-profile.cjs",
+    "auth:export": "node scripts/auth-bootstrap.cjs",
+    "auth:verify": "node scripts/auth-verify.cjs"
   },
   "keywords": [],
   "author": "",
