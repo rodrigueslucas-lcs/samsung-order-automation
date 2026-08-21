@@ -31,9 +31,22 @@ export default class CheckoutPage extends BasePage {
     await this.phoneInput.fill(customer.phone);
 
     await this.documentTypeSelect.click();
-    await this.page.getByText(customer.documentType, { exact: true }).click();
+    await this.page
+      .getByRole("option", { name: customer.documentType, exact: true })
+      .click();
 
     await this.documentNumberInput.fill(customer.documentNumber);
+
+    const documentNumber = await this.documentNumberInput.inputValue();
+    if (documentNumber !== customer.documentNumber) {
+      throw new Error(
+        `Document number was reset after selecting the document type. Expected: ${customer.documentNumber} | Actual: ${documentNumber}`
+      );
+    }
+
+    if (!(await this.customerContinueButton.isEnabled())) {
+      throw new Error("Customer Continue button remained disabled after valid Contact Info.");
+    }
 
     await this.screenshot("04-customer-info");
 
@@ -42,7 +55,103 @@ export default class CheckoutPage extends BasePage {
       this.customerContinueButton.click(),
     ]);
 
+    await this.page
+      .getByRole("heading", { name: /Direcci[oó]n de entrega/i })
+      .waitFor({ state: "visible", timeout: 60000 });
+
     await this.screenshot("05-delivery-step");
+  }
+
+  async validateAuthenticatedDeliveryForm() {
+    const deliveryHeading = this.page.getByRole("heading", {
+      name: /Direcci[oó]n de entrega/i,
+    });
+
+    await deliveryHeading.waitFor({ state: "visible", timeout: 60000 });
+
+    const deliveryRegion = this.page.getByRole("region", {
+      name: /2\. Direcci[oó]n de entrega/i,
+    });
+    const deliveryPanel = deliveryRegion.getByRole("tabpanel", {
+      name: "Envío",
+      exact: true,
+    });
+    const savedAddressMode = deliveryPanel.getByRole("radio", {
+      name: "Dirección guardada",
+      exact: true,
+    });
+    if (!(await savedAddressMode.isChecked())) {
+      await deliveryPanel
+        .locator("span")
+        .getByText("Dirección guardada", { exact: true })
+        .click();
+    }
+    if (!(await savedAddressMode.isChecked())) {
+      throw new Error("Dirección guardada was not selected in authenticated Delivery.");
+    }
+
+    const savedAddress = deliveryPanel.locator(
+      'input[type="radio"][name^="mat-radio-group"]'
+    );
+    await savedAddress.waitFor({ state: "visible", timeout: 30000 });
+
+    const newAddress = deliveryPanel.getByRole("radio", {
+      name: "Nueva dirección",
+      exact: true,
+    });
+    await deliveryPanel
+      .locator("span")
+      .getByText("Nueva dirección", { exact: true })
+      .click();
+    if (!(await newAddress.isChecked())) {
+      throw new Error("Nueva dirección was not selected in authenticated Delivery.");
+    }
+
+    for (const name of ["Departamento", "Provincia", "Distrito"]) {
+      await deliveryPanel
+        .getByRole("combobox", { name })
+        .waitFor({ state: "visible", timeout: 30000 });
+    }
+
+    const saveAddress = deliveryPanel.getByRole("checkbox", {
+      name: /Guardar datos de env[ií]o en Mi cuenta/i,
+    });
+    await saveAddress.waitFor({ state: "visible", timeout: 30000 });
+
+    if (await saveAddress.isChecked()) {
+      await deliveryPanel
+        .getByText("Guardar datos de envío en Mi cuenta", { exact: true })
+        .click();
+    }
+
+    if (await saveAddress.isChecked()) {
+      throw new Error("Save address checkbox remained checked in the safe authenticated smoke.");
+    }
+  }
+
+  async validateAddressValues(address) {
+    const deliveryPanel = this.page.getByRole("tabpanel", {
+      name: "Envío",
+      exact: true,
+    });
+    const expectedValues = [
+      [deliveryPanel.getByRole("combobox", { name: "Departamento" }), address.department],
+      [deliveryPanel.getByRole("combobox", { name: "Provincia" }), address.province],
+      [deliveryPanel.getByRole("combobox", { name: "Distrito" }), address.district],
+      [deliveryPanel.getByRole("textbox", { name: "line1" }), address.street],
+      [deliveryPanel.getByRole("textbox", { name: "line2" }), address.number],
+    ];
+
+    for (const [locator, expected] of expectedValues) {
+      const actual =
+        (await locator.getAttribute("role")) === "combobox"
+          ? (await locator.textContent())?.trim()
+          : await locator.inputValue();
+
+      if (actual !== expected) {
+        throw new Error(`Unexpected Delivery value. Expected: ${expected} | Actual: ${actual}`);
+      }
+    }
   }
 
   async validatePhoneNumberInput(phone) {
@@ -661,7 +770,12 @@ export default class CheckoutPage extends BasePage {
   async fillAddress(address) {
   await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, { timeout: 30000 });
 
-  const departamentoSelect = this.page.getByRole("combobox", {
+  const deliveryPanel = this.page.getByRole("tabpanel", {
+    name: "Envío",
+    exact: true,
+  });
+
+  const departamentoSelect = deliveryPanel.getByRole("combobox", {
     name: /departamento/i,
   });
 
@@ -677,18 +791,18 @@ export default class CheckoutPage extends BasePage {
       .getByRole("option", { name: address.department, exact: true })
       .click();
 
-    await this.page.getByRole("combobox", { name: /provincia/i }).click();
+    await deliveryPanel.getByRole("combobox", { name: /provincia/i }).click();
     await this.page
       .getByRole("option", { name: address.province, exact: true })
       .click();
 
-    await this.page.getByRole("combobox", { name: /distrito/i }).click();
+    await deliveryPanel.getByRole("combobox", { name: /distrito/i }).click();
     await this.page
       .getByRole("option", { name: address.district, exact: true })
       .click();
 
-    await this.page.getByRole("textbox", { name: "line1" }).fill(address.street);
-    await this.page.getByRole("textbox", { name: "line2" }).fill(address.number);
+    await deliveryPanel.getByRole("textbox", { name: "line1" }).fill(address.street);
+    await deliveryPanel.getByRole("textbox", { name: "line2" }).fill(address.number);
 
     await this.screenshot("06-delivery-address");
   }

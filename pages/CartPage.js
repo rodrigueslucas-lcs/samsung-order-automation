@@ -109,6 +109,16 @@ export default class CartPage extends BasePage {
     await this.screenshot('03-guest-login-page');
   }
 
+  async proceedToAuthenticatedCheckout() {
+    await this.continueButton.waitFor({ state: 'visible', timeout: 30000 });
+    await this.continueButton.scrollIntoViewIfNeeded();
+
+    await Promise.all([
+      this.page.waitForURL(/CHECKOUT_STEP_CONTACT_INFO/, { timeout: 60000 }),
+      this.continueButton.click()
+    ]);
+  }
+
 
   async validateCartFooter() {
 

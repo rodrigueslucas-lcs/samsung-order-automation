@@ -8,7 +8,7 @@
 
 | Scope | Total | Automated | Partial | Blocked | Not Applicable | Pending |
 |---|---:|---:|---:|---:|---:|---:|
-| Base Store | 83 | 31 | 1 | 3 | 2 | 46 |
+| Base Store | 83 | 31 | 1 | 5 | 2 | 44 |
 | EPP | ~60 | 0 | 0 | 0 | 0 | ~60 |
 
 ### Status Legend
@@ -29,8 +29,8 @@
 | 4 | Login Page | Customer able to login from Order Confirmation Email (If Applicable) | ⬜ Pending | — | — |
 | 5 | Login Page | Guest Customer, able to place order until Cart Page. Then Customer able to login from Checkout Page. | ⬜ Pending | — | — |
 | 6 | MyAccount Page | Customer able hover on the Profile Icon and verify the Login/Sign-up & MyOrder Page Link. | 🚧 Blocked | — | Login/Register render consistently, but the dynamic `Mis pedidos` item was intermittent: one pass followed by two repeat failures in the same ST2 environment |
-| 7 | MyAccount Page | Customer able to see all the saved shipping and billing addresses in the My Profile Page. | ⬜ Pending | — | — |
-| 8 | MyAccount Page | Customer able to add, edit &delete address for shipping & billing address. | ⬜ Pending | — | — |
+| 7 | MyAccount Page | Customer able to see all the saved shipping and billing addresses in the My Profile Page. | 🚧 Blocked | — | Authenticated user header and Logout are available, but the current ST2 menu exposes no working My Profile/address entry point; the visible user menu item timed out on a normal click |
+| 8 | MyAccount Page | Customer able to add, edit &delete address for shipping & billing address. | 🚧 Blocked | — | The current ST2 UI exposes no working My Profile/address entry point, and no disposable QA address could be identified safely; pre-existing account data was not modified |
 | 9 | MyAccount Page | Customer able to show notification when adding, updating and deleting address for shipping and billing address. | ⬜ Pending | — | — |
 | 10 | MyAccount Page | Customer able to set default address for shipping & billing. | ⬜ Pending | — | — |
 | 11 | MyAccount Page | Customer able to verify the populated address is same on what is default address for shipping & billing in the Profile Setting. | ⬜ Pending | — | — |
@@ -61,8 +61,8 @@
 | 36 | Checkout Page | Customer able to see the Checkout Login button in the Checkout Address Page. | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
 | 37 | Checkout Page | Customer able to verify checkout page (Products added displays correctly in Summary details) | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
 | 38 | Checkout Page | Customer able to verify checkout page for Tax is applied correctly and price break down is displayed properly.(NET price) | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed - PE UI exposes Subtotal/Total |
-| 39 | Checkout Page | Customer able to used save address in checking out. | ⬜ Pending | — | — |
-| 40 | Checkout Page | Customer able to saved address in checkout page and Verify it on the profile-setting. | ⬜ Pending | — | — |
+| 39 | Checkout Page | Customer able to used save address in checking out. | ⬜ Pending | — | Manual authenticated checkout confirms Delivery Address renders after `CHECKOUT_STEP_DELIVERY`; automation synchronization is under investigation |
+| 40 | Checkout Page | Customer able to saved address in checkout page and Verify it on the profile-setting. | ⬜ Pending | — | Manual authenticated checkout exposes `Guardar datos de envío en Mi cuenta`; automation and Profile verification are not yet proven |
 | 41 | Checkout Page | Customer Able to enter different addresses for shipping and billing: | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed - separate Delivery and Billing values validated without advancing to Payment |
 | 42 | Checkout Page | Customer able to input any Phone Number | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
 | 43 | Checkout Page | Customer able to input any Address: | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |

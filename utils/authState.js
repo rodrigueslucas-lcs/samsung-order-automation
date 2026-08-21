@@ -44,6 +44,29 @@ async function applyAuthSessionStorage(context) {
   );
 }
 
+async function validateCurrentPageAuthenticated(page) {
+  const profileButton = page.getByRole("button", {
+    name: "My Profile",
+    exact: true,
+  });
+
+  await profileButton.waitFor({ state: "visible", timeout: 60000 });
+  await page.keyboard.press("Escape");
+  await profileButton.click();
+
+  const logout = page
+    .getByText("Cerrar sesión", { exact: true })
+    .filter({ visible: true });
+
+  await logout
+    .waitFor({ state: "visible", timeout: 30000 })
+    .catch(() => {
+      throw new Error(
+        `The saved Samsung storefront session is expired. ${AUTH_REFRESH_INSTRUCTION}`
+      );
+    });
+}
+
 async function validateAuthenticatedSession(page) {
   await page.goto("https://stg2.shop.samsung.com/getcookie.html", {
     waitUntil: "domcontentloaded",
@@ -66,39 +89,7 @@ async function validateAuthenticatedSession(page) {
     );
   }
 
-  const profileButton = page.getByRole("button", {
-    name: "My Profile",
-    exact: true,
-  });
-
-  await profileButton.waitFor({ state: "visible", timeout: 60000 });
-  await profileButton.click();
-
-  const menus = page.getByRole("menu").filter({ visible: true });
-  const leafMenus = menus.filter({ hasNot: page.getByRole("menu") });
-  await leafMenus.waitFor({ state: "visible", timeout: 30000 });
-
-  const authenticatedMenu = leafMenus.filter({
-    has: page.getByText("Cerrar sesión", { exact: true }),
-  });
-
-  if (!(await authenticatedMenu.isVisible())) {
-    throw new Error(
-      `The saved Samsung storefront session is expired. ${AUTH_REFRESH_INSTRUCTION}`
-    );
-  }
-
-  const logout = authenticatedMenu.getByText("Cerrar sesión", {
-    exact: true,
-  });
-
-  await logout
-    .waitFor({ state: "visible", timeout: 30000 })
-    .catch(() => {
-      throw new Error(
-        `The saved Samsung storefront session is expired. ${AUTH_REFRESH_INSTRUCTION}`
-      );
-    });
+  await validateCurrentPageAuthenticated(page);
 }
 
 module.exports = {
@@ -106,5 +97,6 @@ module.exports = {
   AUTH_SESSION_STORAGE_PATH,
   applyAuthSessionStorage,
   requireAuthState,
+  validateCurrentPageAuthenticated,
   validateAuthenticatedSession,
 };
