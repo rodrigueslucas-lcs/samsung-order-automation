@@ -5,7 +5,6 @@ export default class CartPage extends BasePage {
     super(page);
 
     this.cartUrl = 'https://stg2.shop.samsung.com/pe/cart';
-    this.guestLoginUrl = 'https://stg2.shop.samsung.com/pe/guestlogin/checkout';
 
     this.continueButton = page.getByRole('button', { name: /^continuar$/i });
 
@@ -105,26 +104,9 @@ export default class CartPage extends BasePage {
 
     const guestEmailInput = this.page.getByPlaceholder(/ingresa tu correo/i);
 
-    const reachedGuestLogin = await guestEmailInput
-      .waitFor({ state: 'visible', timeout: 45000 })
-      .then(() => true)
-      .catch(() => false);
+    await guestEmailInput.waitFor({ state: 'visible', timeout: 45000 });
 
-    if (reachedGuestLogin) {
-      await this.screenshot('03-guest-login-page');
-      return;
-    }
-
-    await this.screenshot('02-cart-continue-stuck-loading');
-
-    await this.page.goto(this.guestLoginUrl, {
-      waitUntil: 'domcontentloaded',
-      timeout: 60000
-    });
-
-    await guestEmailInput.waitFor({ state: 'visible', timeout: 30000 });
-
-    await this.screenshot('03-guest-login-page-fallback');
+    await this.screenshot('03-guest-login-page');
   }
 
 
@@ -222,13 +204,19 @@ export default class CartPage extends BasePage {
 
   }
 
+  getAdditionalServicesButton() {
+    return this.page
+      .getByRole("main")
+      .getByRole("button", {
+        name: "Añadir Servicios Adicionales",
+        exact: true,
+      });
+  }
+
 
   async validateExternalServicesVisible() {
    const main = this.page.getByRole("main");
-   const addServiceButton = main.getByRole("button", {
-     name: "Añadir Insurance",
-     exact: true,
-   });
+   const addServiceButton = this.getAdditionalServicesButton();
    const samsungCare = main.getByText("Samsung Care+", {
      exact: true,
    });
@@ -245,16 +233,7 @@ export default class CartPage extends BasePage {
 
 
   async validateSamsungCareButton() {
-
-    const main = this.page.getByRole("main");
-
-    const addServiceButton = main.getByRole("button", {
-
-      name: "Añadir Insurance",
-
-      exact: true,
-
-    });
+    const addServiceButton = this.getAdditionalServicesButton();
 
     await addServiceButton.waitFor({
 
@@ -315,11 +294,7 @@ export default class CartPage extends BasePage {
 
 
  async validateSamsungCareJourney() {
-   const main = this.page.getByRole("main");
-   const addServiceButton = main.getByRole("button", {
-     name: "Añadir Insurance",
-     exact: true,
-   });
+   const addServiceButton = this.getAdditionalServicesButton();
    await addServiceButton.waitFor({
      state: "visible",
      timeout: 30000,

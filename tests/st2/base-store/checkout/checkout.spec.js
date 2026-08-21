@@ -242,6 +242,25 @@ test.describe("ST2 - Base Store - Checkout Page", () => {
     await checkoutPage.validateGuestCannotSaveAddress();
   });
 
+  test("TC41 - Customer Able to enter different addresses for shipping and billing", async ({ page }) => {
+    test.setTimeout(180000);
+
+    const productPage = new ProductPage(page);
+    const cartPage = new CartPage(page);
+    const guestLoginPage = new GuestLoginPage(page);
+    const checkoutPage = new CheckoutPage(page);
+
+    await productPage.validateProductLoaded();
+    await productPage.addToCart();
+    await cartPage.validateProductInCart();
+    await cartPage.proceedToCheckout();
+    await guestLoginPage.checkoutAsGuest(testData.customer.email);
+    await checkoutPage.fillCustomerData(testData.customer);
+    await checkoutPage.fillAddress(testData.address);
+    await checkoutPage.validateDifferentBillingAddress(
+      testData.billingAddress
+    );
+  });
 
   test("TC49 - Customer able see available delivery mode", async ({ page }) => {
     test.setTimeout(180000);

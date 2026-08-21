@@ -24,12 +24,11 @@ export default class ProductPage extends BasePage {
 
   async addToCart() {
     await this.safeGoto(this.addToCartUrl);
-
-    await this.page.waitForTimeout(3000);
-
     await this.safeGoto(this.cartUrl);
 
-    await this.page.waitForTimeout(5000);
+    await this.page
+      .getByText('RB45DG6300B1PE', { exact: true })
+      .waitFor({ state: 'visible', timeout: 30000 });
 
     await this.screenshot('02-product-added-to-cart');
   }
@@ -42,14 +41,13 @@ export default class ProductPage extends BasePage {
       .waitFor({ timeout: 20000 });
 
     await this.safeGoto(this.addToCartUrl);
-    await this.page.waitForTimeout(3000);
-
     await this.safeGoto(this.cartUrl);
-    await this.page.waitForTimeout(3000);
 
     const productLink = this.page.getByRole("link", {
       name: /Refrigeradora Bottom Freezer 409L Black C\/Disp\./i,
     }).first();
+
+    await productLink.waitFor({ state: "visible", timeout: 30000 });
 
     const [pdpPage] = await Promise.all([
       this.page.context().waitForEvent("page"),

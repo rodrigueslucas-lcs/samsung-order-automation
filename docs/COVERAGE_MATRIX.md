@@ -8,7 +8,7 @@
 
 | Scope | Total | Automated | Partial | Blocked | Not Applicable | Pending |
 |---|---:|---:|---:|---:|---:|---:|
-| Base Store | 83 | 26 | 1 | 1 | 2 | 53 |
+| Base Store | 83 | 31 | 1 | 2 | 2 | 47 |
 | EPP | ~60 | 0 | 0 | 0 | 0 | ~60 |
 
 ### Status Legend
@@ -28,7 +28,7 @@
 | 3 | Login Page | Customer able to login from Checkout Page | ⬜ Pending | — | — |
 | 4 | Login Page | Customer able to login from Order Confirmation Email (If Applicable) | ⬜ Pending | — | — |
 | 5 | Login Page | Guest Customer, able to place order until Cart Page. Then Customer able to login from Checkout Page. | ⬜ Pending | — | — |
-| 6 | MyAccount Page | Customer able hover on the Profile Icon and verify the Login/Sign-up & MyOrder Page Link. | ⬜ Pending | — | — |
+| 6 | MyAccount Page | Customer able hover on the Profile Icon and verify the Login/Sign-up & MyOrder Page Link. | 🚧 Blocked | — | Login/Register render consistently, but the dynamic `Mis pedidos` item was intermittent: one pass followed by two repeat failures in the same ST2 environment |
 | 7 | MyAccount Page | Customer able to see all the saved shipping and billing addresses in the My Profile Page. | ⬜ Pending | — | — |
 | 8 | MyAccount Page | Customer able to add, edit &delete address for shipping & billing address. | ⬜ Pending | — | — |
 | 9 | MyAccount Page | Customer able to show notification when adding, updating and deleting address for shipping and billing address. | ⬜ Pending | — | — |
@@ -41,7 +41,7 @@
 | 16 | Cart Page | Customer able to verify cart page (Products added displays correctly) | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
 | 17 | Cart Page | Customer able to increase and decrease the quantity (or remove products) | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
 | 18 | Cart Page | Customer able to see order summary is displayed correctly on right side (without taxes) | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
-| 19 | Cart Page | Verify Added services / Recommended products - (If there's available data) | ⬜ Pending | — | — |
+| 19 | Cart Page | Verify Added services / Recommended products - (If there's available data) | ⬜ Pending | — | Current SKU exposes the Additional Services offer, but no recommended product is rendered and the service cannot currently be added because its endpoint returns HTTP 400 |
 | 20 | Cart Page | Customer able to see Checkout Button | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
 | 21 | Externale Services | Customer able to see external services such Trade-in or Samsung Care Plus. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed with Samsung Care+ / Services available for current SKU |
 | 22 | Externale Services | Customer able to see the Footer for Cart Page | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
@@ -50,8 +50,8 @@
 | 25 | Externale Services | Customer able to see the trade-in amount on the last pop-up in the customer Journey in adding Trade-In. | ⬜ Pending | — | — |
 | 26 | Externale Services | Customer able to successfully added Trade-in In the cart page. | ⬜ Pending | — | — |
 | 27 | Externale Services | Customer able to see the Trade-in Amount in the summary. | ⬜ Pending | — | — |
-| 28 | Externale Services | Customer able to click the Samsung Care Plus Button | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed - Servicios Adicionales modal opens and can be cancelled |
-| 29 | Externale Services | Customer able to navigate on Pop-up Customer Journey in adding Samsung Care Plus. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed - service options, terms and initial add-to-cart state validated |
+| 28 | Externale Services | Customer able to click the Samsung Care Plus Button | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Automation implemented and validated previously; current ST2 execution is impacted by HTTP 400 from the External Services endpoint |
+| 29 | Externale Services | Customer able to navigate on Pop-up Customer Journey in adding Samsung Care Plus. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Automation implemented and validated previously; current ST2 execution is impacted by HTTP 400 from the External Services endpoint |
 | 30 | Externale Services | Customer able to successfully added Samsung Care Plus In the cart page. | ⬜ Pending | — | — |
 | 31 | Externale Services | Customer able to see the Samsung Care Plus Amount in the summary. | ⬜ Pending | — | — |
 | 32 | Externale Services | Total price should change after Trade-In/ SC+ is applied in the cart. Note: Please Keep the Screenshot for future reference | ⬜ Pending | — | — |
@@ -63,7 +63,7 @@
 | 38 | Checkout Page | Customer able to verify checkout page for Tax is applied correctly and price break down is displayed properly.(NET price) | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed - PE UI exposes Subtotal/Total |
 | 39 | Checkout Page | Customer able to used save address in checking out. | ⬜ Pending | — | — |
 | 40 | Checkout Page | Customer able to saved address in checkout page and Verify it on the profile-setting. | ⬜ Pending | — | — |
-| 41 | Checkout Page | Customer Able to enter different addresses for shipping and billing: | ⬜ Pending | — | — |
+| 41 | Checkout Page | Customer Able to enter different addresses for shipping and billing: | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed - separate Delivery and Billing values validated without advancing to Payment |
 | 42 | Checkout Page | Customer able to input any Phone Number | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
 | 43 | Checkout Page | Customer able to input any Address: | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
 | 44 | Checkout Page | Customer able to input any Address line 2 (Optional): | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
@@ -124,4 +124,3 @@
 ## EPP
 
 > EPP Detailed Smoke coverage will use the same status model. The official EPP scenarios will be added here preserving their Confluence names and order.
-

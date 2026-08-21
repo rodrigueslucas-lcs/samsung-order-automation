@@ -391,6 +391,108 @@ export default class CheckoutPage extends BasePage {
     await this.screenshot("checkout-guest-no-save-address");
   }
 
+  async validateDifferentBillingAddress(billingAddress) {
+    await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
+      timeout: 30000,
+    });
+
+    const billingSection = this.page.locator("app-billing-address-v2");
+
+    await billingSection
+      .getByRole("heading", {
+        name: "Completa tus datos de facturación",
+        level: 3,
+      })
+      .waitFor({ state: "visible", timeout: 60000 });
+
+    const invoiceCheckbox = billingSection.getByRole("checkbox", {
+      name: "Deseo factura",
+      exact: true,
+    });
+
+    await invoiceCheckbox.check();
+
+    await billingSection
+      .getByRole("textbox", { name: "companyName" })
+      .fill(billingAddress.companyName);
+
+    await billingSection
+      .getByRole("textbox", { name: "companyTaxNumber" })
+      .fill(billingAddress.companyTaxNumber);
+
+    const department = billingSection.getByRole("combobox", {
+      name: "Departamento",
+    });
+    const province = billingSection.getByRole("combobox", {
+      name: "Provincia",
+    });
+    const district = billingSection.getByRole("combobox", {
+      name: "Distrito",
+    });
+
+    await department.click();
+    await this.page
+      .getByRole("option", {
+        name: billingAddress.department,
+        exact: true,
+      })
+      .click();
+
+    await province.click();
+    await this.page
+      .getByRole("option", {
+        name: billingAddress.province,
+        exact: true,
+      })
+      .click();
+
+    await district.click();
+    await this.page
+      .getByRole("option", {
+        name: billingAddress.district,
+        exact: true,
+      })
+      .click();
+
+    const billingStreet = billingSection.getByRole("textbox", {
+      name: "line1",
+    });
+    const billingNumber = billingSection.getByRole("textbox", {
+      name: "line2",
+    });
+
+    await billingStreet.fill(billingAddress.street);
+    await billingNumber.fill(billingAddress.number);
+
+    const selectedDepartment = (await department.textContent())?.trim();
+    const selectedProvince = (await province.textContent())?.trim();
+    const selectedDistrict = (await district.textContent())?.trim();
+
+    if (selectedDepartment !== billingAddress.department) {
+      throw new Error(
+        `Unexpected billing department: ${selectedDepartment}`
+      );
+    }
+
+    if (selectedProvince !== billingAddress.province) {
+      throw new Error(`Unexpected billing province: ${selectedProvince}`);
+    }
+
+    if (selectedDistrict !== billingAddress.district) {
+      throw new Error(`Unexpected billing district: ${selectedDistrict}`);
+    }
+
+    if ((await billingStreet.inputValue()) !== billingAddress.street) {
+      throw new Error("Billing street was not populated correctly.");
+    }
+
+    if ((await billingNumber.inputValue()) !== billingAddress.number) {
+      throw new Error("Billing number was not populated correctly.");
+    }
+
+    await this.screenshot("checkout-different-billing-address");
+  }
+
   async validateAvailableDeliveryModes() {
     await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
       timeout: 30000,
