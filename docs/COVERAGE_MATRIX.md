@@ -2,14 +2,14 @@
 
 **Environment:** ST2 Peru  
 **Framework:** Playwright  
-**Last Updated:** 2026-08-19
+**Last Updated:** 2026-08-21
 
 ## Summary
 
-| Scope | Total | Automated | Partial | Blocked | Pending |
-|---|---:|---:|---:|---:|---:|
-| Base Store | 83 | 21 | 1 | 1 | 59 |
-| EPP | ~60 | 0 | 0 | 0 | ~60 |
+| Scope | Total | Automated | Partial | Blocked | Not Applicable | Pending |
+|---|---:|---:|---:|---:|---:|---:|
+| Base Store | 83 | 26 | 1 | 1 | 2 | 53 |
+| EPP | ~60 | 0 | 0 | 0 | 0 | ~60 |
 
 ### Status Legend
 
@@ -43,15 +43,15 @@
 | 18 | Cart Page | Customer able to see order summary is displayed correctly on right side (without taxes) | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
 | 19 | Cart Page | Verify Added services / Recommended products - (If there's available data) | ⬜ Pending | — | — |
 | 20 | Cart Page | Customer able to see Checkout Button | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
-| 21 | Externale Services | Customer able to see external services such Trade-in or Samsung Care Plus. | ⬜ Pending | — | — |
-| 22 | Externale Services | Customer able to see the Footer for Cart Page | ⬜ Pending | — | — |
+| 21 | Externale Services | Customer able to see external services such Trade-in or Samsung Care Plus. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed with Samsung Care+ / Services available for current SKU |
+| 22 | Externale Services | Customer able to see the Footer for Cart Page | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
 | 23 | Externale Services | Customer able to click the trade-in button. | ⬜ Pending | — | — |
 | 24 | Externale Services | Customer able to navigate on Pop- up customer journey in adding Trade-In. | ⬜ Pending | — | — |
 | 25 | Externale Services | Customer able to see the trade-in amount on the last pop-up in the customer Journey in adding Trade-In. | ⬜ Pending | — | — |
 | 26 | Externale Services | Customer able to successfully added Trade-in In the cart page. | ⬜ Pending | — | — |
 | 27 | Externale Services | Customer able to see the Trade-in Amount in the summary. | ⬜ Pending | — | — |
-| 28 | Externale Services | Customer able to click the Samsung Care Plus Button | ⬜ Pending | — | — |
-| 29 | Externale Services | Customer able to navigate on Pop-up Customer Journey in adding Samsung Care Plus. | ⬜ Pending | — | — |
+| 28 | Externale Services | Customer able to click the Samsung Care Plus Button | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed - Servicios Adicionales modal opens and can be cancelled |
+| 29 | Externale Services | Customer able to navigate on Pop-up Customer Journey in adding Samsung Care Plus. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed - service options, terms and initial add-to-cart state validated |
 | 30 | Externale Services | Customer able to successfully added Samsung Care Plus In the cart page. | ⬜ Pending | — | — |
 | 31 | Externale Services | Customer able to see the Samsung Care Plus Amount in the summary. | ⬜ Pending | — | — |
 | 32 | Externale Services | Total price should change after Trade-In/ SC+ is applied in the cart. Note: Please Keep the Screenshot for future reference | ⬜ Pending | — | — |
@@ -83,7 +83,7 @@
 | 58 | Payment Page | Customer able to complete order using one payment mode. | 🚧 Blocked | `tests/st2/base-store/payment/payment.spec.js` | Automation reaches submit successfully; blocked by ST2 backend/siteId transaction issue |
 | 59 | Customer Order Journey | Customer able to place one IM order with Trade-in and SC+. (If there is available data) | ⬜ Pending | — | — |
 | 60 | Customer Order Journey | Customer able to place one CE order. (If there is available data) | ⬜ Pending | — | — |
-| 61 | Payment Page/Checkout Page | Customer able to navigate back to cart from Payment page, Checkout page using the Edit button | ⚠️ Partial | `tests/st2/base-store/payment/payment-navigation.spec.js` | Payment Page → Cart validated; Checkout Page → Cart still pending |
+| 61 | Payment Page/Checkout Page | Customer able to navigate back to cart from Payment page, Checkout page using the Edit button | ✅ Automated | `tests/st2/base-store/payment/payment-navigation.spec.js`, `tests/st2/base-store/checkout/checkout.spec.js` | Passed - Payment → Cart and Checkout → Cart validated |
 | 62 | Confirmation Page | Customer able to see the confirmation after placing order. | ⬜ Pending | — | — |
 | 63 | Order Email | Customer able to received Order confirmation/ acknowledgment email | ⬜ Pending | — | — |
 | 64 | BackOffice | User able to login successfully in the BackOffice | ⬜ Pending | — | — |
@@ -105,7 +105,21 @@
 | 80 | Payment Mode | Customer able to place order using Cuotéalo [pe-Cuotealo]. The maximum amount allowed is S/ 7,000.00 | ⬜ Pending | — | — |
 | 81 | Payment Mode | Customer able to place order using Yape [pe-yape] | ⬜ Pending | — | — |
 | 82 | Payment Mode | Customer able to place order using Acuotaz | ⬜ Pending | — | — |
-| 83 | Mobile | Customer able to place order using own mobile | ⬜ Pending | — | — |
+| 83 | Mobile | Customer able to place order using own mobile | ⬜ Pending | — | Mobile responsive smoke exists, but TC83 remains pending because order placement on mobile is not yet covered |
+
+## Supplementary ST2 Coverage
+
+> These checks increase regression coverage but do not change the official 83-scenario Detailed Smoke count above.
+
+| Area | Scenario | File | Status |
+|---|---|---|---|
+| Guest Login | Invalid guest email shows validation and keeps guest checkout disabled | `tests/st2/base-store/guest-login/guest-login.spec.js` | ✅ Passed |
+| Cart | Quantity cannot decrease below 1 | `tests/st2/base-store/cart/cart-negative.spec.js` | ✅ Passed |
+| Mobile | Responsive Header/Footer smoke at 390x844 | `tests/st2/base-store/mobile/mobile.spec.js` | ✅ Passed |
+| PDP | Product title, SKU, gallery, specifications and recommendations smoke | `tests/st2/base-store/pdp/pdp.spec.js` | ✅ Passed |
+| Search | Autocomplete suggestions and related-product behavior | `tests/st2/base-store/search/search.spec.js` | ✅ Passed |
+| Cart | Available payment methods are displayed | `tests/st2/base-store/cart/cart.spec.js` | ✅ Passed |
+| Cart | Invalid coupon is processed without changing cart total | `tests/st2/base-store/cart/cart-negative.spec.js` | ✅ Passed |
 
 ## EPP
 
