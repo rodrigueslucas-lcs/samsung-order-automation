@@ -8,7 +8,7 @@
 
 | Scope | Total | Automated | Partial | Blocked | Not Applicable | Pending |
 |---|---:|---:|---:|---:|---:|---:|
-| Base Store | 83 | 31 | 1 | 5 | 2 | 44 |
+| Base Store | 83 | 32 | 1 | 5 | 2 | 43 |
 | EPP | ~60 | 0 | 0 | 0 | 0 | ~60 |
 
 ### Status Legend
@@ -61,7 +61,7 @@
 | 36 | Checkout Page | Customer able to see the Checkout Login button in the Checkout Address Page. | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
 | 37 | Checkout Page | Customer able to verify checkout page (Products added displays correctly in Summary details) | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
 | 38 | Checkout Page | Customer able to verify checkout page for Tax is applied correctly and price break down is displayed properly.(NET price) | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed - PE UI exposes Subtotal/Total |
-| 39 | Checkout Page | Customer able to used save address in checking out. | ⬜ Pending | — | Manual authenticated checkout confirms Delivery Address renders after `CHECKOUT_STEP_DELIVERY`; automation synchronization is under investigation |
+| 39 | Checkout Page | Customer able to used save address in checking out. | ✅ Automated | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Passed - selected and validated `Dirección guardada`, reused guest shipping/terms/continue, and reached Payment without modifying the saved address or placing an order |
 | 40 | Checkout Page | Customer able to saved address in checkout page and Verify it on the profile-setting. | ⬜ Pending | — | Manual authenticated checkout exposes `Guardar datos de envío en Mi cuenta`; automation and Profile verification are not yet proven |
 | 41 | Checkout Page | Customer Able to enter different addresses for shipping and billing: | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed - separate Delivery and Billing values validated without advancing to Payment |
 | 42 | Checkout Page | Customer able to input any Phone Number | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |

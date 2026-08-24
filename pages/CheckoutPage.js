@@ -80,6 +80,8 @@ export default class CheckoutPage extends BasePage {
       name: "Dirección guardada",
       exact: true,
     });
+    await savedAddressMode.waitFor({ state: "visible", timeout: 30000 });
+
     if (!(await savedAddressMode.isChecked())) {
       await deliveryPanel
         .locator("span")
@@ -127,6 +129,66 @@ export default class CheckoutPage extends BasePage {
     if (await saveAddress.isChecked()) {
       throw new Error("Save address checkbox remained checked in the safe authenticated smoke.");
     }
+  }
+
+  async selectSavedAddressAndValidate() {
+    const deliveryRegion = this.page.getByRole("region", {
+      name: /2\. Direcci[oó]n de entrega/i,
+    });
+    const deliveryPanel = deliveryRegion.getByRole("tabpanel", {
+      name: "Envío",
+      exact: true,
+    });
+    const savedAddressMode = deliveryPanel.getByRole("radio", {
+      name: "Dirección guardada",
+      exact: true,
+    });
+
+    await savedAddressMode.waitFor({ state: "visible", timeout: 30000 });
+
+    if (!(await savedAddressMode.isChecked())) {
+      await deliveryPanel
+        .getByText("Dirección guardada", { exact: true })
+        .click();
+    }
+
+    if (!(await savedAddressMode.isChecked())) {
+      throw new Error("Dirección guardada was not selected in authenticated Delivery.");
+    }
+
+    const savedAddressOptions = deliveryPanel.getByRole("radio", {
+      name: /^(?!Dirección guardada$|Nueva dirección$).+/,
+    });
+    const optionCount = await savedAddressOptions.count();
+
+    if (optionCount < 1) {
+      throw new Error("No saved address was available in authenticated Delivery.");
+    }
+
+    let selectedAddress;
+    for (const option of await savedAddressOptions.all()) {
+      if (await option.isChecked()) {
+        selectedAddress = option;
+        break;
+      }
+    }
+
+    if (!selectedAddress) {
+      if (optionCount !== 1) {
+        throw new Error(
+          `Saved address selection is ambiguous: ${optionCount} addresses are available and none is selected.`
+        );
+      }
+
+      selectedAddress = savedAddressOptions;
+      await selectedAddress.click();
+    }
+
+    if (!(await selectedAddress.isChecked())) {
+      throw new Error("The saved address radio did not remain selected.");
+    }
+
+    await this.screenshot("authenticated-saved-address-selected");
   }
 
   async validateAddressValues(address) {
