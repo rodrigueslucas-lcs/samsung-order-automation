@@ -26,6 +26,43 @@ Official total: `32 + 6 + 5 + 2 + 38 = 83`. Supplementary tests do not change th
 | E — environment/data | Order completion and confirmation | 59, 60, 62, 63, 77–83 | TC77–TC80 pre-submit behavior is proven, but order completion remains unavailable. Do not mark payment-mode TCs Automated until the known post-Place-Order defect is fixed and required payment/order data is approved. |
 | E — out of current scope | BackOffice / fulfillment | 64–76 | Requires separate environment, roles and workflow. |
 
+## Capability ROI audit — 38 Pending
+
+This ranking groups the remaining work by reusable capability rather than by individual TC. It is an implementation gate: do not create a helper until the listed environment/data dependency is available and the capability can be exercised end to end.
+
+| ROI | Capability | Pending TCs unlocked | Existing foundation | Owner / reusable gap | Difficulty | Environment dependency | Current completion chance | Potential official gain |
+|---:|---|---|---|---|---|---|---|---:|
+| 1 | BackOffice order lifecycle | 64–76 | No BackOffice Page Object or spec exists | Future `BackOfficePage`/order-lifecycle helper: login, role-aware Orders page, search, status assertions and cronjob actions | High | Separate BackOffice URL, Admin/CS roles, disposable order and approved cronjob execution | Low until access is supplied | 13 |
+| 2 | Trade-in / Samsung Care+ journey | 19, 23–27, 30–32 | `ProductPage`, `CartPage.getAdditionalServicesButton()`, `validateSamsungCareButton()` and `validateSamsungCareJourney()` | `CartPage`: one active-dialog journey abstraction for semantic steps, selected service, amount and Cart summary reconciliation | Medium–high | Eligible SKU/service data and healthy External Services endpoint; current request returns HTTP 400 | None in current ST2 state | 9 |
+| 3 | Order completion and downstream evidence | 59, 60, 62, 63, 83 | Guest Checkout reaches Payment; `PaymentPage.placeOrder()` and `OrderConfirmationPage` exist | One idempotent submission-result helper plus confirmation number/email evidence; mobile should reuse the same checkout objects | High | Known post-Place-Order ST2 defect must be fixed; disposable order/email data required | None while defect remains | 5 |
+| 4 | Authenticated Profile/address lifecycle | 9, 10, 11, 40 | Reusable auth helpers, authenticated Checkout and TC39 saved-address flow | Future `ProfilePage`: safe entry, list/readback, create/update/default/delete of uniquely tagged QA address, cleanup owned data only | High | Fresh auth, functional Profile entry point and disposable QA address | Low; Profile entry is currently unavailable | 4 |
+| 5 | Alternative payment panel validation | 81, 82 | `reachAuthenticatedPaymentWithSavedAddress()` and generic `PaymentPage.selectPaymentMode()`; TC77–TC80 prove the pattern | Add only thin semantic wrappers after Yape/Acuotaz are observed; assert expanded controlled panel and stop pre-submit | Low–medium | Fresh reusable auth and actual mode availability in current Payment configuration | High after auth refresh if modes are rendered | 2 |
+
+### Current implementation decision
+
+No capability meets all gates for the present round. The multi-TC candidates require at least one explicitly excluded dependency: BackOffice, External Services, Place Order, Profile/auth, or expired-auth Payment inspection. Therefore no Page Object/spec was added, no TC status changed, and coverage remains `32 Automated + 6 Partial + 5 Blocked + 2 N/A + 38 Pending = 83`. The first eligible high-ROI action is TC81/TC82 panel validation after `auth:verify` passes and the modes are visibly present; otherwise obtain BackOffice access for the largest cluster.
+
+## PAYMENT TEST DATA MAP
+
+Never copy provider credentials or full payment values into this document, specs, Page Objects or Git. Obtain approved sandbox data from the internal QA payment-data source at execution time and keep it in the project's ignored/local secret mechanism. Country applicability must be verified in that source and against the live ST2 Payment UI; documentation alone does not prove Peru availability.
+
+| Provider | Countries | Potential official TCs | Current ST2 Peru availability | Current automation coverage | Additional information required | Automation recommendation |
+|---|---|---|---|---|---|---|
+| Mercado Pago | Peru is confirmed by the current `pe-mercadoCC` integration; verify any broader country list in the internal source | TC58; directly TC77; TC57 inventory | Confirmed: credit/debit-card panel and Mercado Pago iframes were exercised | TC57 Automated; TC58 Blocked after submit; TC77 Partial with sandbox card fields/installments ready pre-submit | Approved local sandbox card variants and expected provider states; backend/siteId fix before order-result assertions | Keep using `testData.card` through the existing ignored/approved data architecture and `PaymentPage.selectCreditCard()`, `fillCardData()` and `validateCreditCardReady()`; never duplicate values in specs/Page Objects |
+| PayPal sandbox | Country scope was not supplied in the project-safe metadata; consult the internal source | TC57 and TC58 only if PayPal is actually rendered for Peru; no provider-specific TC exists in the 83-TC matrix | Not observed or proven in the current ST2 Peru Payment evidence | None | Confirm Peru configuration, semantic mode name, sandbox account acquisition process and safe pre-submit stopping point | Inspect once on a valid Payment session; if visible, reuse `selectPaymentMode()` and keep provider login data outside Git; otherwise record unavailable without changing TC status |
+| Klarna | Country scope was not supplied in the project-safe metadata; consult the internal source | TC57 and TC58 only if rendered for Peru; no Klarna-specific official TC | Not observed or proven in ST2 Peru; do not equate Klarna with Cuotéalo | None | Confirm Peru eligibility, exact ST2 label/provider integration and approved sandbox flow | Add only a thin `selectPaymentMode()` wrapper after live semantic evidence; stop before external submission unless the official TC explicitly requires it |
+| Kueski | Country scope was not supplied in the project-safe metadata; consult the internal source | TC57 and TC58 only if rendered for Peru; no Kueski-specific official TC | Not observed or proven in ST2 Peru; do not equate Kueski with Acuotaz | None | Confirm Peru eligibility, exact ST2 label/provider integration and approved sandbox flow | Same evidence-first `selectPaymentMode()` approach; never infer Acuotaz coverage from Kueski test data |
+
+Current ST2 Peru modes without matching test-data coverage in the supplied provider list are `Banca por Internet`/SafetyPay (TC78), `Pago Efectivo` (TC79), `Cuotéalo` (TC80), Yape (TC81) and Acuotaz (TC82). TC78–TC80 already have proven pre-submit selection coverage without provider credentials. Yape and Acuotaz are not covered by the Mercado Pago/PayPal/Klarna/Kueski documentation and still require valid auth plus direct observation of the current Payment UI; keep TC81/TC82 Pending.
+
+### Payment work ranking after test-data review
+
+1. After the known submit defect is fixed, complete TC77 with the approved Mercado Pago sandbox state and one controlled Place Order attempt; the pre-submit automation is already proven.
+2. With valid auth, inspect TC81/TC82 once and reuse `selectPaymentMode()` if the exact semantic modes are present. The new provider documentation does not supply their data.
+3. Revalidate TC57 inventory for PayPal/Klarna/Kueski only when one is visibly configured in ST2 Peru; documentation availability alone is not a reason to add an expected mode.
+4. Complete TC78–TC80 only after provider-specific submission requirements, approved test data and the ST2 order defect are resolved; their pre-submit coverage needs no new credential storage.
+5. Treat any future PayPal/Klarna/Kueski Peru mode as a thin Page Object wrapper over `selectPaymentMode()`, with local ignored data and a provider-specific safe stopping point.
+
 ## Recommended implementation queue
 
 The entries below are ordered by implementation effort, but each dependency must be satisfied before coding or execution.
