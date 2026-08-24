@@ -8,7 +8,7 @@
 
 | Scope | Total | Automated | Partial | Blocked | Not Applicable | Pending |
 |---|---:|---:|---:|---:|---:|---:|
-| Base Store | 83 | 32 | 3 | 5 | 2 | 41 |
+| Base Store | 83 | 32 | 5 | 5 | 2 | 39 |
 | EPP | ~60 | 0 | 0 | 0 | 0 | ~60 |
 
 ### Status Legend
@@ -99,10 +99,10 @@
 | 74 | Order Fullfillment | User able to validate the updated order status is on "Order Split" | ⬜ Pending | — | — |
 | 75 | Order Fullfillment | User able to run cronjob: tokoTransferConsignmentToWarehouseJob | ⬜ Pending | — | — |
 | 76 | Order Fullfillment | User able to validate the updated order status is on "Shipping Requested" | ⬜ Pending | — | — |
-| 77 | Payment Mode | Customer able to place order using Credit Card [pe-mercadoCC] (Master, Visa, AMX) | ⬜ Pending | — | — |
+| 77 | Payment Mode | Customer able to place order using Credit Card [pe-mercadoCC] (Master, Visa, AMX) | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: existing Mercado Pago sandbox data, installments and required iframe fields were populated and `Realizar pedido` became enabled; the button was not clicked |
 | 78 | Payment Mode | Customer able to place order using SafetyPay - Banca por Internet [pe-Bancapor] | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: authenticated saved-address checkout reached Payment and `Banca por Internet` became selected (`aria-expanded=true`); Place Order was intentionally not executed |
 | 79 | Payment Mode | Customer able to place order using Cash Payment [pe-pagoEfectivo]. Note: can only accept payment with maximum amount of S/ 10,000 | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: authenticated saved-address checkout reached Payment and `Pago Efectivo` became selected (`aria-expanded=true`); Place Order was intentionally not executed |
-| 80 | Payment Mode | Customer able to place order using Cuotéalo [pe-Cuotealo]. The maximum amount allowed is S/ 7,000.00 | ⬜ Pending | — | — |
+| 80 | Payment Mode | Customer able to place order using Cuotéalo [pe-Cuotealo]. The maximum amount allowed is S/ 7,000.00 | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: Cuotéalo was available, expanded with `aria-expanded=true`, and its controlled payment panel rendered non-empty content; Place Order was not executed |
 | 81 | Payment Mode | Customer able to place order using Yape [pe-yape] | ⬜ Pending | — | — |
 | 82 | Payment Mode | Customer able to place order using Acuotaz | ⬜ Pending | — | — |
 | 83 | Mobile | Customer able to place order using own mobile | ⬜ Pending | — | Mobile responsive smoke exists, but TC83 remains pending because order placement on mobile is not yet covered |

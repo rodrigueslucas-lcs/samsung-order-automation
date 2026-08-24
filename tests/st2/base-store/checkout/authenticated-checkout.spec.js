@@ -104,4 +104,20 @@ test.describe("ST2 - Base Store - Authenticated Checkout", () => {
     const paymentPage = await reachAuthenticatedPaymentWithSavedAddress(page);
     await paymentPage.selectPagoEfectivo();
   });
+
+  test("TC80 pre-submit - Customer able to select Cuotéalo payment mode", async ({ page }) => {
+    test.setTimeout(240000);
+
+    const paymentPage = await reachAuthenticatedPaymentWithSavedAddress(page);
+    await paymentPage.selectCuotealo();
+  });
+
+  test("TC77 pre-submit - Customer able to complete Credit Card data", async ({ page }) => {
+    test.setTimeout(300000);
+
+    const paymentPage = await reachAuthenticatedPaymentWithSavedAddress(page);
+    await paymentPage.selectCreditCard();
+    await paymentPage.fillCardData(testData.card);
+    await paymentPage.validateCreditCardReady(testData.card);
+  });
 });

@@ -147,6 +147,8 @@ export default class PaymentPage extends BasePage {
     }
 
     await this.screenshot(screenshotName);
+
+    return paymentMode;
   }
 
   async selectBancaPorInternet() {
@@ -161,6 +163,28 @@ export default class PaymentPage extends BasePage {
       /^Pago Efectivo\b/i,
       "09-pago-efectivo-selected"
     );
+  }
+
+  async selectCuotealo() {
+    const paymentMode = await this.selectPaymentMode(
+      /^Cuotéalo\b/i,
+      "09-cuotealo-selected"
+    );
+    const controlledPanelId = await paymentMode.getAttribute("aria-controls");
+
+    if (!controlledPanelId) {
+      throw new Error("Cuotéalo did not expose its controlled payment panel.");
+    }
+
+    const paymentPanel = this.page.locator(`[id="${controlledPanelId}"]`);
+    await paymentPanel.waitFor({ state: "visible", timeout: 30000 });
+
+    const panelContent = (await paymentPanel.innerText()).trim();
+    if (!panelContent) {
+      throw new Error("Cuotéalo expanded, but its payment content was empty.");
+    }
+
+    await this.screenshot("09-cuotealo-content");
   }
 
   async navigateBackToCart() {
@@ -219,6 +243,35 @@ export default class PaymentPage extends BasePage {
     await this.selectInstallments();
 
     await this.screenshot("10-card-data-filled");
+  }
+
+  async validateCreditCardReady(card) {
+    const cardNumber = this.page
+      .frameLocator('iframe[name="cardNumber"]')
+      .locator("#cardNumber");
+    const expirationDate = this.page
+      .frameLocator('iframe[name="expirationDate"]')
+      .locator("#expirationDate");
+    const securityCode = this.page
+      .frameLocator('iframe[name="securityCode"]')
+      .locator("#securityCode");
+
+    for (const input of [cardNumber, expirationDate, securityCode]) {
+      if (!(await input.inputValue()).trim()) {
+        throw new Error("A required Mercado Pago card field was empty before submission.");
+      }
+    }
+
+    if ((await this.cardHolderInput.inputValue()).trim() !== card.holderName) {
+      throw new Error("The cardholder name was not populated correctly.");
+    }
+
+    await this.placeOrderButton.waitFor({ state: "visible", timeout: 30000 });
+    if (!(await this.placeOrderButton.isEnabled())) {
+      throw new Error("Credit card data was filled, but Realizar pedido remained disabled.");
+    }
+
+    await this.screenshot("10-credit-card-ready-before-submit");
   }
 
   async typeInMercadoPagoFrame(frameSelector, inputSelector, value) {
