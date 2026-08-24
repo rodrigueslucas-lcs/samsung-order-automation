@@ -54,6 +54,17 @@ async function reachAuthenticatedDelivery(page) {
   return { checkoutPage, paymentPage };
 }
 
+async function reachAuthenticatedPaymentWithSavedAddress(page) {
+  const { checkoutPage, paymentPage } = await reachAuthenticatedDelivery(page);
+  await checkoutPage.selectSavedAddressAndValidate();
+  await checkoutPage.selectShippingMethod();
+  await checkoutPage.acceptTerms();
+  await checkoutPage.continueToPayment();
+  await paymentPage.validatePaymentPage();
+
+  return paymentPage;
+}
+
 test.describe("ST2 - Base Store - Authenticated Checkout", () => {
   test.use({ storageState: requireAuthState() || AUTH_STATE_PATH });
 
@@ -77,11 +88,20 @@ test.describe("ST2 - Base Store - Authenticated Checkout", () => {
   test("TC39 - Customer able to used save address in checking out.", async ({ page }) => {
     test.setTimeout(240000);
 
-    const { checkoutPage, paymentPage } = await reachAuthenticatedDelivery(page);
-    await checkoutPage.selectSavedAddressAndValidate();
-    await checkoutPage.selectShippingMethod();
-    await checkoutPage.acceptTerms();
-    await checkoutPage.continueToPayment();
-    await paymentPage.validatePaymentPage();
+    await reachAuthenticatedPaymentWithSavedAddress(page);
+  });
+
+  test("TC78 pre-submit - Customer able to select Banca por Internet payment mode", async ({ page }) => {
+    test.setTimeout(240000);
+
+    const paymentPage = await reachAuthenticatedPaymentWithSavedAddress(page);
+    await paymentPage.selectBancaPorInternet();
+  });
+
+  test("TC79 pre-submit - Customer able to select Pago Efectivo payment mode", async ({ page }) => {
+    test.setTimeout(240000);
+
+    const paymentPage = await reachAuthenticatedPaymentWithSavedAddress(page);
+    await paymentPage.selectPagoEfectivo();
   });
 });

@@ -8,7 +8,7 @@
 
 | Scope | Total | Automated | Partial | Blocked | Not Applicable | Pending |
 |---|---:|---:|---:|---:|---:|---:|
-| Base Store | 83 | 32 | 1 | 5 | 2 | 43 |
+| Base Store | 83 | 32 | 3 | 5 | 2 | 41 |
 | EPP | ~60 | 0 | 0 | 0 | 0 | ~60 |
 
 ### Status Legend
@@ -100,8 +100,8 @@
 | 75 | Order Fullfillment | User able to run cronjob: tokoTransferConsignmentToWarehouseJob | ⬜ Pending | — | — |
 | 76 | Order Fullfillment | User able to validate the updated order status is on "Shipping Requested" | ⬜ Pending | — | — |
 | 77 | Payment Mode | Customer able to place order using Credit Card [pe-mercadoCC] (Master, Visa, AMX) | ⬜ Pending | — | — |
-| 78 | Payment Mode | Customer able to place order using SafetyPay - Banca por Internet [pe-Bancapor] | ⬜ Pending | — | — |
-| 79 | Payment Mode | Customer able to place order using Cash Payment [pe-pagoEfectivo]. Note: can only accept payment with maximum amount of S/ 10,000 | ⬜ Pending | — | — |
+| 78 | Payment Mode | Customer able to place order using SafetyPay - Banca por Internet [pe-Bancapor] | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: authenticated saved-address checkout reached Payment and `Banca por Internet` became selected (`aria-expanded=true`); Place Order was intentionally not executed |
+| 79 | Payment Mode | Customer able to place order using Cash Payment [pe-pagoEfectivo]. Note: can only accept payment with maximum amount of S/ 10,000 | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: authenticated saved-address checkout reached Payment and `Pago Efectivo` became selected (`aria-expanded=true`); Place Order was intentionally not executed |
 | 80 | Payment Mode | Customer able to place order using Cuotéalo [pe-Cuotealo]. The maximum amount allowed is S/ 7,000.00 | ⬜ Pending | — | — |
 | 81 | Payment Mode | Customer able to place order using Yape [pe-yape] | ⬜ Pending | — | — |
 | 82 | Payment Mode | Customer able to place order using Acuotaz | ⬜ Pending | — | — |

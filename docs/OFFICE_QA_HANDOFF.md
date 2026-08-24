@@ -6,12 +6,12 @@
 |---|---:|
 | Official Base Store TCs | 83 |
 | Automated | 32 |
-| Partial | 1 |
+| Partial | 3 |
 | Blocked | 5 |
 | Not Applicable | 2 |
-| Pending | 43 |
+| Pending | 41 |
 
-Official total: `32 + 1 + 5 + 2 + 43 = 83`. Supplementary tests do not change this count.
+Official total: `32 + 3 + 5 + 2 + 41 = 83`. Supplementary tests do not change this count.
 
 ## Pending clusters
 
@@ -23,7 +23,7 @@ Official total: `32 + 1 + 5 + 2 + 43 = 83`. Supplementary tests do not change th
 | C — completed | Authenticated saved-address checkout | 39 | Automated on 2026-08-24; validates the selected saved address and reaches Payment using the guest Delivery→Payment methods. |
 | D — complex | Profile address lifecycle | 9, 10, 11, 40 | Requires a working Profile address entry point and disposable QA data. Do not modify pre-existing addresses. |
 | D — complex | Trade-in / Samsung Care+ journey | 23–27, 30–32 | Requires eligible SKU/service data. Current External Services request returns HTTP 400. |
-| E — environment/data | Order completion and confirmation | 59, 60, 62, 63, 77–83 | Do not implement as passing until the known post-Place-Order defect is fixed and required payment/order data is approved. |
+| E — environment/data | Order completion and confirmation | 59, 60, 62, 63, 77–83 | TC78/TC79 pre-submit selection is proven, but order completion remains unavailable. Do not mark payment-mode TCs Automated until the known post-Place-Order defect is fixed and required payment/order data is approved. |
 | E — out of current scope | BackOffice / fulfillment | 64–76 | Requires separate environment, roles and workflow. |
 
 ## Recommended implementation queue

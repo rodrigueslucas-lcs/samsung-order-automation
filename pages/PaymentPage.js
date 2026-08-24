@@ -130,6 +130,39 @@ export default class PaymentPage extends BasePage {
     await this.screenshot("09-payment-modes");
   }
 
+  async selectPaymentMode(name, screenshotName) {
+    const paymentMode = this.page.getByRole("button", {
+      name,
+    });
+
+    await paymentMode.waitFor({ state: "visible", timeout: 90000 });
+    await paymentMode.scrollIntoViewIfNeeded();
+    await paymentMode.click();
+
+    const expanded = await paymentMode.getAttribute("aria-expanded");
+    if (expanded !== "true") {
+      throw new Error(
+        `Payment mode did not become selected. aria-expanded: ${expanded ?? "missing"}`
+      );
+    }
+
+    await this.screenshot(screenshotName);
+  }
+
+  async selectBancaPorInternet() {
+    await this.selectPaymentMode(
+      /^Banca por Internet\b/i,
+      "09-banca-por-internet-selected"
+    );
+  }
+
+  async selectPagoEfectivo() {
+    await this.selectPaymentMode(
+      /^Pago Efectivo\b/i,
+      "09-pago-efectivo-selected"
+    );
+  }
+
   async navigateBackToCart() {
     const editCartLink = this.page.locator('a[href="/pe/cart"]').first();
 
