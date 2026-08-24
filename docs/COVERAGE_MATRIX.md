@@ -8,7 +8,7 @@
 
 | Scope | Total | Automated | Partial | Blocked | Not Applicable | Pending |
 |---|---:|---:|---:|---:|---:|---:|
-| Base Store | 83 | 32 | 5 | 5 | 2 | 39 |
+| Base Store | 83 | 32 | 6 | 5 | 2 | 38 |
 | EPP | ~60 | 0 | 0 | 0 | 0 | ~60 |
 
 ### Status Legend
@@ -25,7 +25,7 @@
 |---:|---|---|---|---|---|
 | 1 | Login Page | Customer able to login as register User from Home Page (My Account) | ⬜ Pending | — | — |
 | 2 | Login Page | Customer able to login from Home Page(My Account) via shop menu | ⬜ Pending | — | — |
-| 3 | Login Page | Customer able to login from Checkout Page | ⬜ Pending | — | — |
+| 3 | Login Page | Customer able to login from Checkout Page | ⚠️ Partial | `tests/st2/base-store/checkout/checkout.spec.js` | Passed pre-auth: Product→Cart→Checkout exposed `Samsung Checkout Express` and navigated to `account.samsung.com/iam/*`; credentials/FedCM/MFA were intentionally not automated |
 | 4 | Login Page | Customer able to login from Order Confirmation Email (If Applicable) | ⬜ Pending | — | — |
 | 5 | Login Page | Guest Customer, able to place order until Cart Page. Then Customer able to login from Checkout Page. | ⬜ Pending | — | — |
 | 6 | MyAccount Page | Customer able hover on the Profile Icon and verify the Login/Sign-up & MyOrder Page Link. | 🚧 Blocked | — | Login/Register render consistently, but the dynamic `Mis pedidos` item was intermittent: one pass followed by two repeat failures in the same ST2 environment |

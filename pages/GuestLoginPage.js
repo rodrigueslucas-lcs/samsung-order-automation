@@ -8,6 +8,10 @@ export default class GuestLoginPage extends BasePage {
     this.guestCheckoutButton = page.getByRole('button', {
       name: /checkout como invitado/i
     });
+    this.registeredLoginButton = page.getByRole('button', {
+      name: 'Samsung Checkout Express',
+      exact: true
+    });
   }
 
   async validateCheckoutLoginPage() {
@@ -44,6 +48,25 @@ export default class GuestLoginPage extends BasePage {
     });
 
     await this.screenshot('04-checkout-contact-info');
+  }
+
+  async openRegisteredLoginFromCheckout() {
+    await this.registeredLoginButton.waitFor({
+      state: 'visible',
+      timeout: 30000
+    });
+
+    await Promise.all([
+      this.page.waitForURL(
+        (url) =>
+          url.hostname === 'account.samsung.com' &&
+          url.pathname.startsWith('/iam/'),
+        { timeout: 60000 }
+      ),
+      this.registeredLoginButton.click()
+    ]);
+
+    await this.screenshot('checkout-registered-login-destination');
   }
 
  async validateInvalidGuestEmail() {

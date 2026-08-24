@@ -9,6 +9,20 @@ import { testData } from "../../../../utils/testData";
 
 test.describe("ST2 - Base Store - Checkout Page", () => {
 
+  test("TC3 pre-auth - Customer able to login from Checkout Page", async ({ page }) => {
+    test.setTimeout(150000);
+
+    const productPage = new ProductPage(page);
+    const cartPage = new CartPage(page);
+    const guestLoginPage = new GuestLoginPage(page);
+
+    await productPage.validateProductLoaded();
+    await productPage.addToCart();
+    await cartPage.validateProductInCart();
+    await cartPage.proceedToCheckout();
+    await guestLoginPage.openRegisteredLoginFromCheckout();
+  });
+
   test("TC34 - Customer able to see Checkout Login Page", async ({ page }) => {
     test.setTimeout(150000);
 

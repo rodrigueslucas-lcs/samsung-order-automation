@@ -6,18 +6,18 @@
 |---|---:|
 | Official Base Store TCs | 83 |
 | Automated | 32 |
-| Partial | 5 |
+| Partial | 6 |
 | Blocked | 5 |
 | Not Applicable | 2 |
-| Pending | 39 |
+| Pending | 38 |
 
-Official total: `32 + 5 + 5 + 2 + 39 = 83`. Supplementary tests do not change this count.
+Official total: `32 + 6 + 5 + 2 + 38 = 83`. Supplementary tests do not change this count.
 
 ## Pending clusters
 
 | Class | Cluster | TCs | Decision |
 |---|---|---|---|
-| A — simple later | Login entry/destination checks | 1, 2, 3, 5 | Implement only after agreeing whether destination-only validation satisfies the official “login” wording. |
+| A — simple later | Login entry/destination checks | 1, 2, 5 | TC3 pre-auth is now Partial. Implement the remaining TCs only after agreeing whether destination-only validation satisfies the official “login” wording. |
 | B — small reuse | Guest tracking entry | 13 | Footer control exists, but destination and disposable order data are missing. |
 | B — small reuse | Conditional Cart content | 19 | Existing Cart setup is reusable; current SKU has no recommendation and External Services is unavailable. |
 | C — completed | Authenticated saved-address checkout | 39 | Automated on 2026-08-24; validates the selected saved address and reaches Payment using the guest Delivery→Payment methods. |
@@ -64,7 +64,14 @@ Run authenticated tests only after `auth:verify` passes.
 
 ```bash
 git pull --ff-only origin main
+# Fresh clone or changed package-lock only:
+npm ci
 npx playwright test --list
+npx playwright test tests/st2/base-store/home/login.spec.js --project=chromium --grep "TC1" --workers=1
+npx playwright test tests/st2/base-store/home/login.spec.js --project=chromium --grep "TC2" --workers=1
+npx playwright test tests/st2/base-store/checkout/checkout.spec.js --project=chromium --grep "TC3 pre-auth" --workers=1
+npx playwright test tests/st2/base-store/checkout/checkout.spec.js --project=chromium --grep "TC5 pre-auth" --workers=1
+npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --grep "TC81 pre-submit" --workers=1
 npx playwright test --project=chromium --workers=1
 npx playwright test tests/st2/base-store/smoke/guest-checkout.spec.js --project=chromium --workers=1
 npx playwright test tests/st2/base-store/cart --project=chromium --workers=1
@@ -87,6 +94,88 @@ npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js
 | 81 | `reachAuthenticatedPaymentWithSavedAddress()` and `PaymentPage.selectPaymentMode()` | Add `selectYape()` only if a semantic Yape button is visible; assert expanded panel and stop | `npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --grep "TC81 pre-submit" --workers=1` | Inspect current ST2 Payment first; absence means document availability, never invent fallback |
 
 Use each candidate's isolated command only after its gate is satisfied.
+
+### TC1 — Home login as registered user
+
+- File: `tests/st2/base-store/home/login.spec.js`.
+- Page Object/helper: `HomePage.openHome()` plus `requireAuthState()`, `applyAuthSessionStorage()` and `validateAuthenticatedSession()` from `utils/authState.js`.
+- Add: an authenticated Home spec; no new login UI method is needed for session validation.
+- Locator/assertion: existing `button "My Profile"` followed by visible exact text `Cerrar sesión` inside the active menu.
+- Fixture: local ignored `playwright/.auth/user.json` plus `session-storage.json`; no credentials in code.
+- Flow/result: restore auth before the first page → validate Home → open Profile → require Logout. Mark only Partial unless the team accepts human-bootstrap login as fulfillment of TC1.
+- Known error: expired snapshot. If `auth:verify` fails too, it is session expiration; if `auth:verify` passes but TC1 cannot show Logout, investigate test context/session restoration.
+- Command: `npx playwright test tests/st2/base-store/home/login.spec.js --project=chromium --grep "TC1" --workers=1`.
+
+```js
+test.use({ storageState: requireAuthState() });
+test.beforeEach(async ({ context }) => applyAuthSessionStorage(context));
+test('TC1 pre-auth - registered session is available from Home', async ({ page }) => {
+  await validateAuthenticatedSession(page);
+});
+```
+
+### TC2 — Home login via shop menu
+
+- File: `tests/st2/base-store/home/login.spec.js`.
+- Existing reuse: the TC1 auth fixture and `validateAuthenticatedSession()`.
+- Add: only the exact shop-menu interaction after its official meaning is confirmed; do not guess whether “shop menu” means Header navigation or My Profile.
+- Locator: start from `page.getByRole('banner')`; resolve the agreed accessible menu/button name inside that scope.
+- Fixture/flow/result: same ignored auth state as TC1 → agreed shop-menu entry → visible authenticated Profile/Logout.
+- Known error: ST2 header hydration can temporarily omit controls. Missing control with otherwise healthy Home is ST2 rendering/data; a locator mismatch while the control is visible in the trace is automation.
+- Command: `npx playwright test tests/st2/base-store/home/login.spec.js --project=chromium --grep "TC2" --workers=1`.
+
+### TC3 — Checkout login entry (implemented, Partial)
+
+- Files: `pages/GuestLoginPage.js` and `tests/st2/base-store/checkout/checkout.spec.js`.
+- Existing reuse: `ProductPage.validateProductLoaded()`, `addToCart()`, `CartPage.validateProductInCart()` and `proceedToCheckout()`.
+- Method: `GuestLoginPage.openRegisteredLoginFromCheckout()`.
+- Locator: `getByRole('button', { name: 'Samsung Checkout Express', exact: true })`.
+- Fixture: none; this pre-auth check must remain anonymous.
+- Flow/result: cookie/setup → add-to-cart → Cart → Checkout Login → click Express → validate host `account.samsung.com` and path `/iam/*` → stop.
+- Known error: older assumptions used button `Iniciar sesión`; the real current accessible name is `Samsung Checkout Express`. Missing Express in a preserved Checkout snapshot is ST2 UI/data; visible Express plus locator failure is automation.
+- Command: `npx playwright test tests/st2/base-store/checkout/checkout.spec.js --project=chromium --grep "TC3 pre-auth" --workers=1`.
+
+```js
+await productPage.validateProductLoaded();
+await productPage.addToCart();
+await cartPage.validateProductInCart();
+await cartPage.proceedToCheckout();
+await guestLoginPage.openRegisteredLoginFromCheckout();
+```
+
+### TC5 — Cart then registered-login entry from Checkout
+
+- File: add beside TC3 in `tests/st2/base-store/checkout/checkout.spec.js` unless Confluence requires a separate journey spec.
+- Existing reuse: copy the TC3 setup and `openRegisteredLoginFromCheckout()` exactly; do not add another locator.
+- Add/assertion: explicit Cart checkpoint for SKU `RB45DG6300B1PE` before `proceedToCheckout()`, then the same account destination assertion.
+- Fixture: none before external auth. A complete registered callback requires the approved human auth architecture and should remain Partial if not exercised.
+- Expected: SKU proven in Cart, Express login destination proven, no direct Checkout navigation.
+- Known error: Cart can remain with disabled Continue. If SKU is absent, setup/add-to-cart failed; if SKU is present but Continue spins, report ST2 Cart instability; do not bypass with a direct route.
+- Command: `npx playwright test tests/st2/base-store/checkout/checkout.spec.js --project=chromium --grep "TC5 pre-auth" --workers=1`.
+
+```js
+await productPage.validateProductLoaded();
+await productPage.addToCart();
+await cartPage.validateProductInCart();
+await cartPage.proceedToCheckout();
+await guestLoginPage.openRegisteredLoginFromCheckout();
+```
+
+### TC81 — Yape availability/pre-submit
+
+- Files: `pages/PaymentPage.js` and `tests/st2/base-store/checkout/authenticated-checkout.spec.js`.
+- Existing reuse: `reachAuthenticatedPaymentWithSavedAddress()` and generic `PaymentPage.selectPaymentMode()`.
+- Add only if visible: `selectYape()` calling `selectPaymentMode(/^Yape\b/i, '09-yape-selected')`; validate the controlled panel if the accordion exposes `aria-controls`.
+- Fixture: fresh ignored auth state; no payment secrets needed for availability/selection.
+- Flow/result: auth preflight → TC39 saved-address path → Payment → Yape → `aria-expanded=true` and visible non-empty panel → stop before Place Order.
+- Known error: Yape was not among the four modes previously asserted by `validateAvailablePaymentModes()`. If absent in a fresh Payment snapshot, document environment/config availability and keep Pending; never add a fallback to another mode.
+- Command: `npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --grep "TC81 pre-submit" --workers=1`.
+
+```js
+async selectYape() {
+  await this.selectPaymentMode(/^Yape\b/i, '09-yape-selected');
+}
+```
 
 ## Stop conditions
 
