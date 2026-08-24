@@ -50,8 +50,8 @@
 | 25 | Externale Services | Customer able to see the trade-in amount on the last pop-up in the customer Journey in adding Trade-In. | ⬜ Pending | — | — |
 | 26 | Externale Services | Customer able to successfully added Trade-in In the cart page. | ⬜ Pending | — | — |
 | 27 | Externale Services | Customer able to see the Trade-in Amount in the summary. | ⬜ Pending | — | — |
-| 28 | Externale Services | Customer able to click the Samsung Care Plus Button | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Automation implemented and validated previously; current ST2 execution is impacted by HTTP 400 from the External Services endpoint |
-| 29 | Externale Services | Customer able to navigate on Pop-up Customer Journey in adding Samsung Care Plus. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Automation implemented and validated previously; current ST2 execution is impacted by HTTP 400 from the External Services endpoint |
+| 28 | Externale Services | Customer able to click the Samsung Care Plus Button | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Automation implemented and validated previously; current modal opens but remains at `Cargando página...` after the External Services endpoint returns HTTP 400 |
+| 29 | Externale Services | Customer able to navigate on Pop-up Customer Journey in adding Samsung Care Plus. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Automation implemented and validated previously; current modal journey cannot render beyond `Cargando página...` after the External Services endpoint returns HTTP 400 |
 | 30 | Externale Services | Customer able to successfully added Samsung Care Plus In the cart page. | ⬜ Pending | — | — |
 | 31 | Externale Services | Customer able to see the Samsung Care Plus Amount in the summary. | ⬜ Pending | — | — |
 | 32 | Externale Services | Total price should change after Trade-In/ SC+ is applied in the cart. Note: Please Keep the Screenshot for future reference | ⬜ Pending | — | — |

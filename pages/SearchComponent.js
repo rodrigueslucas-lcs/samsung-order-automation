@@ -71,7 +71,17 @@ export default class SearchComponent extends BasePage {
    await this.screenshot("search-autocomplete-related-product");
    await productResult.click();
    await this.page.waitForURL(
-     /stg2\.shop\.samsung\.com\/pe\/p\/RB45DG6300B1PE/,
+     (url) => {
+       const validHost = [
+         "stg2.shop.samsung.com",
+         "www.samsung.com",
+       ].includes(url.hostname);
+       return (
+         validHost &&
+         url.pathname.startsWith("/pe/") &&
+         url.pathname.toLowerCase().includes("rb45dg6300b1pe")
+       );
+     },
      {
        timeout: 30000,
      }
@@ -85,7 +95,7 @@ export default class SearchComponent extends BasePage {
      state: "visible",
      timeout: 30000,
    });
-   await this.screenshot("search-autocomplete-st2-pdp");
+   await this.screenshot("search-autocomplete-product-pdp");
    return {
      autocompleteVisible: true,
      relatedProductAvailable: true,

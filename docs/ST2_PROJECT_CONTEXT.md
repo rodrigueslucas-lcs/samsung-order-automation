@@ -22,7 +22,7 @@ The add-to-cart endpoint response is sufficient to continue to Cart; wait for SK
 - My Orders can navigate to `shop.samsung.com`.
 - Login, registration and anonymous wishlist confirmation navigate to `account.samsung.com`.
 - Business actions must stop after leaving the ST2 host unless a test explicitly validates only the external destination.
-- Search autocomplete can link to an ST2 PDP, while submitting the search navigates to production search results.
+- Search autocomplete related-product clicks can resolve either to an ST2 PDP or to the matching Samsung Peru production PDP. Validate the Peru host/path and SKU; after a production exit, stop the business flow.
 
 ## Checkout and data
 
@@ -73,7 +73,7 @@ The add-to-cart endpoint response is sufficient to continue to Cart; wait for SK
 
 - The Cart service entry is visually associated with Samsung Care+ and currently has the accessible name `Añadir Servicios Adicionales`.
 - Locate the CTA by its exact accessible name inside `main`; older executions exposed `Añadir Insurance`.
-- On 2026-08-21, the external-service request for `RB45DG6300B1PE` returned HTTP 400 and the modal could not complete loading. This is an ST2 environment/backend block and must not be hidden by an automation fallback.
+- On 2026-08-21, the external-service request for `RB45DG6300B1PE` returned HTTP 400. Recent regression evidence confirms the CTA opens the modal, but it remains at `Cargando página...` and its internal journey never renders. This is an ST2 environment/backend block and must not be hidden by an automation fallback.
 - The same Cart load also exposed a Trade-in API 404 for the primary SKU; this does not prove that Trade-in is globally unavailable.
 - TC28 and TC29 remain Automated because their implementations were successfully validated previously. Record the current HTTP 400 as an execution-environment limitation, separately from coverage status.
 - TC19 remains Pending: the current Cart has no recommended-product block, and no service can be added while the External Services endpoint is unavailable.
