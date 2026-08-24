@@ -83,6 +83,8 @@ The add-to-cart endpoint response is sufficient to continue to Cart; wait for SK
 - PDP can render duplicate product headings and Add to Cart buttons due to sticky components. Scope to `main` and the relevant section.
 - Profile menu contains hidden/duplicated Login and Register elements. Scope locators to the visible role `menu` or active overlay.
 - The anonymous Profile menu is data-dependent in ST2. On 2026-08-21, `Mis pedidos` appeared in one automated run and was absent in two immediate repeats, while Login/Register remained available. TC6 must remain Blocked until this menu data is stable.
+- On 2026-08-24, the Home footer exposed visible text `Pedidos` as an `<a target="_blank">` without an `href`; navigation is JavaScript-controlled. Do not infer or hardcode a tracking route for TC13. Validate the popup destination from a real click only when disposable guest order data is available.
+- The reusable authenticated snapshot was expired during the 2026-08-24 Pending audit. Auth-dependent TC39/TC40 work was intentionally skipped; this is session expiration, not a Storefront regression or a reason to change coverage.
 - Cart coupon application is asynchronous. Wait for the processing message to disappear before checking the final total.
 - Cart → Guest Login can intermittently remain on Cart with a disabled `Continuar` spinner and disabled product controls. A 2026-08-21 regression reproduced this once in TC37, while TC33 and the isolated TC37 rerun passed. Surface the timeout as ST2 instability; do not bypass it with direct Guest Login navigation.
 

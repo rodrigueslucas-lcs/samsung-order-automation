@@ -2,7 +2,7 @@
 
 **Environment:** ST2 Peru  
 **Framework:** Playwright  
-**Last Updated:** 2026-08-21
+**Last Updated:** 2026-08-24
 
 ## Summary
 
@@ -35,7 +35,7 @@
 | 10 | MyAccount Page | Customer able to set default address for shipping & billing. | ⬜ Pending | — | — |
 | 11 | MyAccount Page | Customer able to verify the populated address is same on what is default address for shipping & billing in the Profile Setting. | ⬜ Pending | — | — |
 | 12 | MyAccount Page | Customer able to see Order List/ Order Details in My Orders Page. | 🚧 Blocked | — | Reusable authenticated state is proven, but `Mis pedidos` is currently absent from both the reusable and live authenticated menus despite `/users/current` and `checkAccess` returning HTTP 200; existing order data is also not yet confirmed |
-| 13 | MyAccount Page | Customer able to verify Tracking Order Page (Includes Guest) | ⬜ Pending | — | — |
+| 13 | MyAccount Page | Customer able to verify Tracking Order Page (Includes Guest) | ⬜ Pending | — | Current Home footer exposes visible `Pedidos` as a JavaScript-controlled `<a target="_blank">` with no `href`; destination and required guest order data are not yet proven |
 | 14 | Home Page | Customer able to see Homepage Attributes (Header, Hero banner, Top seller carousel, Footer) | ⚠️ Partial | `tests/st2/base-store/home/home.spec.js` | Header and Footer available; Hero banner and Top seller carousel are not rendered in current ST2 Home |
 | 15 | Cart Page | Customer able to see the Cart Page | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
 | 16 | Cart Page | Customer able to verify cart page (Products added displays correctly) | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
