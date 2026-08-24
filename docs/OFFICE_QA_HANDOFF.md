@@ -72,6 +72,7 @@ npx playwright test tests/st2/base-store/home/login.spec.js --project=chromium -
 npx playwright test tests/st2/base-store/checkout/checkout.spec.js --project=chromium --grep "TC3 pre-auth" --workers=1
 npx playwright test tests/st2/base-store/checkout/checkout.spec.js --project=chromium --grep "TC5 pre-auth" --workers=1
 npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --grep "TC81 pre-submit" --workers=1
+npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --grep "TC82 pre-submit" --workers=1
 npx playwright test --project=chromium --workers=1
 npx playwright test tests/st2/base-store/smoke/guest-checkout.spec.js --project=chromium --workers=1
 npx playwright test tests/st2/base-store/cart --project=chromium --workers=1
@@ -92,6 +93,7 @@ npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js
 | 3 | `ProductPage`, `CartPage.proceedToCheckout()` and authenticated helpers | Add a checkout-login entry test that proves the Login control/destination, then restores auth only through the approved fixture architecture | `npx playwright test tests/st2/base-store/checkout/login.spec.js --project=chromium --grep "TC3" --workers=1` | Do not automate Google/FedCM; agree whether destination-only coverage is Partial |
 | 5 | Existing Product→Cart and Checkout Login flow | Reuse TC33 setup, assert Cart SKU, enter Checkout and validate registered-login entry | `npx playwright test tests/st2/base-store/checkout/login.spec.js --project=chromium --grep "TC5" --workers=1` | Official wording is ambiguous (“place order until Cart”); confirm expected stopping point |
 | 81 | `reachAuthenticatedPaymentWithSavedAddress()` and `PaymentPage.selectPaymentMode()` | Add `selectYape()` only if a semantic Yape button is visible; assert expanded panel and stop | `npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --grep "TC81 pre-submit" --workers=1` | Inspect current ST2 Payment first; absence means document availability, never invent fallback |
+| 82 | `reachAuthenticatedPaymentWithSavedAddress()` and `PaymentPage.selectPaymentMode()` | Add `selectAcuotaz()` only if a semantic Acuotaz button is visible; assert expanded panel and stop | `npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --grep "TC82 pre-submit" --workers=1` | Inspect current ST2 Payment first; absence means document availability, never infer that another installment mode is Acuotaz |
 
 Use each candidate's isolated command only after its gate is satisfied.
 
@@ -174,6 +176,22 @@ await guestLoginPage.openRegisteredLoginFromCheckout();
 ```js
 async selectYape() {
   await this.selectPaymentMode(/^Yape\b/i, '09-yape-selected');
+}
+```
+
+### TC82 — Acuotaz availability/pre-submit
+
+- Files: `pages/PaymentPage.js` and `tests/st2/base-store/checkout/authenticated-checkout.spec.js`.
+- Existing reuse: the same `reachAuthenticatedPaymentWithSavedAddress()` and `selectPaymentMode()` used by TC78–TC80.
+- Add only if visible: `selectAcuotaz()` with the exact accessible name observed in the current Payment DOM. Do not map Cuotéalo or another installment option to Acuotaz by assumption.
+- Fixture: fresh ignored auth state; no payment data is required for availability/selection.
+- Flow/result: `npm run auth:verify` → TC39 saved-address setup → Payment → Acuotaz → expanded state and visible non-empty controlled panel → stop.
+- Known error: the latest inspection attempt expired during auth preflight, so availability is unconfirmed. If the button is absent after a fresh authenticated run, keep Pending and document ST2 configuration; if visible but a semantic locator misses it, correct the locator from the preserved trace.
+- Command: `npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --grep "TC82 pre-submit" --workers=1`.
+
+```js
+async selectAcuotaz() {
+  await this.selectPaymentMode(/^Acuotaz\b/i, '09-acuotaz-selected');
 }
 ```
 

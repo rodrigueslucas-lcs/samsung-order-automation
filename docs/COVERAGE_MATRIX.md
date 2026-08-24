@@ -103,8 +103,8 @@
 | 78 | Payment Mode | Customer able to place order using SafetyPay - Banca por Internet [pe-Bancapor] | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: authenticated saved-address checkout reached Payment and `Banca por Internet` became selected (`aria-expanded=true`); Place Order was intentionally not executed |
 | 79 | Payment Mode | Customer able to place order using Cash Payment [pe-pagoEfectivo]. Note: can only accept payment with maximum amount of S/ 10,000 | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: authenticated saved-address checkout reached Payment and `Pago Efectivo` became selected (`aria-expanded=true`); Place Order was intentionally not executed |
 | 80 | Payment Mode | Customer able to place order using Cuotéalo [pe-Cuotealo]. The maximum amount allowed is S/ 7,000.00 | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: Cuotéalo was available, expanded with `aria-expanded=true`, and its controlled payment panel rendered non-empty content; Place Order was not executed |
-| 81 | Payment Mode | Customer able to place order using Yape [pe-yape] | ⬜ Pending | — | — |
-| 82 | Payment Mode | Customer able to place order using Acuotaz | ⬜ Pending | — | — |
+| 81 | Payment Mode | Customer able to place order using Yape [pe-yape] | ⬜ Pending | — | Current Payment availability could not be revalidated because the authenticated preflight expired before Checkout; no fallback or Place Order was attempted |
+| 82 | Payment Mode | Customer able to place order using Acuotaz | ⬜ Pending | — | Current Payment availability could not be revalidated because the authenticated preflight expired before Checkout; no fallback or Place Order was attempted |
 | 83 | Mobile | Customer able to place order using own mobile | ⬜ Pending | — | Mobile responsive smoke exists, but TC83 remains pending because order placement on mobile is not yet covered |
 
 ## Supplementary ST2 Coverage

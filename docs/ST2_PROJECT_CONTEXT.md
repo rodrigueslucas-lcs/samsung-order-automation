@@ -40,6 +40,7 @@ The add-to-cart endpoint response is sufficient to continue to Cart; wait for SK
 - Preserve failure evidence when the defect occurs. Reinvestigate the completion step only after there is evidence that the ST2 fix was deployed.
 - Authenticated pre-submit checks for TC78 (`Banca por Internet`) and TC79 (`Pago Efectivo`) passed on 2026-08-24 by reusing TC39 through Payment and validating the selected accordion with `aria-expanded=true`. Both remain Partial because no Place Order was executed. A focused sequence later expired before the third test preflight; treat that as auth expiration, not a payment-mode failure.
 - Authenticated pre-submit checks for TC80 (`Cuotéalo`) and TC77 (credit/debit card) also passed on 2026-08-24. Cuotéalo expanded and rendered non-empty controlled-panel content. TC77 reused `selectCreditCard()`, `fillCardData(testData.card)` and installments, verified all required Mercado Pago fields plus cardholder data, and confirmed `Realizar pedido` was enabled without clicking it. Both remain Partial until an approved order succeeds after the backend fix.
+- A single planned Payment DOM inspection for TC81/TC82 stopped at the authenticated preflight because the reusable snapshot had expired. It produced no evidence about current Yape/Acuotaz availability. Keep both Pending, renew auth before the next inspection, and use `selectPaymentMode()` only if the corresponding semantic button is actually present.
 
 ## Authentication foundation
 
