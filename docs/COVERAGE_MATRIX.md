@@ -8,7 +8,7 @@
 
 | Scope | Total | Automated | Partial | Blocked | Not Applicable | Pending |
 |---|---:|---:|---:|---:|---:|---:|
-| Base Store | 83 | 40 | 11 | 5 | 2 | 25 |
+| Base Store | 83 | 45 | 11 | 13 | 2 | 12 |
 | EPP | ~60 | 0 | 0 | 0 | 0 | ~60 |
 
 ### Status Legend
@@ -86,19 +86,19 @@
 | 61 | Payment Page/Checkout Page | Customer able to navigate back to cart from Payment page, Checkout page using the Edit button | ✅ Automated | `tests/st2/base-store/payment/payment-navigation.spec.js`, `tests/st2/base-store/checkout/checkout.spec.js` | Passed - Payment → Cart and Checkout → Cart validated |
 | 62 | Confirmation Page | Customer able to see the confirmation after placing order. | ⬜ Pending | — | — |
 | 63 | Order Email | Customer able to received Order confirmation/ acknowledgment email | ⬜ Pending | — | — |
-| 64 | BackOffice | User able to login successfully in the BackOffice | ⬜ Pending | — | — |
-| 65 | BackOffice | User able to see order page(Admin view) | ⬜ Pending | — | — |
-| 66 | BackOffice | User able to see orderpage(CS Agent View) | ⬜ Pending | — | — |
-| 67 | BackOffice | User able to cancelled order via CS Agent View | ⬜ Pending | — | — |
-| 68 | BackOffice | User able to see the status of order is cancelled | ⬜ Pending | — | — |
-| 69 | BackOffice | User able to view cronjobs page | ⬜ Pending | — | — |
-| 70 | BackOffice | Verify we can not save changes into Anonymous's user addresses | ⬜ Pending | — | — |
-| 71 | Order Fullfillment | User able to search order via BackOffice order Page. | ⬜ Pending | — | — |
-| 72 | Order Fullfillment | User able to validate the initial status is on "Waiting for Send Financial" | ⬜ Pending | — | — |
-| 73 | Order Fullfillment | User able to run cronjob: tokoFinancialInitialUpdateJob | ⬜ Pending | — | — |
-| 74 | Order Fullfillment | User able to validate the updated order status is on "Order Split" | ⬜ Pending | — | — |
-| 75 | Order Fullfillment | User able to run cronjob: tokoTransferConsignmentToWarehouseJob | ⬜ Pending | — | — |
-| 76 | Order Fullfillment | User able to validate the updated order status is on "Shipping Requested" | ⬜ Pending | — | — |
+| 64 | BackOffice | User able to login successfully in the BackOffice | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Direct real-Chrome login passed twice with admin authority and authenticated perspective validation |
+| 65 | BackOffice | User able to see order page(Admin view) | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Passed with direct admin login and Orders page validation |
+| 66 | BackOffice | User able to see orderpage(CS Agent View) | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Passed with an independent direct agent login; `Customer Support`, `Order` and `Order-Enhanced` validated |
+| 67 | BackOffice | User able to cancelled order via CS Agent View | 🚧 Blocked | — | State-changing; no order has been proven disposable |
+| 68 | BackOffice | User able to see the status of order is cancelled | 🚧 Blocked | — | Depends on a safely cancelled order from TC67 |
+| 69 | BackOffice | User able to view cronjobs page | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Passed with direct admin login; both Peru job codes found without executing them |
+| 70 | BackOffice | Verify we can not save changes into Anonymous's user addresses | 🚧 Blocked | — | UID search returned an unproven masked record; Anonymous identity and safe address are not established |
+| 71 | Order Fullfillment | User able to search order via BackOffice order Page. | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Deterministic order lookup passed with direct login; supports `BACKOFFICE_ORDER_CODE` |
+| 72 | Order Fullfillment | User able to validate the initial status is on "Waiting for Send Financial" | 🚧 Blocked | — | No deterministic order in the required state was identified |
+| 73 | Order Fullfillment | User able to run cronjob: pe-tokoFinancialInitialUpdateJob | 🚧 Blocked | — | Job found; `Run CronJob` disabled and no higher available authority or safe affected mass |
+| 74 | Order Fullfillment | User able to validate the updated order status is on "Order Split" | 🚧 Blocked | — | No deterministic order in the required state was identified |
+| 75 | Order Fullfillment | User able to run cronjob: pe-tokoTransferConsignmentToWarehouseJob | 🚧 Blocked | — | Job found; execution disabled and affected mass is unproven |
+| 76 | Order Fullfillment | User able to validate the updated order status is on "Shipping Requested" | 🚧 Blocked | — | No deterministic order in the required state was identified |
 | 77 | Payment Mode | Customer able to place order using Credit Card [pe-mercadoCC] (Master, Visa, AMX) | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: existing Mercado Pago sandbox data, installments and required iframe fields were populated and `Realizar pedido` became enabled; the button was not clicked |
 | 78 | Payment Mode | Customer able to place order using SafetyPay - Banca por Internet [pe-Bancapor] | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: authenticated saved-address checkout reached Payment and `Banca por Internet` became selected (`aria-expanded=true`); Place Order was intentionally not executed |
 | 79 | Payment Mode | Customer able to place order using Cash Payment [pe-pagoEfectivo]. Note: can only accept payment with maximum amount of S/ 10,000 | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: authenticated saved-address checkout reached Payment and `Pago Efectivo` became selected (`aria-expanded=true`); Place Order was intentionally not executed |
