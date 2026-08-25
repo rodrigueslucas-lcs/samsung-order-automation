@@ -8,7 +8,7 @@
 
 | Scope | Total | Automated | Partial | Blocked | Not Applicable | Pending |
 |---|---:|---:|---:|---:|---:|---:|
-| Base Store | 83 | 35 | 11 | 5 | 2 | 30 |
+| Base Store | 83 | 40 | 11 | 5 | 2 | 25 |
 | EPP | ~60 | 0 | 0 | 0 | 0 | ~60 |
 
 ### Status Legend
@@ -45,11 +45,11 @@
 | 20 | Cart Page | Customer able to see Checkout Button | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
 | 21 | Externale Services | Customer able to see external services such Trade-in or Samsung Care Plus. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed with Samsung Care+ / Services available for current SKU |
 | 22 | Externale Services | Customer able to see the Footer for Cart Page | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
-| 23 | Externale Services | Customer able to click the trade-in button. | ⬜ Pending | — | — |
-| 24 | Externale Services | Customer able to navigate on Pop- up customer journey in adding Trade-In. | ⬜ Pending | — | — |
-| 25 | Externale Services | Customer able to see the trade-in amount on the last pop-up in the customer Journey in adding Trade-In. | ⬜ Pending | — | — |
-| 26 | Externale Services | Customer able to successfully added Trade-in In the cart page. | ⬜ Pending | — | — |
-| 27 | Externale Services | Customer able to see the Trade-in Amount in the summary. | ⬜ Pending | — | — |
+| 23 | Externale Services | Customer able to click the trade-in button. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed - Plan Canje Galaxy entry opened successfully with the functional two-SKU cart setup |
+| 24 | Externale Services | Customer able to navigate on Pop- up customer journey in adding Trade-In. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed - completed SMARTPHONE → Samsung → Galaxy S25 → 256GB → IMEI → device-condition → terms → Finalizar flow |
+| 25 | Externale Services | Customer able to see the trade-in amount on the last pop-up in the customer Journey in adding Trade-In. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed - final Trade-in review displayed estimated value S/ 1,100.00 for Galaxy S25 256GB |
+| 26 | Externale Services | Customer able to successfully added Trade-in In the cart page. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed - Plan Canje Galaxy successfully applied and confirmed in Cart |
+| 27 | Externale Services | Customer able to see the Trade-in Amount in the summary. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed - Trade-in summary displayed - S/ 1,100.00 |
 | 28 | Externale Services | Customer able to click the Samsung Care Plus Button | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Automation implemented and validated previously; current modal opens but remains at `Cargando página...` after the External Services endpoint returns HTTP 400 |
 | 29 | Externale Services | Customer able to navigate on Pop-up Customer Journey in adding Samsung Care Plus. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Automation implemented and validated previously; current modal journey cannot render beyond `Cargando página...` after the External Services endpoint returns HTTP 400 |
 | 30 | Externale Services | Customer able to successfully added Samsung Care Plus In the cart page. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed with functional Additional Services setup using RB45DG6300B1PE + SM-F741BLBKPEO; Samsung Care+ was added successfully to Cart |
