@@ -43,6 +43,37 @@ export default class HomePage extends BasePage {
     }
   }
 
+  async openGuestOrders() {
+   await this.footer.scrollIntoViewIfNeeded();
+   const ordersEntry = this.footer
+     .getByText("Pedidos", { exact: true })
+     .filter({ visible: true });
+   await ordersEntry.waitFor({
+     state: "visible",
+     timeout: 30000,
+   });
+   const popupPromise = this.page.context().waitForEvent("page", {
+     timeout: 30000,
+   });
+   await ordersEntry.click();
+   const ordersPage = await popupPromise;
+   await ordersPage.waitForLoadState("domcontentloaded", {
+     timeout: 60000,
+   });
+   const url = new URL(ordersPage.url());
+   if (!/samsung\.com$/i.test(url.hostname) &&
+       !/\.samsung\.com$/i.test(url.hostname)) {
+     throw new Error(
+       `Unexpected orders/tracking destination: ${ordersPage.url()}`
+     );
+   }
+   if (!/\/pe\//i.test(url.pathname)) {
+     throw new Error(
+       `Orders/tracking destination is not Peru: ${ordersPage.url()}`
+     );
+   }
+   return ordersPage;
+ }
   async validateHomepageAttributes() {
     await this.header
       .getByRole("link", { name: "Homepage" })

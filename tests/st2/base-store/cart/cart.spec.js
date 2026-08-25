@@ -174,6 +174,176 @@ test.describe("ST2 - Base Store - Cart Page", () => {
    await cartPage.validateSamsungCareJourney();
  });
 
+ test("TC23 - Customer able to click the Trade-in button", async ({ page }) => {
+
+   test.setTimeout(180000);
+
+   const productPage = new ProductPage(page);
+
+   const cartPage = new CartPage(page);
+
+   await productPage.validateProductLoaded();
+
+   await productPage.addToCartForAdditionalServices();
+
+   await cartPage.openTradeInJourney();
+
+ });
+
+ test("TC24 - Customer able to navigate Trade-in customer journey", async ({ page }) => {
+   test.setTimeout(240000);
+
+   const productPage = new ProductPage(page);
+   const cartPage = new CartPage(page);
+
+   await productPage.validateProductLoaded();
+   await productPage.addToCartForAdditionalServices();
+
+   await cartPage.openTradeInJourney();
+   await cartPage.completeTradeInJourney();
+   await cartPage.validateTradeInAdded();
+ });
+
+ test("TC25 - Customer able to see the trade-in amount on the last pop-up", async ({ page }) => {
+   test.setTimeout(240000);
+
+   const productPage = new ProductPage(page);
+   const cartPage = new CartPage(page);
+
+   await productPage.validateProductLoaded();
+   await productPage.addToCartForAdditionalServices();
+
+   await cartPage.openTradeInJourney();
+   await cartPage.completeTradeInJourney();
+ });
+
+ test("TC26 - Customer able to successfully add Trade-in in the cart page", async ({ page }) => {
+   test.setTimeout(240000);
+
+   const productPage = new ProductPage(page);
+   const cartPage = new CartPage(page);
+
+   await productPage.validateProductLoaded();
+   await productPage.addToCartForAdditionalServices();
+
+   await cartPage.openTradeInJourney();
+   await cartPage.completeTradeInJourney();
+   await cartPage.validateTradeInAdded();
+ });
+
+ test("TC27 - Customer able to see the Trade-in amount in the summary", async ({ page }) => {
+   test.setTimeout(240000);
+
+   const productPage = new ProductPage(page);
+   const cartPage = new CartPage(page);
+
+   await productPage.validateProductLoaded();
+   await productPage.addToCartForAdditionalServices();
+
+   await cartPage.openTradeInJourney();
+   await cartPage.completeTradeInJourney();
+   await cartPage.validateTradeInAdded();
+   await cartPage.validateTradeInSummaryAmount();
+ });
+
+ test("TC30 - Customer able to successfully add Samsung Care Plus in the cart page", async ({ page }) => {
+
+   test.setTimeout(180000);
+
+   const productPage = new ProductPage(page);
+
+   const cartPage = new CartPage(page);
+
+   await productPage.validateProductLoaded();
+
+   await productPage.addToCartForAdditionalServices();
+
+   await cartPage.addFunctionalAdditionalService();
+
+   await cartPage.validateAddedAdditionalService();
+
+ });
+
+ test("TC31 - Customer able to see the Samsung Care Plus amount in the summary", async ({ page }) => {
+
+   test.setTimeout(180000);
+
+   const productPage = new ProductPage(page);
+
+   const cartPage = new CartPage(page);
+
+   await productPage.validateProductLoaded();
+
+   await productPage.addToCartForAdditionalServices();
+
+   await cartPage.addFunctionalAdditionalService();
+
+   await cartPage.validateAddedAdditionalService();
+
+   const summary = page
+
+     .getByRole("heading", { name: /Resumen de la orden/i })
+
+     .locator("..");
+
+   await summary
+
+     .getByText(/SC\+.*Mantenimiento preventivo.*French Door.*2 años/i)
+
+     .waitFor({ state: "visible", timeout: 30000 });
+
+   await summary
+
+     .getByText("S/ 389.00", { exact: true })
+
+     .waitFor({ state: "visible", timeout: 30000 });
+
+ });
+
+ test("TC32 - Total price changes after Samsung Care Plus is applied", async ({ page }) => {
+
+   test.setTimeout(180000);
+
+   const productPage = new ProductPage(page);
+
+   const cartPage = new CartPage(page);
+
+   await productPage.validateProductLoaded();
+
+   await productPage.addToCartForAdditionalServices();
+
+   const totalBefore = await cartPage.readCartTotal();
+
+   await cartPage.addFunctionalAdditionalService();
+
+   await cartPage.validateAddedAdditionalService();
+
+   const totalAfter = await cartPage.readCartTotal();
+
+   if (totalAfter <= totalBefore) {
+
+     throw new Error(
+
+       `Cart total did not increase after adding Samsung Care+. Before: ${totalBefore}, After: ${totalAfter}`
+
+     );
+
+   }
+
+   const expectedDifference = 389;
+
+   if (Math.abs((totalAfter - totalBefore) - expectedDifference) > 0.01) {
+
+     throw new Error(
+
+       `Unexpected Samsung Care+ total difference. Before: ${totalBefore}, After: ${totalAfter}`
+
+     );
+
+   }
+
+ });
+
  test("Cart - available payment methods are displayed", async ({ page }) => {
    test.setTimeout(180000);
    const productPage = new ProductPage(page);

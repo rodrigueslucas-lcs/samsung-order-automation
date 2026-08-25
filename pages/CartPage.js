@@ -370,6 +370,556 @@ export default class CartPage extends BasePage {
 
 
 
+  async openTradeInJourney() {
+
+    const main = this.page.getByRole("main");
+
+    const tradeInButton = main.getByRole("button", {
+
+      name: "Añadir Plan Canje Galaxy",
+
+      exact: true,
+
+    });
+
+    await tradeInButton.waitFor({
+
+      state: "visible",
+
+      timeout: 30000,
+
+    });
+
+    await tradeInButton.scrollIntoViewIfNeeded();
+
+    await tradeInButton.click();
+
+    // Trade-in must produce an observable journey UI.
+
+    const journey = this.page
+
+      .getByRole("dialog")
+
+      .filter({ visible: true });
+
+    await journey.waitFor({
+
+      state: "visible",
+
+      timeout: 30000,
+
+    });
+
+    await this.screenshot("cart-trade-in-journey-open");
+
+    return journey;
+
+  }
+
+  async clickTradeInContinue(dialog) {
+    const continueButton = dialog.getByRole("button", {
+      name: "Continuar",
+      exact: true,
+    });
+
+    await continueButton.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    const timeoutAt = Date.now() + 30000;
+
+    while (!(await continueButton.isEnabled())) {
+      if (Date.now() > timeoutAt) {
+        throw new Error("Trade-in Continuar button did not become enabled.");
+      }
+
+      await this.page.waitForTimeout(250);
+    }
+
+    await continueButton.click();
+  }
+
+  async completeTradeInJourney() {
+    const dialog = this.page.getByRole("dialog").filter({ visible: true });
+
+    await dialog
+      .getByText("Selecciona tu equipo a reciclar", { exact: true })
+      .waitFor({
+        state: "visible",
+        timeout: 30000,
+      });
+
+    // Category
+    const smartphone = dialog.getByText("SMARTPHONE", { exact: true });
+    await smartphone.waitFor({ state: "visible", timeout: 30000 });
+    await smartphone.click();
+
+    // Brand
+    const samsungSelection = dialog.getByText("Samsung", {
+      exact: true,
+    }).first();
+
+    await samsungSelection.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    // Open brand selector only if necessary.
+    await samsungSelection.click();
+
+    const samsungOption = dialog
+      .locator(".trade-in_dropdown-list")
+      .getByText("Samsung", { exact: true });
+
+    if (await samsungOption.count()) {
+      await samsungOption.first().click();
+    }
+
+    // Model - dropdown already expanded; click the real option text element
+    const galaxyS25Option = dialog
+      .locator("span.option-brand", {
+        hasText: "Galaxy S25",
+      })
+      .first();
+
+    await galaxyS25Option.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await galaxyS25Option.click();
+
+    // Capacity is automatically populated for Galaxy S25.
+    await dialog
+      .getByText("256GB", { exact: true })
+      .first()
+      .waitFor({
+        state: "visible",
+        timeout: 30000,
+      });
+
+    const selectedDeviceCard = dialog
+      .getByRole("heading", {
+        name: "Galaxy S25 | 256GB",
+        exact: true,
+      })
+      .locator("..");
+
+    await selectedDeviceCard
+      .getByText("Valoración estimada", { exact: true })
+      .waitFor({
+        state: "visible",
+        timeout: 30000,
+      });
+
+    await selectedDeviceCard
+      .getByText("S/ 1,100.00", { exact: true })
+      .waitFor({
+        state: "visible",
+        timeout: 30000,
+      });
+
+    await this.clickTradeInContinue(dialog);
+
+    // IMEI
+    await dialog
+      .getByText(/Casi listo.*número de IMEI/i)
+      .waitFor({
+        state: "visible",
+        timeout: 30000,
+      });
+
+    const imeiInput = dialog.getByRole("textbox");
+
+    await imeiInput.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await imeiInput.fill("517295184717843");
+
+    await dialog
+      .getByText(/IMEI es válido/i)
+      .waitFor({
+        state: "visible",
+        timeout: 30000,
+      });
+
+    await this.clickTradeInContinue(dialog);
+
+    // Device condition
+    await dialog
+      .getByRole("heading", {
+        name: /Último paso.*buenas condiciones/i,
+      })
+      .waitFor({
+        state: "visible",
+        timeout: 30000,
+      });
+
+    const yesOptions = dialog.getByRole("radio", {
+      name: "Si",
+      exact: true,
+    });
+
+    await yesOptions.first().waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    const yesCount = await yesOptions.count();
+
+    if (yesCount !== 3) {
+      throw new Error(
+        `Expected exactly 3 Trade-in "Si" options, received ${yesCount}.`
+      );
+    }
+
+    for (let i = 0; i < 3; i++) {
+      const radio = yesOptions.nth(i);
+
+      const mdcRadio = radio.locator("..");
+      const touchTarget = mdcRadio.locator(".mat-mdc-radio-touch-target");
+
+      await touchTarget.click();
+
+      if (!(await radio.isChecked())) {
+        throw new Error(
+          `Trade-in condition radio Si ${i + 1} was not selected.`
+        );
+      }
+    }
+
+    await this.clickTradeInContinue(dialog);
+
+    // Final review
+    await dialog
+      .getByText(
+        /Entrega tu smartphone actual y recibe tu bonificación/i
+      )
+      .waitFor({
+        state: "visible",
+        timeout: 30000,
+      });
+
+    await dialog
+      .getByText(/Galaxy S25\s*\|\s*256GB/i)
+      .waitFor({
+        state: "visible",
+        timeout: 30000,
+      });
+
+    await dialog
+      .getByText("S/ 1,100.00", { exact: true })
+      .last()
+      .waitFor({
+        state: "visible",
+        timeout: 30000,
+      });
+
+    await this.screenshot("cart-trade-in-final-review");
+
+    const termsCheckbox = dialog.getByRole("checkbox");
+
+    await termsCheckbox.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    if (!(await termsCheckbox.isChecked())) {
+      await termsCheckbox.check();
+    }
+
+    const finishButton = dialog.getByRole("button", {
+      name: "Finalizar",
+      exact: true,
+    });
+
+    await finishButton.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    if (!(await finishButton.isEnabled())) {
+      throw new Error(
+        "Trade-in Finalizar button did not become enabled."
+      );
+    }
+
+    await finishButton.click();
+
+    await dialog.waitFor({
+      state: "hidden",
+      timeout: 30000,
+    });
+
+    await this.screenshot("cart-trade-in-added");
+  }
+
+  async validateTradeInAdded() {
+    const main = this.page.getByRole("main");
+
+    const tradeInBlock = main
+      .getByRole("heading", {
+        name: /Plan Canje Galaxy/i,
+      })
+      .first()
+      .locator("..");
+
+    await tradeInBlock
+      .getByText("Galaxy S25 | 256GB", { exact: true })
+      .waitFor({
+        state: "visible",
+        timeout: 30000,
+      });
+
+    await tradeInBlock
+      .getByText("-S/ 1,100.00", { exact: true })
+      .waitFor({
+        state: "visible",
+        timeout: 30000,
+      });
+
+    await tradeInBlock
+      .getByText(/Se aplicó correctamente el Plan Canje Galaxy/i)
+      .waitFor({
+        state: "visible",
+        timeout: 30000,
+      });
+
+    await this.screenshot("cart-trade-in-confirmed");
+  }
+
+  async validateTradeInSummaryAmount() {
+    const main = this.page.getByRole("main");
+
+    await main
+      .getByText(
+        /El valor estimado de tu Galaxy S25\s*\|\s*256GB es de hasta S\/\s*1,100\.00/i
+      )
+      .waitFor({
+        state: "visible",
+        timeout: 30000,
+      });
+
+    await main
+      .getByText("- S/ 1,100.00", {
+        exact: true,
+      })
+      .waitFor({
+        state: "visible",
+        timeout: 30000,
+      });
+
+    await this.screenshot("cart-trade-in-summary");
+  }
+
+  async addFunctionalAdditionalService() {
+
+    const main = this.page.getByRole("main");
+
+    const addServiceButton = main.locator(
+     'button[data-an-la="add service:samsung care"]'
+   );
+    await addServiceButton.waitFor({
+
+      state: "visible",
+
+      timeout: 30000,
+
+    });
+
+    await addServiceButton.click();
+
+    const dialog = this.page.getByRole("dialog").filter({ visible: true });
+
+    const servicesHeading = dialog.getByRole("heading", {
+
+      name: "Servicios Adicionales",
+
+      level: 1,
+
+    });
+
+    await servicesHeading.waitFor({
+
+      state: "visible",
+
+      timeout: 30000,
+
+    });
+
+    const serviceOption = dialog.getByRole("radio", {
+
+      name: /SC\+.*Mantenimiento preventivo.*French Door.*2 años/i,
+
+    });
+
+    await serviceOption.waitFor({
+
+      state: "visible",
+
+      timeout: 30000,
+
+    });
+
+    if (!(await serviceOption.isChecked())) {
+
+      await serviceOption.check();
+
+    }
+
+    const termsCheckbox = dialog.getByRole("checkbox");
+
+    await termsCheckbox.waitFor({
+
+      state: "visible",
+
+      timeout: 30000,
+
+    });
+
+    const addToCartButton = dialog.getByRole("button", {
+
+      name: "Agregar al carrito",
+
+      exact: true,
+
+    });
+
+    await addToCartButton.waitFor({
+
+      state: "visible",
+
+      timeout: 30000,
+
+    });
+
+    if (await addToCartButton.isEnabled()) {
+
+      throw new Error(
+
+        "Agregar al carrito should be disabled before accepting the terms."
+
+      );
+
+    }
+
+    await termsCheckbox.check();
+
+    if (!(await addToCartButton.isEnabled())) {
+
+      throw new Error(
+
+        "Agregar al carrito did not become enabled after accepting the terms."
+
+      );
+
+    }
+
+    await this.screenshot("cart-functional-additional-service-ready");
+
+    await addToCartButton.click();
+
+    await servicesHeading.waitFor({
+
+      state: "hidden",
+
+      timeout: 30000,
+
+    });
+
+    await this.screenshot("cart-functional-additional-service-added");
+
+  }
+
+  async validateAddedAdditionalService() {
+
+    const serviceItem = this.page
+
+      .getByRole("main")
+
+      .locator("app-service-item-smc");
+
+    await serviceItem
+
+      .getByText(
+
+        /SC\+.*Mantenimiento preventivo.*French Door.*2 años/i
+
+      )
+
+      .waitFor({
+
+        state: "visible",
+
+        timeout: 30000,
+
+      });
+
+    await serviceItem
+
+      .getByText("Servicio adicional agregado con éxito.", {
+
+        exact: true,
+
+      })
+
+      .waitFor({
+
+        state: "visible",
+
+        timeout: 30000,
+
+      });
+
+    await serviceItem
+
+      .getByText("S/ 389.00", {
+
+        exact: true,
+
+      })
+
+      .waitFor({
+
+        state: "visible",
+
+        timeout: 30000,
+
+      });
+
+    await this.screenshot("cart-additional-service-added");
+
+  }
+
+  async readCartTotal() {
+
+    await this.totalTitle.waitFor({
+
+      state: "visible",
+
+      timeout: 30000,
+
+    });
+
+    const container = this.totalTitle.locator("..");
+
+    const text = await container.innerText();
+
+    const match = text.match(/S\/\s*([\d,.]+)/);
+
+    if (!match) {
+
+      throw new Error(`Cart Total value was not found. Content: ${text}`);
+
+    }
+
+    return Number(match[1].replace(/,/g, ""));
+
+  }
+
   async validateQuantityLowerBoundary() {
 
     const quantityInput = this.page.getByRole("textbox", {

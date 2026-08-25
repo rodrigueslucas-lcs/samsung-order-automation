@@ -8,7 +8,7 @@
 
 | Scope | Total | Automated | Partial | Blocked | Not Applicable | Pending |
 |---|---:|---:|---:|---:|---:|---:|
-| Base Store | 83 | 32 | 6 | 5 | 2 | 38 |
+| Base Store | 83 | 35 | 11 | 5 | 2 | 30 |
 | EPP | ~60 | 0 | 0 | 0 | 0 | ~60 |
 
 ### Status Legend
@@ -23,11 +23,11 @@
 
 | No. | Functionality | Test Scenario | Automation Status | File | Notes |
 |---:|---|---|---|---|---|
-| 1 | Login Page | Customer able to login as register User from Home Page (My Account) | ⬜ Pending | — | — |
-| 2 | Login Page | Customer able to login from Home Page(My Account) via shop menu | ⬜ Pending | — | — |
+| 1 | Login Page | Customer able to login as register User from Home Page (My Account) | ⚠️ Partial | `tests/st2/base-store/home/login.spec.js` | Registered authenticated session validated from Home; full Google/FedCM/MFA login is intentionally not automated |
+| 2 | Login Page | Customer able to login from Home Page(My Account) via shop menu | ⚠️ Partial | `tests/st2/base-store/home/login.spec.js` | Authenticated Profile entry through the Home header validated; full identity-provider login is intentionally not automated |
 | 3 | Login Page | Customer able to login from Checkout Page | ⚠️ Partial | `tests/st2/base-store/checkout/checkout.spec.js` | Passed pre-auth: Product→Cart→Checkout exposed `Samsung Checkout Express` and navigated to `account.samsung.com/iam/*`; credentials/FedCM/MFA were intentionally not automated |
 | 4 | Login Page | Customer able to login from Order Confirmation Email (If Applicable) | ⬜ Pending | — | — |
-| 5 | Login Page | Guest Customer, able to place order until Cart Page. Then Customer able to login from Checkout Page. | ⬜ Pending | — | — |
+| 5 | Login Page | Guest Customer, able to place order until Cart Page. Then Customer able to login from Checkout Page. | ⚠️ Partial | `tests/st2/base-store/checkout/checkout.spec.js` | Product→Cart checkpoint and registered-login entry from Checkout passed; external Samsung Account authentication was not automated |
 | 6 | MyAccount Page | Customer able hover on the Profile Icon and verify the Login/Sign-up & MyOrder Page Link. | 🚧 Blocked | — | Login/Register render consistently, but the dynamic `Mis pedidos` item was intermittent: one pass followed by two repeat failures in the same ST2 environment |
 | 7 | MyAccount Page | Customer able to see all the saved shipping and billing addresses in the My Profile Page. | 🚧 Blocked | — | Authenticated user header and Logout are available, but the current ST2 menu exposes no working My Profile/address entry point; the visible user menu item timed out on a normal click |
 | 8 | MyAccount Page | Customer able to add, edit &delete address for shipping & billing address. | 🚧 Blocked | — | The current ST2 UI exposes no working My Profile/address entry point, and no disposable QA address could be identified safely; pre-existing account data was not modified |
@@ -35,7 +35,7 @@
 | 10 | MyAccount Page | Customer able to set default address for shipping & billing. | ⬜ Pending | — | — |
 | 11 | MyAccount Page | Customer able to verify the populated address is same on what is default address for shipping & billing in the Profile Setting. | ⬜ Pending | — | — |
 | 12 | MyAccount Page | Customer able to see Order List/ Order Details in My Orders Page. | 🚧 Blocked | — | Reusable authenticated state is proven, but `Mis pedidos` is currently absent from both the reusable and live authenticated menus despite `/users/current` and `checkAccess` returning HTTP 200; existing order data is also not yet confirmed |
-| 13 | MyAccount Page | Customer able to verify Tracking Order Page (Includes Guest) | ⬜ Pending | — | Current Home footer exposes visible `Pedidos` as a JavaScript-controlled `<a target="_blank">` with no `href`; destination and required guest order data are not yet proven |
+| 13 | MyAccount Page | Customer able to verify Tracking Order Page (Includes Guest) | ⚠️ Partial | `tests/st2/base-store/home/tracking.spec.js` | Guest `Pedidos` entry from the Home footer successfully opened and the Samsung Peru orders/tracking destination was validated; disposable guest order number/email is still required for full tracking validation |
 | 14 | Home Page | Customer able to see Homepage Attributes (Header, Hero banner, Top seller carousel, Footer) | ⚠️ Partial | `tests/st2/base-store/home/home.spec.js` | Header and Footer available; Hero banner and Top seller carousel are not rendered in current ST2 Home |
 | 15 | Cart Page | Customer able to see the Cart Page | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
 | 16 | Cart Page | Customer able to verify cart page (Products added displays correctly) | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
@@ -52,9 +52,9 @@
 | 27 | Externale Services | Customer able to see the Trade-in Amount in the summary. | ⬜ Pending | — | — |
 | 28 | Externale Services | Customer able to click the Samsung Care Plus Button | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Automation implemented and validated previously; current modal opens but remains at `Cargando página...` after the External Services endpoint returns HTTP 400 |
 | 29 | Externale Services | Customer able to navigate on Pop-up Customer Journey in adding Samsung Care Plus. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Automation implemented and validated previously; current modal journey cannot render beyond `Cargando página...` after the External Services endpoint returns HTTP 400 |
-| 30 | Externale Services | Customer able to successfully added Samsung Care Plus In the cart page. | ⬜ Pending | — | — |
-| 31 | Externale Services | Customer able to see the Samsung Care Plus Amount in the summary. | ⬜ Pending | — | — |
-| 32 | Externale Services | Total price should change after Trade-In/ SC+ is applied in the cart. Note: Please Keep the Screenshot for future reference | ⬜ Pending | — | — |
+| 30 | Externale Services | Customer able to successfully added Samsung Care Plus In the cart page. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed with functional Additional Services setup using RB45DG6300B1PE + SM-F741BLBKPEO; Samsung Care+ was added successfully to Cart |
+| 31 | Externale Services | Customer able to see the Samsung Care Plus Amount in the summary. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed - added Samsung Care+ amount S/ 389.00 was validated in the Order Summary |
+| 32 | Externale Services | Total price should change after Trade-In/ SC+ is applied in the cart. Note: Please Keep the Screenshot for future reference | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed - Cart total increased by S/ 389.00 after Samsung Care+ was applied; screenshots captured as evidence |
 | 33 | Cart Page | Customer able to navigate to Checkout Page, when click the Checkout Button. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
 | 34 | Checkout Page | Customer able to see Checkout Login Page | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
 | 35 | Checkout Page | Customer able to see the Checkout Address Page | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
@@ -105,7 +105,7 @@
 | 80 | Payment Mode | Customer able to place order using Cuotéalo [pe-Cuotealo]. The maximum amount allowed is S/ 7,000.00 | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: Cuotéalo was available, expanded with `aria-expanded=true`, and its controlled payment panel rendered non-empty content; Place Order was not executed |
 | 81 | Payment Mode | Customer able to place order using Yape [pe-yape] | ⬜ Pending | — | Current Payment availability could not be revalidated because the authenticated preflight expired before Checkout; no fallback or Place Order was attempted |
 | 82 | Payment Mode | Customer able to place order using Acuotaz | ⬜ Pending | — | Current Payment availability could not be revalidated because the authenticated preflight expired before Checkout; no fallback or Place Order was attempted |
-| 83 | Mobile | Customer able to place order using own mobile | ⬜ Pending | — | Mobile responsive smoke exists, but TC83 remains pending because order placement on mobile is not yet covered |
+| 83 | Mobile | Customer able to place order using own mobile | ⚠️ Partial | `tests/st2/base-store/mobile/mobile-order.spec.js` | Mobile guest checkout passed twice at 390x844 through Payment with credit card data ready pre-submit; Place Order was intentionally not executed due to the known post-submit defect |
 
 ## Supplementary ST2 Coverage
 
