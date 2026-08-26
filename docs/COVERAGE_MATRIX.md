@@ -9,7 +9,7 @@
 
 | Scope | Total | Automated | Partial | Blocked | Not Applicable | Pending |
 |---|---:|---:|---:|---:|---:|---:|
-| Base Store | 83 | 50 | 12 | 8 | 2 | 11 |
+| Base Store | 83 | 53 | 11 | 7 | 2 | 10 |
 | EPP | ~60 | 0 | 0 | 0 | 0 | ~60 |
 
 ### Status Legend
@@ -81,11 +81,11 @@
 | 55 | Payment Page | Customer able to see the price break down. | ✅ Automated | `tests/st2/base-store/payment/payment.spec.js` | Passed |
 | 56 | Payment Page | Customer able to see the address for Shipping and Billing | ✅ Automated | `tests/st2/base-store/payment/payment.spec.js` | Passed |
 | 57 | Payment Page | Customer able to see all available Payment mode | ✅ Automated | `tests/st2/base-store/payment/payment.spec.js` | Passed |
-| 58 | Payment Page | Customer able to complete order using one payment mode. | 🚧 Blocked | `tests/st2/base-store/payment/payment.spec.js` | Automation reaches submit successfully; blocked by ST2 backend/siteId transaction issue |
+| 58 | Payment Page | Customer able to complete order using one payment mode. | ✅ Automated | `tests/st2/base-store/payment/payment.spec.js` | Passed in ST2 - complete Credit Card checkout submitted successfully and created order `PE260826-74728051`; previous backend/siteId blocker was not reproduced |
 | 59 | Customer Order Journey | Customer able to place one IM order with Trade-in and SC+. (If there is available data) | ⬜ Pending | — | — |
 | 60 | Customer Order Journey | Customer able to place one CE order. (If there is available data) | ⬜ Pending | — | — |
 | 61 | Payment Page/Checkout Page | Customer able to navigate back to cart from Payment page, Checkout page using the Edit button | ✅ Automated | `tests/st2/base-store/payment/payment-navigation.spec.js`, `tests/st2/base-store/checkout/checkout.spec.js` | Passed - Payment → Cart and Checkout → Cart validated |
-| 62 | Confirmation Page | Customer able to see the confirmation after placing order. | ⬜ Pending | — | — |
+| 62 | Confirmation Page | Customer able to see the confirmation after placing order. | ✅ Automated | `tests/st2/base-store/smoke/guest-checkout.spec.js` | Passed in ST2 - Order Confirmation displayed successfully and order number `PE260826-74728051` was validated |
 | 63 | Order Email | Customer able to received Order confirmation/ acknowledgment email | ⬜ Pending | — | — |
 | 64 | BackOffice | User able to login successfully in the BackOffice | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Direct real-Chrome login passed twice with admin authority and authenticated perspective validation |
 | 65 | BackOffice | User able to see order page(Admin view) | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Passed with direct admin login and Orders page validation |
@@ -100,7 +100,7 @@
 | 74 | Order Fullfillment | User able to validate the updated order status is on "Order Split" | ✅ Automated | `tests/st2/backoffice/backoffice-fulfillment.spec.js` | Passed in S3 as an independent status checkpoint. The tracked FI order remained blocked by ERP/FI data, which is annotated separately as an external blocker |
 | 75 | Order Fullfillment | User able to run cronjob: pe-tokoTransferConsignmentToWarehouseJob | ✅ Automated | `tests/st2/backoffice/backoffice-fulfillment.spec.js` | Passed in S3 with full admin: warehouse CronJob executed and completed `FINISHED / SUCCESS` |
 | 76 | Order Fullfillment | User able to validate the updated order status is on "Shipping Requested" | ✅ Automated | `tests/st2/backoffice/backoffice-fulfillment.spec.js` | Passed in S3 as an independent status checkpoint. The tracked Order Split mass remained blocked by NERP data, annotated separately as an external blocker |
-| 77 | Payment Mode | Customer able to place order using Credit Card [pe-mercadoCC] (Master, Visa, AMX) | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: existing Mercado Pago sandbox data, installments and required iframe fields were populated and `Realizar pedido` became enabled; the button was not clicked |
+| 77 | Payment Mode | Customer able to place order using Credit Card [pe-mercadoCC] (Master, Visa, AMX) | ✅ Automated | `tests/st2/base-store/smoke/guest-checkout.spec.js` | Passed in ST2 - Credit Card payment was submitted successfully and resulted in confirmed order `PE260826-74728051` |
 | 78 | Payment Mode | Customer able to place order using SafetyPay - Banca por Internet [pe-Bancapor] | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: authenticated saved-address checkout reached Payment and `Banca por Internet` became selected (`aria-expanded=true`); Place Order was intentionally not executed |
 | 79 | Payment Mode | Customer able to place order using Cash Payment [pe-pagoEfectivo]. Note: can only accept payment with maximum amount of S/ 10,000 | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: authenticated saved-address checkout reached Payment and `Pago Efectivo` became selected (`aria-expanded=true`); Place Order was intentionally not executed |
 | 80 | Payment Mode | Customer able to place order using Cuotéalo [pe-Cuotealo]. The maximum amount allowed is S/ 7,000.00 | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: Cuotéalo was available, expanded with `aria-expanded=true`, and its controlled payment panel rendered non-empty content; Place Order was not executed |

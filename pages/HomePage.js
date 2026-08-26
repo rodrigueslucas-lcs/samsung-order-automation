@@ -57,6 +57,9 @@ export default class HomePage extends BasePage {
    });
    await ordersEntry.click();
    const ordersPage = await popupPromise;
+   await ordersPage.waitForURL(/https:\/\/[^/]*samsung\.com\/pe\//i, {
+     timeout: 60000,
+   });
    await ordersPage.waitForLoadState("domcontentloaded", {
      timeout: 60000,
    });
