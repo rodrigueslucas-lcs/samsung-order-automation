@@ -1,14 +1,15 @@
-# ST2 Peru - Detailed Smoke Automation Coverage
+# Peru - Detailed Smoke Automation Coverage
 
-**Environment:** ST2 Peru  
+**Environment:** Peru ST2 / S3  
 **Framework:** Playwright  
-**Last Updated:** 2026-08-24
+**Last Updated:** 2026-08-26  
+**Current validation rule:** Until environment-specific matrices are split, a scenario is marked Automated when it has been successfully validated in either Peru staging environment (ST2 or S3). Environment-specific evidence and blockers remain documented in Notes.
 
 ## Summary
 
 | Scope | Total | Automated | Partial | Blocked | Not Applicable | Pending |
 |---|---:|---:|---:|---:|---:|---:|
-| Base Store | 83 | 45 | 12 | 13 | 2 | 11 |
+| Base Store | 83 | 50 | 12 | 8 | 2 | 11 |
 | EPP | ~60 | 0 | 0 | 0 | 0 | ~60 |
 
 ### Status Legend
@@ -89,16 +90,16 @@
 | 64 | BackOffice | User able to login successfully in the BackOffice | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Direct real-Chrome login passed twice with admin authority and authenticated perspective validation |
 | 65 | BackOffice | User able to see order page(Admin view) | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Passed with direct admin login and Orders page validation |
 | 66 | BackOffice | User able to see orderpage(CS Agent View) | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Passed with an independent direct agent login; `Customer Support`, `Order` and `Order-Enhanced` validated |
-| 67 | BackOffice | User able to cancelled order via CS Agent View | 🚧 Blocked | — | Official ST2 remains blocked. S3 headed discovery reached Cancel on valid lifecycle states, but available mass exposed no selectable product/reason/Confirm Selected; no order was changed |
-| 68 | BackOffice | User able to see the status of order is cancelled | 🚧 Blocked | — | Official ST2 remains blocked and causal S3 validation depends on completing TC67 on the same order |
-| 69 | BackOffice | User able to view cronjobs page | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Passed with direct admin login; both Peru job codes found without executing them |
+| 67 | BackOffice | User able to cancelled order via CS Agent View | 🚧 Blocked | — | S3 headed discovery reached Cancel on officially cancelable lifecycle states, but available mass exposed no selectable product/reason/Confirm Selected; no order was changed |
+| 68 | BackOffice | User able to see the status of order is cancelled | 🚧 Blocked | — | Causal validation still depends on completing TC67 on the same order |
+| 69 | BackOffice | User able to view cronjobs page | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Passed with direct admin login; both Peru job codes found |
 | 70 | BackOffice | Verify we can not save changes into Anonymous's user addresses | 🚧 Blocked | — | UID search returned an unproven masked record; Anonymous identity and safe address are not established |
 | 71 | Order Fullfillment | User able to search order via BackOffice order Page. | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Deterministic order lookup passed with direct login; supports `BACKOFFICE_ORDER_CODE` |
-| 72 | Order Fullfillment | User able to validate the initial status is on "Waiting for Send Financial" | 🚧 Blocked | — | Official ST2 remains blocked; S3 dynamic seven-page lookup validated WAITING_FOR_SEND_FINANCIAL in headed Chrome |
-| 73 | Order Fullfillment | User able to run cronjob: pe-tokoFinancialInitialUpdateJob | 🚧 Blocked | — | Official ST2 remains blocked; S3 full-admin execution completed FINISHED / SUCCESS |
-| 74 | Order Fullfillment | User able to validate the updated order status is on "Order Split" | 🚧 Blocked | — | Official ST2 remains blocked; S3 independently validated Order Split, while the tracked FI order remained blocked by ERP/FI data |
-| 75 | Order Fullfillment | User able to run cronjob: pe-tokoTransferConsignmentToWarehouseJob | 🚧 Blocked | — | Official ST2 remains blocked; S3 full-admin execution completed FINISHED / SUCCESS |
-| 76 | Order Fullfillment | User able to validate the updated order status is on "Shipping Requested" | 🚧 Blocked | — | Official ST2 remains blocked; S3 validated Shipping Requested read-only, while the tracked split order remained blocked by NERP data |
+| 72 | Order Fullfillment | User able to validate the initial status is on "Waiting for Send Financial" | ✅ Automated | `tests/st2/backoffice/backoffice-fulfillment.spec.js` | Passed in S3: dynamic seven-page lookup validated `WAITING_FOR_SEND_FINANCIAL` in headed Chrome |
+| 73 | Order Fullfillment | User able to run cronjob: pe-tokoFinancialInitialUpdateJob | ✅ Automated | `tests/st2/backoffice/backoffice-fulfillment.spec.js` | Passed in S3 with full admin: CronJob executed and completed `FINISHED / SUCCESS` |
+| 74 | Order Fullfillment | User able to validate the updated order status is on "Order Split" | ✅ Automated | `tests/st2/backoffice/backoffice-fulfillment.spec.js` | Passed in S3 as an independent status checkpoint. The tracked FI order remained blocked by ERP/FI data, which is annotated separately as an external blocker |
+| 75 | Order Fullfillment | User able to run cronjob: pe-tokoTransferConsignmentToWarehouseJob | ✅ Automated | `tests/st2/backoffice/backoffice-fulfillment.spec.js` | Passed in S3 with full admin: warehouse CronJob executed and completed `FINISHED / SUCCESS` |
+| 76 | Order Fullfillment | User able to validate the updated order status is on "Shipping Requested" | ✅ Automated | `tests/st2/backoffice/backoffice-fulfillment.spec.js` | Passed in S3 as an independent status checkpoint. The tracked Order Split mass remained blocked by NERP data, annotated separately as an external blocker |
 | 77 | Payment Mode | Customer able to place order using Credit Card [pe-mercadoCC] (Master, Visa, AMX) | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: existing Mercado Pago sandbox data, installments and required iframe fields were populated and `Realizar pedido` became enabled; the button was not clicked |
 | 78 | Payment Mode | Customer able to place order using SafetyPay - Banca por Internet [pe-Bancapor] | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: authenticated saved-address checkout reached Payment and `Banca por Internet` became selected (`aria-expanded=true`); Place Order was intentionally not executed |
 | 79 | Payment Mode | Customer able to place order using Cash Payment [pe-pagoEfectivo]. Note: can only accept payment with maximum amount of S/ 10,000 | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: authenticated saved-address checkout reached Payment and `Pago Efectivo` became selected (`aria-expanded=true`); Place Order was intentionally not executed |
