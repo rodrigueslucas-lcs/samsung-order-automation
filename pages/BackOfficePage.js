@@ -5,13 +5,29 @@ export const BACKOFFICE_AUTHORITIES = {
   agent: "Customer Support Agent Role",
 };
 
+const BACKOFFICE_URLS = {
+  s2: "https://backoffice.cnmzsgcaar-samsunge12-s2-public.model-t.cc.commerce.ondemand.com/backoffice/",
+  s3: "https://backoffice.cnmzsgcaar-samsunge12-s3-public.model-t.cc.commerce.ondemand.com/backoffice/",
+};
+
+export function getBackOfficeUrl() {
+  if (process.env.BACKOFFICE_URL) return process.env.BACKOFFICE_URL;
+
+  const environment = (process.env.BACKOFFICE_ENV || "s2").toLowerCase();
+  const url = BACKOFFICE_URLS[environment];
+  if (!url) {
+    throw new Error(
+      `Unsupported BACKOFFICE_ENV: ${environment}. Use s2, s3, or BACKOFFICE_URL.`
+    );
+  }
+  return url;
+}
+
 export default class BackOfficePage extends BasePage {
   constructor(page) {
     super(page);
 
-    this.url =
-      process.env.BACKOFFICE_URL ||
-      "https://backoffice.cnmzsgcaar-samsunge12-s2-public.model-t.cc.commerce.ondemand.com/backoffice/";
+    this.url = getBackOfficeUrl();
   }
 
   async login({ username, password, authority }) {
@@ -25,6 +41,21 @@ export default class BackOfficePage extends BasePage {
     const usernameInput = this.page.getByPlaceholder("Enter user name", { exact: true });
     const passwordInput = this.page.getByPlaceholder("Enter password", { exact: true });
 
+    const maintenance = this.page.getByText(/service is down for maintenance/i);
+    const forbidden = this.page.getByRole("heading", {
+      name: /403: The server did not authorize the request/i,
+    });
+    if (await maintenance.isVisible().catch(() => false)) {
+      throw new Error(
+        `BackOffice is down for maintenance (HTTP 503 page): ${this.url}`
+      );
+    }
+    if (await forbidden.isVisible().catch(() => false)) {
+      throw new Error(
+        `BackOffice denied access before login (HTTP 403): ${this.url}`
+      );
+    }
+
     await usernameInput.click();
     await usernameInput.pressSequentially(username, { delay: 35 });
     await usernameInput.press("Tab");
@@ -34,11 +65,35 @@ export default class BackOfficePage extends BasePage {
     await this.page.getByRole("button", { name: "Sign In", exact: true }).click();
 
     const proceedButton = this.page.getByRole("button", { name: "PROCEED", exact: true });
-    await proceedButton.waitFor({ state: "visible", timeout: 60000 });
-    const authorityText = this.page.getByText(authorityLabel, { exact: true });
-    await authorityText.waitFor({ state: "visible", timeout: 30000 });
-    await authorityText.click();
-    await proceedButton.click();
+    const directPerspective = this.page
+      .getByText("Administration Cockpit", { exact: true })
+      .first();
+    const loginOutcome = await Promise.race([
+      proceedButton
+        .waitFor({ state: "visible", timeout: 60000 })
+        .then(() => "authority"),
+      directPerspective
+        .waitFor({ state: "visible", timeout: 60000 })
+        .then(() => "direct-admin"),
+      this.page
+        .waitForURL(/login\.zul\?login_error=1/, { timeout: 60000 })
+        .then(() => "rejected"),
+    ]);
+    if (loginOutcome === "rejected") {
+      throw new Error(
+        `BackOffice rejected the runtime credentials (login_error=1): ${this.url}`
+      );
+    }
+    if (loginOutcome === "authority") {
+      const authorityText = this.page.getByText(authorityLabel, { exact: true });
+      await authorityText.waitFor({ state: "visible", timeout: 30000 });
+      await authorityText.click();
+      await proceedButton.click();
+    } else if (authority !== "admin") {
+      throw new Error(
+        "BackOffice logged in directly to Administration Cockpit; an agent authority is unavailable."
+      );
+    }
 
     await this.expectPerspective(authority);
   }

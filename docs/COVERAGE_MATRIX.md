@@ -8,7 +8,7 @@
 
 | Scope | Total | Automated | Partial | Blocked | Not Applicable | Pending |
 |---|---:|---:|---:|---:|---:|---:|
-| Base Store | 83 | 45 | 11 | 13 | 2 | 12 |
+| Base Store | 83 | 45 | 12 | 13 | 2 | 11 |
 | EPP | ~60 | 0 | 0 | 0 | 0 | ~60 |
 
 ### Status Legend
@@ -35,13 +35,13 @@
 | 10 | MyAccount Page | Customer able to set default address for shipping & billing. | ⬜ Pending | — | — |
 | 11 | MyAccount Page | Customer able to verify the populated address is same on what is default address for shipping & billing in the Profile Setting. | ⬜ Pending | — | — |
 | 12 | MyAccount Page | Customer able to see Order List/ Order Details in My Orders Page. | 🚧 Blocked | — | Reusable authenticated state is proven, but `Mis pedidos` is currently absent from both the reusable and live authenticated menus despite `/users/current` and `checkAccess` returning HTTP 200; existing order data is also not yet confirmed |
-| 13 | MyAccount Page | Customer able to verify Tracking Order Page (Includes Guest) | ⚠️ Partial | `tests/st2/base-store/home/tracking.spec.js` | Guest `Pedidos` entry from the Home footer successfully opened and the Samsung Peru orders/tracking destination was validated; disposable guest order number/email is still required for full tracking validation |
+| 13 | MyAccount Page | Customer able to verify Tracking Order Page (Includes Guest) | ⚠️ Partial | `tests/st2/base-store/home/tracking.spec.js` | Headed Chrome validated footer `Pedidos` → `/pe/mypage/orders`, required order/email fields, client-side messages, OTP field/buttons, and invalid-data `sendOrderOtp` HTTP 401 contract. Full order lookup still requires an order/email/OTP created by our own automation |
 | 14 | Home Page | Customer able to see Homepage Attributes (Header, Hero banner, Top seller carousel, Footer) | ⚠️ Partial | `tests/st2/base-store/home/home.spec.js` | Header and Footer available; Hero banner and Top seller carousel are not rendered in current ST2 Home |
 | 15 | Cart Page | Customer able to see the Cart Page | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
 | 16 | Cart Page | Customer able to verify cart page (Products added displays correctly) | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
 | 17 | Cart Page | Customer able to increase and decrease the quantity (or remove products) | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
 | 18 | Cart Page | Customer able to see order summary is displayed correctly on right side (without taxes) | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
-| 19 | Cart Page | Verify Added services / Recommended products - (If there's available data) | ⬜ Pending | — | Current SKU exposes the Additional Services offer, but no recommended product is rendered and the service cannot currently be added because its endpoint returns HTTP 400 |
+| 19 | Cart Page | Verify Added services / Recommended products - (If there's available data) | ⚠️ Partial | `tests/st2/base-store/cart/cart.spec.js` | Headed two-SKU validation confirmed Additional Services for Galaxy; no Recommended Products section was rendered by current ST2 data |
 | 20 | Cart Page | Customer able to see Checkout Button | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
 | 21 | Externale Services | Customer able to see external services such Trade-in or Samsung Care Plus. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed with Samsung Care+ / Services available for current SKU |
 | 22 | Externale Services | Customer able to see the Footer for Cart Page | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
@@ -50,8 +50,8 @@
 | 25 | Externale Services | Customer able to see the trade-in amount on the last pop-up in the customer Journey in adding Trade-In. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed - final Trade-in review displayed estimated value S/ 1,100.00 for Galaxy S25 256GB |
 | 26 | Externale Services | Customer able to successfully added Trade-in In the cart page. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed - Plan Canje Galaxy successfully applied and confirmed in Cart |
 | 27 | Externale Services | Customer able to see the Trade-in Amount in the summary. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed - Trade-in summary displayed - S/ 1,100.00 |
-| 28 | Externale Services | Customer able to click the Samsung Care Plus Button | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Automation implemented and validated previously; current modal opens but remains at `Cargando página...` after the External Services endpoint returns HTTP 400 |
-| 29 | Externale Services | Customer able to navigate on Pop-up Customer Journey in adding Samsung Care Plus. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Automation implemented and validated previously; current modal journey cannot render beyond `Cargando página...` after the External Services endpoint returns HTTP 400 |
+| 28 | Externale Services | Customer able to click the Samsung Care Plus Button | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Functional modal validation passed with the required order-sensitive two-SKU setup: add `SM-F741BLBKPEO`, then `RB45DG6300B1PE`, then open Cart |
+| 29 | Externale Services | Customer able to navigate on Pop-up Customer Journey in adding Samsung Care Plus. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | SC+ French Door option, terms and enabled `Agregar al carrito` state validated with Galaxy first and refrigerator second; service is not submitted in this TC |
 | 30 | Externale Services | Customer able to successfully added Samsung Care Plus In the cart page. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed with functional Additional Services setup using RB45DG6300B1PE + SM-F741BLBKPEO; Samsung Care+ was added successfully to Cart |
 | 31 | Externale Services | Customer able to see the Samsung Care Plus Amount in the summary. | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed - added Samsung Care+ amount S/ 389.00 was validated in the Order Summary |
 | 32 | Externale Services | Total price should change after Trade-In/ SC+ is applied in the cart. Note: Please Keep the Screenshot for future reference | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed - Cart total increased by S/ 389.00 after Samsung Care+ was applied; screenshots captured as evidence |
@@ -89,16 +89,16 @@
 | 64 | BackOffice | User able to login successfully in the BackOffice | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Direct real-Chrome login passed twice with admin authority and authenticated perspective validation |
 | 65 | BackOffice | User able to see order page(Admin view) | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Passed with direct admin login and Orders page validation |
 | 66 | BackOffice | User able to see orderpage(CS Agent View) | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Passed with an independent direct agent login; `Customer Support`, `Order` and `Order-Enhanced` validated |
-| 67 | BackOffice | User able to cancelled order via CS Agent View | 🚧 Blocked | — | State-changing; no order has been proven disposable |
-| 68 | BackOffice | User able to see the status of order is cancelled | 🚧 Blocked | — | Depends on a safely cancelled order from TC67 |
+| 67 | BackOffice | User able to cancelled order via CS Agent View | 🚧 Blocked | — | Official ST2 remains blocked. S3 headed discovery reached Cancel on valid lifecycle states, but available mass exposed no selectable product/reason/Confirm Selected; no order was changed |
+| 68 | BackOffice | User able to see the status of order is cancelled | 🚧 Blocked | — | Official ST2 remains blocked and causal S3 validation depends on completing TC67 on the same order |
 | 69 | BackOffice | User able to view cronjobs page | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Passed with direct admin login; both Peru job codes found without executing them |
 | 70 | BackOffice | Verify we can not save changes into Anonymous's user addresses | 🚧 Blocked | — | UID search returned an unproven masked record; Anonymous identity and safe address are not established |
 | 71 | Order Fullfillment | User able to search order via BackOffice order Page. | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Deterministic order lookup passed with direct login; supports `BACKOFFICE_ORDER_CODE` |
-| 72 | Order Fullfillment | User able to validate the initial status is on "Waiting for Send Financial" | 🚧 Blocked | — | No deterministic order in the required state was identified |
-| 73 | Order Fullfillment | User able to run cronjob: pe-tokoFinancialInitialUpdateJob | 🚧 Blocked | — | Job found; `Run CronJob` disabled and no higher available authority or safe affected mass |
-| 74 | Order Fullfillment | User able to validate the updated order status is on "Order Split" | 🚧 Blocked | — | No deterministic order in the required state was identified |
-| 75 | Order Fullfillment | User able to run cronjob: pe-tokoTransferConsignmentToWarehouseJob | 🚧 Blocked | — | Job found; execution disabled and affected mass is unproven |
-| 76 | Order Fullfillment | User able to validate the updated order status is on "Shipping Requested" | 🚧 Blocked | — | No deterministic order in the required state was identified |
+| 72 | Order Fullfillment | User able to validate the initial status is on "Waiting for Send Financial" | 🚧 Blocked | — | Official ST2 remains blocked; S3 dynamic seven-page lookup validated WAITING_FOR_SEND_FINANCIAL in headed Chrome |
+| 73 | Order Fullfillment | User able to run cronjob: pe-tokoFinancialInitialUpdateJob | 🚧 Blocked | — | Official ST2 remains blocked; S3 full-admin execution completed FINISHED / SUCCESS |
+| 74 | Order Fullfillment | User able to validate the updated order status is on "Order Split" | 🚧 Blocked | — | Official ST2 remains blocked; S3 independently validated Order Split, while the tracked FI order remained blocked by ERP/FI data |
+| 75 | Order Fullfillment | User able to run cronjob: pe-tokoTransferConsignmentToWarehouseJob | 🚧 Blocked | — | Official ST2 remains blocked; S3 full-admin execution completed FINISHED / SUCCESS |
+| 76 | Order Fullfillment | User able to validate the updated order status is on "Shipping Requested" | 🚧 Blocked | — | Official ST2 remains blocked; S3 validated Shipping Requested read-only, while the tracked split order remained blocked by NERP data |
 | 77 | Payment Mode | Customer able to place order using Credit Card [pe-mercadoCC] (Master, Visa, AMX) | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: existing Mercado Pago sandbox data, installments and required iframe fields were populated and `Realizar pedido` became enabled; the button was not clicked |
 | 78 | Payment Mode | Customer able to place order using SafetyPay - Banca por Internet [pe-Bancapor] | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: authenticated saved-address checkout reached Payment and `Banca por Internet` became selected (`aria-expanded=true`); Place Order was intentionally not executed |
 | 79 | Payment Mode | Customer able to place order using Cash Payment [pe-pagoEfectivo]. Note: can only accept payment with maximum amount of S/ 10,000 | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: authenticated saved-address checkout reached Payment and `Pago Efectivo` became selected (`aria-expanded=true`); Place Order was intentionally not executed |

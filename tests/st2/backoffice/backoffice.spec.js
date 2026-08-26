@@ -7,14 +7,21 @@ const credentials = {
   password: process.env.BACKOFFICE_PASSWORD,
 };
 
+const environmentOrderCodes = {
+  s2: "PE260819-75543032_260819182727780",
+  // TEMPORARY TEST DATA discovered read-only in the S3 CS order grid.
+  s3: "PE260817-69932056_260821145428295",
+};
+const selectedEnvironment = (process.env.BACKOFFICE_ENV || "s2").toLowerCase();
 const orderCode =
-  process.env.BACKOFFICE_ORDER_CODE ||
-  "PE260819-75543032_260819182727780";
+  process.env.BACKOFFICE_ORDER_CODE || environmentOrderCodes[selectedEnvironment];
 
 test.use({ screenshot: "off", video: "off", trace: "off" });
 
-test.describe("ST2 Peru - BackOffice", () => {
-  test.describe.configure({ timeout: 120000 });
+const backOfficeEnvironment = (process.env.BACKOFFICE_ENV || "s2").toUpperCase();
+
+test.describe(`ST2 Peru - BackOffice ${backOfficeEnvironment}`, () => {
+  test.describe.configure({ timeout: 180000 });
 
   test.skip(
     !credentials.username || !credentials.password,
@@ -69,9 +76,19 @@ test.describe("ST2 Peru - BackOffice", () => {
     page,
   }) => {
     const orders = new BackOfficeOrderPage(page);
-    await orders.login({ ...credentials, authority: "admin" });
-    await orders.openAdminOrders();
-    const result = await orders.searchAdminOrder(orderCode);
+    const useAgentSearch = selectedEnvironment === "s3";
+    await orders.login({
+      ...credentials,
+      authority: useAgentSearch ? "agent" : "admin",
+    });
+    if (useAgentSearch) {
+      await orders.expectAgentOrders();
+    } else {
+      await orders.openAdminOrders();
+    }
+    const result = useAgentSearch
+      ? await orders.searchAgentOrder(orderCode)
+      : await orders.searchAdminOrder(orderCode);
     await expect(result).toContainText(orderCode);
   });
 });
