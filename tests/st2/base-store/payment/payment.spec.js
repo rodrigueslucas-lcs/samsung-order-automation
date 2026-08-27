@@ -119,7 +119,6 @@ test.describe("ST2 - Base Store - Payment Page", () => {
       type: "payment-modes",
       description: `${names.join(" | ")}; API=${JSON.stringify(paymentModesApi)}`,
     });
-    console.log(`TC81_DISCOVERY ${JSON.stringify({ names, paymentModesApi })}`);
     test.skip(
       !(await paymentPage.isPaymentModeAvailable(/^Yape\b/i)),
       `Yape is not available for the current guest cart: ${names.join(" | ")}`
@@ -137,7 +136,7 @@ test.describe("ST2 - Base Store - Payment Page", () => {
     await paymentPage.selectAcuotaz();
   });
 
-  test("TC58 - Customer able to complete order using one payment mode", async () => {
+  test("@destructive TC58 - Customer able to complete order using one payment mode", async () => {
     test.setTimeout(300000);
 
     await paymentPage.selectCreditCard();

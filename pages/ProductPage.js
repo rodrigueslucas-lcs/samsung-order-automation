@@ -32,21 +32,13 @@ export default class ProductPage extends BasePage {
    await this.safeGoto(additionalServicesAddToCartUrl);
    await this.safeGoto(this.addToCartUrl);
    await this.safeGoto(this.cartUrl);
-   await this.page
-     .getByText("RB45DG6300B1PE", { exact: true })
-     .waitFor({ state: "visible", timeout: 30000 });
-   await this.page
-     .getByText("SM-F741BLBKPEO", { exact: true })
-     .waitFor({ state: "visible", timeout: 30000 });
+   await this.waitForCartSkus(["RB45DG6300B1PE", "SM-F741BLBKPEO"]);
    await this.screenshot("02-additional-services-cart-setup");
  }
   async addToCart() {
     await this.safeGoto(this.addToCartUrl);
     await this.safeGoto(this.cartUrl);
-
-    await this.page
-      .getByText('RB45DG6300B1PE', { exact: true })
-      .waitFor({ state: 'visible', timeout: 30000 });
+    await this.waitForCartSkus(['RB45DG6300B1PE']);
 
     await this.screenshot('02-product-added-to-cart');
   }
@@ -149,7 +141,10 @@ export default class ProductPage extends BasePage {
   }
 
   async safeGoto(url) {
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    const isStateChangingCartRequest = /\/addToCart$/i.test(new URL(url).pathname);
+    const maxAttempts = isStateChangingCartRequest ? 1 : 3;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         await this.page.goto(url, {
           waitUntil: 'domcontentloaded',
@@ -158,13 +153,33 @@ export default class ProductPage extends BasePage {
 
         return;
       } catch (error) {
-        if (attempt === 3) {
+        if (attempt === maxAttempts) {
           throw error;
         }
 
         await this.page.waitForTimeout(3000);
       }
     }
+  }
+
+  async waitForCartSkus(skus, { reloadAttempts = 2 } = {}) {
+    for (let attempt = 0; attempt <= reloadAttempts; attempt++) {
+      const results = await Promise.all(
+        skus.map((sku) =>
+          this.page
+            .getByText(sku, { exact: true })
+            .first()
+            .waitFor({ state: 'visible', timeout: 15000 })
+            .then(() => true)
+            .catch(() => false)
+        )
+      );
+      if (results.every(Boolean)) return;
+      if (attempt < reloadAttempts) {
+        await this.safeGoto(this.cartUrl);
+      }
+    }
+    throw new Error(`Cart did not render expected SKU(s): ${skus.join(', ')}.`);
   }
 
 

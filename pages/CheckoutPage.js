@@ -631,29 +631,9 @@ export default class CheckoutPage extends BasePage {
       name: "Distrito",
     });
 
-    await department.click();
-    await this.page
-      .getByRole("option", {
-        name: billingAddress.department,
-        exact: true,
-      })
-      .click();
-
-    await province.click();
-    await this.page
-      .getByRole("option", {
-        name: billingAddress.province,
-        exact: true,
-      })
-      .click();
-
-    await district.click();
-    await this.page
-      .getByRole("option", {
-        name: billingAddress.district,
-        exact: true,
-      })
-      .click();
+    await this.selectMaterialOption(department, billingAddress.department);
+    await this.selectMaterialOption(province, billingAddress.province);
+    await this.selectMaterialOption(district, billingAddress.district);
 
     const billingStreet = billingSection.getByRole("textbox", {
       name: "line1",
@@ -747,24 +727,32 @@ export default class CheckoutPage extends BasePage {
       .getByRole("listitem")
       .filter({ hasText: /Para envíos a provincias/i })
       .first();
+    await shippingOption.waitFor({ state: "visible", timeout: 30000 });
+    await shippingOption.click();
 
-    await shippingOption.scrollIntoViewIfNeeded();
-
-    await shippingOption.click({
-      force: true,
-      position: { x: 50, y: 20 },
-    });
-
-    const selectedMode = this.page
-      .locator(".delivery-mode-tab.button-style.selected-mode")
-      .filter({ hasText: /Envío regular/i });
-
-    await selectedMode.waitFor({
-      state: "visible",
-      timeout: 30000,
-    });
+    const orderSummary = this.page
+      .getByRole("heading", { name: "Resumen de la orden", exact: true })
+      .locator("..");
+    await orderSummary
+      .getByText("Envío regular", { exact: true })
+      .waitFor({ state: "visible", timeout: 30000 });
 
     await this.screenshot("checkout-selected-delivery-mode");
+  }
+
+  async selectMaterialOption(combobox, label) {
+    await combobox.click();
+    const option = this.page
+      .locator(".cdk-overlay-pane:visible")
+      .getByRole("option", { name: label, exact: true });
+    await option.waitFor({ state: "visible", timeout: 30000 });
+    await option.evaluate((element) =>
+      element.scrollIntoView({ block: "center", inline: "nearest" })
+    );
+    await option.dispatchEvent("click");
+    await combobox
+      .filter({ hasText: label })
+      .waitFor({ state: "visible", timeout: 30000 });
   }
 
   async validateCheckoutFooter() {

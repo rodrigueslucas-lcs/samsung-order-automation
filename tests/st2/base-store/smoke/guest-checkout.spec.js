@@ -11,7 +11,7 @@ import { testData } from "../../../../utils/testData";
 
 test.describe("ST2 - Base Store - Guest Customer Order Journey", () => {
 
-  test("E2E - Guest checkout using Credit Card", async ({ page }) => {
+  test("@destructive E2E - Guest checkout using Credit Card", async ({ page }) => {
     test.setTimeout(300000);
 
     const productPage = new ProductPage(page);
@@ -64,7 +64,11 @@ test.describe("ST2 - Base Store - Guest Customer Order Journey", () => {
     });
   });
 
-  test("TC59 - IM order with Trade-in and Samsung Care+", async ({ page }) => {
+  test("@destructive TC59 - IM order with Trade-in and Samsung Care+", async ({ page }) => {
+    test.skip(
+      true,
+      "TC59 is on stand-by: ST2 removes Samsung Care+ at Checkout because the service is unavailable/out of stock."
+    );
     test.setTimeout(420000);
 
     const productPage = new ProductPage(page);

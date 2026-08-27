@@ -1,16 +1,19 @@
 const { test } = require("@playwright/test");
 const HomePage = require("../../../../pages/HomePage").default;
 const {
- requireAuthState,
+ AUTH_STATE_PATH,
+ hasAuthState,
  applyAuthSessionStorage,
  validateAuthenticatedSession,
  validateCurrentPageAuthenticated,
 } = require("../../../../utils/authState");
+const AUTH_REQUIRED = "Authenticated storefront state required. Run auth bootstrap first.";
 test.describe("ST2 - Base Store - Registered Customer", () => {
  test.use({
-   storageState: requireAuthState(),
+   storageState: hasAuthState() ? AUTH_STATE_PATH : undefined,
  });
  test.beforeEach(async ({ context }) => {
+   test.skip(!hasAuthState(), AUTH_REQUIRED);
    await applyAuthSessionStorage(context);
  });
  test("TC1 pre-auth - registered session is available from Home", async ({

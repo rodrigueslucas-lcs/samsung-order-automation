@@ -1,242 +1,133 @@
-# ST2 Peru Office QA Handoff
+# ST2 Peru QA Handoff
 
 ## Current baseline
 
-| Metric | Value |
-|---|---:|
-| Official Base Store TCs | 83 |
-| Automated | 32 |
-| Partial | 6 |
-| Blocked | 5 |
-| Not Applicable | 2 |
-| Pending | 38 |
+The official Base Store matrix contains 83 scenarios:
 
-Official total: `32 + 6 + 5 + 2 + 38 = 83`. Supplementary tests do not change this count.
+| Automated | Partial | Blocked | Not Applicable | Pending | Total |
+|---:|---:|---:|---:|---:|---:|
+| 60 | 8 | 4 | 9 | 2 | 83 |
 
-## Pending clusters
+`docs/COVERAGE_MATRIX.md` is the source of truth. Supplementary tests do not change this count.
 
-| Class | Cluster | TCs | Decision |
-|---|---|---|---|
-| A — simple later | Login entry/destination checks | 1, 2, 5 | TC3 pre-auth is now Partial. Implement the remaining TCs only after agreeing whether destination-only validation satisfies the official “login” wording. |
-| B — small reuse | Guest tracking entry | 13 | Footer control exists, but destination and disposable order data are missing. |
-| B — small reuse | Conditional Cart content | 19 | Existing Cart setup is reusable; current SKU has no recommendation and External Services is unavailable. |
-| C — completed | Authenticated saved-address checkout | 39 | Automated on 2026-08-24; validates the selected saved address and reaches Payment using the guest Delivery→Payment methods. |
-| D — complex | Profile address lifecycle | 9, 10, 11, 40 | Requires a working Profile address entry point and disposable QA data. Do not modify pre-existing addresses. |
-| D — complex | Trade-in / Samsung Care+ journey | 23–27, 30–32 | Requires eligible SKU/service data. Current External Services request returns HTTP 400. |
-| E — environment/data | Order completion and confirmation | 59, 60, 62, 63, 77–83 | TC77–TC80 pre-submit behavior is proven, but order completion remains unavailable. Do not mark payment-mode TCs Automated until the known post-Place-Order defect is fixed and required payment/order data is approved. |
-| E — out of current scope | BackOffice / fulfillment | 64–76 | Requires separate environment, roles and workflow. |
+## Architecture
 
-## Capability ROI audit — 38 Pending
+- Specs under `tests/st2/` orchestrate business scenarios.
+- Page Objects under `pages/` own locators, interaction and reusable UI assertions.
+- Deterministic customer/address/payment fixtures are exposed through `utils/testData.js`.
+- Storefront reusable authentication is handled by `utils/authState.js` plus the `auth:*` npm scripts.
+- BackOffice uses runtime environment selection and credentials; S2 is the default and S3 must be explicit.
+- Chrome is the configured channel, with one worker. Screenshots and failure traces are enabled by default.
 
-This ranking groups the remaining work by reusable capability rather than by individual TC. It is an implementation gate: do not create a helper until the listed environment/data dependency is available and the capability can be exercised end to end.
+## Safety boundaries
 
-| ROI | Capability | Pending TCs unlocked | Existing foundation | Owner / reusable gap | Difficulty | Environment dependency | Current completion chance | Potential official gain |
-|---:|---|---|---|---|---|---|---|---:|
-| 1 | BackOffice order lifecycle | 64–76 | No BackOffice Page Object or spec exists | Future `BackOfficePage`/order-lifecycle helper: login, role-aware Orders page, search, status assertions and cronjob actions | High | Separate BackOffice URL, Admin/CS roles, disposable order and approved cronjob execution | Low until access is supplied | 13 |
-| 2 | Trade-in / Samsung Care+ journey | 19, 23–27, 30–32 | `ProductPage`, `CartPage.getAdditionalServicesButton()`, `validateSamsungCareButton()` and `validateSamsungCareJourney()` | `CartPage`: one active-dialog journey abstraction for semantic steps, selected service, amount and Cart summary reconciliation | Medium–high | Eligible SKU/service data and healthy External Services endpoint; current request returns HTTP 400 | None in current ST2 state | 9 |
-| 3 | Order completion and downstream evidence | 59, 60, 62, 63, 83 | Guest Checkout reaches Payment; `PaymentPage.placeOrder()` and `OrderConfirmationPage` exist | One idempotent submission-result helper plus confirmation number/email evidence; mobile should reuse the same checkout objects | High | Known post-Place-Order ST2 defect must be fixed; disposable order/email data required | None while defect remains | 5 |
-| 4 | Authenticated Profile/address lifecycle | 9, 10, 11, 40 | Reusable auth helpers, authenticated Checkout and TC39 saved-address flow | Future `ProfilePage`: safe entry, list/readback, create/update/default/delete of uniquely tagged QA address, cleanup owned data only | High | Fresh auth, functional Profile entry point and disposable QA address | Low; Profile entry is currently unavailable | 4 |
-| 5 | Alternative payment panel validation | 81, 82 | `reachAuthenticatedPaymentWithSavedAddress()` and generic `PaymentPage.selectPaymentMode()`; TC77–TC80 prove the pattern | Add only thin semantic wrappers after Yape/Acuotaz are observed; assert expanded controlled panel and stop pre-submit | Low–medium | Fresh reusable auth and actual mode availability in current Payment configuration | High after auth refresh if modes are rendered | 2 |
+- Never run storefront or BackOffice writes against Production.
+- ST2 My Account/Profile links redirect to `https://shop.samsung.com/` Production. TC7-TC12 and TC40 are Not Applicable and statically skipped before navigation.
+- Tests containing `@destructive` can create orders or submit a provider. Exclude them from ordinary regression.
+- TC59 is statically skipped while Samsung Care+ is removed at Checkout as unavailable/out of stock.
+- Alternative-provider submit requires both an approved `STOREFRONT_PAYMENT_MODE` and `ALLOW_PAYMENT_SUBMIT=1`; the helper clicks once and never retries.
+- BackOffice CronJobs/cancellation require explicit staging authorization and are not part of storefront regression.
+- Never commit `.env`, `playwright/.auth/`, `playwright/profiles/`, `test-results/`, reports or runtime evidence.
 
-### Current implementation decision
+## Authentication
 
-No capability meets all gates for the present round. The multi-TC candidates require at least one explicitly excluded dependency: BackOffice, External Services, Place Order, Profile/auth, or expired-auth Payment inspection. Therefore no Page Object/spec was added, no TC status changed, and coverage remains `32 Automated + 6 Partial + 5 Blocked + 2 N/A + 38 Pending = 83`. The first eligible high-ROI action is TC81/TC82 panel validation after `auth:verify` passes and the modes are visibly present; otherwise obtain BackOffice access for the largest cluster.
+Authentication is human bootstrap plus reusable storefront state:
 
-## PAYMENT TEST DATA MAP
-
-Never copy provider credentials or full payment values into this document, specs, Page Objects or Git. Obtain approved sandbox data from the internal QA payment-data source at execution time and keep it in the project's ignored/local secret mechanism. Country applicability must be verified in that source and against the live ST2 Payment UI; documentation alone does not prove Peru availability.
-
-| Provider | Countries | Potential official TCs | Current ST2 Peru availability | Current automation coverage | Additional information required | Automation recommendation |
-|---|---|---|---|---|---|---|
-| Mercado Pago | Peru is confirmed by the current `pe-mercadoCC` integration; verify any broader country list in the internal source | TC58; directly TC77; TC57 inventory | Confirmed: credit/debit-card panel and Mercado Pago iframes were exercised | TC57 Automated; TC58 Blocked after submit; TC77 Partial with sandbox card fields/installments ready pre-submit | Approved local sandbox card variants and expected provider states; backend/siteId fix before order-result assertions | Keep using `testData.card` through the existing ignored/approved data architecture and `PaymentPage.selectCreditCard()`, `fillCardData()` and `validateCreditCardReady()`; never duplicate values in specs/Page Objects |
-| PayPal sandbox | Country scope was not supplied in the project-safe metadata; consult the internal source | TC57 and TC58 only if PayPal is actually rendered for Peru; no provider-specific TC exists in the 83-TC matrix | Not observed or proven in the current ST2 Peru Payment evidence | None | Confirm Peru configuration, semantic mode name, sandbox account acquisition process and safe pre-submit stopping point | Inspect once on a valid Payment session; if visible, reuse `selectPaymentMode()` and keep provider login data outside Git; otherwise record unavailable without changing TC status |
-| Klarna | Country scope was not supplied in the project-safe metadata; consult the internal source | TC57 and TC58 only if rendered for Peru; no Klarna-specific official TC | Not observed or proven in ST2 Peru; do not equate Klarna with Cuotéalo | None | Confirm Peru eligibility, exact ST2 label/provider integration and approved sandbox flow | Add only a thin `selectPaymentMode()` wrapper after live semantic evidence; stop before external submission unless the official TC explicitly requires it |
-| Kueski | Country scope was not supplied in the project-safe metadata; consult the internal source | TC57 and TC58 only if rendered for Peru; no Kueski-specific official TC | Not observed or proven in ST2 Peru; do not equate Kueski with Acuotaz | None | Confirm Peru eligibility, exact ST2 label/provider integration and approved sandbox flow | Same evidence-first `selectPaymentMode()` approach; never infer Acuotaz coverage from Kueski test data |
-
-Current ST2 Peru modes without matching test-data coverage in the supplied provider list are `Banca por Internet`/SafetyPay (TC78), `Pago Efectivo` (TC79), `Cuotéalo` (TC80), Yape (TC81) and Acuotaz (TC82). TC78–TC80 already have proven pre-submit selection coverage without provider credentials. Yape and Acuotaz are not covered by the Mercado Pago/PayPal/Klarna/Kueski documentation and still require valid auth plus direct observation of the current Payment UI; keep TC81/TC82 Pending.
-
-### Payment work ranking after test-data review
-
-1. After the known submit defect is fixed, complete TC77 with the approved Mercado Pago sandbox state and one controlled Place Order attempt; the pre-submit automation is already proven.
-2. With valid auth, inspect TC81/TC82 once and reuse `selectPaymentMode()` if the exact semantic modes are present. The new provider documentation does not supply their data.
-3. Revalidate TC57 inventory for PayPal/Klarna/Kueski only when one is visibly configured in ST2 Peru; documentation availability alone is not a reason to add an expected mode.
-4. Complete TC78–TC80 only after provider-specific submission requirements, approved test data and the ST2 order defect are resolved; their pre-submit coverage needs no new credential storage.
-5. Treat any future PayPal/Klarna/Kueski Peru mode as a thin Page Object wrapper over `selectPaymentMode()`, with local ignored data and a provider-specific safe stopping point.
-
-## Recommended implementation queue
-
-The entries below are ordered by implementation effort, but each dependency must be satisfied before coding or execution.
-
-| TC | Description | Priority | Spec | Page Object | Existing code to reuse | Missing implementation | Fixture | Locator / strategy | Steps | Final assertion | Isolated command |
-|---:|---|---|---|---|---|---|---|---|---|---|---|
-| 13 | Verify Tracking Order Page (includes Guest) | 1 | `tests/st2/base-store/home/tracking.spec.js` | `HomePage`, `GuestOrderTrackingPage` | `openHome()` | `openGuestOrders()`, form/validation/invalid OTP API checks | Future checkout-generated guest order/email/OTP; current invalid values are deliberately nonexistent and never persisted | Footer exact `Pedidos` opens an initially blank popup; wait for HTTP(S), then use the guest form scoped by `Ingrese su número de pedido y correo electrónico` | Cookie setup → Home → popup → required fields/messages → invalid `sendOrderOtp` contract → stop | Partial until a checkout-generated order and its OTP can enable `Buscar` and return the expected order | `npx playwright test tests/st2/base-store/home/tracking.spec.js --project=chromium --workers=1 --headed` |
-| 19 | Added services / recommended products, if data exists | 2 | `tests/st2/base-store/cart/cart.spec.js` | `ProductPage`, `CartPage` | `validateProductLoaded()`, `addToCart()`, `validateProductInCart()`, `validateExternalServicesVisible()` | Conditional `validateRecommendedProductsOrAddedServices()` returning explicit availability evidence | SKU eligible for recommendations or successfully added service | Scope to `main`; use accessible service/product heading and SKU link, not broad card CSS | Setup → add SKU → Cart → inspect recommendation/service section | Recommended SKU or added service visible in Cart and summary | `npx playwright test tests/st2/base-store/cart/cart.spec.js --project=chromium --grep "TC19" --workers=1` |
-| 23 | Click Trade-in button | 3 | `tests/st2/base-store/cart/trade-in.spec.js` | `ProductPage`, `CartPage` | Standard Product→Cart setup | `getTradeInButton()` and `openTradeIn()` | Trade-in-eligible ST2 SKU | Exact accessible CTA inside `main`; discover from eligible SKU, never guess from Samsung Care+ | Setup → add eligible SKU → Cart → verify CTA → click once | Trade-in modal heading visible | `npx playwright test tests/st2/base-store/cart/trade-in.spec.js --project=chromium --grep "TC23" --workers=1` |
-| 24 | Navigate Trade-in popup journey | 4 | `tests/st2/base-store/cart/trade-in.spec.js` | `CartPage` | TC23 setup/open method | Semantic modal step helper using headings/radios/buttons | Same eligible SKU and journey answers approved for QA | Scope every locator to active dialog/overlay; use role `dialog`, headings, labels and enabled Next button | Reuse TC23 → traverse non-destructive steps → stop before adding | Expected final review/amount step visible | `npx playwright test tests/st2/base-store/cart/trade-in.spec.js --project=chromium --grep "TC24" --workers=1` |
-| 30 | Add Samsung Care+ in Cart | 6 | `tests/st2/base-store/cart/cart.spec.js` | `CartPage` | `getAdditionalServicesButton()`, `validateSamsungCareJourney()` | Select eligible radio and confirm add action after service endpoint recovers | Current primary SKU if service API is fixed | Active service dialog; exact Samsung Care+ radio accessible name and semantic Add/Continue button | Setup → Cart → open Additional Services → choose plan → add | Modal closes and chosen Samsung Care+ line appears in Cart | `npx playwright test tests/st2/base-store/cart/cart.spec.js --project=chromium --grep "TC30" --workers=1` |
-| 31 | Show Samsung Care+ amount in summary | 7 | `tests/st2/base-store/cart/cart.spec.js` | `CartPage` | TC30 helper, `validateOrderSummary()` | Capture service price and validate matching summary line/total | Same as TC30 | Scope service line and summary by accessible text; parse `S/` values, do not assert hardcoded price | Reuse TC30 → read service amount → inspect summary | Service amount visible and total reflects service | `npx playwright test tests/st2/base-store/cart/cart.spec.js --project=chromium --grep "TC31" --workers=1` |
-| 40 | Save checkout address and verify in Profile | 8 | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | `CheckoutPage`, future `ProfilePage` | Authenticated new-address smoke through Delivery; `fillAddress()`, `validateAddressValues()` | Opt-in save helper plus Profile navigation/readback; cleanup only the address created by the test | Unique disposable QA address with recognizable suffix | Delivery checkbox `Guardar datos de envío en Mi cuenta`; Profile locators must be discovered from a working entry point before implementation | Fresh auth → Nueva dirección → QA address → check save → advance without Place Order → Profile → verify exact address | Unique QA address visible in Profile; preserve all pre-existing addresses | `npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --grep "TC40" --workers=1` |
-| 77 | Credit-card order mode | 9 | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | `PaymentPage` | `selectCreditCard()`, `fillCardData(testData.card)`, `validateCreditCardReady()` | Only the final approved Place Order/confirmation remains after the backend fix | Existing Mercado Pago sandbox `testData.card` only | Existing Mercado Pago iframe locators and enabled `Realizar pedido`; never hardcode card data in spec/Page Object | Auth TC39 baseline → Payment → card fields/installments → readiness assertion → stop | Pre-submit already proven; confirmation/order number required for Automated | `npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --grep "TC77 pre-submit" --workers=1` |
-| 80 | Cuotéalo order mode | 10 | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | `PaymentPage` | `selectPaymentMode()`, `selectCuotealo()` | Only provider-specific completion and approved Place Order remain | No new fixture for current pre-submit check | Button `/^Cuotéalo\b/i`; assert `aria-expanded=true`, resolve `aria-controls`, require visible non-empty panel | Auth TC39 baseline → Payment → Cuotéalo → validate panel → stop | Pre-submit already proven; confirmation required for Automated | `npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --grep "TC80 pre-submit" --workers=1` |
-| 83 | Place order on mobile | 10 | `tests/st2/base-store/mobile/mobile-order.spec.js` | Existing guest Page Objects; extend only where responsive semantics differ | Entire guest checkout baseline plus mobile viewport from `mobile.spec.js` | Mobile-specific navigation assertions and final approved order execution | Existing guest fixtures and sandbox card; backend must be fixed | Reuse accessible locators at `390x844`; inspect responsive overlays only when a baseline locator fails | Mobile viewport → required setup → guest Cart/Checkout/Payment → one Place Order click | Mobile order confirmation and order number | `npx playwright test tests/st2/base-store/mobile/mobile-order.spec.js --project=chromium --workers=1` |
-
-## Local authentication prerequisite
-
-`playwright/.auth/*` is intentionally not versioned. Each machine must create its own local reusable state. Never copy auth files through Git, chat or shared storage.
-
-```bash
+```powershell
 npm run auth:open-profile
-```
-
-Complete Samsung/Google login manually in the dedicated QA Chrome and keep it open. In another terminal:
-
-```bash
 npm run auth:export
 npm run auth:verify
 ```
 
-Run authenticated tests only after `auth:verify` passes.
+The dedicated profile is `playwright/profiles/st2-peru-qa`; exported state is under `playwright/.auth/`. Both are ignored secrets. Specs use `hasAuthState()` and skip clearly when the state is absent or expired. Do not automate Google/FedCM/CAPTCHA/MFA.
 
-## Commands for the Samsung machine
+## Checkout and payment
 
-```bash
-git pull --ff-only origin main
-# Fresh clone or changed package-lock only:
-npm ci
-npx playwright test --list
-npx playwright test tests/st2/base-store/home/login.spec.js --project=chromium --grep "TC1" --workers=1
-npx playwright test tests/st2/base-store/home/login.spec.js --project=chromium --grep "TC2" --workers=1
-npx playwright test tests/st2/base-store/checkout/checkout.spec.js --project=chromium --grep "TC3 pre-auth" --workers=1
-npx playwright test tests/st2/base-store/checkout/checkout.spec.js --project=chromium --grep "TC5 pre-auth" --workers=1
-npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --grep "TC81 pre-submit" --workers=1
-npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --grep "TC82 pre-submit" --workers=1
-npx playwright test --project=chromium --workers=1
-npx playwright test tests/st2/base-store/smoke/guest-checkout.spec.js --project=chromium --workers=1
-npx playwright test tests/st2/base-store/cart --project=chromium --workers=1
-npx playwright test tests/st2/base-store/checkout/checkout.spec.js --project=chromium --workers=1
-npx playwright test tests/st2/base-store/payment --project=chromium --workers=1
-npx playwright test tests/st2/base-store/search/search.spec.js --project=chromium --workers=1
-npx playwright test tests/st2/base-store/mobile/mobile.spec.js --project=chromium --workers=1
+- Checkout must be reached through Product → Cart → Guest/Authenticated Checkout.
+- The primary deterministic SKU is `RB45DG6300B1PE`.
+- Additional Services requires order-sensitive setup: add `SM-F741BLBKPEO`, then `RB45DG6300B1PE`, then open Cart.
+- Add-to-cart is never retried because repeating it changes cart quantity. A blank/hydrating Cart may be reloaded safely without repeating add-to-cart.
+- Credit Card, Banca por Internet, Pago Efectivo, Cuotéalo and Acuotaz have proven coverage recorded in the matrix.
+- Yape remains Blocked because the current `paymentmodes` API does not return `pe-yape`.
+- Provider evidence stores only sanitized origin/path/status. Do not log response bodies, tokens or query strings.
+
+## Windows teardown
+
+`browserContext.close: spawn EPERM` was isolated to Playwright video/FFmpeg on the managed Windows machine. Real Chrome closes normally with screenshots and tracing. Video is opt-in:
+
+```powershell
+$env:PW_VIDEO = "1"
+```
+
+Enable it only after the matching Playwright FFmpeg is installed and allowed by corporate policy. Default `trace: retain-on-failure` preserves failure evidence and avoids trace artifact locks on statically skipped tests.
+
+## Remaining scenarios
+
+### Partial
+
+| TCs | What remains | Dependency / next action |
+|---|---|---|
+| 1, 2 | Full registered login rather than reusable-session validation | Human Samsung/Google/FedCM/MFA decision; keep provider login manual |
+| 3, 5 | Successful authenticated callback after the proven Checkout login entry | Same identity-provider dependency; reuse a renewed auth state for downstream tests |
+| 13 | Valid guest order lookup and OTP correlation | Checkout-generated order/email plus inbox/OTP access; never use arbitrary existing orders |
+| 14 | Hero and Top Seller presence | ST2 CMS/catalog content; helper reports each attribute independently |
+| 19 | Recommended Products alongside Additional Services | Catalog/service data returning a recommendation block |
+| 59 | Completed IM order with Trade-in and SC+ | Samsung Care+ stock/configuration must stop removing the service at Checkout |
+
+### Blocked
+
+| TCs | Blocker | Next action |
+|---|---|---|
+| 67, 68 | Accessible staging orders expose no valid cancellation controls | Samsung team supplies a cancelable S3 order/state; then cancel once and validate the same order |
+| 70 | Anonymous identity/safe address is not proven | Samsung team confirms the canonical Anonymous user and disposable staging address |
+| 81 | `pe-yape` absent from current payment modes API | Payment configuration enables Yape; rerun read-only discovery before any provider submit |
+
+### Pending
+
+| TC | Required evidence | Next action |
+|---:|---|---|
+| 4 | Applicable Order Confirmation email with a registered-login link | Confirm the email template/requirement, then validate a link from an approved test inbox |
+| 63 | Receipt of acknowledgement email correlated to order code/email | Provide test inbox access and a newly approved automation-created order; do not infer delivery from UI confirmation |
+
+No email/inbox connector currently exists in this repository.
+
+## Useful commands
+
+All commands use real Chrome from `playwright.config.js`.
+
+```powershell
+# A. Non-destructive smoke
+npx playwright test tests/st2/base-store/home/home.spec.js tests/st2/base-store/mobile/mobile.spec.js tests/st2/base-store/guest-login/guest-login.spec.js --project=chromium --workers=1 --headed
+
+# B. Cart (ephemeral cart mutations only; TC59 is not in this group)
+npx playwright test tests/st2/base-store/cart --project=chromium --workers=1 --headed
+
+# C. Checkout pre-submit
+npx playwright test tests/st2/base-store/checkout/checkout.spec.js --project=chromium --workers=1 --headed
+
+# D. Payment read-only
+npx playwright test tests/st2/base-store/payment/payment.spec.js --project=chromium --grep-invert "@destructive" --workers=1 --headed
+
+# E. Mobile read-only
+npx playwright test tests/st2/base-store/mobile/mobile.spec.js --project=chromium --workers=1 --headed
+
+# F. Full safe storefront regression
+npx playwright test tests/st2/base-store/home/home.spec.js tests/st2/base-store/mobile/mobile.spec.js tests/st2/base-store/guest-login/guest-login.spec.js tests/st2/base-store/pdp/product.spec.js tests/st2/base-store/pdp/pdp.spec.js tests/st2/base-store/cart tests/st2/base-store/checkout/checkout.spec.js tests/st2/base-store/payment/payment.spec.js --project=chromium --grep-invert "@destructive" --workers=1 --headed
+
+# G. Authenticated block after manual renewal
 npm run auth:verify
-npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --workers=1
-```
+npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --workers=1 --headed
 
-## Five copy/paste-ready office tasks
+# H. TC12 with existing order
+# Not runnable in ST2: My Orders redirects to Production. Do not follow it.
 
-| TC | Reuse | Minimal change | Isolated command | Gate before implementation |
-|---:|---|---|---|---|
-| 1 | `HomePage.openHome()` and authenticated session helpers | Add `tests/st2/base-store/home/login.spec.js`; validate `Cerrar sesión` from Home using local auth state | `npx playwright test tests/st2/base-store/home/login.spec.js --project=chromium --grep "TC1" --workers=1` | Confirm reusable-session validation satisfies the official “login” wording; do not automate Google/FedCM |
-| 2 | `HomePage.openHome()` and the semantic Profile menu pattern from `authState.js` | Add a shop-menu entry assertion before validating the authenticated state | `npx playwright test tests/st2/base-store/home/login.spec.js --project=chromium --grep "TC2" --workers=1` | Confirm exact Confluence meaning of “via shop menu” |
-| 3 | `ProductPage`, `CartPage.proceedToCheckout()` and authenticated helpers | Add a checkout-login entry test that proves the Login control/destination, then restores auth only through the approved fixture architecture | `npx playwright test tests/st2/base-store/checkout/login.spec.js --project=chromium --grep "TC3" --workers=1` | Do not automate Google/FedCM; agree whether destination-only coverage is Partial |
-| 5 | Existing Product→Cart and Checkout Login flow | Reuse TC33 setup, assert Cart SKU, enter Checkout and validate registered-login entry | `npx playwright test tests/st2/base-store/checkout/login.spec.js --project=chromium --grep "TC5" --workers=1` | Official wording is ambiguous (“place order until Cart”); confirm expected stopping point |
-| 81 | `reachAuthenticatedPaymentWithSavedAddress()` and `PaymentPage.selectPaymentMode()` | Add `selectYape()` only if a semantic Yape button is visible; assert expanded panel and stop | `npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --grep "TC81 pre-submit" --workers=1` | Inspect current ST2 Payment first; absence means document availability, never invent fallback |
-| 82 | `reachAuthenticatedPaymentWithSavedAddress()` and `PaymentPage.selectPaymentMode()` | Add `selectAcuotaz()` only if a semantic Acuotaz button is visible; assert expanded panel and stop | `npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --grep "TC82 pre-submit" --workers=1` | Inspect current ST2 Payment first; absence means document availability, never infer that another installment mode is Acuotaz |
-
-Use each candidate's isolated command only after its gate is satisfied.
-
-### TC1 — Home login as registered user
-
-- File: `tests/st2/base-store/home/login.spec.js`.
-- Page Object/helper: `HomePage.openHome()` plus `requireAuthState()`, `applyAuthSessionStorage()` and `validateAuthenticatedSession()` from `utils/authState.js`.
-- Add: an authenticated Home spec; no new login UI method is needed for session validation.
-- Locator/assertion: existing `button "My Profile"` followed by visible exact text `Cerrar sesión` inside the active menu.
-- Fixture: local ignored `playwright/.auth/user.json` plus `session-storage.json`; no credentials in code.
-- Flow/result: restore auth before the first page → validate Home → open Profile → require Logout. Mark only Partial unless the team accepts human-bootstrap login as fulfillment of TC1.
-- Known error: expired snapshot. If `auth:verify` fails too, it is session expiration; if `auth:verify` passes but TC1 cannot show Logout, investigate test context/session restoration.
-- Command: `npx playwright test tests/st2/base-store/home/login.spec.js --project=chromium --grep "TC1" --workers=1`.
-
-```js
-test.use({ storageState: requireAuthState() });
-test.beforeEach(async ({ context }) => applyAuthSessionStorage(context));
-test('TC1 pre-auth - registered session is available from Home', async ({ page }) => {
-  await validateAuthenticatedSession(page);
-});
-```
-
-### TC2 — Home login via shop menu
-
-- File: `tests/st2/base-store/home/login.spec.js`.
-- Existing reuse: the TC1 auth fixture and `validateAuthenticatedSession()`.
-- Add: only the exact shop-menu interaction after its official meaning is confirmed; do not guess whether “shop menu” means Header navigation or My Profile.
-- Locator: start from `page.getByRole('banner')`; resolve the agreed accessible menu/button name inside that scope.
-- Fixture/flow/result: same ignored auth state as TC1 → agreed shop-menu entry → visible authenticated Profile/Logout.
-- Known error: ST2 header hydration can temporarily omit controls. Missing control with otherwise healthy Home is ST2 rendering/data; a locator mismatch while the control is visible in the trace is automation.
-- Command: `npx playwright test tests/st2/base-store/home/login.spec.js --project=chromium --grep "TC2" --workers=1`.
-
-### TC3 — Checkout login entry (implemented, Partial)
-
-- Files: `pages/GuestLoginPage.js` and `tests/st2/base-store/checkout/checkout.spec.js`.
-- Existing reuse: `ProductPage.validateProductLoaded()`, `addToCart()`, `CartPage.validateProductInCart()` and `proceedToCheckout()`.
-- Method: `GuestLoginPage.openRegisteredLoginFromCheckout()`.
-- Locator: `getByRole('button', { name: 'Samsung Checkout Express', exact: true })`.
-- Fixture: none; this pre-auth check must remain anonymous.
-- Flow/result: cookie/setup → add-to-cart → Cart → Checkout Login → click Express → validate host `account.samsung.com` and path `/iam/*` → stop.
-- Known error: older assumptions used button `Iniciar sesión`; the real current accessible name is `Samsung Checkout Express`. Missing Express in a preserved Checkout snapshot is ST2 UI/data; visible Express plus locator failure is automation.
-- Command: `npx playwright test tests/st2/base-store/checkout/checkout.spec.js --project=chromium --grep "TC3 pre-auth" --workers=1`.
-
-```js
-await productPage.validateProductLoaded();
-await productPage.addToCart();
-await cartPage.validateProductInCart();
-await cartPage.proceedToCheckout();
-await guestLoginPage.openRegisteredLoginFromCheckout();
-```
-
-### TC5 — Cart then registered-login entry from Checkout
-
-- File: add beside TC3 in `tests/st2/base-store/checkout/checkout.spec.js` unless Confluence requires a separate journey spec.
-- Existing reuse: copy the TC3 setup and `openRegisteredLoginFromCheckout()` exactly; do not add another locator.
-- Add/assertion: explicit Cart checkpoint for SKU `RB45DG6300B1PE` before `proceedToCheckout()`, then the same account destination assertion.
-- Fixture: none before external auth. A complete registered callback requires the approved human auth architecture and should remain Partial if not exercised.
-- Expected: SKU proven in Cart, Express login destination proven, no direct Checkout navigation.
-- Known error: Cart can remain with disabled Continue. If SKU is absent, setup/add-to-cart failed; if SKU is present but Continue spins, report ST2 Cart instability; do not bypass with a direct route.
-- Command: `npx playwright test tests/st2/base-store/checkout/checkout.spec.js --project=chromium --grep "TC5 pre-auth" --workers=1`.
-
-```js
-await productPage.validateProductLoaded();
-await productPage.addToCart();
-await cartPage.validateProductInCart();
-await cartPage.proceedToCheckout();
-await guestLoginPage.openRegisteredLoginFromCheckout();
-```
-
-### TC81 — Yape availability/pre-submit
-
-- Files: `pages/PaymentPage.js` and `tests/st2/base-store/checkout/authenticated-checkout.spec.js`.
-- Existing reuse: `reachAuthenticatedPaymentWithSavedAddress()` and generic `PaymentPage.selectPaymentMode()`.
-- Add only if visible: `selectYape()` calling `selectPaymentMode(/^Yape\b/i, '09-yape-selected')`; validate the controlled panel if the accordion exposes `aria-controls`.
-- Fixture: fresh ignored auth state; no payment secrets needed for availability/selection.
-- Flow/result: auth preflight → TC39 saved-address path → Payment → Yape → `aria-expanded=true` and visible non-empty panel → stop before Place Order.
-- Known error: Yape was not among the four modes previously asserted by `validateAvailablePaymentModes()`. If absent in a fresh Payment snapshot, document environment/config availability and keep Pending; never add a fallback to another mode.
-- Command: `npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --grep "TC81 pre-submit" --workers=1`.
-
-```js
-async selectYape() {
-  await this.selectPaymentMode(/^Yape\b/i, '09-yape-selected');
-}
-```
-
-### TC82 — Acuotaz availability/pre-submit
-
-- Files: `pages/PaymentPage.js` and `tests/st2/base-store/checkout/authenticated-checkout.spec.js`.
-- Existing reuse: the same `reachAuthenticatedPaymentWithSavedAddress()` and `selectPaymentMode()` used by TC78–TC80.
-- Add only if visible: `selectAcuotaz()` with the exact accessible name observed in the current Payment DOM. Do not map Cuotéalo or another installment option to Acuotaz by assumption.
-- Fixture: fresh ignored auth state; no payment data is required for availability/selection.
-- Flow/result: `npm run auth:verify` → TC39 saved-address setup → Payment → Acuotaz → expanded state and visible non-empty controlled panel → stop.
-- Known error: the latest inspection attempt expired during auth preflight, so availability is unconfirmed. If the button is absent after a fresh authenticated run, keep Pending and document ST2 configuration; if visible but a semantic locator misses it, correct the locator from the preserved trace.
-- Command: `npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --grep "TC82 pre-submit" --workers=1`.
-
-```js
-async selectAcuotaz() {
-  await this.selectPaymentMode(/^Acuotaz\b/i, '09-acuotaz-selected');
-}
+# I. BackOffice read-only, future use with runtime staging credentials
+npx playwright test tests/st2/backoffice/backoffice.spec.js --project=chromium --grep "TC64|TC65|TC66|TC69|TC71" --workers=1 --headed
 ```
 
 ## Stop conditions
 
-- Never navigate directly to Checkout or Payment. Use cookie/setup → add-to-cart → Cart → Checkout.
-- Stop authenticated execution immediately when `auth:verify` reports expiration.
-- Do not retry or mask the known failure after Place Order.
-- Do not run TC23–32 until eligible service data is visible and its endpoint is healthy.
-- Do not edit/delete pre-existing account addresses. Only manage uniquely identifiable disposable QA data.
-- After navigation to production, validate the destination and stop unless the TC explicitly requires that external page.
+- Stop before Production navigation, external-provider completion, unexpected persistent account mutation or unapproved BackOffice write.
+- Treat missing auth as a skip, not a reason to request login during guest regression.
+- Treat a submit timeout as ambiguous; never retry Place Order/provider submit automatically.
+- Keep environment health separate from official coverage already proven functionally.

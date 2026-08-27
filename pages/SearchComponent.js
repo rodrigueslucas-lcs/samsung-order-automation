@@ -50,9 +50,6 @@ export default class SearchComponent extends BasePage {
      .catch(() => false);
    await this.screenshot("search-autocomplete-suggestions");
    if (!relatedProductsAvailable) {
-     console.log(
-       "Autocomplete loaded successfully, but ST2 did not return related products for this execution."
-     );
      return {
        autocompleteVisible: true,
        relatedProductAvailable: false,

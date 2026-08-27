@@ -13,11 +13,15 @@ const paymentModes = {
   acuotaz: { code: "Acuotaz", select: "selectAcuotaz" },
 };
 
-test("Alternative payment submit probe", async ({ page }) => {
+test("@destructive Alternative payment submit probe", async ({ page }) => {
   test.setTimeout(360000);
   const modeName = process.env.STOREFRONT_PAYMENT_MODE?.toLowerCase();
   const mode = paymentModes[modeName];
   test.skip(!mode, "Set STOREFRONT_PAYMENT_MODE to an approved payment mode.");
+  test.skip(
+    process.env.ALLOW_PAYMENT_SUBMIT !== "1",
+    "Set ALLOW_PAYMENT_SUBMIT=1 to explicitly authorize the single provider submit."
+  );
 
   const productPage = new ProductPage(page);
   const cartPage = new CartPage(page);
@@ -55,5 +59,4 @@ test("Alternative payment submit probe", async ({ page }) => {
     type: "payment-submit-result",
     description: JSON.stringify({ mode: modeName, code: mode.code, paymentApi, ...result }),
   });
-  console.log(`PAYMENT_RESULT ${JSON.stringify({ mode: modeName, code: mode.code, paymentApi, ...result })}`);
 });

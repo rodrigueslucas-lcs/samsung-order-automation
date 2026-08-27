@@ -105,12 +105,13 @@ export default class HomePage extends BasePage {
     const heroCount = await hero.count();
     const topSellerCount = await topSeller.count();
 
-    if (heroCount > 0 || topSellerCount > 0) {
-      throw new Error(
-        `Unexpected ST2 Home state. Hero count: ${heroCount}, Top Seller count: ${topSellerCount}`
-      );
-    }
-
     await this.screenshot("homepage-header-footer");
+
+    return {
+      headerVisible: true,
+      footerVisible: true,
+      heroVisible: heroCount > 0,
+      topSellerVisible: topSellerCount > 0,
+    };
   }
 }

@@ -139,7 +139,7 @@ test.describe("ST2 - Base Store - Cart Page", () => {
    const productPage = new ProductPage(page);
    const cartPage = new CartPage(page);
    await productPage.validateProductLoaded();
-   await productPage.addToCart();
+   await productPage.addToCartForAdditionalServices();
    await cartPage.validateProductInCart();
    await cartPage.validateExternalServicesVisible();
  });

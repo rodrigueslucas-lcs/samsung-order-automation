@@ -10,9 +10,10 @@ import { testData } from "../../../../utils/testData";
 const {
   AUTH_STATE_PATH,
   applyAuthSessionStorage,
-  requireAuthState,
+  hasAuthState,
   validateAuthenticatedSession,
 } = authState;
+const AUTH_REQUIRED = "Authenticated storefront state required. Run auth bootstrap first.";
 
 test.use({ channel: "chrome" });
 
@@ -66,9 +67,10 @@ async function reachAuthenticatedPaymentWithSavedAddress(page) {
 }
 
 test.describe("ST2 - Base Store - Authenticated Checkout", () => {
-  test.use({ storageState: requireAuthState() || AUTH_STATE_PATH });
+  test.use({ storageState: hasAuthState() ? AUTH_STATE_PATH : undefined });
 
   test.beforeEach(async ({ context }) => {
+    test.skip(!hasAuthState(), AUTH_REQUIRED);
     await applyAuthSessionStorage(context);
   });
 

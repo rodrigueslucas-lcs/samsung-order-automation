@@ -13,7 +13,7 @@ test.describe("ST2 - Base Store - Mobile Order Journey", () => {
      height: 844,
    },
  });
- test("TC83 - Customer able to place an order using mobile browser", async ({ page }) => {
+ test("@destructive TC83 - Customer able to place an order using mobile browser", async ({ page }) => {
    test.setTimeout(300000);
    const productPage = new ProductPage(page);
    const guestLoginPage = new GuestLoginPage(page);

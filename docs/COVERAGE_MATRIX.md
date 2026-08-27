@@ -2,7 +2,7 @@
 
 **Environment:** Peru ST2 / S3  
 **Framework:** Playwright  
-**Last Updated:** 2026-08-26  
+**Last Updated:** 2026-08-27
 **Current validation rule:** Until environment-specific matrices are split, a scenario is marked Automated when it has been successfully validated in either Peru staging environment (ST2 or S3). Environment-specific evidence and blockers remain documented in Notes.
 
 ## Summary

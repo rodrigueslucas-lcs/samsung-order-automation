@@ -31,9 +31,13 @@ export default defineConfig({
 
     screenshot: 'on',
 
-    video: 'on',
+    // Playwright video requires its bundled FFmpeg. On managed Windows machines
+    // where that executable is unavailable/blocked, context teardown fails with
+    // `spawn EPERM` after an otherwise valid test. Trace and screenshots remain
+    // enabled; opt in to video only after FFmpeg is available.
+    video: process.env.PW_VIDEO === '1' ? 'on' : 'off',
 
-    trace: 'on',
+    trace: 'retain-on-failure',
 
     actionTimeout: 15000,
 

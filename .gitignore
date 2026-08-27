@@ -10,9 +10,5 @@ node_modules/
 .env
 
 # Playwright runtime evidence
-evidence/screenshots/*.png
-
-# Playwright runtime evidence
-evidence/screenshots/*.png
-evidence/screenshots/
+/evidence/screenshots/
 .playwright-mcp/
