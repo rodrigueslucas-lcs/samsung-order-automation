@@ -131,6 +131,36 @@ export default class CheckoutPage extends BasePage {
     }
   }
 
+  async saveNewAuthenticatedAddress(address) {
+    await this.page.getByRole("tabpanel", {
+      name: "Envío",
+      exact: true,
+    }).waitFor({ state: "visible", timeout: 60000 });
+    const newAddress = this.page.getByRole("radio", {
+      name: "Nueva dirección",
+      exact: true,
+    });
+    if (await newAddress.isVisible()) {
+      await newAddress.check();
+    }
+    await this.fillAddress(address);
+    const deliveryPanel = this.page.getByRole("tabpanel", {
+      name: "Envío",
+      exact: true,
+    });
+    const saveAddress = deliveryPanel.getByRole("checkbox", {
+      name: /Guardar datos de env[ií]o en Mi cuenta/i,
+    });
+    if (!(await saveAddress.isChecked())) {
+      await deliveryPanel
+        .getByText(/Guardar datos de env[ií]o en Mi cuenta/i)
+        .click();
+    }
+    if (!(await saveAddress.isChecked())) {
+      throw new Error("Authenticated QA address was not marked for saving.");
+    }
+  }
+
   async selectSavedAddressAndValidate() {
     const deliveryRegion = this.page.getByRole("region", {
       name: /2\. Direcci[oó]n de entrega/i,

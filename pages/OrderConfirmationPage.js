@@ -37,8 +37,8 @@ export default class OrderConfirmationPage extends BasePage {
 
     const orderNumber = match[2];
 
-    console.log(`Order Number => ${orderNumber}`);
-
     await this.screenshot('12-order-confirmation');
+
+    return orderNumber;
   }
 }

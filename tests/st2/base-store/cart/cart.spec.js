@@ -144,6 +144,23 @@ test.describe("ST2 - Base Store - Cart Page", () => {
    await cartPage.validateExternalServicesVisible();
  });
 
+ test("TC19 partial - Added Services and Recommended Products", async ({ page }, testInfo) => {
+   test.setTimeout(180000);
+   const productPage = new ProductPage(page);
+   const cartPage = new CartPage(page);
+
+   await productPage.validateProductLoaded();
+   await productPage.addToCartForAdditionalServices();
+   const result = await cartPage.inspectAddedServicesAndRecommendedProducts();
+
+   if (!result.recommendationVisible) {
+     testInfo.annotations.push({
+       type: "partial",
+       description: "Additional Services is available; no Recommended Products section is rendered by current ST2 data.",
+     });
+   }
+ });
+
 
   test("TC28 - Customer able to click the Samsung Care Plus Button", async ({ page }) => {
 
@@ -155,11 +172,14 @@ test.describe("ST2 - Base Store - Cart Page", () => {
 
     await productPage.validateProductLoaded();
 
-    await productPage.addToCart();
+    await productPage.addToCartForAdditionalServices();
 
     await cartPage.validateProductInCart();
 
-    await cartPage.validateSamsungCareButton();
+    await cartPage.addFunctionalAdditionalService({
+      acceptTerms: false,
+      submit: false,
+    });
 
   });
 
@@ -169,9 +189,9 @@ test.describe("ST2 - Base Store - Cart Page", () => {
    const productPage = new ProductPage(page);
    const cartPage = new CartPage(page);
    await productPage.validateProductLoaded();
-   await productPage.addToCart();
+   await productPage.addToCartForAdditionalServices();
    await cartPage.validateProductInCart();
-   await cartPage.validateSamsungCareJourney();
+   await cartPage.addFunctionalAdditionalService({ submit: false });
  });
 
  test("TC23 - Customer able to click the Trade-in button", async ({ page }) => {

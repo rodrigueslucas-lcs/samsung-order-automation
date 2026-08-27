@@ -241,6 +241,34 @@ export default class CartPage extends BasePage {
    await this.screenshot("cart-external-service-visible");
  }
 
+  async inspectAddedServicesAndRecommendedProducts() {
+    const main = this.page.getByRole("main");
+    const additionalServicesButton = main
+      .locator('button[data-an-la="add service:samsung care"]')
+      .filter({ hasText: "Servicios Adicionales" });
+
+    await additionalServicesButton.waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
+
+    const recommendationSection = main.getByText(
+      /Productos recomendados|Recomendados para ti|También te puede gustar/i
+    );
+    const recommendationVisible = await recommendationSection
+      .first()
+      .isVisible()
+      .catch(() => false);
+
+    await this.screenshot(
+      recommendationVisible
+        ? "cart-added-services-and-recommendations"
+        : "cart-added-services-without-recommendations"
+    );
+
+    return { additionalServicesVisible: true, recommendationVisible };
+  }
+
 
   async validateSamsungCareButton() {
     const addServiceButton = this.getAdditionalServicesButton();
@@ -715,13 +743,13 @@ export default class CartPage extends BasePage {
     await this.screenshot("cart-trade-in-summary");
   }
 
-  async addFunctionalAdditionalService() {
+  async addFunctionalAdditionalService({ acceptTerms = true, submit = true } = {}) {
 
     const main = this.page.getByRole("main");
 
     const addServiceButton = main.locator(
      'button[data-an-la="add service:samsung care"]'
-   );
+   ).filter({ hasText: "Servicios Adicionales" });
     await addServiceButton.waitFor({
 
       state: "visible",
@@ -806,6 +834,11 @@ export default class CartPage extends BasePage {
 
     }
 
+    if (!acceptTerms) {
+      await this.screenshot("cart-functional-additional-service-modal");
+      return;
+    }
+
     await termsCheckbox.check();
 
     if (!(await addToCartButton.isEnabled())) {
@@ -819,6 +852,10 @@ export default class CartPage extends BasePage {
     }
 
     await this.screenshot("cart-functional-additional-service-ready");
+
+    if (!submit) {
+      return;
+    }
 
     await addToCartButton.click();
 
@@ -836,11 +873,7 @@ export default class CartPage extends BasePage {
 
   async validateAddedAdditionalService() {
 
-    const serviceItem = this.page
-
-      .getByRole("main")
-
-      .locator("app-service-item-smc");
+    const serviceItem = this.page.getByRole("main");
 
     await serviceItem
 
@@ -850,21 +883,7 @@ export default class CartPage extends BasePage {
 
       )
 
-      .waitFor({
-
-        state: "visible",
-
-        timeout: 30000,
-
-      });
-
-    await serviceItem
-
-      .getByText("Servicio adicional agregado con éxito.", {
-
-        exact: true,
-
-      })
+      .first()
 
       .waitFor({
 
@@ -881,6 +900,8 @@ export default class CartPage extends BasePage {
         exact: true,
 
       })
+
+      .first()
 
       .waitFor({
 

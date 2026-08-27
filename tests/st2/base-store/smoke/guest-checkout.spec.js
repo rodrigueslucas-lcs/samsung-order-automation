@@ -64,4 +64,35 @@ test.describe("ST2 - Base Store - Guest Customer Order Journey", () => {
     });
   });
 
+  test("TC59 - IM order with Trade-in and Samsung Care+", async ({ page }) => {
+    test.setTimeout(420000);
+
+    const productPage = new ProductPage(page);
+    const guestLoginPage = new GuestLoginPage(page);
+    const cartPage = new CartPage(page);
+    const checkoutPage = new CheckoutPage(page);
+    const paymentPage = new PaymentPage(page);
+    const orderConfirmationPage = new OrderConfirmationPage(page);
+
+    await productPage.validateProductLoaded();
+    await productPage.addToCartForAdditionalServices();
+    await cartPage.openTradeInJourney();
+    await cartPage.completeTradeInJourney();
+    await cartPage.validateTradeInAdded();
+    await cartPage.addFunctionalAdditionalService();
+    await cartPage.validateAddedAdditionalService();
+
+    await cartPage.proceedToCheckout();
+    await guestLoginPage.checkoutAsGuest(testData.customer.email);
+    await checkoutPage.fillCustomerData(testData.customer);
+    await checkoutPage.fillAddress(testData.address);
+    await checkoutPage.selectShippingMethod();
+    await checkoutPage.acceptTerms();
+    await checkoutPage.continueToPayment();
+    await paymentPage.selectCreditCard();
+    await paymentPage.fillCardData(testData.card);
+    await paymentPage.placeOrder();
+    await orderConfirmationPage.validateOrderCreated();
+  });
+
 });

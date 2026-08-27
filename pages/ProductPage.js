@@ -26,11 +26,11 @@ export default class ProductPage extends BasePage {
    const additionalServicesAddToCartUrl =
      "https://stg2.shop.samsung.com/pe/ng/p4v1/addToCart?products%5B0%5D.productCode=SM-F741BLBKPEO&products%5B0%5D.quantity=1&callback=jQuery111305177703263619047_1595407056965&_=1595407056969";
    // Required ST2 setup:
-   // 1) add the standard refrigerator SKU
-   // 2) add the Galaxy Z Flip6 SKU
+   // 1) add the Galaxy Z Flip6 SKU
+   // 2) add the standard refrigerator SKU
    // 3) only then open Cart
-   await this.safeGoto(this.addToCartUrl);
    await this.safeGoto(additionalServicesAddToCartUrl);
+   await this.safeGoto(this.addToCartUrl);
    await this.safeGoto(this.cartUrl);
    await this.page
      .getByText("RB45DG6300B1PE", { exact: true })

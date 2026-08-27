@@ -21,6 +21,13 @@ function requireAuthState() {
   return AUTH_STATE_PATH;
 }
 
+function hasAuthState() {
+  return (
+    fs.existsSync(AUTH_STATE_PATH) &&
+    fs.existsSync(AUTH_SESSION_STORAGE_PATH)
+  );
+}
+
 async function applyAuthSessionStorage(context) {
   requireAuthState();
   const sessionStorage = JSON.parse(
@@ -96,6 +103,7 @@ module.exports = {
   AUTH_STATE_PATH,
   AUTH_SESSION_STORAGE_PATH,
   applyAuthSessionStorage,
+  hasAuthState,
   requireAuthState,
   validateCurrentPageAuthenticated,
   validateAuthenticatedSession,
