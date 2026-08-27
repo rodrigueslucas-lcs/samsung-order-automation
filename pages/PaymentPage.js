@@ -152,17 +152,19 @@ export default class PaymentPage extends BasePage {
   }
 
   async selectBancaPorInternet() {
-    await this.selectPaymentMode(
+    const paymentMode = await this.selectPaymentMode(
       /^Banca por Internet\b/i,
       "09-banca-por-internet-selected"
     );
+    await this.validateControlledPaymentPanel(paymentMode, "Banca por Internet");
   }
 
   async selectPagoEfectivo() {
-    await this.selectPaymentMode(
+    const paymentMode = await this.selectPaymentMode(
       /^Pago Efectivo\b/i,
       "09-pago-efectivo-selected"
     );
+    await this.validateControlledPaymentPanel(paymentMode, "Pago Efectivo");
   }
 
   async selectCuotealo() {
@@ -170,21 +172,130 @@ export default class PaymentPage extends BasePage {
       /^Cuotéalo\b/i,
       "09-cuotealo-selected"
     );
-    const controlledPanelId = await paymentMode.getAttribute("aria-controls");
+    await this.validateControlledPaymentPanel(paymentMode, "Cuotéalo");
 
+    await this.screenshot("09-cuotealo-content");
+  }
+
+  async selectYape() {
+    const paymentMode = await this.selectPaymentMode(
+      /^Yape\b/i,
+      "09-yape-selected"
+    );
+    await this.validateControlledPaymentPanel(paymentMode, "Yape");
+  }
+
+  async selectAcuotaz() {
+    const paymentMode = await this.selectPaymentMode(
+      /^Acuotaz\b/i,
+      "09-acuotaz-selected"
+    );
+    await this.validateControlledPaymentPanel(paymentMode, "Acuotaz");
+  }
+
+  async availablePaymentModeNames() {
+    return this.page
+      .getByRole("button")
+      .evaluateAll((buttons) =>
+        buttons
+          .filter((button) => button.hasAttribute("aria-expanded"))
+          .map((button) => button.textContent?.replace(/\s+/g, " ").trim())
+          .filter(Boolean)
+      );
+  }
+
+  async isPaymentModeAvailable(name) {
+    return this.page.getByRole("button", { name }).isVisible();
+  }
+
+  async submitSelectedPaymentMode() {
+    const panel = this.selectedPaymentPanel;
+    if (!panel) {
+      throw new Error("No validated payment panel is selected.");
+    }
+    const pageAction = this.page.getByRole("button", {
+      name: /^Pagar Ahora/i,
+    });
+    const submitAction = pageAction;
+    await submitAction.waitFor({ state: "visible", timeout: 30000 });
+    if (await submitAction.isDisabled().catch(() => false)) {
+      throw new Error("The selected payment action is disabled.");
+    }
+
+    const initialUrl = this.page.url();
+    const responses = [];
+    let responseOrderCode = null;
+    const recordResponse = (response) => {
+      if (/payment|checkout|order|placeorder|transaction/i.test(response.url())) {
+        responses.push({
+          method: response.request().method(),
+          status: response.status(),
+          endpoint: new URL(response.url()).origin + new URL(response.url()).pathname,
+        });
+        response.text().then((text) => {
+          responseOrderCode ||= text.match(/\bPE\d{6}-\d{8}(?:_\d+)?\b/i)?.[0] || null;
+        }).catch(() => {});
+      }
+    };
+    this.page.on("response", recordResponse);
+
+    const popupPromise = this.page.context().waitForEvent("page", {
+      timeout: 90000,
+    }).catch(() => null);
+
+    await this.screenshot("11-before-alternative-payment-submit");
+    await submitAction.click();
+
+    const result = await Promise.race([
+      this.page.waitForURL(
+        /confirmation|confirmacion|order-confirmation|checkout\/order|success/i,
+        { timeout: 90000 }
+      ).then(() => ({ type: "CONFIRMATION", target: this.page })),
+      this.page.waitForURL(
+        (url) => url.href !== initialUrl && !/CHECKOUT_STEP_PAYMENT/i.test(url.href),
+        { timeout: 90000 }
+      ).then(() => ({ type: "REDIRECT", target: this.page })),
+      popupPromise.then((popup) => popup && ({ type: "POPUP", target: popup })),
+      this.page.getByText(/error|rechazad|no pudimos|problema|no disponible/i)
+        .first()
+        .waitFor({ state: "visible", timeout: 90000 })
+        .then(() => ({ type: "ERROR_MESSAGE", target: this.page })),
+      this.page.waitForTimeout(90000).then(() => ({ type: "TIMEOUT", target: this.page })),
+    ]);
+
+    this.page.off("response", recordResponse);
+    const target = result?.target || this.page;
+    await target.waitForLoadState("domcontentloaded", { timeout: 30000 }).catch(() => {});
+    const rawFinalUrl = target.url();
+    const parsedFinalUrl = new URL(rawFinalUrl);
+    const finalUrl = parsedFinalUrl.origin + parsedFinalUrl.pathname;
+    const bodyText = await target.locator("body").innerText({ timeout: 15000 }).catch(() => "");
+    const orderCode = bodyText.match(/\bPE\d{6}-\d{8}(?:_\d+)?\b/i)?.[0] || responseOrderCode;
+
+    await this.screenshot(`11-alternative-payment-${result?.type?.toLowerCase() || "unknown"}`);
+
+    return {
+      type: result?.type || "UNKNOWN",
+      finalUrl,
+      orderCode,
+      responses: responses.slice(-20),
+    };
+  }
+
+  async validateControlledPaymentPanel(paymentMode, modeName) {
+    const controlledPanelId = await paymentMode.getAttribute("aria-controls");
     if (!controlledPanelId) {
-      throw new Error("Cuotéalo did not expose its controlled payment panel.");
+      throw new Error(`${modeName} did not expose its controlled payment panel.`);
     }
 
     const paymentPanel = this.page.locator(`[id="${controlledPanelId}"]`);
     await paymentPanel.waitFor({ state: "visible", timeout: 30000 });
-
-    const panelContent = (await paymentPanel.innerText()).trim();
-    if (!panelContent) {
-      throw new Error("Cuotéalo expanded, but its payment content was empty.");
+    if (!(await paymentPanel.innerText()).trim()) {
+      throw new Error(`${modeName} expanded, but its payment content was empty.`);
     }
 
-    await this.screenshot("09-cuotealo-content");
+    this.selectedPaymentPanel = paymentPanel;
+    return paymentPanel;
   }
 
   async navigateBackToCart() {

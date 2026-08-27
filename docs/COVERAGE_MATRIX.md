@@ -9,7 +9,7 @@
 
 | Scope | Total | Automated | Partial | Blocked | Not Applicable | Pending |
 |---|---:|---:|---:|---:|---:|---:|
-| Base Store | 83 | 53 | 11 | 7 | 2 | 10 |
+| Base Store | 83 | 59 | 8 | 8 | 2 | 6 |
 | EPP | ~60 | 0 | 0 | 0 | 0 | ~60 |
 
 ### Status Legend
@@ -82,8 +82,8 @@
 | 56 | Payment Page | Customer able to see the address for Shipping and Billing | ✅ Automated | `tests/st2/base-store/payment/payment.spec.js` | Passed |
 | 57 | Payment Page | Customer able to see all available Payment mode | ✅ Automated | `tests/st2/base-store/payment/payment.spec.js` | Passed |
 | 58 | Payment Page | Customer able to complete order using one payment mode. | ✅ Automated | `tests/st2/base-store/payment/payment.spec.js` | Passed in ST2 - complete Credit Card checkout submitted successfully and created order `PE260826-74728051`; previous backend/siteId blocker was not reproduced |
-| 59 | Customer Order Journey | Customer able to place one IM order with Trade-in and SC+. (If there is available data) | ⬜ Pending | — | — |
-| 60 | Customer Order Journey | Customer able to place one CE order. (If there is available data) | ⬜ Pending | — | — |
+| 59 | Customer Order Journey | Customer able to place one IM order with Trade-in and SC+. (If there is available data) | ⚠️ Partial | `tests/st2/base-store/smoke/guest-checkout.spec.js` | Trade-in and SC+ were simultaneously applied to the two-SKU cart, but ST2 removed SC+ as unavailable when Checkout was requested and kept the user in Cart; no order was created |
+| 60 | Customer Order Journey | Customer able to place one CE order. (If there is available data) | ✅ Automated | `tests/st2/base-store/smoke/guest-checkout.spec.js` | Full guest CE journey for refrigerator `RB45DG6300B1PE` completed with Credit Card and confirmation; ST2 order `PE260826-74728051` |
 | 61 | Payment Page/Checkout Page | Customer able to navigate back to cart from Payment page, Checkout page using the Edit button | ✅ Automated | `tests/st2/base-store/payment/payment-navigation.spec.js`, `tests/st2/base-store/checkout/checkout.spec.js` | Passed - Payment → Cart and Checkout → Cart validated |
 | 62 | Confirmation Page | Customer able to see the confirmation after placing order. | ✅ Automated | `tests/st2/base-store/smoke/guest-checkout.spec.js` | Passed in ST2 - Order Confirmation displayed successfully and order number `PE260826-74728051` was validated |
 | 63 | Order Email | Customer able to received Order confirmation/ acknowledgment email | ⬜ Pending | — | — |
@@ -101,12 +101,12 @@
 | 75 | Order Fullfillment | User able to run cronjob: pe-tokoTransferConsignmentToWarehouseJob | ✅ Automated | `tests/st2/backoffice/backoffice-fulfillment.spec.js` | Passed in S3 with full admin: warehouse CronJob executed and completed `FINISHED / SUCCESS` |
 | 76 | Order Fullfillment | User able to validate the updated order status is on "Shipping Requested" | ✅ Automated | `tests/st2/backoffice/backoffice-fulfillment.spec.js` | Passed in S3 as an independent status checkpoint. The tracked Order Split mass remained blocked by NERP data, annotated separately as an external blocker |
 | 77 | Payment Mode | Customer able to place order using Credit Card [pe-mercadoCC] (Master, Visa, AMX) | ✅ Automated | `tests/st2/base-store/smoke/guest-checkout.spec.js` | Passed in ST2 - Credit Card payment was submitted successfully and resulted in confirmed order `PE260826-74728051` |
-| 78 | Payment Mode | Customer able to place order using SafetyPay - Banca por Internet [pe-Bancapor] | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: authenticated saved-address checkout reached Payment and `Banca por Internet` became selected (`aria-expanded=true`); Place Order was intentionally not executed |
-| 79 | Payment Mode | Customer able to place order using Cash Payment [pe-pagoEfectivo]. Note: can only accept payment with maximum amount of S/ 10,000 | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: authenticated saved-address checkout reached Payment and `Pago Efectivo` became selected (`aria-expanded=true`); Place Order was intentionally not executed |
-| 80 | Payment Mode | Customer able to place order using Cuotéalo [pe-Cuotealo]. The maximum amount allowed is S/ 7,000.00 | ⚠️ Partial | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Pre-submit passed: Cuotéalo was available, expanded with `aria-expanded=true`, and its controlled payment panel rendered non-empty content; Place Order was not executed |
-| 81 | Payment Mode | Customer able to place order using Yape [pe-yape] | ⬜ Pending | — | Current Payment availability could not be revalidated because the authenticated preflight expired before Checkout; no fallback or Place Order was attempted |
-| 82 | Payment Mode | Customer able to place order using Acuotaz | ⬜ Pending | — | Current Payment availability could not be revalidated because the authenticated preflight expired before Checkout; no fallback or Place Order was attempted |
-| 83 | Mobile | Customer able to place order using own mobile | ⚠️ Partial | `tests/st2/base-store/mobile/mobile-order.spec.js` | Mobile guest checkout passed twice at 390x844 through Payment with credit card data ready pre-submit; Place Order was intentionally not executed due to the known post-submit defect |
+| 78 | Payment Mode | Customer able to place order using SafetyPay - Banca por Internet [pe-Bancapor] | ✅ Automated | `tests/st2/base-store/payment/alternative-payment-submit.spec.js` | Payment API returned `pe-Bancapor`; selection/panel passed; `submitOrder` returned HTTP 200 and handed off to the SafetyPay sandbox. External payment was intentionally not completed |
+| 79 | Payment Mode | Customer able to place order using Cash Payment [pe-pagoEfectivo]. Note: can only accept payment with maximum amount of S/ 10,000 | ✅ Automated | `tests/st2/base-store/payment/alternative-payment-submit.spec.js` | Below-limit checkout submitted `pe-pagoEfectivo` with HTTP 200, created `PE260826-74728068`, and opened Samsung confirmation. Panel documented an 8-digit CIP valid for 24 hours |
+| 80 | Payment Mode | Customer able to place order using Cuotéalo [pe-Cuotealo]. The maximum amount allowed is S/ 7,000.00 | ✅ Automated | `tests/st2/base-store/payment/alternative-payment-submit.spec.js` | Eligible below-limit checkout submitted `pe-Cuotealo` with HTTP 200, created `PE260826-74728069`, and handed off to the SafetyPay sandbox |
+| 81 | Payment Mode | Customer able to place order using Yape [pe-yape] | 🚧 Blocked | `tests/st2/base-store/payment/payment.spec.js` | Current payment-modes API returned HTTP 200 without `pe-yape`; Yape was consequently absent from the DOM. Current ST2 configuration/API availability blocks functional automation |
+| 82 | Payment Mode | Customer able to place order using Acuotaz | ✅ Automated | `tests/st2/base-store/payment/alternative-payment-submit.spec.js` | API/CMS and DOM exposed Acuotaz; selection/panel passed; submission created `PE260826-74728070_260826235706309` and handed off to the Apurata Acuotaz test provider |
+| 83 | Mobile | Customer able to place order using own mobile | ✅ Automated | `tests/st2/base-store/mobile/mobile-order.spec.js` | Full guest checkout passed at 390x844 through Credit Card, Place Order and confirmation; created ST2 order `PE260826-74728055` (runner teardown still reported the independent Windows EPERM) |
 
 ## Supplementary ST2 Coverage
 
