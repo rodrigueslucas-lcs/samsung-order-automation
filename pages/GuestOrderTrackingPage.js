@@ -5,11 +5,14 @@ export default class GuestOrderTrackingPage extends BasePage {
     super(page);
 
     this.form = page.locator("form").filter({
-      hasText: "Ingrese su número de pedido y correo electrónico",
+      has: page.getByRole("button", { name: /Enviar código|Reenviar Código/i }),
     });
     this.orderNumber = this.form.locator('input[type="text"]').first();
     this.email = this.form.locator('input[type="email"]');
-    this.verificationCode = this.form.locator('input[type="text"]').nth(1);
+    this.verificationCode = this.form.getByRole("textbox", {
+      name: "Código de verificación",
+      exact: true,
+    });
     this.sendCodeButton = this.form.getByRole("button", {
       name: "Enviar código",
       exact: true,
@@ -21,10 +24,6 @@ export default class GuestOrderTrackingPage extends BasePage {
   }
 
   async validateGuestTrackingForm() {
-    await this.page
-      .getByRole("heading", { name: /Búsqueda de Pedidos|Pedidos/i })
-      .first()
-      .waitFor({ state: "visible", timeout: 60000 });
     await this.form.waitFor({ state: "visible", timeout: 60000 });
 
     for (const field of [this.orderNumber, this.email, this.verificationCode]) {
@@ -127,11 +126,73 @@ export default class GuestOrderTrackingPage extends BasePage {
     await this.sendCodeButton.click();
     const response = await responsePromise;
 
+    if (!response.ok()) {
+      throw new Error(
+        `Guest order OTP request was rejected with HTTP ${response.status()}.`
+      );
+    }
+
+    await this.page
+      .getByText(/Hemos enviado el c\u00f3digo de verificaci\u00f3n.*correo electr\u00f3nico/i)
+      .waitFor({ state: "visible", timeout: 30000 });
+
     return {
       method: response.request().method(),
       status: response.status(),
       accepted: response.ok(),
       endpoint: new URL(response.url()).origin + new URL(response.url()).pathname,
+    };
+  }
+
+  async submitVerificationCode(otp, orderNumber) {
+    if (!/^\d{6}$/.test(otp)) {
+      throw new Error("Guest tracking OTP must contain exactly six digits.");
+    }
+
+    await this.verificationCode.fill(otp);
+    await this.searchButton.waitFor({ state: "visible", timeout: 30000 });
+    if (!(await this.searchButton.isEnabled())) {
+      throw new Error("Guest order Search remained disabled after the OTP was filled.");
+    }
+
+    await this.searchButton.click();
+    await this.page.getByRole("main").getByText(orderNumber, { exact: false })
+      .first().waitFor({ state: "visible", timeout: 60000 });
+  }
+
+  async validateTrackedOrder(orderNumber) {
+    const main = this.page.getByRole("main");
+    const order = main.getByText(orderNumber, { exact: false }).first();
+    await order.waitFor({ state: "visible", timeout: 60000 });
+
+    const card = order.locator(
+      "xpath=ancestor::*[.//button[normalize-space()='Ver detalles'] or .//a[normalize-space()='Ver detalles']][1]"
+    );
+    const details = card.getByRole("link", { name: /Ver detalles/i })
+      .or(card.getByRole("button", { name: /Ver detalles/i })).first();
+    await details.waitFor({ state: "visible", timeout: 30000 });
+
+    const statusPattern = /Recibido|Pagado|En proceso|Preparando env[i\u00ed]o|En camino|Entregado|Processing|Shipping/i;
+    const status = card.getByText(statusPattern).first();
+    await status.waitFor({ state: "visible", timeout: 30000 });
+    const statusText = (await status.innerText()).trim();
+
+    await this.screenshot("tc13-guest-order-tracking-card");
+    await details.click();
+    await main.getByText(orderNumber, { exact: false }).last()
+      .waitFor({ state: "visible", timeout: 60000 });
+
+    const tracking = main.getByText(statusPattern).first();
+    await tracking.waitFor({ state: "visible", timeout: 30000 });
+    const detailText = await main.innerText();
+    const hasOrderSummary = /S\/\s*[\d,.]+/.test(detailText);
+    const hasProduct = /RB45DG6300B1PE|Refrigeradora|producto/i.test(detailText);
+    await this.screenshot("tc13-guest-order-tracking-details");
+
+    return {
+      status: statusText,
+      hasOrderSummary,
+      hasProduct,
     };
   }
 }

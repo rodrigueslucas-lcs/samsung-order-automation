@@ -69,7 +69,7 @@ Enable it only after the matching Playwright FFmpeg is installed and allowed by 
 |---|---|---|
 | 1, 2 | Full registered login rather than reusable-session validation | Human Samsung/Google/FedCM/MFA decision; keep provider login manual |
 | 3, 5 | Successful authenticated callback after the proven Checkout login entry | Same identity-provider dependency; reuse a renewed auth state for downstream tests |
-| 13 | Valid guest order lookup and OTP correlation | Checkout-generated order/email plus inbox/OTP access; never use arbitrary existing orders |
+| 13 | Complete the final OTP submission and guest order/status assertion | Guest tracking flow and automatic OTP extraction were validated in prior execution, but the latest end-to-end rerun could not complete because the OTP email was not delivered to the test inbox within the configured timeout. The request was accepted once, no resend occurred, and the current locator was not the failure. |
 | 14 | Hero and Top Seller presence | ST2 CMS/catalog content; helper reports each attribute independently |
 | 19 | Recommended Products alongside Additional Services | Catalog/service data returning a recommendation block |
 | 59 | Completed IM order with Trade-in and SC+ | Samsung Care+ stock/configuration must stop removing the service at Checkout |
