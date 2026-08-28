@@ -2,14 +2,14 @@
 
 **Environment:** Peru ST2 / S3  
 **Framework:** Playwright  
-**Last Updated:** 2026-08-27
+**Last Updated:** 2026-08-28
 **Current validation rule:** Until environment-specific matrices are split, a scenario is marked Automated when it has been successfully validated in either Peru staging environment (ST2 or S3). Environment-specific evidence and blockers remain documented in Notes.
 
 ## Summary
 
 | Scope | Total | Automated | Partial | Blocked | Not Applicable | Pending |
 |---|---:|---:|---:|---:|---:|---:|
-| Base Store | 83 | 60 | 8 | 4 | 9 | 2 |
+| Base Store | 83 | 61 | 9 | 9 | 2 | 2 |
 | EPP | ~60 | 0 | 0 | 0 | 0 | ~60 |
 
 ### Status Legend
@@ -30,12 +30,12 @@
 | 4 | Login Page | Customer able to login from Order Confirmation Email (If Applicable) | ⬜ Pending | — | — |
 | 5 | Login Page | Guest Customer, able to place order until Cart Page. Then Customer able to login from Checkout Page. | ⚠️ Partial | `tests/st2/base-store/checkout/checkout.spec.js` | Product→Cart checkpoint and registered-login entry from Checkout passed; external Samsung Account authentication was not automated |
 | 6 | MyAccount Page | Customer able hover on the Profile Icon and verify the Login/Sign-up & MyOrder Page Link. | ✅ Automated | `tests/st2/base-store/profile/authenticated-profile.spec.js` | Fresh authenticated state validated the visible menu with `Mi cuenta`, `Pedidos` and `Cerrar sesión`; functional assertions completed before the independent EPERM teardown |
-| 7 | MyAccount Page | Customer able to see all the saved shipping and billing addresses in the My Profile Page. | ➖ Not Applicable | `tests/st2/base-store/profile/authenticated-profile.spec.js` | ST2 My Account/Profile navigation redirects to Production URL; staging flow is not available for safe validation. |
-| 8 | MyAccount Page | Customer able to add, edit &delete address for shipping & billing address. | ➖ Not Applicable | `tests/st2/base-store/profile/authenticated-profile.spec.js` | ST2 My Account/Profile navigation redirects to Production URL; staging flow is not available for safe validation. |
-| 9 | MyAccount Page | Customer able to show notification when adding, updating and deleting address for shipping and billing address. | ➖ Not Applicable | `tests/st2/base-store/profile/authenticated-profile.spec.js` | ST2 My Account/Profile navigation redirects to Production URL; staging flow is not available for safe validation. |
-| 10 | MyAccount Page | Customer able to set default address for shipping & billing. | ➖ Not Applicable | `tests/st2/base-store/profile/authenticated-profile.spec.js` | ST2 My Account/Profile navigation redirects to Production URL; staging flow is not available for safe validation. |
-| 11 | MyAccount Page | Customer able to verify the populated address is same on what is default address for shipping & billing in the Profile Setting. | ➖ Not Applicable | `tests/st2/base-store/profile/authenticated-profile.spec.js` | ST2 My Account/Profile navigation redirects to Production URL; staging flow is not available for safe validation. |
-| 12 | MyAccount Page | Customer able to see Order List/ Order Details in My Orders Page. | ➖ Not Applicable | `tests/st2/base-store/smoke/authenticated-order.spec.js`, `tests/st2/base-store/profile/authenticated-profile.spec.js` | ST2 My Account/Profile navigation redirects to Production URL; staging flow is not available for safe validation. |
+| 7 | MyAccount Page | Customer able to see all the saved shipping and billing addresses in the My Profile Page. | 🚧 Blocked | `tests/st2/base-store/profile/authenticated-profile.spec.js`, `tests/st2/base-store/profile/my-account-discovery.spec.js` | Direct ST2 `/pe/mypage` returns HTTP 200 but its CMS page requests return 404 and no Profile/Address Management component renders. The authenticated addresses API returns HTTP 200 with zero saved addresses. |
+| 8 | MyAccount Page | Customer able to add, edit &delete address for shipping & billing address. | 🚧 Blocked | `tests/st2/base-store/profile/authenticated-profile.spec.js` | Address API exists, but ST2 exposes no Address Management UI in which to perform and validate safe QA-only create/edit/delete. No mutation was attempted. |
+| 9 | MyAccount Page | Customer able to show notification when adding, updating and deleting address for shipping and billing address. | 🚧 Blocked | `tests/st2/base-store/profile/authenticated-profile.spec.js` | Depends on the missing ST2 Address Management UI and its notification components; no mutation was attempted. |
+| 10 | MyAccount Page | Customer able to set default address for shipping & billing. | 🚧 Blocked | `tests/st2/base-store/profile/authenticated-profile.spec.js` | No ST2 Address Management UI or existing saved-address mass is available to validate and safely restore a default. |
+| 11 | MyAccount Page | Customer able to verify the populated address is same on what is default address for shipping & billing in the Profile Setting. | 🚧 Blocked | `tests/st2/base-store/profile/authenticated-profile.spec.js` | Both Profile UI/default-address evidence and cross-flow correlation are unavailable in ST2; validating only Checkout would be insufficient. |
+| 12 | MyAccount Page | Customer able to see Order List/ Order Details in My Orders Page. | ✅ Automated | `tests/st2/base-store/profile/authenticated-profile.spec.js` | Headed real Chrome passed on direct ST2 `/pe/mypage/orders`: order `PE260826-74796841`, status `En proceso`, SKU `RB45DG6300B1PE`, total, `Ver detalles`, and the expanded order details were validated without creating a new order. |
 | 13 | MyAccount Page | Customer able to verify Tracking Order Page (Includes Guest) | ⚠️ Partial | `tests/st2/base-store/home/tracking.spec.js` | Headed Chrome validated footer `Pedidos` → `/pe/mypage/orders`, required order/email fields, client-side messages, OTP field/buttons, and invalid-data `sendOrderOtp` HTTP 401 contract. Full order lookup still requires an order/email/OTP created by our own automation |
 | 14 | Home Page | Customer able to see Homepage Attributes (Header, Hero banner, Top seller carousel, Footer) | ⚠️ Partial | `tests/st2/base-store/home/home.spec.js` | Header and Footer available; Hero banner and Top seller carousel are not rendered in current ST2 Home |
 | 15 | Cart Page | Customer able to see the Cart Page | ✅ Automated | `tests/st2/base-store/cart/cart.spec.js` | Passed |
@@ -63,7 +63,7 @@
 | 37 | Checkout Page | Customer able to verify checkout page (Products added displays correctly in Summary details) | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
 | 38 | Checkout Page | Customer able to verify checkout page for Tax is applied correctly and price break down is displayed properly.(NET price) | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed - PE UI exposes Subtotal/Total |
 | 39 | Checkout Page | Customer able to used save address in checking out. | ✅ Automated | `tests/st2/base-store/checkout/authenticated-checkout.spec.js` | Passed - selected and validated `Dirección guardada`, reused guest shipping/terms/continue, and reached Payment without modifying the saved address or placing an order |
-| 40 | Checkout Page | Customer able to saved address in checkout page and Verify it on the profile-setting. | ➖ Not Applicable | `tests/st2/base-store/profile/authenticated-profile.spec.js` | ST2 My Account/Profile navigation redirects to Production URL; staging flow is not available for safe validation. |
+| 40 | Checkout Page | Customer able to saved address in checkout page and Verify it on the profile-setting. | ⚠️ Partial | `tests/st2/base-store/profile/authenticated-profile.spec.js` | Checkout save/Payment and cleanup were previously proven, and the authenticated ST2 address API now provides a safe readback path. Today's integrated rerun was blocked by multi-shipment delivery selection before persistence/readback; all `QA AUTOMATION TC40` attempts were cleaned up. |
 | 41 | Checkout Page | Customer Able to enter different addresses for shipping and billing: | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed - separate Delivery and Billing values validated without advancing to Payment |
 | 42 | Checkout Page | Customer able to input any Phone Number | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |
 | 43 | Checkout Page | Customer able to input any Address: | ✅ Automated | `tests/st2/base-store/checkout/checkout.spec.js` | Passed |

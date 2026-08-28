@@ -27,7 +27,7 @@ test.describe("ST2 - Authenticated Order Journey", () => {
   test("TC12 - Authenticated order appears in My Orders and Order Details", async ({ page }) => {
     test.skip(
       true,
-      "ST2 My Account/Profile redirects to Production; staging flow is not available for safe validation."
+      "Destructive order creation is disabled; TC12 validates an existing automated order read-only via direct ST2 Orders."
     );
     test.setTimeout(600000);
     const sku = "RB45DG6300B1PE";

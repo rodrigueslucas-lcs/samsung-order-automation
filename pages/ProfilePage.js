@@ -1,7 +1,7 @@
 import { expect } from "@playwright/test";
-import BasePage from "./BasePage";
+import MyAccountPage from "./MyAccountPage";
 
-export default class ProfilePage extends BasePage {
+export default class ProfilePage extends MyAccountPage {
   constructor(page) {
     super(page);
     this.profileButton = page.getByRole("button", { name: "My Profile", exact: true });
@@ -34,14 +34,7 @@ export default class ProfilePage extends BasePage {
   }
 
   async openProfile() {
-    await this.openProfileMenu();
-    const entry = this.page.getByRole("menuitem", { name: "Mi cuenta", exact: true })
-      .or(this.page.getByRole("link", { name: /Mi perfil|Perfil|My Profile/i }))
-      .or(this.page.getByText(/Mi perfil|Perfil|My Profile/i).filter({ visible: true }))
-      .first();
-    await entry.waitFor({ state: "visible", timeout: 30000 });
-    await entry.click();
-    await this.page.waitForLoadState("domcontentloaded");
+    await this.openRoute(this.routes.root);
   }
 
   async openAddressManagement() {
@@ -58,6 +51,50 @@ export default class ProfilePage extends BasePage {
   async listSavedAddresses() {
     await this.openAddressManagement();
     return this.addressCards.allInnerTexts();
+  }
+
+  async inspectSavedAddressesApi() {
+    const endpoint =
+      "https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/pe/users/current/addresses";
+    const response = await this.page.request.get(endpoint);
+    const evidence = {
+      endpoint,
+      status: response.status(),
+      count: null,
+      shape: [],
+    };
+    if (!response.ok()) return evidence;
+    const payload = await response.json();
+    const addresses = Array.isArray(payload) ? payload : payload.addresses || [];
+    evidence.count = addresses.length;
+    evidence.shape = [...new Set(addresses.flatMap((address) => Object.keys(address)))]
+      .filter((key) => !/token|email|phone|name|line|formatted|id/i.test(key))
+      .slice(0, 20);
+    return evidence;
+  }
+
+  async waitForQaAddressViaApi(marker, { attempts = 10, intervalMs = 3000 } = {}) {
+    if (!marker.startsWith(this.qaMarker)) {
+      throw new Error("Refusing API lookup for a non-QA address.");
+    }
+    const endpoint =
+      "https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/pe/users/current/addresses";
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      const response = await this.page.request.get(endpoint);
+      if (!response.ok()) {
+        throw new Error(`Address readback returned HTTP ${response.status()}.`);
+      }
+      const payload = await response.json();
+      const addresses = Array.isArray(payload) ? payload : payload.addresses || [];
+      const found = addresses.some((address) =>
+        [address.line1, address.formattedAddress, address.addressName]
+          .filter(Boolean)
+          .some((value) => String(value).includes(marker)),
+      );
+      if (found) return { found: true, attempt };
+      if (attempt < attempts) await this.page.waitForTimeout(intervalMs);
+    }
+    throw new Error("QA address saved from Checkout was not returned by the authenticated address API.");
   }
 
   qaAddress(marker, baseAddress) {

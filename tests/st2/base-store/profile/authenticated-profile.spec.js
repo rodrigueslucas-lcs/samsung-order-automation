@@ -15,7 +15,9 @@ const {
 } = authState;
 const AUTH_REQUIRED = "Authenticated storefront state required. Run auth bootstrap first.";
 const PROFILE_NOT_AVAILABLE =
-  "ST2 My Account/Profile redirects to Production; staging flow is not available for safe validation.";
+  "ST2 address API is available but Address Management UI is absent; /pe/mypage has missing CMS content.";
+const TC40_PARTIAL =
+  "TC40 remains Partial: Checkout save is proven, but today's integrated multi-shipment run did not reach API readback.";
 
 test.describe("ST2 - Authenticated Profile and Addresses", () => {
   test.use({ storageState: hasAuthState() ? AUTH_STATE_PATH : undefined });
@@ -97,19 +99,20 @@ test.describe("ST2 - Authenticated Profile and Addresses", () => {
   }
 
   test("TC12 - Authenticated My Orders exposes order details", async ({ page }) => {
-    test.skip(true, PROFILE_NOT_AVAILABLE);
     test.setTimeout(300000);
-    const orderCode = process.env.AUTHENTICATED_ORDER_CODE;
+    const orderCode = process.env.AUTHENTICATED_ORDER_CODE || "PE260826-74796841";
     const orders = new MyOrdersPage(page);
     await orders.openMyOrders();
-    test.skip(!orderCode, "My Orders opened, but AUTHENTICATED_ORDER_CODE must belong to the signed-in account for detail validation.");
     const { order } = await orders.waitForOrder(orderCode);
-    await order.click();
-    await expect(page.getByText(orderCode, { exact: false }).first()).toBeVisible();
+    await expect(order).toBeVisible();
+    await expect(page.getByText(/En proceso|Processing/i).first()).toBeVisible();
+    await expect(page.getByText("RB45DG6300B1PE", { exact: false }).first()).toBeVisible();
+    await orders.openOrderDetails(orderCode);
+    await orders.validateOrderDetails(orderCode, { sku: "RB45DG6300B1PE" });
   });
 
   test("TC40 - Save checkout QA address and verify it in Profile", async ({ page }) => {
-    test.skip(true, PROFILE_NOT_AVAILABLE);
+    test.skip(true, TC40_PARTIAL);
     test.setTimeout(300000);
     const profile = new ProfilePage(page);
     const qa = profile.qaAddress("TC40", testData.address);
@@ -128,15 +131,9 @@ test.describe("ST2 - Authenticated Profile and Addresses", () => {
       await checkout.selectShippingMethod();
       await checkout.acceptTerms();
       await checkout.continueToPayment();
-      await profile.openAddressManagement();
-      await profile.expectQaAddress(qa.street);
+      await profile.waitForQaAddressViaApi(qa.street);
     } finally {
-      await profile.openAddressManagement().catch(() => {});
-      if (await page.getByText(qa.street, { exact: false }).count()) {
-        await profile.deleteQaAddress(qa.street).catch(async () => {
-          await profile.deleteQaAddressesViaApi(qa.street);
-        });
-      }
+      await profile.deleteQaAddressesViaApi(qa.street);
     }
   });
 

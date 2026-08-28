@@ -6,7 +6,7 @@ The official Base Store matrix contains 83 scenarios:
 
 | Automated | Partial | Blocked | Not Applicable | Pending | Total |
 |---:|---:|---:|---:|---:|---:|
-| 60 | 8 | 4 | 9 | 2 | 83 |
+| 61 | 9 | 9 | 2 | 2 | 83 |
 
 `docs/COVERAGE_MATRIX.md` is the source of truth. Supplementary tests do not change this count.
 
@@ -22,7 +22,7 @@ The official Base Store matrix contains 83 scenarios:
 ## Safety boundaries
 
 - Never run storefront or BackOffice writes against Production.
-- ST2 My Account/Profile links redirect to `https://shop.samsung.com/` Production. TC7-TC12 and TC40 are Not Applicable and statically skipped before navigation.
+- My Account links may point to Production, but automation must rewrite only approved Samsung paths to `stg2.shop.samsung.com` and reject any final Production interaction. Direct ST2 Orders and Wishlist work; Profile/Address Management remains absent.
 - Tests containing `@destructive` can create orders or submit a provider. Exclude them from ordinary regression.
 - TC59 is statically skipped while Samsung Care+ is removed at Checkout as unavailable/out of stock.
 - Alternative-provider submit requires both an approved `STOREFRONT_PAYMENT_MODE` and `ALLOW_PAYMENT_SUBMIT=1`; the helper clicks once and never retries.
@@ -118,8 +118,9 @@ npx playwright test tests/st2/base-store/home/home.spec.js tests/st2/base-store/
 npm run auth:verify
 npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --workers=1 --headed
 
-# H. TC12 with existing order
-# Not runnable in ST2: My Orders redirects to Production. Do not follow it.
+# H. TC12 with existing order (read-only direct ST2 route)
+$env:AUTHENTICATED_ORDER_CODE="PE260826-74796841"
+npx playwright test tests/st2/base-store/profile/authenticated-profile.spec.js --project=chromium --grep "TC12 -" --workers=1 --headed
 
 # I. BackOffice read-only, future use with runtime staging credentials
 npx playwright test tests/st2/backoffice/backoffice.spec.js --project=chromium --grep "TC64|TC65|TC66|TC69|TC71" --workers=1 --headed
