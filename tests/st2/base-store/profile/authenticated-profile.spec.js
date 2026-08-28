@@ -39,6 +39,32 @@ test.describe("ST2 - Authenticated Profile and Addresses", () => {
     expect(menu.profile + menu.orders).toBeGreaterThan(0);
   });
 
+  test("TC4 - Order email My Account CTA opens authenticated My Orders", async ({ page }) => {
+    test.setTimeout(300000);
+    const emailCtaUrl = process.env.ORDER_EMAIL_CTA_URL;
+    const orderCode = process.env.ORDER_EMAIL_ORDER_CODE;
+    test.skip(!emailCtaUrl, "Runtime order-email CTA URL is required.");
+
+    const decodedCta = decodeURIComponent(emailCtaUrl);
+    expect(decodedCta).toContain("https://stg2.shop.samsung.com/pe/mypage/orders");
+    expect(decodedCta).not.toMatch(/https:\/\/(?:www\.)?samsung\.com\/pe\//i);
+
+    await page.goto(emailCtaUrl, { waitUntil: "domcontentloaded" });
+    await page.waitForURL(/^https:\/\/stg2\.shop\.samsung\.com\/pe\/mypage\/orders(?:[/?#]|$)/, {
+      timeout: 120000,
+    });
+
+    await expect(page.getByRole("heading", { name: /Mis pedidos|Pedidos|My Orders/i }).first()).toBeVisible();
+    await expect(page.getByText("Cerrar sesión", { exact: true }).filter({ visible: true })).toBeVisible();
+
+    if (process.env.ORDER_EMAIL_EXPECT_ORDER === "1") {
+      expect(orderCode, "ORDER_EMAIL_ORDER_CODE is required when order correlation is enabled.").toBeTruthy();
+      const orders = new MyOrdersPage(page);
+      const { order } = await orders.waitForOrder(orderCode, { attempts: 4, intervalMs: 10000 });
+      await expect(order).toBeVisible();
+    }
+  });
+
   test("TC7 - Saved shipping and billing addresses are visible", async ({ page }) => {
     test.skip(true, PROFILE_NOT_AVAILABLE);
     const addresses = await new ProfilePage(page).listSavedAddresses();

@@ -6,7 +6,7 @@ The official Base Store matrix contains 83 scenarios:
 
 | Automated | Partial | Blocked | Not Applicable | Pending | Total |
 |---:|---:|---:|---:|---:|---:|
-| 61 | 9 | 9 | 2 | 2 | 83 |
+| 62 | 10 | 9 | 2 | 0 | 83 |
 
 `docs/COVERAGE_MATRIX.md` is the source of truth. Supplementary tests do not change this count.
 
@@ -73,6 +73,7 @@ Enable it only after the matching Playwright FFmpeg is installed and allowed by 
 | 14 | Hero and Top Seller presence | ST2 CMS/catalog content; helper reports each attribute independently |
 | 19 | Recommended Products alongside Additional Services | Catalog/service data returning a recommendation block |
 | 59 | Completed IM order with Trade-in and SC+ | Samsung Care+ stock/configuration must stop removing the service at Checkout |
+| 63 | Stable automated inbox correlation for the proven ST2 order emails | Provide approved programmatic inbox access and correlate sender, subject, order code, order date, and primary content without relying on a public mailbox |
 
 ### Blocked
 
@@ -82,14 +83,29 @@ Enable it only after the matching Playwright FFmpeg is installed and allowed by 
 | 70 | Anonymous identity/safe address is not proven | Samsung team confirms the canonical Anonymous user and disposable staging address |
 | 81 | `pe-yape` absent from current payment modes API | Payment configuration enables Yape; rerun read-only discovery before any provider submit |
 
-### Pending
-
-| TC | Required evidence | Next action |
-|---:|---|---|
-| 4 | Applicable Order Confirmation email with a registered-login link | Confirm the email template/requirement, then validate a link from an approved test inbox |
-| 63 | Receipt of acknowledgement email correlated to order code/email | Provide test inbox access and a newly approved automation-created order; do not infer delivery from UI confirmation |
-
 No email/inbox connector currently exists in this repository.
+
+## Order email evidence
+
+- Manual ST2 evidence confirms sender `Customer Services Team` and delivery to the corporate Outlook folder `Samsung eStore`.
+- `¡Recibimos tu pedido!` is the acknowledgment/order-received template.
+- `¡Pago confirmado!` is the payment-confirmation template.
+- Shipment or later status templates have not yet been observed, so their sender, subject and CTA must not be inferred.
+- Minimum TC63 validation is sender, exact expected subject for the lifecycle stage, correlated order code, order date and stage-appropriate main content.
+- Example manual evidence: order `PE260827-74844022`. This proves ST2 mail delivery, but not automated inbox correlation.
+- Public-inbox evidence for automation-created order `PE260828-74946004`: `Customer Services Team` / `customerservice@shopmail.samsung.com`, subject `¡Pago confirmado!`, order date `28 de agosto de 2026`, payment-confirmed copy and order summary. Delivery occurred after the five-minute polling attempt, and the Mailinator public API was intermittently unavailable.
+- TC4 is Automated: headed real Chrome followed the existing `Mi cuenta` email CTA supplied through runtime-only `ORDER_EMAIL_CTA_URL`, resolved to ST2 `/pe/mypage/orders`, preserved the authenticated session and validated `Pedidos` plus `Cerrar sesión`. Optional order correlation is enabled only with `ORDER_EMAIL_EXPECT_ORDER=1`; the evidence order was created as guest and correctly did not belong to the registered account.
+- Public Mailinator is temporary discovery evidence only: inbox contents are public and ephemeral, so it is not suitable for personal data or stable CI architecture.
+- Do not automate Outlook Desktop with Playwright and do not invent an inbox API. Automation requires an approved integration such as Microsoft Graph/IMAP or an existing test-inbox connector with least-privilege access.
+
+### Recommended TC63 inbox architecture
+
+1. Prefer Microsoft Graph with a dedicated Outlook QA mailbox/folder, least-privilege read access and order-code correlation.
+2. If available inside the staging platform, prefer an internal mail catcher because it avoids external delivery delay and public exposure.
+3. A shared QA inbox is acceptable when it offers an approved programmatic interface, retention policy and ownership for credential rotation.
+4. A private test-email service is the external fallback; use a private inbox/API, never a public Mailinator mailbox, and keep credentials in runtime secrets.
+
+Until one of these integrations is actually provisioned, TC63 remains Partial: delivery is functionally proven, while stable programmatic inbox validation is not.
 
 ## Useful commands
 

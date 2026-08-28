@@ -9,7 +9,7 @@
 
 | Scope | Total | Automated | Partial | Blocked | Not Applicable | Pending |
 |---|---:|---:|---:|---:|---:|---:|
-| Base Store | 83 | 61 | 9 | 9 | 2 | 2 |
+| Base Store | 83 | 62 | 10 | 9 | 2 | 0 |
 | EPP | ~60 | 0 | 0 | 0 | 0 | ~60 |
 
 ### Status Legend
@@ -27,7 +27,7 @@
 | 1 | Login Page | Customer able to login as register User from Home Page (My Account) | ⚠️ Partial | `tests/st2/base-store/home/login.spec.js` | Registered authenticated session validated from Home; full Google/FedCM/MFA login is intentionally not automated |
 | 2 | Login Page | Customer able to login from Home Page(My Account) via shop menu | ⚠️ Partial | `tests/st2/base-store/home/login.spec.js` | Authenticated Profile entry through the Home header validated; full identity-provider login is intentionally not automated |
 | 3 | Login Page | Customer able to login from Checkout Page | ⚠️ Partial | `tests/st2/base-store/checkout/checkout.spec.js` | Passed pre-auth: Product→Cart→Checkout exposed `Samsung Checkout Express` and navigated to `account.samsung.com/iam/*`; credentials/FedCM/MFA were intentionally not automated |
-| 4 | Login Page | Customer able to login from Order Confirmation Email (If Applicable) | ⬜ Pending | — | — |
+| 4 | Login Page | Customer able to login from Order Confirmation Email (If Applicable) | ✅ Automated | `tests/st2/base-store/profile/authenticated-profile.spec.js` | Headed real Chrome passed using the existing `¡Pago confirmado!` email CTA supplied only at runtime: the tracked link resolved to ST2 `/pe/mypage/orders`, preserved the authenticated session, and displayed `Pedidos` plus `Cerrar sesión`. Order `PE260828-74946004` was guest checkout data and therefore was not expected in the registered account. |
 | 5 | Login Page | Guest Customer, able to place order until Cart Page. Then Customer able to login from Checkout Page. | ⚠️ Partial | `tests/st2/base-store/checkout/checkout.spec.js` | Product→Cart checkpoint and registered-login entry from Checkout passed; external Samsung Account authentication was not automated |
 | 6 | MyAccount Page | Customer able hover on the Profile Icon and verify the Login/Sign-up & MyOrder Page Link. | ✅ Automated | `tests/st2/base-store/profile/authenticated-profile.spec.js` | Fresh authenticated state validated the visible menu with `Mi cuenta`, `Pedidos` and `Cerrar sesión`; functional assertions completed before the independent EPERM teardown |
 | 7 | MyAccount Page | Customer able to see all the saved shipping and billing addresses in the My Profile Page. | 🚧 Blocked | `tests/st2/base-store/profile/authenticated-profile.spec.js`, `tests/st2/base-store/profile/my-account-discovery.spec.js` | Direct ST2 `/pe/mypage` returns HTTP 200 but its CMS page requests return 404 and no Profile/Address Management component renders. The authenticated addresses API returns HTTP 200 with zero saved addresses. |
@@ -86,7 +86,7 @@
 | 60 | Customer Order Journey | Customer able to place one CE order. (If there is available data) | ✅ Automated | `tests/st2/base-store/smoke/guest-checkout.spec.js` | Full guest CE journey for refrigerator `RB45DG6300B1PE` completed with Credit Card and confirmation; ST2 order `PE260826-74728051` |
 | 61 | Payment Page/Checkout Page | Customer able to navigate back to cart from Payment page, Checkout page using the Edit button | ✅ Automated | `tests/st2/base-store/payment/payment-navigation.spec.js`, `tests/st2/base-store/checkout/checkout.spec.js` | Passed - Payment → Cart and Checkout → Cart validated |
 | 62 | Confirmation Page | Customer able to see the confirmation after placing order. | ✅ Automated | `tests/st2/base-store/smoke/guest-checkout.spec.js` | Passed in ST2 - Order Confirmation displayed successfully and order number `PE260826-74728051` was validated |
-| 63 | Order Email | Customer able to received Order confirmation/ acknowledgment email | ⬜ Pending | — | — |
+| 63 | Order Email | Customer able to received Order confirmation/ acknowledgment email | ⚠️ Partial | — | Delivery is proven both in corporate Outlook and for automation-created ST2 order `PE260828-74946004` in a temporary public Mailinator inbox. The `¡Pago confirmado!` message correlated sender, order code, order date, payment status and order summary, but arrived after the five-minute automated polling window and the public API returned intermittent errors. Full automation still requires an approved stable inbox integration; none exists in this repository. |
 | 64 | BackOffice | User able to login successfully in the BackOffice | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Direct real-Chrome login passed twice with admin authority and authenticated perspective validation |
 | 65 | BackOffice | User able to see order page(Admin view) | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Passed with direct admin login and Orders page validation |
 | 66 | BackOffice | User able to see orderpage(CS Agent View) | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Passed with an independent direct agent login; `Customer Support`, `Order` and `Order-Enhanced` validated |
