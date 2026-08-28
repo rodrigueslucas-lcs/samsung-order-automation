@@ -6,7 +6,7 @@ The official Base Store matrix contains 83 scenarios:
 
 | Automated | Partial | Blocked | Not Applicable | Pending | Total |
 |---:|---:|---:|---:|---:|---:|
-| 62 | 10 | 9 | 2 | 0 | 83 |
+| 63 | 9 | 9 | 2 | 0 | 83 |
 
 `docs/COVERAGE_MATRIX.md` is the source of truth. Supplementary tests do not change this count.
 
@@ -73,7 +73,6 @@ Enable it only after the matching Playwright FFmpeg is installed and allowed by 
 | 14 | Hero and Top Seller presence | ST2 CMS/catalog content; helper reports each attribute independently |
 | 19 | Recommended Products alongside Additional Services | Catalog/service data returning a recommendation block |
 | 59 | Completed IM order with Trade-in and SC+ | Samsung Care+ stock/configuration must stop removing the service at Checkout |
-| 63 | Stable automated inbox correlation for the proven ST2 order emails | Provide approved programmatic inbox access and correlate sender, subject, order code, order date, and primary content without relying on a public mailbox |
 
 ### Blocked
 
@@ -94,6 +93,7 @@ No email/inbox connector currently exists in this repository.
 - Minimum TC63 validation is sender, exact expected subject for the lifecycle stage, correlated order code, order date and stage-appropriate main content.
 - Example manual evidence: order `PE260827-74844022`. This proves ST2 mail delivery, but not automated inbox correlation.
 - Public-inbox evidence for automation-created order `PE260828-74946004`: `Customer Services Team` / `customerservice@shopmail.samsung.com`, subject `¡Pago confirmado!`, order date `28 de agosto de 2026`, payment-confirmed copy and order summary. Delivery occurred after the five-minute polling attempt, and the Mailinator public API was intermittently unavailable.
+- TC63 is Automated through the Mailinator web UI, without using its unstable public API. Headed real Chrome created exactly one ST2 order, `PE260828-74946006`, then searched inbox `s2tc63-0828-1646` through the header/`GO` flow and correlated `¡Pago confirmado!`, `customerservice@shopmail.samsung.com`, the same order code and `28 de agosto de 2026`. The email evidence screenshot was captured 55 seconds after the confirmation screenshot.
 - TC4 is Automated: headed real Chrome followed the existing `Mi cuenta` email CTA supplied through runtime-only `ORDER_EMAIL_CTA_URL`, resolved to ST2 `/pe/mypage/orders`, preserved the authenticated session and validated `Pedidos` plus `Cerrar sesión`. Optional order correlation is enabled only with `ORDER_EMAIL_EXPECT_ORDER=1`; the evidence order was created as guest and correctly did not belong to the registered account.
 - Public Mailinator is temporary discovery evidence only: inbox contents are public and ephemeral, so it is not suitable for personal data or stable CI architecture.
 - Do not automate Outlook Desktop with Playwright and do not invent an inbox API. Automation requires an approved integration such as Microsoft Graph/IMAP or an existing test-inbox connector with least-privilege access.
@@ -105,7 +105,17 @@ No email/inbox connector currently exists in this repository.
 3. A shared QA inbox is acceptable when it offers an approved programmatic interface, retention policy and ownership for credential rotation.
 4. A private test-email service is the external fallback; use a private inbox/API, never a public Mailinator mailbox, and keep credentials in runtime secrets.
 
-Until one of these integrations is actually provisioned, TC63 remains Partial: delivery is functionally proven, while stable programmatic inbox validation is not.
+TC63 currently has automated functional coverage through the public web UI. The options above remain the recommended hardening path for private, long-term CI execution.
+
+Run the destructive email validation only with explicit guards and a fresh short inbox:
+
+```powershell
+$env:ALLOW_PAYMENT_SUBMIT = "1"
+$env:VALIDATE_ORDER_EMAIL = "1"
+$env:MAILINATOR_INBOX = "s2tc63-MMDD-HHmm"
+$env:STOREFRONT_GUEST_EMAIL = "$env:MAILINATOR_INBOX@mailinator.com"
+npx playwright test tests/st2/base-store/smoke/guest-checkout.spec.js --project=chromium --grep "optional TC63 email validation" --workers=1 --headed
+```
 
 ## Useful commands
 

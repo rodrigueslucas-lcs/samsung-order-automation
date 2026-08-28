@@ -9,7 +9,7 @@
 
 | Scope | Total | Automated | Partial | Blocked | Not Applicable | Pending |
 |---|---:|---:|---:|---:|---:|---:|
-| Base Store | 83 | 62 | 10 | 9 | 2 | 0 |
+| Base Store | 83 | 63 | 9 | 9 | 2 | 0 |
 | EPP | ~60 | 0 | 0 | 0 | 0 | ~60 |
 
 ### Status Legend
@@ -86,7 +86,7 @@
 | 60 | Customer Order Journey | Customer able to place one CE order. (If there is available data) | ✅ Automated | `tests/st2/base-store/smoke/guest-checkout.spec.js` | Full guest CE journey for refrigerator `RB45DG6300B1PE` completed with Credit Card and confirmation; ST2 order `PE260826-74728051` |
 | 61 | Payment Page/Checkout Page | Customer able to navigate back to cart from Payment page, Checkout page using the Edit button | ✅ Automated | `tests/st2/base-store/payment/payment-navigation.spec.js`, `tests/st2/base-store/checkout/checkout.spec.js` | Passed - Payment → Cart and Checkout → Cart validated |
 | 62 | Confirmation Page | Customer able to see the confirmation after placing order. | ✅ Automated | `tests/st2/base-store/smoke/guest-checkout.spec.js` | Passed in ST2 - Order Confirmation displayed successfully and order number `PE260826-74728051` was validated |
-| 63 | Order Email | Customer able to received Order confirmation/ acknowledgment email | ⚠️ Partial | — | Delivery is proven both in corporate Outlook and for automation-created ST2 order `PE260828-74946004` in a temporary public Mailinator inbox. The `¡Pago confirmado!` message correlated sender, order code, order date, payment status and order summary, but arrived after the five-minute automated polling window and the public API returned intermittent errors. Full automation still requires an approved stable inbox integration; none exists in this repository. |
+| 63 | Order Email | Customer able to received Order confirmation/ acknowledgment email | ✅ Automated | `tests/st2/base-store/smoke/guest-checkout.spec.js` | Passed end to end in headed real Chrome through the Mailinator web UI: a single ST2 guest checkout created `PE260828-74946006`, opened inbox `s2tc63-0828-1646`, found `¡Pago confirmado!` from `customerservice@shopmail.samsung.com`, and correlated the same order code plus order date. Email polling is opt-in with `VALIDATE_ORDER_EMAIL=1`; Place Order remains guarded by `ALLOW_PAYMENT_SUBMIT=1`. |
 | 64 | BackOffice | User able to login successfully in the BackOffice | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Direct real-Chrome login passed twice with admin authority and authenticated perspective validation |
 | 65 | BackOffice | User able to see order page(Admin view) | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Passed with direct admin login and Orders page validation |
 | 66 | BackOffice | User able to see orderpage(CS Agent View) | ✅ Automated | `tests/st2/backoffice/backoffice.spec.js` | Passed with an independent direct agent login; `Customer Support`, `Order` and `Order-Enhanced` validated |
