@@ -1,310 +1,189 @@
-# Samsung Detailed Smoke Automation
+# Samsung Peru QA Automation
 
-Playwright automation framework for Samsung SDS eCommerce Detailed Smoke Test scenarios.
+Playwright automation for Samsung Peru eCommerce flows running on SAP Commerce. The repository covers storefront, Samsung Account, email, payment, BackOffice and order-fulfillment validation in the ST2/ST3 staging environments.
 
-The project is focused on progressively automating the **ST2 Detailed Smoke Test for Samsung Peru (PE)** while keeping the repository structure and test naming aligned with the official QA documentation maintained in Confluence.
+Production is not an automation target for state-changing tests. Existing environment and destructive-action guards must always be preserved.
 
-## Objective
+## Test suites
 
-Build a maintainable automation framework capable of supporting the complete Detailed Smoke suite instead of creating isolated scripts for each scenario.
+| Suite | Purpose | Coverage source |
+|---|---|---|
+| DST — Detailed Smoke Test | Broad functional coverage of the Peru storefront and BackOffice journeys | [DST Coverage](docs/COVERAGE_MATRIX.md) |
+| QST — Quick Smoke Test | Operational smoke suite for Normal, Modified and Sanity executions | [QST Coverage](docs/QST_COVERAGE_MATRIX.md) |
 
-The framework started with a complete Guest Checkout E2E flow and is now being expanded into individual Detailed Smoke scenarios using reusable Page Objects and shared flows.
+DST and QST have independent specs, IDs, execution evidence and coverage. They share Page Objects, fixtures and utilities instead of duplicating interaction code.
 
-## Detailed Smoke Scope
+### QST scope
 
-The PE Detailed Smoke Test is currently divided into two main suites:
+QST contains 44 official scenarios:
 
-- **Base Store:** 83 scenarios
-- **EPP Store:** 59 scenarios
+- Base Store: 22
+- EPP: 22
 
-Base Store and EPP have independent test-case numbering and are therefore organized separately in the repository.
+Current Base Store status:
 
-The overall scope includes:
+| Automated | Partial | Blocked | Reusable — needs wrapper | Not implemented |
+|---:|---:|---:|---:|---:|
+| 10 | 3 | 8 | 1 | 0 |
 
-- Login
-- My Account
-- Product Detail Page (PDP)
-- Cart
-- Checkout
-- Delivery
-- Payment
-- Order Confirmation
-- Payment Modes
-- BackOffice
-- Order Fulfillment
-- Mobile
+The 22 EPP scenarios remain blocked until the EPP URL, authentication, configuration and compatible test data are available. See the [QST Automation Guide](docs/QST_AUTOMATION_GUIDE.md) for execution types, tags and dependencies.
 
-## Stack
+### DST scope
 
-- Playwright
-- Playwright Test
-- JavaScript
-- Node.js
-- Page Object Model (POM)
-- Chromium
-- Git / GitHub
+DST currently tracks 83 Base Store scenarios: 63 Automated, 9 Partial, 9 Blocked and 2 Not Applicable. The detailed evidence and environment-specific notes live in the [DST Coverage Matrix](docs/COVERAGE_MATRIX.md).
 
-## Project Architecture
+## Repository structure
 
 ```text
-samsung-order-automation/
-├── pages/
-│   ├── BasePage.js
-│   ├── ProductPage.js
-│   ├── CartPage.js
-│   ├── GuestLoginPage.js
-│   ├── CheckoutPage.js
-│   ├── PaymentPage.js
-│   └── OrderConfirmationPage.js
-│
-├── tests/
-│   └── st2/
-│       ├── base-store/
-│       │   ├── cart/
-│       │   ├── checkout/
-│       │   ├── pdp/
-│       │   └── smoke/
-│       │
-│       └── epp/
-│           ├── login/
-│           ├── my-account/
-│           ├── cart/
-│           ├── checkout/
-│           ├── payment/
-│           ├── backoffice/
-│           └── fulfillment/
-│
-├── utils/
-│   └── testData.js
-│
-├── evidence/
-│   └── screenshots/
-│
-└── playwright.config.js
+pages/                  Shared Page Objects
+tests/
+  st2/
+    base-store/         Current DST storefront specs
+    backoffice/         Current DST BackOffice specs
+    qst/
+      base-store/       QST Base Store specs
+      epp/              Reserved QST EPP structure
+fixtures/               Synthetic QA test data
+utils/                  Auth, execution-summary and test-data helpers
+scripts/                Auth bootstrap and QST runner scripts
+docs/                   Coverage, operating guides and handoff notes
 ```
 
-## Automation Design
+Moving DST specs under `tests/st2/dst/` is planned as an incremental migration; it has not happened yet. See [DST Automation Structure](docs/DST_AUTOMATION_STRUCTURE.md).
 
-The project uses **Page Object Model (POM)** to separate page interaction logic from test scenarios.
+## Setup
 
-This provides:
-
-- Reusable components
-- Reduced code duplication
-- Easier maintenance
-- Better scalability
-- Easier debugging
-- Reuse between Base Store and EPP
-- Better preparation for CI/CD execution
-
-Page Objects remain shared under `pages/`. Store-specific behavior should only be separated when the implementation actually differs.
-
-## Test Organization
-
-Detailed Smoke scenarios keep the same test-case identification used in the official QA documentation.
-
-Example:
-
-```javascript
-test(
-  "TC17 - Customer able to increase and decrease the quantity (or remove products)",
-  async ({ page }) => {
-    // test implementation
-  }
-);
-```
-
-The suite name also identifies the store explicitly:
-
-```javascript
-test.describe("ST2 - Base Store - Cart Page", () => {});
-```
-
-Future EPP scenarios follow the same convention:
-
-```javascript
-test.describe("ST2 - EPP - Cart Page", () => {});
-```
-
-This avoids ambiguity because Base Store and EPP use different TC numbering.
-
-## Current Automated Coverage
-
-### Base Store
-
-Current individual Detailed Smoke coverage includes:
-
-#### Cart
-
-- Cart page availability
-- Product validation in Cart
-- Product quantity increase/decrease
-- Order summary validation
-- Checkout button visibility
-- Navigation from Cart to Checkout
-
-#### Checkout
-
-- Checkout Login Page
-- Checkout Address Page
-- Login / Rewards option displayed during Checkout
-
-#### PDP
-
-- PDP navigation and page validation
-- Product attributes
-- Selected product color variant
-
-### End-to-End Guest Checkout
-
-A complete Guest Checkout flow is also implemented and currently covers:
-
-1. Product setup
-2. Add to Cart
-3. Cart validation
-4. Guest Checkout
-5. Customer information
-6. Delivery address
-7. Delivery mode
-8. Terms and conditions
-9. Payment page
-10. Credit card data
-11. Order placement
-12. Order confirmation
-
-The E2E flow is reused as the foundation for additional Detailed Smoke scenarios instead of duplicating the same navigation and interaction logic.
-
-## Test Data
-
-Reusable test data is centralized in:
-
-```text
-utils/testData.js
-```
-
-Environment-specific and reusable data should remain centralized instead of being duplicated across specs.
-
-## Installation
+Install the locked dependency set:
 
 ```bash
-npm install
+npm ci
+```
+
+Install Playwright browser dependencies when required by the machine:
+
+```bash
 npx playwright install
 ```
 
-## Execution
+The current Playwright configuration uses the real Chrome channel, visible mode, one worker, screenshots and failure-retained traces. Video is disabled unless `PW_VIDEO=1` is supplied.
 
-Run the complete suite:
+## Main commands
 
-```bash
-npx playwright test
-```
-
-Run with browser visible:
+### QST
 
 ```bash
-npx playwright test --headed
+npm run qst:normal
+npm run qst:modified
+npm run qst:sanity
+npm run qst:base-store
+npm run qst:epp
 ```
 
-List all available tests:
+The QST runner selects the matching tags and executes with one worker.
+
+### Authentication
+
+```bash
+npm run auth:open-profile
+npm run auth:export
+npm run auth:verify
+```
+
+### DST and targeted Playwright execution
 
 ```bash
 npx playwright test --list
-```
-
-Run all Base Store tests:
-
-```bash
-npx playwright test tests/st2/base-store
-```
-
-Run Cart Detailed Smoke tests:
-
-```bash
-npx playwright test tests/st2/base-store/cart/cart.spec.js
-```
-
-Run Checkout Detailed Smoke tests:
-
-```bash
-npx playwright test tests/st2/base-store/checkout/checkout.spec.js
-```
-
-Run one specific TC:
-
-```bash
-npx playwright test -g "TC36"
-```
-
-Open the Playwright HTML report:
-
-```bash
+npx playwright test tests/st2/base-store --project=chromium --workers=1
+npx playwright test tests/st2/backoffice --project=chromium --workers=1
+npx playwright test --grep "TC<number>" --project=chromium --workers=1
 npx playwright show-report
 ```
 
-## Evidence and Debugging
+There are no `dst:*` npm scripts yet; current DST execution uses explicit Playwright paths.
 
-The framework supports:
+## Samsung Account authentication
 
-- Playwright HTML Report
-- Automatic screenshots
-- Video recording
-- Trace Viewer
-- Failure screenshots
-- Order confirmation evidence
-- Captured order number for completed E2E journeys
+Samsung Account may require a human login because of Google/FedCM/MFA behavior:
 
-Trace example:
+1. Run `npm run auth:open-profile` to open the dedicated visible Chrome profile.
+2. Complete authentication manually.
+3. Keep that Chrome open and run `npm run auth:export` in another terminal.
+4. Run `npm run auth:verify` to validate the exported session.
 
-```bash
-npx playwright show-trace test-results/<test>/trace.zip
-```
+The dedicated profiles and `playwright/.auth/` state are ignored by Git. Authenticated tests skip with a bootstrap instruction when the session files are unavailable; expired sessions must be refreshed rather than embedding credentials in specs.
 
-## Environment
+## Email and Guest tracking
 
-Current automation development is focused on:
+`MailinatorPage` provides reusable UI automation for:
+
+- order acknowledgment/payment email validation;
+- Guest Order Tracking OTP retrieval.
+
+Public inboxes must contain only synthetic QA data. Never document real inboxes, personal email addresses, OTPs or tokens. Public delivery can be delayed, so email-dependent coverage may remain Partial when no stable private inbox integration exists.
+
+## Payments and destructive guards
+
+Place Order and external payment-provider submits are opt-in:
 
 ```text
-ST2 - Peru (PE)
+ALLOW_PAYMENT_SUBMIT=1
 ```
 
-The architecture is being prepared to expand coverage without duplicating the core framework.
+Without this guard, destructive payment tests skip. A permitted execution must use staging test data, one worker and no retry after an ambiguous submit. Payment fixture values must not be copied into logs, reports or documentation.
 
-## Roadmap
+Other runtime controls include:
 
-1. Expand Base Store Detailed Smoke coverage
-2. Reuse existing Page Objects and E2E flows
-3. Complete Checkout coverage
-4. Expand Payment coverage
-5. Add Login and Registered User scenarios
-6. Add EPP Detailed Smoke coverage
-7. Add BackOffice automation
-8. Add Order Fulfillment automation
-9. Expand Payment Mode coverage
-10. Add Mobile execution
-11. Prepare stable CI/CD execution
+- `STOREFRONT_PAYMENT_MODE` for an approved alternative-payment probe;
+- `VALIDATE_ORDER_EMAIL`, `STOREFRONT_GUEST_EMAIL` and `MAILINATOR_INBOX` for synthetic email validation;
+- `GUEST_TRACKING_ORDER` and `GUEST_TRACKING_EMAIL` for Guest tracking;
+- `PW_VIDEO=1` to opt in to Playwright video.
 
-## Project Status
+## BackOffice and fulfillment
 
-| Area | Status |
-|---|---|
-| Playwright framework | Implemented |
-| Page Object Model | Implemented |
-| Guest Checkout E2E | Implemented |
-| Credit Card order journey | Implemented |
-| Base Store Detailed Smoke | In Progress |
-| EPP Detailed Smoke | Planned |
-| BackOffice automation | Planned |
-| Order Fulfillment automation | Planned |
-| Mobile coverage | Planned |
-| CI/CD execution | Planned |
+BackOffice supports S2/S3 through `BACKOFFICE_ENV` or an explicit `BACKOFFICE_URL`. Credentials are runtime-only:
 
-## Author
+```text
+BACKOFFICE_USERNAME
+BACKOFFICE_PASSWORD
+BACKOFFICE_ADMIN_USERNAME
+BACKOFFICE_ADMIN_PASSWORD
+```
 
-**Lucas Rodrigues**  
-QA Engineer
+Login, order-status and CronJob helpers already exist. Fulfillment CronJobs are guarded for S3 and require administrator credentials plus suitable staging mass. Never run a CronJob merely to test a locator, and never persist credentials, cookies or tokens.
 
-## Automation Coverage
+## Production safety
 
-The current ST2 Peru Detailed Smoke automation status is tracked in:
+- Never create an order in Production.
+- Never submit a Production payment.
+- Never run a Production CronJob or cancellation.
+- Never alter Production customer, address or order data.
+- Preserve all environment, credential and destructive-action guards.
+- Use Production only when a specifically authorized workflow is strictly read-only.
 
-[Coverage Matrix](docs/COVERAGE_MATRIX.md)
+## QST execution summary
+
+`utils/qstExecutionSummary.js` attaches structured execution metadata for:
+
+- Environment
+- Version/Build
+- Type of QST
+- Date
+- Country Code
+- Store Type
+- Order Number
+- Defect Found
+- Tester Name
+
+The helper prepares data for manual reporting; it does not write to Confluence. Variables and defaults are documented in the [QST Automation Guide](docs/QST_AUTOMATION_GUIDE.md).
+
+## Evidence and local artifacts
+
+Playwright reports, traces, screenshots, auth state and browser profiles are local artifacts and are protected by `.gitignore`. Review `git status` before every commit to ensure no session or test-result artifact is staged.
+
+## Documentation
+
+- [DST Coverage](docs/COVERAGE_MATRIX.md)
+- [QST Coverage](docs/QST_COVERAGE_MATRIX.md)
+- [QST Automation Guide](docs/QST_AUTOMATION_GUIDE.md)
+- [DST Automation Structure](docs/DST_AUTOMATION_STRUCTURE.md)
+- [Office QA Handoff](docs/OFFICE_QA_HANDOFF.md)

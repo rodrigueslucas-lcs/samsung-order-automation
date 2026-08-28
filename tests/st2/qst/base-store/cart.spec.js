@@ -42,3 +42,16 @@ test("QST-BS-11 @qst @qst-normal @qst-modified @base-store - Navigate to Checkou
   await cart.proceedToCheckout();
   await page.getByPlaceholder(/ingresa tu correo/i).waitFor({ state: "visible", timeout: 30000 });
 });
+
+test("QST-BS-09 @qst @qst-normal @qst-modified @base-store - Add Trade-In service", async ({ page }, testInfo) => {
+  test.setTimeout(240000);
+  annotateQstExecution(testInfo, { type: process.env.QST_TYPE, storeType: "Base Store" });
+  const product = new ProductPage(page);
+  const cart = new CartPage(page);
+  await product.validateProductLoaded();
+  await product.addToCartForAdditionalServices();
+  await cart.openTradeInJourney();
+  await cart.completeTradeInJourney();
+  await cart.validateTradeInAdded();
+  await cart.validateTradeInSummaryAmount();
+});

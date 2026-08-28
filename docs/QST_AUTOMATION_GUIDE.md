@@ -65,8 +65,9 @@ This prepares evidence for manual Confluence reporting; it does not write to Con
 
 - External payment submission/order creation requires `ALLOW_PAYMENT_SUBMIT=1`.
 - BackOffice state-changing flows retain their existing environment and credential guards.
-- QST discovery must not run Place Order, cancellation, CronJobs or Production writes.
-- QST-BS-13/14/16/17/20/21/22 and EPP equivalents are mapped for reuse but are deliberately not part of the initial safe execution.
+- Place Order remains opt-in and must never be retried after an ambiguous submit. The controlled expansion created one ST2 guest order for QST-BS-13/14.
+- Cancellation, CronJobs and all Production writes remain unexecuted.
+- QST-BS-16/17/20/21/22 and EPP equivalents remain guarded or blocked by credentials/test mass.
 
 ## Adding coverage without duplicating DST
 
@@ -79,7 +80,7 @@ This prepares evidence for manual Confluence reporting; it does not write to Con
 
 ## Known blockers
 
-- PLP navigation/attributes lack a verified reusable PLP implementation.
+- ST2 main-navigation category links point to Production and expose no safe staging PLP route; QST-BS-02/03 are blocked.
 - QST-BS-05 asks for variants other than color; current DST evidence covers color only.
 - Samsung Care+ depends on currently available eligible product/service mass and remains Partial in DST.
 - Address, payment, confirmation, registered ordering, email and fulfillment need dedicated guarded QST wrappers and/or test data.
