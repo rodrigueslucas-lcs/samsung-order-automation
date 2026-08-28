@@ -6,7 +6,12 @@
   "scripts": {
     "auth:open-profile": "node scripts/auth-open-profile.cjs",
     "auth:export": "node scripts/auth-bootstrap.cjs",
-    "auth:verify": "node scripts/auth-verify.cjs"
+    "auth:verify": "node scripts/auth-verify.cjs",
+    "qst:normal": "node scripts/qst-run.cjs normal",
+    "qst:modified": "node scripts/qst-run.cjs modified",
+    "qst:sanity": "node scripts/qst-run.cjs sanity",
+    "qst:base-store": "node scripts/qst-run.cjs normal base-store",
+    "qst:epp": "node scripts/qst-run.cjs normal epp"
   },
   "keywords": [],
   "author": "",
