@@ -888,22 +888,43 @@ export default class CheckoutPage extends BasePage {
   }
 
   async selectShippingMethod() {
-  const shippingOption = this.page
-    .getByRole("listitem")
-    .filter({ hasText: /Para envíos a provincias/i })
-    .first();
+    const deliveryOptions = this.page.locator(
+      'input[type="radio"][name$="delivery_mode_option"]'
+    );
+    await deliveryOptions.first().waitFor({ state: "attached", timeout: 60000 });
 
-  await shippingOption.scrollIntoViewIfNeeded();
+    const groupNames = await deliveryOptions.evaluateAll((inputs) => [
+      ...new Set(inputs.map((input) => input.name)),
+    ]);
+    for (const groupName of groupNames) {
+      const selected = this.page.locator(
+        `input[type="radio"][name="${groupName}"]:checked`
+      );
+      if (await selected.count()) continue;
 
-  await shippingOption.click({
-    force: true,
-    position: { x: 50, y: 20 }
-  });
+      const option = this.page
+        .locator(`input[type="radio"][name="${groupName}"]`)
+        .first();
+      const label = option.locator("xpath=ancestor::label[1]");
+      await label.scrollIntoViewIfNeeded();
+      await label.click();
+      if (!(await option.isChecked())) {
+        throw new Error(`Delivery option did not remain selected for ${groupName}.`);
+      }
+    }
 
-  await this.page.waitForTimeout(1000);
+    const checkedGroups = await deliveryOptions.evaluateAll((inputs) => [
+      ...new Set(inputs.filter((input) => input.checked).map((input) => input.name)),
+    ]);
+    if (checkedGroups.length !== groupNames.length) {
+      throw new Error(
+        `Expected one selected option for ${groupNames.length} delivery groups, found ${checkedGroups.length}.`
+      );
+    }
 
-  await this.screenshot("07-shipping-method");
-}
+    await this.page.waitForTimeout(1000);
+    await this.screenshot("07-shipping-method");
+  }
 
   async acceptTerms() {
     await this.page.getByText(/autorizo el tratamiento/i).click();
@@ -912,9 +933,11 @@ export default class CheckoutPage extends BasePage {
     await this.screenshot("08-terms-accepted");
   }
 
-  async continueToPayment() {
-    const creditCardButton = this.page.getByRole("button", {
-      name: /Tarjeta de Crédito \/ Débito/i,
+  async continueToPayment({
+    expectedPaymentMode = /Tarjeta de Crédito \/ Débito/i,
+  } = {}) {
+    const paymentModeButton = this.page.getByRole("button", {
+      name: expectedPaymentMode,
     });
 
     const deliveryAlert = this.page.getByRole("alert").filter({
@@ -923,35 +946,17 @@ export default class CheckoutPage extends BasePage {
 
     for (let attempt = 1; attempt <= 8; attempt++) {
       // Payment já abriu.
-      if (await creditCardButton.isVisible().catch(() => false)) {
+      if (await paymentModeButton.isVisible().catch(() => false)) {
         break;
       }
 
       // Se o ST2 reclamar da entrega, reseleciona o shipping.
       if (await deliveryAlert.isVisible().catch(() => false)) {
-        const shippingOption = this.page
-          .getByRole("listitem")
-          .filter({ hasText: /Para envíos a provincias/i })
-          .first();
-
-        await shippingOption.scrollIntoViewIfNeeded();
-
-        await shippingOption.click({
-          force: true,
-          position: { x: 50, y: 20 },
-        });
-
-        await this.page
-          .locator(".delivery-mode-tab.button-style.selected-mode")
-          .filter({ hasText: /Envío regular/i })
-          .waitFor({
-            state: "visible",
-            timeout: 30000,
-          });
+        await this.selectShippingMethod();
       }
 
       // A página pode ter mudado para Payment durante a reseleção.
-      if (await creditCardButton.isVisible().catch(() => false)) {
+      if (await paymentModeButton.isVisible().catch(() => false)) {
         break;
       }
 
@@ -966,7 +971,7 @@ export default class CheckoutPage extends BasePage {
           timeout: 5000,
         });
       } catch {
-        if (await creditCardButton.isVisible().catch(() => false)) {
+        if (await paymentModeButton.isVisible().catch(() => false)) {
           break;
         }
 
@@ -977,7 +982,7 @@ export default class CheckoutPage extends BasePage {
       await continueButton.click();
 
       try {
-        await creditCardButton.waitFor({
+        await paymentModeButton.waitFor({
           state: "visible",
           timeout: 5000,
         });
@@ -990,10 +995,24 @@ export default class CheckoutPage extends BasePage {
       }
     }
 
-    await creditCardButton.waitFor({
-      state: "visible",
-      timeout: 30000,
-    });
+    if (!(await paymentModeButton.isVisible().catch(() => false))) {
+      const diagnostics = await this.page.evaluate(() => ({
+        url: window.location.href,
+        visibleAlerts: [...document.querySelectorAll('[role="alert"]')]
+          .filter((element) => element.offsetParent !== null)
+          .map((element) => element.textContent?.replace(/\s+/g, " ").trim())
+          .filter(Boolean),
+        selectedDeliveryModes: [
+          ...document.querySelectorAll(".delivery-mode-tab.button-style.selected-mode"),
+        ].map((element) => element.textContent?.replace(/\s+/g, " ").trim()),
+        checkedRadios: [...document.querySelectorAll('input[type="radio"]:checked')]
+          .map((element) => ({ name: element.name, value: element.value })),
+        checkedTerms: [...document.querySelectorAll('input[type="checkbox"]:checked')].length,
+      }));
+      throw new Error(
+        `Delivery did not transition to the expected payment mode: ${JSON.stringify(diagnostics)}`
+      );
+    }
 
     await this.screenshot("09-payment-step");
   }

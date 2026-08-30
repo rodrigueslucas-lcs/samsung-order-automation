@@ -6,6 +6,7 @@ export const BACKOFFICE_AUTHORITIES = {
 };
 
 const BACKOFFICE_URLS = {
+  s1: "https://backoffice.cnmzsgcaar-samsunge12-s1-public.model-t.cc.commerce.ondemand.com/backoffice/",
   s2: "https://backoffice.cnmzsgcaar-samsunge12-s2-public.model-t.cc.commerce.ondemand.com/backoffice/",
   s3: "https://backoffice.cnmzsgcaar-samsunge12-s3-public.model-t.cc.commerce.ondemand.com/backoffice/",
 };
@@ -17,7 +18,7 @@ export function getBackOfficeUrl() {
   const url = BACKOFFICE_URLS[environment];
   if (!url) {
     throw new Error(
-      `Unsupported BACKOFFICE_ENV: ${environment}. Use s2, s3, or BACKOFFICE_URL.`
+      `Unsupported BACKOFFICE_ENV: ${environment}. Use s1, s2, s3, or BACKOFFICE_URL.`
     );
   }
   return url;
@@ -108,7 +109,10 @@ export default class BackOfficePage extends BasePage {
   }
 
   async openTreeRow(name) {
-    const row = this.page.getByRole("row", { name, exact: true });
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const row = this.page.getByRole("row", {
+      name: new RegExp(`^${escapedName}(?: selected)?$`),
+    });
     await row.waitFor({ state: "visible", timeout: 30000 });
     await row.click();
   }

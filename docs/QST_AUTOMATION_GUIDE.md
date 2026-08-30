@@ -58,7 +58,7 @@ This prepares evidence for manual Confluence reporting; it does not write to Con
 
 - Base Store guest wrappers use ST2 Peru and the existing `getcookie.html` setup.
 - Registered scenarios reuse the ignored Playwright auth state only when a QST wrapper is implemented and a valid QA session exists.
-- BackOffice scenarios must keep runtime-only credentials, environment guards and the established authority selection.
+- BackOffice scenarios support S1/S2/S3 staging through `BACKOFFICE_ENV` (or explicit `BACKOFFICE_URL`) and must keep runtime-only credentials, environment guards and the established authority selection.
 - EPP is blocked until its real non-Production URL, store identifier, login/bootstrap flow, auth state and compatible test data are supplied and verified. Base Store behavior must not be assumed for EPP.
 
 ## Destructive guards
@@ -67,7 +67,8 @@ This prepares evidence for manual Confluence reporting; it does not write to Con
 - BackOffice state-changing flows retain their existing environment and credential guards.
 - Place Order remains opt-in and must never be retried after an ambiguous submit. The controlled expansion created one ST2 guest order for QST-BS-13/14.
 - Cancellation, CronJobs and all Production writes remain unexecuted.
-- QST-BS-16/17/20/21/22 and EPP equivalents remain guarded or blocked by credentials/test mass.
+- QST-BS-16 has a guarded registered-order wrapper, mode-specific payment marker and support for selecting every delivery group in a mixed cart. The authorized Pago Efectivo request was `POST .../paymentmodes/pe-pagoEfectivo/submitOrder`; it completed as HTTP 200 in about 8.7 seconds but returned functional error `code=601`, `details=payment generic error`, and `openPaymentPageInIframe=false`. It returned no provider URL, CIP or order code, and My Orders showed no new entry. It was not retried.
+- A read-only S1 Admin scan opened all 50 accessible orders and found only `COMPLETED`; QST-BS-20/21/22 therefore remain blocked without executing either job.
 
 ## Adding coverage without duplicating DST
 
@@ -83,5 +84,5 @@ This prepares evidence for manual Confluence reporting; it does not write to Con
 - ST2 main-navigation category links point to Production and expose no safe staging PLP route; QST-BS-02/03 are blocked.
 - QST-BS-05 asks for variants other than color; current DST evidence covers color only.
 - Samsung Care+ depends on currently available eligible product/service mass and remains Partial in DST.
-- Address, payment, confirmation, registered ordering, email and fulfillment need dedicated guarded QST wrappers and/or test data.
+- Registered ordering remains reusable but unproven because the single Pago Efectivo submit had an ambiguous result and generated no observable order. Confirmation email could not run without that order; causal fulfillment still needs S1 test mass.
 - EPP has no verified runtime configuration or implementation in this repository.

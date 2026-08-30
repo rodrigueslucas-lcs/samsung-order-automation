@@ -335,3 +335,29 @@ Admin Orders returned no result for `PE260730-69727105` although CS Agent still
 showed it. Because the original consignment status could not be read safely,
 `ORDER_SPLIT` plus `WAITING_FOR_TRANSFER` was not applied. TC67 and causal TC68
 remain blocked by S3 test-data/index access rather than a Playwright assertion.
+
+## S1 QST read-only validation (2026-08-28)
+
+`BACKOFFICE_ENV=s1` was validated in headed Chrome with runtime-only credentials.
+The full administrator authenticated directly into `Administration Cockpit`
+without an authority chooser. QST-BS-18 passed.
+
+Admin Orders exposed 50 visible rows. Opening the first real row proved order
+`PE260805-63779426` with status `completed`; QST-BS-19 passed read-only. The Admin
+grid itself did not expose a fulfillment-status column/filter, and this account
+did not expose the CS Agent perspective, so no S1 `Shipping Requested` mass was
+proven for QST-BS-22.
+
+Both exact S1 jobs were found in CronJobs. The financial job
+`pe-tokoFinancialInitialUpdateJob` was observed as `FINISHED / SUCCESS`, and the
+warehouse job `pe-tokoTransferConsignmentToWarehouseJob` was also found by the
+read-only TC69 execution. Neither job was run: no disposable S1 order with the
+required causal pre-state was confirmed, so QST-BS-20/21 remain blocked rather
+than processing unknown staging mass blindly.
+
+The follow-up read-only scan opened all 50 orders visible to S1 full admin and
+read each Status control. Every order was `COMPLETED`; no
+`WAITING_FOR_SEND_FINANCIAL`, `Order Split`, or `Shipping Requested` entry was
+available. Consequently neither CronJob was run (zero confirmations), no order
+was altered, and QST-BS-20/21/22 remain blocked by S1 test mass rather than UI
+automation or permissions.

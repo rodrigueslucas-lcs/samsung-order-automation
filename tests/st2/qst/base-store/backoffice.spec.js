@@ -9,6 +9,7 @@ const credentials = {
 };
 const environment = (process.env.BACKOFFICE_ENV || "s2").toLowerCase();
 const orderFallbacks = {
+  s1: null,
   s2: "PE260819-75543032_260819182727780",
   s3: "PE260817-69932056_260821145428295",
 };
@@ -34,23 +35,71 @@ test.describe("QST Base Store - BackOffice read-only", () => {
     annotateQstExecution(testInfo, { type: process.env.QST_TYPE, storeType: "Base Store" });
     const orders = new BackOfficeOrderPage(page);
     const orderCode = process.env.BACKOFFICE_ORDER_CODE || orderFallbacks[environment];
+    if (environment === "s1") {
+      await orders.login({ ...credentials, authority: "admin" });
+      await orders.openAdminOrders();
+      const order = await orders.openFirstAdminOrderAndReadStatus();
+      testInfo.annotations.push({ type: "qst-order", description: order.orderCode });
+      testInfo.annotations.push({ type: "qst-order-status", description: order.status });
+      return;
+    }
+
     await orders.login({ ...credentials, authority: "agent" });
     await orders.expectAgentOrders();
-    const order = await orders.openOrderByCode(orderCode);
-    expect(order.orderCode).toBe(orderCode);
+    const order = orderCode
+      ? await orders.openOrderByCode(orderCode)
+      : (await orders.readVisibleAgentOrders()).find(
+          (candidate) => candidate.orderCode && candidate.hybrisStatus
+        );
+    expect(order, "No S1 order with a readable Hybris status was visible.").toBeTruthy();
+    if (orderCode) expect(order.orderCode).toBe(orderCode);
     expect(order.hybrisStatus).toBeTruthy();
-    testInfo.annotations.push({ type: "qst-order", description: orderCode });
+    testInfo.annotations.push({ type: "qst-order", description: order.orderCode });
   });
 
   test("QST-BS-22 @qst @qst-normal @base-store - Shipping Requested is visible", async ({ page }, testInfo) => {
+    test.setTimeout(900000);
     annotateQstExecution(testInfo, { type: process.env.QST_TYPE, storeType: "Base Store" });
-    test.skip(environment !== "s3", "Shipping Requested read-only fallback is verified for S3 only.");
+    test.skip(
+      !["s1", "s3"].includes(environment),
+      "Shipping Requested read-only discovery is enabled for S1/S3 staging only."
+    );
     const orders = new BackOfficeOrderPage(page);
+    if (environment === "s1") {
+      await orders.login({ ...credentials, authority: "admin" });
+      await orders.openAdminOrders();
+      const inspected = await orders.scanVisibleAdminOrderStatuses({ limit: 50 });
+      for (const status of [
+        "Waiting for Send Financial",
+        "Order Split",
+        "Shipping Requested",
+      ]) {
+        const matches = inspected.filter(
+          (order) => order.status.toLowerCase() === status.toLowerCase()
+        );
+        testInfo.annotations.push({
+          type: `s1-${status.toLowerCase().replaceAll(" ", "-")}`,
+          description: matches.map((order) => order.orderCode).join(", ") || "none",
+        });
+      }
+      const shipping = inspected.find(
+        (order) => order.status.toLowerCase() === "shipping requested"
+      );
+      expect(
+        shipping,
+        `No Shipping Requested order found among ${inspected.length} visible S1 Admin orders. ` +
+          `Observed: ${inspected.map((order) => `${order.orderCode}=${order.status}`).join(" | ")}`
+      ).toBeTruthy();
+      testInfo.annotations.push({ type: "qst-order", description: shipping.orderCode });
+      return;
+    }
+
     await orders.login({ ...credentials, authority: "agent" });
     await orders.expectAgentOrders();
     const order = await orders.findOrOpenOrderByHybrisStatus(
       "Shipping Requested",
-      process.env.BACKOFFICE_SHIPPING_ORDER_CODE || shippingFallback
+      process.env.BACKOFFICE_SHIPPING_ORDER_CODE ||
+        (environment === "s3" ? shippingFallback : undefined)
     );
     expect(order.hybrisStatus).toBe("Shipping Requested");
     testInfo.annotations.push({ type: "qst-order", description: order.orderCode });

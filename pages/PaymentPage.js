@@ -19,12 +19,14 @@ export default class PaymentPage extends BasePage {
     });
   }
 
-  async validatePaymentPage() {
+  async validatePaymentPage({
+    expectedPaymentMode = /Tarjeta de Crédito \/ Débito/i,
+  } = {}) {
     await this.page.waitForURL(/CHECKOUT_STEP_PAYMENT/, {
       timeout: 90000,
     });
 
-    await this.creditCardOption.waitFor({
+    await this.page.getByRole("button", { name: expectedPaymentMode }).waitFor({
       state: "visible",
       timeout: 90000,
     });

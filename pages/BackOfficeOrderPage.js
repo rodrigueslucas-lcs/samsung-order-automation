@@ -59,6 +59,82 @@ export default class BackOfficeOrderPage extends BackOfficePage {
     return result;
   }
 
+  async readVisibleAdminOrders() {
+    const rows = this.page.locator(
+      '[role="row"][aria-label*="Order Nr.:"]:visible'
+    );
+    await rows.first().waitFor({ state: "visible", timeout: 30000 });
+    const labels = await rows.evaluateAll((elements) =>
+      elements.map((element) => element.getAttribute("aria-label") || "")
+    );
+    return labels.map((label) => ({
+      orderCode: label.match(/Order Nr\.: ([^,]+)/)?.[1]?.trim() || null,
+      status:
+        label.match(/(?:Status|Order Status): ([^,]+)/i)?.[1]?.trim() || null,
+      label,
+    }));
+  }
+
+  async openFirstAdminOrderAndReadStatus() {
+    const orders = await this.readVisibleAdminOrders();
+    const order = orders.find((candidate) => candidate.orderCode);
+    if (!order) throw new Error("No readable Admin order row was available.");
+
+    const row = this.page.getByRole("row", {
+      name: new RegExp(`Order Nr\\.: ${this.escapeRegExp(order.orderCode)}(?:,|$)`),
+    });
+    await row.click();
+    await this.page.waitForFunction(() => !window.zk || !zk.processing, null, {
+      timeout: 30000,
+    });
+
+    const status = await this.readOpenAdminOrderStatus();
+    return { orderCode: order.orderCode, status };
+  }
+
+  async readOpenAdminOrderStatus() {
+    const statusControl = this.page
+      .getByRole("button", {
+        name: /^(created|processing|completed|shipped|cancelled|waiting for send financial|order split|shipping requested|temporary[_ ]\w+)$/i,
+      })
+      .filter({ visible: true })
+      .last();
+    await statusControl.waitFor({ state: "visible", timeout: 30000 });
+    const status = (await statusControl.innerText()).replace(/\s+/g, " ").trim();
+    if (!status) {
+      throw new Error("The opened Admin order had an empty Status control.");
+    }
+    return status;
+  }
+
+  async scanVisibleAdminOrderStatuses({ limit = 50 } = {}) {
+    const orders = (await this.readVisibleAdminOrders())
+      .filter((order) => order.orderCode)
+      .slice(0, limit);
+    const inspected = [];
+
+    for (const order of orders) {
+      await this.searchAdminOrder(order.orderCode);
+      const row = this.page.getByRole("row", {
+        name: new RegExp(`Order Nr\\.: ${this.escapeRegExp(order.orderCode)}(?:,|$)`),
+      });
+      await row.click();
+      await this.page.waitForFunction(() => !window.zk || !zk.processing, null, {
+        timeout: 30000,
+      });
+      const status = await this.readOpenAdminOrderStatus();
+      inspected.push({ orderCode: order.orderCode, status });
+
+      await this.openTreeRow("Orders");
+      await this.page
+        .getByPlaceholder("Type to search", { exact: true })
+        .last()
+        .waitFor({ state: "visible", timeout: 30000 });
+    }
+
+    return inspected;
+  }
+
   async searchAgentOrder(orderCode) {
     const searchInput = this.page.getByPlaceholder(
       "Search by order code, email, name, mobile",

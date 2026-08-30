@@ -21,7 +21,7 @@ export default class BackOfficeCronJobsPage extends BackOfficePage {
     await searchInput.locator("xpath=../..").locator('button[title="Search"]').click();
 
     const result = this.page.getByRole("row", {
-      name: new RegExp(`Code: ${this.escapeRegExp(code)}`),
+      name: new RegExp(`Jobname: ${this.escapeRegExp(code)}(?:,|$)`),
     });
     await result.waitFor({ state: "visible", timeout: 30000 });
     return result;

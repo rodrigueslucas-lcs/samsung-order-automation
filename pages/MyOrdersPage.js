@@ -2,6 +2,11 @@ import { expect } from "@playwright/test";
 import MyAccountPage from "./MyAccountPage";
 
 export default class MyOrdersPage extends MyAccountPage {
+  async visibleOrderCodes() {
+    const text = await this.page.getByRole("main").innerText();
+    return [...new Set(text.match(/\bPE\d{6}-\d{8}(?:_\d+)?\b/g) || [])];
+  }
+
   async visibleOrderCode(orderCode) {
     const matches = await this.page.getByRole("main")
       .getByText(orderCode, { exact: false })
@@ -30,6 +35,23 @@ export default class MyOrdersPage extends MyAccountPage {
       }
     }
     throw new Error(`Authenticated order ${orderCode} did not appear in My Orders.`);
+  }
+
+  async waitForNewOrder(previousOrderCodes, { attempts = 12, intervalMs = 15000 } = {}) {
+    const previous = new Set(previousOrderCodes);
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      const orderCode = (await this.visibleOrderCodes()).find(
+        (candidate) => !previous.has(candidate)
+      );
+      if (orderCode) {
+        return { orderCode, attempt, elapsedMs: (attempt - 1) * intervalMs };
+      }
+      if (attempt < attempts) {
+        await this.page.waitForTimeout(intervalMs);
+        await this.page.reload({ waitUntil: "domcontentloaded" });
+      }
+    }
+    throw new Error("A newly submitted authenticated order did not appear in My Orders.");
   }
 
   async findOrder(orderCode) {

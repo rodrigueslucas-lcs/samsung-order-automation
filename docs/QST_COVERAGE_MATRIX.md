@@ -23,13 +23,13 @@ Legend: **A** = Available, **If needed** = applicable for targeted changes, **N/
 | QST-BS-13 | Payment | Guest | Complete order with available payment | A | A | N/A | DST TC58/TC77 | PaymentPage, CheckoutPage | Automated | Guarded execution only | One ST2 Credit Card test order; `ALLOW_PAYMENT_SUBMIT=1` preserved |
 | QST-BS-14 | Confirmation | Guest | Order confirmation page | A | A | N/A | DST TC62 E2E step | OrderConfirmationPage | Automated | Same causal execution as BS-13 | Confirmed order PE260828-74965010 |
 | QST-BS-15 | Login | Registered | Login via Home Page | A | A | A | Authenticated DST/profile flows | authState, HomePage, ProfilePage | Automated | Valid ignored QA auth state required | Passed without MFA or Production navigation |
-| QST-BS-16 | Customer Order Fulfillment Journey | Registered | Place order with different payment mode from guest | A | N/A | A | Authenticated checkout DST | authState, CheckoutPage, PaymentPage | Reusable - needs QST wrapper | Payment guard, account and QA data required | Destructive; not executed |
-| QST-BS-17 | Confirmation Email | Registered | Order confirmation email | A | N/A | N/A | DST TC63/Mailinator evidence | MailinatorPage | Blocked | Requires a registered order and reliable inbox; guest order does not satisfy wording | Known inbox-delivery instability also applies |
-| QST-BS-18 | BackOffice | Admin | Login in BackOffice | A | N/A | N/A | DST TC64 | BackOfficePage | Blocked | Runtime BackOffice credentials absent in this execution | Guarded QST wrapper created |
-| QST-BS-19 | Order Fulfillment | Admin | See order status | A | N/A | N/A | DST TC71/72/74/76 | BackOfficeOrderPage | Blocked | Runtime BackOffice credentials absent | Read-only guarded wrapper created |
-| QST-BS-20 | Order Fulfillment | Admin | Run financial initial CronJob | A | N/A | N/A | DST TC73 | BackOfficeCronJobsPage | Blocked | Admin credentials and causal disposable S3 mass not available together | No blind CronJob execution |
-| QST-BS-21 | Order Fulfillment | Admin | Run warehouse transfer CronJob | A | N/A | N/A | DST TC75 | BackOfficeCronJobsPage | Blocked | Admin credentials and causal disposable S3 mass not available together | No blind CronJob execution |
-| QST-BS-22 | Order Fulfillment | Admin | Status becomes Shipping Requested | A | N/A | N/A | DST TC76 | BackOfficeOrderPage | Blocked | Runtime BackOffice credentials absent | Read-only S3 wrapper and known fallback exist |
+| QST-BS-16 | Customer Order Fulfillment Journey | Registered | Place order with different payment mode from guest | A | N/A | A | Authenticated checkout DST | authState, CheckoutPage, PaymentPage, MyOrdersPage | Reusable - needs successful QST execution | Pago Efectivo `submitOrder` returned HTTP 200 with functional error `code=601`, `payment generic error` | No provider URL/CIP/order code or new My Orders entry; submit was not retried |
+| QST-BS-17 | Confirmation Email | Registered | Order confirmation email | A | N/A | N/A | DST TC63/Mailinator evidence | MailinatorPage | Blocked | BS-16 produced no registered order code to correlate with an inbox message | No second order was created to force delivery |
+| QST-BS-18 | BackOffice | Admin | Login in BackOffice | A | N/A | N/A | DST TC64 | BackOfficePage | Automated | None for S1 runtime credentials | Passed headed in S1; direct full-admin Administration Cockpit flow |
+| QST-BS-19 | Order Fulfillment | Admin | See order status | A | N/A | N/A | DST TC71/72/74/76 | BackOfficeOrderPage | Automated | None for read-only S1 Admin order | Passed headed with order PE260805-63779426 and status completed |
+| QST-BS-20 | Order Fulfillment | Admin | Run financial initial CronJob | A | N/A | N/A | DST TC73 | BackOfficeCronJobsPage | Blocked | All 50 accessible S1 Admin orders are COMPLETED; no eligible financial pre-state | Exact S1 job found FINISHED/SUCCESS; zero Runs |
+| QST-BS-21 | Order Fulfillment | Admin | Run warehouse transfer CronJob | A | N/A | N/A | DST TC75 | BackOfficeCronJobsPage | Blocked | All 50 accessible S1 Admin orders are COMPLETED; no Order Split mass | Exact S1 job found; zero Runs |
+| QST-BS-22 | Order Fulfillment | Admin | Status becomes Shipping Requested | A | N/A | N/A | DST TC76 | BackOfficeOrderPage | Blocked | No Shipping Requested order among all 50 accessible S1 Admin orders | Read-only scan completed; no S2/S3 code transplanted to S1 |
 
 ## EPP Store (22)
 
@@ -64,10 +64,10 @@ No verified EPP URL, store identifier, auth/profile, credentials, fixtures, test
 
 | Status | Count |
 |---|---:|
-| Automated | 10 |
+| Automated | 12 |
 | Reusable - needs QST wrapper | 1 |
 | Partial | 3 |
-| Blocked | 30 |
+| Blocked | 28 |
 | Not implemented | 0 |
 | N/A | 0 |
 | **Total** | **44** |

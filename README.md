@@ -4,33 +4,33 @@ Playwright automation for Samsung Peru eCommerce flows running on SAP Commerce. 
 
 Production is not an automation target for state-changing tests. Existing environment and destructive-action guards must always be preserved.
 
-## Test suites
-
-| Suite | Purpose | Coverage source |
-|---|---|---|
-| DST — Detailed Smoke Test | Broad functional coverage of the Peru storefront and BackOffice journeys | [DST Coverage](docs/COVERAGE_MATRIX.md) |
-| QST — Quick Smoke Test | Operational smoke suite for Normal, Modified and Sanity executions | [QST Coverage](docs/QST_COVERAGE_MATRIX.md) |
-
 DST and QST have independent specs, IDs, execution evidence and coverage. They share Page Objects, fixtures and utilities instead of duplicating interaction code.
 
-### QST scope
+## DST — Detailed Smoke Test
 
-QST contains 44 official scenarios:
+DST tracks 83 Base Store scenarios: 63 Automated, 9 Partial, 9 Blocked and 2 Not Applicable. Its broad coverage includes storefront, authenticated journeys, checkout, payments, email, BackOffice and fulfillment.
 
-- Base Store: 22
-- EPP: 22
+```bash
+npx playwright test tests/st2/base-store --project=chromium --workers=1
+npx playwright test tests/st2/backoffice --project=chromium --workers=1
+npx playwright test --grep "TC<number>" --project=chromium --workers=1
+```
 
-Current Base Store status:
+Detailed status and evidence: [DST Coverage Matrix](docs/COVERAGE_MATRIX.md). DST currently uses the paths above; migration to `tests/st2/dst/` remains planned and incremental.
 
-| Automated | Partial | Blocked | Reusable — needs wrapper | Not implemented |
-|---:|---:|---:|---:|---:|
-| 10 | 3 | 8 | 1 | 0 |
+## QST — Quick Smoke Test
 
-The 22 EPP scenarios remain blocked until the EPP URL, authentication, configuration and compatible test data are available. See the [QST Automation Guide](docs/QST_AUTOMATION_GUIDE.md) for execution types, tags and dependencies.
+QST contains 44 official scenarios: 22 Base Store and 22 EPP, organized for Normal, Modified and Sanity executions. Current Base Store status is 12 Automated, 3 Partial, 6 Blocked and 1 Reusable; the EPP scenarios remain blocked pending a verified environment and test data.
 
-### DST scope
+```bash
+npm run qst:normal
+npm run qst:modified
+npm run qst:sanity
+npm run qst:base-store
+npm run qst:epp
+```
 
-DST currently tracks 83 Base Store scenarios: 63 Automated, 9 Partial, 9 Blocked and 2 Not Applicable. The detailed evidence and environment-specific notes live in the [DST Coverage Matrix](docs/COVERAGE_MATRIX.md).
+Detailed status and execution guidance: [QST Coverage Matrix](docs/QST_COVERAGE_MATRIX.md) and [QST Automation Guide](docs/QST_AUTOMATION_GUIDE.md).
 
 ## Repository structure
 
@@ -67,21 +67,7 @@ npx playwright install
 
 The current Playwright configuration uses the real Chrome channel, visible mode, one worker, screenshots and failure-retained traces. Video is disabled unless `PW_VIDEO=1` is supplied.
 
-## Main commands
-
-### QST
-
-```bash
-npm run qst:normal
-npm run qst:modified
-npm run qst:sanity
-npm run qst:base-store
-npm run qst:epp
-```
-
-The QST runner selects the matching tags and executes with one worker.
-
-### Authentication
+## Authentication commands
 
 ```bash
 npm run auth:open-profile
@@ -89,17 +75,15 @@ npm run auth:export
 npm run auth:verify
 ```
 
-### DST and targeted Playwright execution
+## Targeted Playwright execution
 
 ```bash
 npx playwright test --list
-npx playwright test tests/st2/base-store --project=chromium --workers=1
-npx playwright test tests/st2/backoffice --project=chromium --workers=1
 npx playwright test --grep "TC<number>" --project=chromium --workers=1
 npx playwright show-report
 ```
 
-There are no `dst:*` npm scripts yet; current DST execution uses explicit Playwright paths.
+There are no `dst:*` npm scripts yet; current DST execution uses the explicit paths documented in the DST section.
 
 ## Samsung Account authentication
 
@@ -140,7 +124,7 @@ Other runtime controls include:
 
 ## BackOffice and fulfillment
 
-BackOffice supports S2/S3 through `BACKOFFICE_ENV` or an explicit `BACKOFFICE_URL`. Credentials are runtime-only:
+BackOffice supports S1/S2/S3 staging through `BACKOFFICE_ENV` or an explicit `BACKOFFICE_URL`. Credentials are runtime-only:
 
 ```text
 BACKOFFICE_USERNAME
