@@ -33,7 +33,7 @@ Legend: **A** = Available, **If needed** = applicable for targeted changes, **N/
 
 ## EPP Store (22)
 
-No verified EPP URL, store identifier, auth/profile, credentials, fixtures, test mass or compatible DOM implementation exists in this repository. The rows remain blocked rather than copying Base Store specs under EPP names.
+Read-only discovery confirmed that the current Samsung Account state is valid for ST2 Base Store, but the homepage exposes no EPP/employee entry. `/pe/campaign/select-ai` is a Select AI subscription route, not EPP, and its ST2 CMS page requests return 404. The official Peru employee-store paths `/pe/multistore/beneficios_empleados/` and `/pe/multistore/ventaempleados/` leave ST2 and resolve to Production in a browser. No product, cart, checkout or account mutation was attempted. All 22 rows therefore remain blocked pending a real non-Production EPP URL, store/site UID, eligible account/employee entitlement and EPP test SKU.
 
 | ID | Functionality | User Type | Scenario | Normal | Modified | Sanity | Existing reusable automation | Page Object/helper | Current QST status | Dependency/blocker | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|

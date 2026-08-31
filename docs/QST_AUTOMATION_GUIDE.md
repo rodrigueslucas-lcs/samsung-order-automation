@@ -59,7 +59,7 @@ This prepares evidence for manual Confluence reporting; it does not write to Con
 - Base Store guest wrappers use ST2 Peru and the existing `getcookie.html` setup.
 - Registered scenarios reuse the ignored Playwright auth state only when a QST wrapper is implemented and a valid QA session exists.
 - BackOffice scenarios support S1/S2/S3 staging through `BACKOFFICE_ENV` (or explicit `BACKOFFICE_URL`) and must keep runtime-only credentials, environment guards and the established authority selection.
-- EPP is blocked until its real non-Production URL, store identifier, login/bootstrap flow, auth state and compatible test data are supplied and verified. Base Store behavior must not be assumed for EPP.
+- EPP is blocked until its real non-Production URL, store identifier, login/bootstrap flow, entitlement and compatible test data are supplied and verified. The authenticated ST2 Base Store state is valid, but it does not expose an EPP entry. The known official Peru paths `/pe/multistore/beneficios_empleados/` and `/pe/multistore/ventaempleados/` leave ST2 and resolve to Production when opened in a browser, so functional automation deliberately stops before navigation, product or cart interaction.
 
 ## Destructive guards
 
@@ -85,4 +85,4 @@ This prepares evidence for manual Confluence reporting; it does not write to Con
 - QST-BS-05 asks for variants other than color; current DST evidence covers color only.
 - Samsung Care+ depends on currently available eligible product/service mass and remains Partial in DST.
 - Registered ordering remains reusable but unproven because the single Pago Efectivo submit had an ambiguous result and generated no observable order. Confirmation email could not run without that order; causal fulfillment still needs S1 test mass.
-- EPP has no verified runtime configuration or implementation in this repository.
+- EPP has a read-only staging discovery spec, but no verified functional runtime configuration. Discovery probes must not be reported as official QST scenario passes.

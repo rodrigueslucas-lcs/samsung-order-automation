@@ -20,7 +20,7 @@ Detailed status and evidence: [DST Coverage Matrix](docs/COVERAGE_MATRIX.md). DS
 
 ## QST — Quick Smoke Test
 
-QST contains 44 official scenarios: 22 Base Store and 22 EPP, organized for Normal, Modified and Sanity executions. Current Base Store status is 12 Automated, 3 Partial, 6 Blocked and 1 Reusable; the EPP scenarios remain blocked pending a verified environment and test data.
+QST contains 44 official scenarios: 22 Base Store and 22 EPP, organized for Normal, Modified and Sanity executions. Current Base Store status is 12 Automated, 3 Partial, 6 Blocked and 1 Reusable; the 22 EPP scenarios remain blocked because the known Peru employee-store paths redirect from ST2 to Production and no staging EPP route/entitlement has been supplied.
 
 ```bash
 npm run qst:normal
@@ -42,7 +42,7 @@ tests/
     backoffice/         Current DST BackOffice specs
     qst/
       base-store/       QST Base Store specs
-      epp/              Reserved QST EPP structure
+      epp/              QST EPP safe staging discovery and future specs
 fixtures/               Synthetic QA test data
 utils/                  Auth, execution-summary and test-data helpers
 scripts/                Auth bootstrap and QST runner scripts
