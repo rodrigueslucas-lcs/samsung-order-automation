@@ -1,6 +1,6 @@
 import { expect, test as base } from "@playwright/test";
-import authState from "../../../../utils/authState";
-import eppConfigModule from "../../../../utils/eppConfig";
+import authState from "../../../../../utils/authState";
+import eppConfigModule from "../../../../../utils/eppConfig";
 
 const { AUTH_STATE_PATH, applyAuthSessionStorage, hasAuthState } = authState;
 const { resolveEppConfig } = eppConfigModule;

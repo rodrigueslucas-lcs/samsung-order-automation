@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import eppConfig from "../../../../utils/eppConfig";
+import eppConfig from "../../../../../utils/eppConfig";
 
 const { resolveEppConfig } = eppConfig;
 const config = resolveEppConfig();

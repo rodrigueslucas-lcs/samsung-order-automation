@@ -99,19 +99,21 @@ tests/
   st2/                              Legacy PE environment/path naming
     base-store/                     Current PE DST storefront specs
     backoffice/                     Current PE DST BackOffice and fulfillment specs
-    dst/
-      base-store/search/            Completed PE DST migration pilot
-      epp/                          Guarded PE DST EPP wrappers
     qst/
       base-store/                   PE QST Base Store specs
       epp/                          PE QST EPP discovery
+  s2/
+    pe/
+      dst/
+        base-store/search/          Normalized PE DST Search path
+        epp/                        Guarded PE DST EPP wrappers
 fixtures/                           Synthetic QA test data
 utils/                              Configuration, auth, safety and reporting helpers
 scripts/                            Authentication bootstrap and QST execution helpers
 docs/                               Coverage, discovery and operational documentation
 ```
 
-PE paths have not yet been normalized. Do not assume that `tests/st2/base-store` or `tests/st2/backoffice` has already moved under `tests/s2/pe/dst`.
+Only the already-modern PE DST Search and EPP areas have been normalized. Do not assume that legacy `tests/st2/base-store`, `tests/st2/backoffice` or `tests/st2/qst` has already moved under `tests/s2/pe`.
 
 ### Target convention
 

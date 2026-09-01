@@ -1,9 +1,9 @@
-import HomePage from "../../../../pages/HomePage";
-import ProductPage from "../../../../pages/ProductPage";
-import CartPage from "../../../../pages/CartPage";
-import CheckoutPage from "../../../../pages/CheckoutPage";
-import PaymentPage from "../../../../pages/PaymentPage";
-import { testData } from "../../../../utils/testData";
+import HomePage from "../../../../../pages/HomePage";
+import ProductPage from "../../../../../pages/ProductPage";
+import CartPage from "../../../../../pages/CartPage";
+import CheckoutPage from "../../../../../pages/CheckoutPage";
+import PaymentPage from "../../../../../pages/PaymentPage";
+import { testData } from "../../../../../utils/testData";
 
 export async function openEppHome(page, config) {
   const home = new HomePage(page, { setupUrl: null, homeUrl: config.url.toString() });

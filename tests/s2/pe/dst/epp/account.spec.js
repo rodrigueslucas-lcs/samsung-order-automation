@@ -1,5 +1,5 @@
-import ProfilePage from "../../../../pages/ProfilePage";
-import MyOrdersPage from "../../../../pages/MyOrdersPage";
+import ProfilePage from "../../../../../pages/ProfilePage";
+import MyOrdersPage from "../../../../../pages/MyOrdersPage";
 import { test, expect } from "./epp.fixture";
 
 test("TC03 @dst @epp - EPP authenticated profile menu", async ({ page, eppConfig }, testInfo) => {

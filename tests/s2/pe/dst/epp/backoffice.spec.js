@@ -1,6 +1,6 @@
-import BackOfficePage from "../../../../pages/BackOfficePage";
-import BackOfficeOrderPage from "../../../../pages/BackOfficeOrderPage";
-import BackOfficeCronJobsPage from "../../../../pages/BackOfficeCronJobsPage";
+import BackOfficePage from "../../../../../pages/BackOfficePage";
+import BackOfficeOrderPage from "../../../../../pages/BackOfficeOrderPage";
+import BackOfficeCronJobsPage from "../../../../../pages/BackOfficeCronJobsPage";
 import { test, expect } from "@playwright/test";
 
 const url = process.env.EPP_BACKOFFICE_URL;
