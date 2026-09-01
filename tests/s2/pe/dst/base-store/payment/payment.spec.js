@@ -1,11 +1,11 @@
 import { test } from "@playwright/test";
 
-import ProductPage from "../../../../pages/ProductPage";
-import CartPage from "../../../../pages/CartPage";
-import GuestLoginPage from "../../../../pages/GuestLoginPage";
-import CheckoutPage from "../../../../pages/CheckoutPage";
-import PaymentPage from "../../../../pages/PaymentPage";
-import { testData } from "../../../../utils/testData";
+import ProductPage from "../../../../../../pages/ProductPage";
+import CartPage from "../../../../../../pages/CartPage";
+import GuestLoginPage from "../../../../../../pages/GuestLoginPage";
+import CheckoutPage from "../../../../../../pages/CheckoutPage";
+import PaymentPage from "../../../../../../pages/PaymentPage";
+import { testData } from "../../../../../../utils/testData";
 
 async function reachPayment(page) {
   const productPage = new ProductPage(page);

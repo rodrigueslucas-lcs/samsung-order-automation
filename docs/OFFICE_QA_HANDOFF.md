@@ -129,20 +129,20 @@ npx playwright test tests/s2/pe/dst/base-store/home/home.spec.js tests/s2/pe/dst
 npx playwright test tests/s2/pe/dst/base-store/cart --project=chromium --workers=1 --headed
 
 # C. Checkout pre-submit
-npx playwright test tests/st2/base-store/checkout/checkout.spec.js --project=chromium --workers=1 --headed
+npx playwright test tests/s2/pe/dst/base-store/checkout/checkout.spec.js --project=chromium --workers=1 --headed
 
 # D. Payment read-only
-npx playwright test tests/st2/base-store/payment/payment.spec.js --project=chromium --grep-invert "@destructive" --workers=1 --headed
+npx playwright test tests/s2/pe/dst/base-store/payment/payment.spec.js --project=chromium --grep-invert "@destructive" --workers=1 --headed
 
 # E. Mobile read-only
 npx playwright test tests/s2/pe/dst/base-store/mobile/mobile.spec.js --project=chromium --workers=1 --headed
 
 # F. Full safe storefront regression
-npx playwright test tests/s2/pe/dst/base-store/home/home.spec.js tests/s2/pe/dst/base-store/mobile/mobile.spec.js tests/s2/pe/dst/base-store/guest-login/guest-login.spec.js tests/s2/pe/dst/base-store/pdp/product.spec.js tests/s2/pe/dst/base-store/pdp/pdp.spec.js tests/s2/pe/dst/base-store/cart tests/st2/base-store/checkout/checkout.spec.js tests/st2/base-store/payment/payment.spec.js --project=chromium --grep-invert "@destructive" --workers=1 --headed
+npx playwright test tests/s2/pe/dst/base-store/home/home.spec.js tests/s2/pe/dst/base-store/mobile/mobile.spec.js tests/s2/pe/dst/base-store/guest-login/guest-login.spec.js tests/s2/pe/dst/base-store/pdp/product.spec.js tests/s2/pe/dst/base-store/pdp/pdp.spec.js tests/s2/pe/dst/base-store/cart tests/s2/pe/dst/base-store/checkout/checkout.spec.js tests/s2/pe/dst/base-store/payment/payment.spec.js --project=chromium --grep-invert "@destructive" --workers=1 --headed
 
 # G. Authenticated block after manual renewal
 npm run auth:verify
-npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --workers=1 --headed
+npx playwright test tests/s2/pe/dst/base-store/checkout/authenticated-checkout.spec.js --project=chromium --workers=1 --headed
 
 # H. TC12 with existing order (read-only direct ST2 route)
 $env:AUTHENTICATED_ORDER_CODE="PE260826-74796841"
