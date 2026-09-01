@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
-import BackOfficePage from "../../../../pages/BackOfficePage";
-import BackOfficeOrderPage from "../../../../pages/BackOfficeOrderPage";
-import BackOfficeCronJobsPage from "../../../../pages/BackOfficeCronJobsPage";
+import BackOfficePage from "../../../../../pages/BackOfficePage";
+import BackOfficeOrderPage from "../../../../../pages/BackOfficeOrderPage";
+import BackOfficeCronJobsPage from "../../../../../pages/BackOfficeCronJobsPage";
 
 test.use({ screenshot: "off", video: "off", trace: "off" });
 test.describe.configure({ timeout: 240000 });

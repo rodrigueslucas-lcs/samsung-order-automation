@@ -18,8 +18,6 @@ export default defineConfig({
   ],
 
   use: {
-    baseURL: 'https://stg2.shop.samsung.com',
-
     channel: 'chrome',
 
     headless: false,

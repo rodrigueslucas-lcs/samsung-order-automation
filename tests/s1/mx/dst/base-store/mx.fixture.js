@@ -1,5 +1,5 @@
 import { test as base, expect } from "@playwright/test";
-import mxConfigModule from "../../../../utils/mxConfig";
+import mxConfigModule from "../../../../../utils/mxConfig";
 
 const { getMxConfig } = mxConfigModule;
 

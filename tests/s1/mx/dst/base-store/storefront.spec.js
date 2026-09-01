@@ -1,6 +1,6 @@
-import HomePage from "../../../../pages/HomePage";
-import ProductPage from "../../../../pages/ProductPage";
-import CartPage from "../../../../pages/CartPage";
+import HomePage from "../../../../../pages/HomePage";
+import ProductPage from "../../../../../pages/ProductPage";
+import CartPage from "../../../../../pages/CartPage";
 import { test, expect } from "./mx.fixture";
 
 async function openMxCart(page, config) {

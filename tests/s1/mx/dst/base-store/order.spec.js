@@ -1,4 +1,4 @@
-import destructiveGuards from "../../../../utils/destructiveGuards";
+import destructiveGuards from "../../../../../utils/destructiveGuards";
 import { test, expect } from "./mx.fixture";
 import { reachMxGuestPayment } from "./mxFlows";
 

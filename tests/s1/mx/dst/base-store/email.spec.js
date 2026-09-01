@@ -1,4 +1,4 @@
-import MailinatorPage from "../../../../pages/MailinatorPage";
+import MailinatorPage from "../../../../../pages/MailinatorPage";
 import { test, expect } from "./mx.fixture";
 
 test("MX TC64 @dst @mx @base-store - Order email correlates to current QA order", async ({ page }) => {

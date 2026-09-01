@@ -1,32 +1,77 @@
-# Samsung Peru QA Automation
+# Samsung LATAM QA Automation
 
-Playwright automation for Samsung Peru eCommerce flows running on SAP Commerce. The repository covers storefront, Samsung Account, email, payment, BackOffice and order-fulfillment validation in the ST2/ST3 staging environments.
+Playwright automation for Samsung LATAM eCommerce flows running on SAP Commerce. The repository currently contains validated automation for Mexico and Peru, with country, environment, suite and store boundaries being standardized incrementally.
 
-Production is not an automation target for state-changing tests. Existing environment and destructive-action guards must always be preserved.
+Production is read-only. State-changing automation is restricted to explicitly authorized staging targets and guarded at runtime.
 
-DST and QST have independent specs, IDs, execution evidence and coverage. They share Page Objects, fixtures and utilities instead of duplicating interaction code.
+## Current scope
 
-## DST — Detailed Smoke Test
+The execution identity has four dimensions:
 
-DST tracks 83 Base Store scenarios: 63 Automated, 9 Partial, 9 Blocked and 2 Not Applicable. Its broad coverage includes storefront, authenticated journeys, checkout, payments, email, BackOffice and fulfillment.
+| Dimension | Current values |
+|---|---|
+| Environment | S1, S2 and S3 where applicable |
+| Country | MX and PE |
+| Suite | DST and QST |
+| Area | Base Store, EPP and BackOffice/Fulfillment |
+
+Chile (`CL`) and Colombia (`CO`) are planned target countries only. No CL or CO automation coverage is claimed until verified configuration, tests and execution evidence exist.
+
+Current implementations include:
+
+- MX S1 DST Base Store and read-only BackOffice wrappers under the country-scoped structure.
+- PE DST Base Store, EPP and BackOffice coverage under the existing legacy `tests/st2` structure.
+- PE QST Base Store and EPP discovery under the existing legacy `tests/st2/qst` structure.
+- PE fulfillment evidence that may execute against S3 through explicit BackOffice environment configuration.
+
+`ST2` remains in existing Peru paths, test names and historical documentation. It represents the current legacy naming used by the repository; normalization to the `s2/pe/...` convention is pending and must be performed incrementally without rewriting execution evidence.
+
+## Coverage
+
+Coverage is country-, suite- and store-specific. Historical manual Pass results never imply current automation.
+
+### Peru DST
+
+The verified PE Base Store matrix contains 83 scenarios: 63 Automated, 9 Partial, 9 Blocked and 2 Not Applicable.
 
 ```bash
-npx playwright test tests/st2/base-store --project=chromium --workers=1
-npx playwright test tests/st2/backoffice --project=chromium --workers=1
-npx playwright test --grep "TC<number>" --project=chromium --workers=1
 npm run dst:base-store
 npm run dst:backoffice
 npm run dst:epp
 npm run dst:list
 ```
 
-Detailed status and evidence: [DST Coverage Matrix](docs/COVERAGE_MATRIX.md). DST currently uses the paths above; migration to `tests/st2/dst/` remains planned and incremental.
+Detailed evidence: [PE DST Coverage Matrix](docs/COVERAGE_MATRIX.md).
 
-DST EPP is tracked independently in the [DST EPP Coverage Matrix](docs/DST_EPP_COVERAGE_MATRIX.md). Its 59 historical manual Pass results are reuse context, not current automation evidence; a guarded staging bootstrap is ready for the real EPP environment configuration.
+PE DST EPP is tracked independently in the [DST EPP Coverage Matrix](docs/DST_EPP_COVERAGE_MATRIX.md). Its 59 historical manual Pass results are reuse context, not current automation evidence. Functional execution remains guarded by verified non-Production EPP configuration.
 
-## QST — Quick Smoke Test
+### Mexico DST
 
-QST contains 44 official scenarios: 22 Base Store and 22 EPP, organized for Normal, Modified and Sanity executions. Current Base Store status is 12 Automated, 3 Partial, 6 Blocked and 1 Reusable; the 22 EPP scenarios remain blocked because the known Peru employee-store paths redirect from ST2 to Production and no staging EPP route/entitlement has been supplied.
+The verified MX S1 Base Store matrix contains 84 official scenarios: 31 Automated, 13 Reusable, 4 Partial and 36 Blocked.
+
+```bash
+npm run dst:mx:list
+npm run dst:mx:base-store
+```
+
+The destructive MX order probe remains isolated and must never be included in the default Base Store command:
+
+```bash
+ALLOW_PAYMENT_SUBMIT=1 npm run dst:mx:order
+```
+
+On PowerShell, set the variable for the current process before running the command:
+
+```powershell
+$env:ALLOW_PAYMENT_SUBMIT = "1"
+npm run dst:mx:order
+```
+
+Detailed evidence: [MX S1 DST Base Store Coverage Matrix](docs/DST_MX_BASE_STORE_COVERAGE_MATRIX.md).
+
+### Peru QST
+
+PE QST contains 44 official scenarios: 22 Base Store and 22 EPP. The currently verified Base Store status remains 12 Automated, 3 Partial, 6 Blocked and 1 Reusable. The 22 EPP scenarios remain blocked pending a verified staging EPP route, entitlement and test data.
 
 ```bash
 npm run qst:normal
@@ -37,27 +82,56 @@ npm run qst:epp
 npm run qst:list
 ```
 
-Detailed status and execution guidance: [QST Coverage Matrix](docs/QST_COVERAGE_MATRIX.md) and [QST Automation Guide](docs/QST_AUTOMATION_GUIDE.md).
+Detailed evidence: [QST Coverage Matrix](docs/QST_COVERAGE_MATRIX.md) and [QST Automation Guide](docs/QST_AUTOMATION_GUIDE.md).
 
 ## Repository structure
 
+### Current structure
+
 ```text
-pages/                  Shared Page Objects
+pages/                              Shared and currently reusable Page Objects
 tests/
-  st2/
-    base-store/         Current DST storefront specs
-    backoffice/         Current DST BackOffice specs
-    dst/epp/            Guarded DST EPP staging bootstrap
+  s1/
+    mx/
+      dst/
+        base-store/                 MX S1 DST storefront and checkout specs
+        backoffice/                 MX S1 DST BackOffice specs
+  st2/                              Legacy PE environment/path naming
+    base-store/                     Current PE DST storefront specs
+    backoffice/                     Current PE DST BackOffice and fulfillment specs
+    dst/
+      base-store/search/            Completed PE DST migration pilot
+      epp/                          Guarded PE DST EPP wrappers
     qst/
-      base-store/       QST Base Store specs
-      epp/              QST EPP safe staging discovery and future specs
-fixtures/               Synthetic QA test data
-utils/                  Auth, execution-summary and test-data helpers
-scripts/                Auth bootstrap and QST runner scripts
-docs/                   Coverage, operating guides and handoff notes
+      base-store/                   PE QST Base Store specs
+      epp/                          PE QST EPP discovery
+fixtures/                           Synthetic QA test data
+utils/                              Configuration, auth, safety and reporting helpers
+scripts/                            Authentication bootstrap and QST execution helpers
+docs/                               Coverage, discovery and operational documentation
 ```
 
-Moving DST specs under `tests/st2/dst/` is planned as an incremental migration; it has not happened yet. See [DST Automation Structure](docs/DST_AUTOMATION_STRUCTURE.md).
+PE paths have not yet been normalized. Do not assume that `tests/st2/base-store` or `tests/st2/backoffice` has already moved under `tests/s2/pe/dst`.
+
+### Target convention
+
+New country/environment work should converge on:
+
+```text
+tests/<environment>/<country>/<suite>/<area>/
+```
+
+Examples:
+
+```text
+tests/s1/mx/dst/base-store/
+tests/s1/mx/dst/backoffice/
+tests/s2/pe/dst/base-store/
+tests/s2/pe/qst/epp/
+tests/s3/pe/dst/backoffice/
+```
+
+Directories for unsupported targets are not created in advance. Migration remains structural and incremental so validated tests, imports, commands and evidence can be checked after each move.
 
 ## Setup
 
@@ -67,23 +141,17 @@ Install the locked dependency set:
 npm ci
 ```
 
-Install Playwright browser dependencies when required by the machine:
+Install Playwright browser dependencies when required:
 
 ```bash
 npx playwright install
 ```
 
-The current Playwright configuration uses the real Chrome channel, visible mode, one worker, screenshots and failure-retained traces. Video is disabled unless `PW_VIDEO=1` is supplied.
+Playwright uses the real Chrome channel, visible mode, one worker, screenshots and failure-retained traces. Video is disabled unless `PW_VIDEO=1` is supplied.
 
-## Authentication commands
+There is no global Peru `baseURL` in `playwright.config.js`. Current flows navigate through explicit absolute target URLs or guarded country/store configuration. Future relative navigation must use an explicit target resolver rather than silently assuming PE.
 
-```bash
-npm run auth:open-profile
-npm run auth:export
-npm run auth:verify
-```
-
-## Targeted Playwright execution
+## Targeted execution
 
 ```bash
 npx playwright test --list
@@ -91,48 +159,41 @@ npx playwright test --grep "TC<number>" --project=chromium --workers=1
 npx playwright show-report
 ```
 
-The `dst:*` scripts preserve the legacy Base Store/BackOffice paths while new DST EPP work starts under the target `tests/st2/dst/epp/` structure.
+MX S1 direct paths use the country-scoped structure:
 
-## Samsung Account authentication
+```bash
+npx playwright test tests/s1/mx/dst/base-store --project=chromium --workers=1 --grep-invert @destructive
+npx playwright test tests/s1/mx/dst/backoffice --project=chromium --workers=1
+```
 
-Samsung Account may require a human login because of Google/FedCM/MFA behavior:
+PE commands continue to use compatibility paths while the legacy structure is migrated.
+
+## Authentication
+
+The current Samsung Account bootstrap is PE S2-specific and may require human interaction because of Google/FedCM/MFA behavior:
 
 1. Run `npm run auth:open-profile` to open the dedicated visible Chrome profile.
 2. Complete authentication manually.
-3. Keep that Chrome open and run `npm run auth:export` in another terminal.
+3. Keep Chrome open and run `npm run auth:export` in another terminal.
 4. Run `npm run auth:verify` to validate the exported session.
 
-The dedicated profiles and `playwright/.auth/` state are ignored by Git. Authenticated tests skip with a bootstrap instruction when the session files are unavailable; expired sessions must be refreshed rather than embedding credentials in specs.
+Dedicated profiles and `playwright/.auth/` state are ignored by Git. Credentials, cookies and tokens must remain runtime-only. PE authentication state must not be assumed valid for MX, CL, CO or EPP.
+
+## EPP
+
+EPP coverage is independent from Base Store coverage. The current EPP implementation is PE-oriented and accepts verified runtime-only staging configuration. Known Production redirects are blocked and never treated as functional staging evidence.
+
+Required EPP URLs, entitlement, SKUs, payment modes and BackOffice mapping must be verified per country before automation is promoted. See [EPP Discovery](docs/EPP_DISCOVERY.md) and [EPP External Dependencies](docs/EPP_EXTERNAL_DEPENDENCIES.md).
 
 ## Email and Guest tracking
 
-`MailinatorPage` provides reusable UI automation for:
+`MailinatorPage` provides reusable UI automation for order email validation and Guest Tracking OTP retrieval. Public inboxes must contain only synthetic QA data. Never document personal email addresses, OTPs or tokens.
 
-- order acknowledgment/payment email validation;
-- Guest Order Tracking OTP retrieval.
-
-Public inboxes must contain only synthetic QA data. Never document real inboxes, personal email addresses, OTPs or tokens. Public delivery can be delayed, so email-dependent coverage may remain Partial when no stable private inbox integration exists.
-
-## Payments and destructive guards
-
-Place Order and external payment-provider submits are opt-in:
-
-```text
-ALLOW_PAYMENT_SUBMIT=1
-```
-
-Without this guard, destructive payment tests skip. A permitted execution must use staging test data, one worker and no retry after an ambiguous submit. Payment fixture values must not be copied into logs, reports or documentation.
-
-Other runtime controls include:
-
-- `STOREFRONT_PAYMENT_MODE` for an approved alternative-payment probe;
-- `VALIDATE_ORDER_EMAIL`, `STOREFRONT_GUEST_EMAIL` and `MAILINATOR_INBOX` for synthetic email validation;
-- `GUEST_TRACKING_ORDER` and `GUEST_TRACKING_EMAIL` for Guest tracking;
-- `PW_VIDEO=1` to opt in to Playwright video.
+Email templates, tracking routes and order-code formats are country-specific. Existing evidence must not be transferred between MX and PE without a causal execution.
 
 ## BackOffice and fulfillment
 
-BackOffice supports S1/S2/S3 staging through `BACKOFFICE_ENV` or an explicit `BACKOFFICE_URL`. Credentials are runtime-only:
+Shared Page Objects support S1, S2 and S3 staging through `BACKOFFICE_ENV` or an explicit `BACKOFFICE_URL`. Credentials are runtime-only:
 
 ```text
 BACKOFFICE_USERNAME
@@ -141,42 +202,58 @@ BACKOFFICE_ADMIN_USERNAME
 BACKOFFICE_ADMIN_PASSWORD
 ```
 
-Login, order-status and CronJob helpers already exist. Fulfillment CronJobs are guarded for S3 and require administrator credentials plus suitable staging mass. Never run a CronJob merely to test a locator, and never persist credentials, cookies or tokens.
+BackOffice specs remain owned by their country, suite and environment even when they reuse the same Page Objects. Never execute a CronJob without controlled causal staging mass and explicit authorization.
 
-## Production safety
+## Destructive-action safety
 
-- Never create an order in Production.
-- Never submit a Production payment.
+Production is strictly read-only:
+
+- Never create an order or submit a payment in Production.
 - Never run a Production CronJob or cancellation.
 - Never alter Production customer, address or order data.
-- Preserve all environment, credential and destructive-action guards.
-- Use Production only when a specifically authorized workflow is strictly read-only.
+- Never navigate into Production to continue a staging test.
+
+Payment/order submit requires:
+
+```text
+ALLOW_PAYMENT_SUBMIT=1
+```
+
+CronJob execution requires:
+
+```text
+ALLOW_CRONJOB_RUN=1
+```
+
+Additional rules:
+
+- Every destructive test must carry `@destructive`.
+- Default non-destructive commands must exclude `@destructive`.
+- Destructive execution must use `--workers=1 --retries=0`.
+- Never perform a blind or automatic retry after an ambiguous submit.
+- Do not create another order only to obtain confirmation or email evidence.
+- Do not cancel an order that was not created and controlled by the automation.
+- Do not execute fulfillment jobs without a causal eligible order.
+- Preserve country/environment host guards, including the exact MX S1 guard for `stg.shop.samsung.com`.
 
 ## QST execution summary
 
-`utils/qstExecutionSummary.js` attaches structured execution metadata for:
+`utils/qstExecutionSummary.js` attaches Environment, Version/Build, QST type, Date, Country Code, Store Type, Order Number, Defect Found and Tester Name metadata. Current defaults are PE-oriented legacy defaults and must be overridden explicitly when future country QST support is added.
 
-- Environment
-- Version/Build
-- Type of QST
-- Date
-- Country Code
-- Store Type
-- Order Number
-- Defect Found
-- Tester Name
-
-The helper prepares data for manual reporting; it does not write to Confluence. Variables and defaults are documented in the [QST Automation Guide](docs/QST_AUTOMATION_GUIDE.md).
+The helper prepares data for manual reporting; it does not write to Confluence.
 
 ## Evidence and local artifacts
 
-Playwright reports, traces, screenshots, auth state and browser profiles are local artifacts and are protected by `.gitignore`. Review `git status` before every commit to ensure no session or test-result artifact is staged.
+Playwright reports, traces, screenshots, auth state and browser profiles are local artifacts protected by `.gitignore`. Review `git status` before every commit so no session or test-result artifact is included.
+
+Coverage status changes require an explicit scenario mapping, executable assertion and actual environment evidence. Structural similarity or historical manual Pass is insufficient.
 
 ## Documentation
 
-- [DST Coverage](docs/COVERAGE_MATRIX.md)
-- [DST EPP Coverage](docs/DST_EPP_COVERAGE_MATRIX.md)
-- [QST Coverage](docs/QST_COVERAGE_MATRIX.md)
+- [PE DST Coverage](docs/COVERAGE_MATRIX.md)
+- [MX S1 DST Base Store Coverage](docs/DST_MX_BASE_STORE_COVERAGE_MATRIX.md)
+- [PE DST EPP Coverage](docs/DST_EPP_COVERAGE_MATRIX.md)
+- [PE QST Coverage](docs/QST_COVERAGE_MATRIX.md)
 - [QST Automation Guide](docs/QST_AUTOMATION_GUIDE.md)
 - [DST Automation Structure](docs/DST_AUTOMATION_STRUCTURE.md)
 - [Office QA Handoff](docs/OFFICE_QA_HANDOFF.md)

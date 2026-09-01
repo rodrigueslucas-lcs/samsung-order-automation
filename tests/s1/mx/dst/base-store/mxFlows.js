@@ -1,7 +1,7 @@
 import { expect } from "@playwright/test";
-import ProductPage from "../../../../pages/ProductPage";
-import CartPage from "../../../../pages/CartPage";
-import MxCheckoutPage from "../../../../pages/MxCheckoutPage";
+import ProductPage from "../../../../../pages/ProductPage";
+import CartPage from "../../../../../pages/CartPage";
+import MxCheckoutPage from "../../../../../pages/MxCheckoutPage";
 
 export async function reachMxGuestPayment(page, config, email) {
   await page.goto(config.bootstrapUrl.toString(), { waitUntil: "domcontentloaded" });
