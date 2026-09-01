@@ -55,6 +55,10 @@ test.describe("S3 Peru - BackOffice fulfillment", () => {
 
   test("TC73 - Financial initial update CronJob completes", async ({ page }) => {
     test.skip(
+      process.env.ALLOW_CRONJOB_RUN !== "1",
+      "Set ALLOW_CRONJOB_RUN=1 for an explicitly authorized causal staging execution."
+    );
+    test.skip(
       !adminCredentials.username || !adminCredentials.password,
       "Full administrator runtime credentials are required to run CronJobs."
     );
@@ -90,6 +94,10 @@ test.describe("S3 Peru - BackOffice fulfillment", () => {
   });
 
   test("TC75 - Warehouse transfer CronJob completes", async ({ page }) => {
+    test.skip(
+      process.env.ALLOW_CRONJOB_RUN !== "1",
+      "Set ALLOW_CRONJOB_RUN=1 for an explicitly authorized causal staging execution."
+    );
     test.skip(
       !adminCredentials.username || !adminCredentials.password,
       "Full administrator runtime credentials are required to run CronJobs."

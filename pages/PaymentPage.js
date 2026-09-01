@@ -1,4 +1,7 @@
 import BasePage from "./BasePage";
+import destructiveGuards from "../utils/destructiveGuards";
+
+const { requirePaymentSubmitOptIn } = destructiveGuards;
 
 export default class PaymentPage extends BasePage {
   constructor(page) {
@@ -211,6 +214,7 @@ export default class PaymentPage extends BasePage {
   }
 
   async submitSelectedPaymentMode() {
+    requirePaymentSubmitOptIn();
     const panel = this.selectedPaymentPanel;
     if (!panel) {
       throw new Error("No validated payment panel is selected.");
@@ -412,7 +416,8 @@ export default class PaymentPage extends BasePage {
   }
 
   async placeOrder() {
-  await this.placeOrderButton.scrollIntoViewIfNeeded();
+    requirePaymentSubmitOptIn();
+    await this.placeOrderButton.scrollIntoViewIfNeeded();
 
   await this.page.waitForFunction(() => {
     const button = [...document.querySelectorAll("button")]

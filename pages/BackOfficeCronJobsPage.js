@@ -1,4 +1,7 @@
 import BackOfficePage from "./BackOfficePage";
+import destructiveGuards from "../utils/destructiveGuards";
+
+const { requireCronJobRunOptIn } = destructiveGuards;
 
 export default class BackOfficeCronJobsPage extends BackOfficePage {
   async openCronJobs() {
@@ -49,6 +52,7 @@ export default class BackOfficeCronJobsPage extends BackOfficePage {
   }
 
   async runCronJob() {
+    requireCronJobRunOptIn();
     const runAction = this.page.locator(
       'button[title="Run CronJob"]:visible'
     );

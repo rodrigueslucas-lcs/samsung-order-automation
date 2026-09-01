@@ -137,6 +137,10 @@ test.describe("ST2 - Base Store - Payment Page", () => {
   });
 
   test("@destructive TC58 - Customer able to complete order using one payment mode", async () => {
+    test.skip(
+      process.env.ALLOW_PAYMENT_SUBMIT !== "1",
+      "Set ALLOW_PAYMENT_SUBMIT=1 to authorize the single Place Order submit."
+    );
     test.setTimeout(300000);
 
     await paymentPage.selectCreditCard();

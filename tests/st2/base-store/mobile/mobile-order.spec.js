@@ -14,6 +14,10 @@ test.describe("ST2 - Base Store - Mobile Order Journey", () => {
    },
  });
  test("@destructive TC83 - Customer able to place an order using mobile browser", async ({ page }) => {
+   test.skip(
+     process.env.ALLOW_PAYMENT_SUBMIT !== "1",
+     "Set ALLOW_PAYMENT_SUBMIT=1 to authorize the single mobile Place Order submit."
+   );
    test.setTimeout(300000);
    const productPage = new ProductPage(page);
    const guestLoginPage = new GuestLoginPage(page);
