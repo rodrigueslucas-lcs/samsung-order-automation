@@ -42,6 +42,27 @@ test("MX-DISCOVERY TC14 @dst @mx @base-store - Homepage attributes", async ({ pa
   }
 });
 
+test("MX TC6 @dst @mx @base-store - Guest profile menu exposes account links", async ({ page, mxConfig }) => {
+  test.setTimeout(180000);
+  await page.goto(mxConfig.bootstrapUrl.toString(), { waitUntil: "domcontentloaded" });
+  await expect(page.getByText(/You can access pages now/i)).toBeVisible({ timeout: 60000 });
+  await page.goto(mxConfig.baseUrl.toString(), { waitUntil: "domcontentloaded" });
+
+  const profile = page.getByRole("button", { name: "My Profile" });
+  await profile.waitFor({ state: "visible", timeout: 60000 });
+  await profile.hover();
+
+  await expect(page.getByText(/Iniciar Sesi[oó]n\//i).filter({ visible: true })).toBeVisible();
+  await expect(page.getByText("Registrarme", { exact: true }).filter({ visible: true })).toBeVisible();
+  const myOrders = page.getByText("Mis pedidos", { exact: true }).filter({ visible: true });
+  await expect(myOrders).toBeVisible();
+  await expect(myOrders.locator("xpath=ancestor::a[1]")).toHaveAttribute(
+    "href",
+    /\/mx\/mypage\/orders$/i
+  );
+  expect(new URL(page.url()).hostname).toBe(mxConfig.hostname);
+});
+
 test("MX-DISCOVERY PDP @dst @mx @base-store - configured product is purchasable", async ({ page, mxConfig }) => {
   test.setTimeout(180000);
   await page.goto(mxConfig.bootstrapUrl.toString(), { waitUntil: "domcontentloaded" });
@@ -61,6 +82,15 @@ test("MX-DISCOVERY TC15 TC16 TC18 TC20 @dst @mx @base-store - Cart structure", a
   expect(summary.subtotal).toBeTruthy();
   expect(summary.total).toBeTruthy();
   await cart.validateCheckoutButton();
+});
+
+test("MX TC22 @dst @mx @base-store - Cart footer is visible", async ({ page, mxConfig }) => {
+  test.setTimeout(240000);
+  await openMxCart(page, mxConfig);
+  const footer = page.getByRole("contentinfo");
+  await footer.scrollIntoViewIfNeeded();
+  await expect(footer).toBeVisible({ timeout: 60000 });
+  expect(await footer.getByRole("link").filter({ visible: true }).count()).toBeGreaterThan(0);
 });
 
 test("MX-DISCOVERY TC17 @dst @mx @base-store - Cart quantity can change and restore", async ({ page, mxConfig }) => {
@@ -97,4 +127,16 @@ test("MX-DISCOVERY TC35 TC36 @dst @mx @base-store - Guest Contact step", async (
   await expect(page.getByRole("textbox", { name: "firstName" })).toBeVisible({ timeout: 60000 });
   await expect(page.getByRole("textbox", { name: "lastName" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "phone", exact: true })).toBeVisible();
+});
+
+test("MX TC61 checkout @dst @mx @base-store - Checkout Edit returns safely to Cart", async ({ page, mxConfig }) => {
+  test.setTimeout(240000);
+  const cart = await openMxCart(page, mxConfig);
+  await cart.proceedToCheckout();
+  const editCart = page.locator('a[href$="/mx/cart"]:visible').first();
+  await editCart.waitFor({ state: "visible", timeout: 60000 });
+  await editCart.click();
+  await page.waitForURL(/\/mx\/cart(?:[/?#]|$)/i, { timeout: 60000 });
+  expect(new URL(page.url()).hostname).toBe(mxConfig.hostname);
+  await expect(page.getByText(mxConfig.sku, { exact: true }).first()).toBeVisible({ timeout: 60000 });
 });
