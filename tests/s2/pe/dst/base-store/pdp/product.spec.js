@@ -1,6 +1,6 @@
 import { test } from "@playwright/test";
 
-import ProductPage from "../../../../pages/ProductPage";
+import ProductPage from "../../../../../../pages/ProductPage";
 
 test.describe("ST2 - Base Store - PDP", () => {
 

@@ -1,7 +1,7 @@
 import { test } from "@playwright/test";
-import ProductPage from "../../../../pages/ProductPage";
-import CartPage from "../../../../pages/CartPage";
-import GuestLoginPage from "../../../../pages/GuestLoginPage";
+import ProductPage from "../../../../../../pages/ProductPage";
+import CartPage from "../../../../../../pages/CartPage";
+import GuestLoginPage from "../../../../../../pages/GuestLoginPage";
 test.describe("ST2 - Base Store - Guest Login", () => {
 
  test("Guest checkout - invalid email validation", async ({ page }) => {

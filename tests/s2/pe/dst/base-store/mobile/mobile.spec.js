@@ -1,5 +1,5 @@
 import { test } from "@playwright/test";
-import HomePage from "../../../../pages/HomePage";
+import HomePage from "../../../../../../pages/HomePage";
 test.describe("ST2 - Base Store - Mobile Smoke", () => {
  test.use({
    viewport: {

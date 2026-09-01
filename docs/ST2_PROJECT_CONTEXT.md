@@ -104,11 +104,11 @@ The add-to-cart endpoint response is sufficient to continue to Cart; wait for SK
 
 ## Safe execution commands
 
-- Non-destructive smoke: `npx playwright test tests/st2/base-store/home/home.spec.js tests/st2/base-store/mobile/mobile.spec.js --project=chromium --workers=1 --headed`
-- Cart: `npx playwright test tests/st2/base-store/cart --project=chromium --workers=1 --headed`
+- Non-destructive smoke: `npx playwright test tests/s2/pe/dst/base-store/home/home.spec.js tests/s2/pe/dst/base-store/mobile/mobile.spec.js --project=chromium --workers=1 --headed`
+- Cart: `npx playwright test tests/s2/pe/dst/base-store/cart --project=chromium --workers=1 --headed`
 - Checkout pre-submit: `npx playwright test tests/st2/base-store/checkout/checkout.spec.js --project=chromium --workers=1 --headed`
 - Payment read-only: `npx playwright test tests/st2/base-store/payment/payment.spec.js --project=chromium --grep-invert "@destructive" --workers=1 --headed`
-- Mobile read-only: `npx playwright test tests/st2/base-store/mobile/mobile.spec.js --project=chromium --workers=1 --headed`
+- Mobile read-only: `npx playwright test tests/s2/pe/dst/base-store/mobile/mobile.spec.js --project=chromium --workers=1 --headed`
 - Full safe storefront regression: run the smoke, Cart, Checkout pre-submit, Payment read-only, PDP and Search groups explicitly; do not include order, auth, tracking-to-Production, provider-submit or BackOffice write specs.
 - Authenticated block after renewal: `npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js --project=chromium --workers=1 --headed`
 - TC12 with existing order: run the read-only authenticated profile spec against direct ST2 Orders with `AUTHENTICATED_ORDER_CODE=PE260826-74796841`; never follow the Production menu URL.

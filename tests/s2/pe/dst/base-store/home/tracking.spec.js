@@ -1,6 +1,6 @@
 import { test } from "@playwright/test";
-import GuestOrderTrackingPage from "../../../../pages/GuestOrderTrackingPage";
-import MailinatorPage from "../../../../pages/MailinatorPage";
+import GuestOrderTrackingPage from "../../../../../../pages/GuestOrderTrackingPage";
+import MailinatorPage from "../../../../../../pages/MailinatorPage";
 
 test.describe("ST2 - Base Store - Guest Order Tracking", () => {
   test("TC13 - Guest customer tracks an order with email OTP", async ({ page, context }, testInfo) => {

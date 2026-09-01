@@ -114,7 +114,7 @@ $env:ALLOW_PAYMENT_SUBMIT = "1"
 $env:VALIDATE_ORDER_EMAIL = "1"
 $env:MAILINATOR_INBOX = "s2tc63-MMDD-HHmm"
 $env:STOREFRONT_GUEST_EMAIL = "$env:MAILINATOR_INBOX@mailinator.com"
-npx playwright test tests/st2/base-store/smoke/guest-checkout.spec.js --project=chromium --grep "optional TC63 email validation" --workers=1 --headed
+npx playwright test tests/s2/pe/dst/base-store/smoke/guest-checkout.spec.js --project=chromium --grep "optional TC63 email validation" --workers=1 --headed
 ```
 
 ## Useful commands
@@ -123,10 +123,10 @@ All commands use real Chrome from `playwright.config.js`.
 
 ```powershell
 # A. Non-destructive smoke
-npx playwright test tests/st2/base-store/home/home.spec.js tests/st2/base-store/mobile/mobile.spec.js tests/st2/base-store/guest-login/guest-login.spec.js --project=chromium --workers=1 --headed
+npx playwright test tests/s2/pe/dst/base-store/home/home.spec.js tests/s2/pe/dst/base-store/mobile/mobile.spec.js tests/s2/pe/dst/base-store/guest-login/guest-login.spec.js --project=chromium --workers=1 --headed
 
 # B. Cart (ephemeral cart mutations only; TC59 is not in this group)
-npx playwright test tests/st2/base-store/cart --project=chromium --workers=1 --headed
+npx playwright test tests/s2/pe/dst/base-store/cart --project=chromium --workers=1 --headed
 
 # C. Checkout pre-submit
 npx playwright test tests/st2/base-store/checkout/checkout.spec.js --project=chromium --workers=1 --headed
@@ -135,10 +135,10 @@ npx playwright test tests/st2/base-store/checkout/checkout.spec.js --project=chr
 npx playwright test tests/st2/base-store/payment/payment.spec.js --project=chromium --grep-invert "@destructive" --workers=1 --headed
 
 # E. Mobile read-only
-npx playwright test tests/st2/base-store/mobile/mobile.spec.js --project=chromium --workers=1 --headed
+npx playwright test tests/s2/pe/dst/base-store/mobile/mobile.spec.js --project=chromium --workers=1 --headed
 
 # F. Full safe storefront regression
-npx playwright test tests/st2/base-store/home/home.spec.js tests/st2/base-store/mobile/mobile.spec.js tests/st2/base-store/guest-login/guest-login.spec.js tests/st2/base-store/pdp/product.spec.js tests/st2/base-store/pdp/pdp.spec.js tests/st2/base-store/cart tests/st2/base-store/checkout/checkout.spec.js tests/st2/base-store/payment/payment.spec.js --project=chromium --grep-invert "@destructive" --workers=1 --headed
+npx playwright test tests/s2/pe/dst/base-store/home/home.spec.js tests/s2/pe/dst/base-store/mobile/mobile.spec.js tests/s2/pe/dst/base-store/guest-login/guest-login.spec.js tests/s2/pe/dst/base-store/pdp/product.spec.js tests/s2/pe/dst/base-store/pdp/pdp.spec.js tests/s2/pe/dst/base-store/cart tests/st2/base-store/checkout/checkout.spec.js tests/st2/base-store/payment/payment.spec.js --project=chromium --grep-invert "@destructive" --workers=1 --headed
 
 # G. Authenticated block after manual renewal
 npm run auth:verify
@@ -146,7 +146,7 @@ npx playwright test tests/st2/base-store/checkout/authenticated-checkout.spec.js
 
 # H. TC12 with existing order (read-only direct ST2 route)
 $env:AUTHENTICATED_ORDER_CODE="PE260826-74796841"
-npx playwright test tests/st2/base-store/profile/authenticated-profile.spec.js --project=chromium --grep "TC12 -" --workers=1 --headed
+npx playwright test tests/s2/pe/dst/base-store/profile/authenticated-profile.spec.js --project=chromium --grep "TC12 -" --workers=1 --headed
 
 # I. BackOffice read-only, future use with runtime staging credentials
 npx playwright test tests/st2/backoffice/backoffice.spec.js --project=chromium --grep "TC64|TC65|TC66|TC69|TC71" --workers=1 --headed

@@ -1,12 +1,12 @@
 const { test } = require("@playwright/test");
-const HomePage = require("../../../../pages/HomePage").default;
+const HomePage = require("../../../../../../pages/HomePage").default;
 const {
  AUTH_STATE_PATH,
  hasAuthState,
  applyAuthSessionStorage,
  validateAuthenticatedSession,
  validateCurrentPageAuthenticated,
-} = require("../../../../utils/authState");
+} = require("../../../../../../utils/authState");
 const AUTH_REQUIRED = "Authenticated storefront state required. Run auth bootstrap first.";
 test.describe("ST2 - Base Store - Registered Customer", () => {
  test.use({

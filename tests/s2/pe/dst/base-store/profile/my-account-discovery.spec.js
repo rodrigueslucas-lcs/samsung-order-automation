@@ -1,7 +1,7 @@
 import { test } from "@playwright/test";
-import MyAccountPage from "../../../../pages/MyAccountPage";
-import ProfilePage from "../../../../pages/ProfilePage";
-import authState from "../../../../utils/authState";
+import MyAccountPage from "../../../../../../pages/MyAccountPage";
+import ProfilePage from "../../../../../../pages/ProfilePage";
+import authState from "../../../../../../utils/authState";
 
 const { AUTH_STATE_PATH, applyAuthSessionStorage, hasAuthState, validateAuthenticatedSession } = authState;
 

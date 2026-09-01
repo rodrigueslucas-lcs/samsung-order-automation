@@ -1,11 +1,11 @@
 import { test } from "@playwright/test";
-import ProductPage from "../../../../pages/ProductPage";
-import GuestLoginPage from "../../../../pages/GuestLoginPage";
-import CartPage from "../../../../pages/CartPage";
-import CheckoutPage from "../../../../pages/CheckoutPage";
-import PaymentPage from "../../../../pages/PaymentPage";
-import OrderConfirmationPage from "../../../../pages/OrderConfirmationPage";
-import { testData } from "../../../../utils/testData";
+import ProductPage from "../../../../../../pages/ProductPage";
+import GuestLoginPage from "../../../../../../pages/GuestLoginPage";
+import CartPage from "../../../../../../pages/CartPage";
+import CheckoutPage from "../../../../../../pages/CheckoutPage";
+import PaymentPage from "../../../../../../pages/PaymentPage";
+import OrderConfirmationPage from "../../../../../../pages/OrderConfirmationPage";
+import { testData } from "../../../../../../utils/testData";
 test.describe("ST2 - Base Store - Mobile Order Journey", () => {
  test.use({
    viewport: {

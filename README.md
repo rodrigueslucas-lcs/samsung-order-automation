@@ -20,11 +20,11 @@ Chile (`CL`) and Colombia (`CO`) are planned target countries only. No CL or CO 
 Current implementations include:
 
 - MX S1 DST Base Store and read-only BackOffice wrappers under the country-scoped structure.
-- PE DST Base Store, EPP and BackOffice coverage under the existing legacy `tests/st2` structure.
+- PE DST Base Store is partially normalized under `tests/s2/pe/dst/base-store`, while checkout/payment and BackOffice remain under legacy `tests/st2` paths; PE EPP is normalized under `tests/s2/pe/dst/epp`.
 - PE QST Base Store and EPP discovery under the existing legacy `tests/st2/qst` structure.
 - PE fulfillment evidence that may execute against S3 through explicit BackOffice environment configuration.
 
-`ST2` remains in existing Peru paths, test names and historical documentation. It represents the current legacy naming used by the repository; normalization to the `s2/pe/...` convention is pending and must be performed incrementally without rewriting execution evidence.
+`ST2` remains in legacy Peru checkout/payment, BackOffice and QST paths, test names and historical documentation. It represents the repository's historical naming; normalization to the `s2/pe/...` convention is incremental and does not rewrite execution evidence.
 
 ## Coverage
 
@@ -97,7 +97,7 @@ tests/
         base-store/                 MX S1 DST storefront and checkout specs
         backoffice/                 MX S1 DST BackOffice specs
   st2/                              Legacy PE environment/path naming
-    base-store/                     Current PE DST storefront specs
+    base-store/                     Legacy PE DST checkout/payment specs still pending migration
     backoffice/                     Current PE DST BackOffice and fulfillment specs
     qst/
       base-store/                   PE QST Base Store specs
@@ -105,7 +105,7 @@ tests/
   s2/
     pe/
       dst/
-        base-store/search/          Normalized PE DST Search path
+        base-store/                 Normalized PE DST Home, PDP, Cart, Guest Login, Profile, Mobile, Smoke and Search paths
         epp/                        Guarded PE DST EPP wrappers
 fixtures/                           Synthetic QA test data
 utils/                              Configuration, auth, safety and reporting helpers
@@ -113,7 +113,7 @@ scripts/                            Authentication bootstrap and QST execution h
 docs/                               Coverage, discovery and operational documentation
 ```
 
-Only the already-modern PE DST Search and EPP areas have been normalized. Do not assume that legacy `tests/st2/base-store`, `tests/st2/backoffice` or `tests/st2/qst` has already moved under `tests/s2/pe`.
+PE DST Search, Home, PDP, Cart, Guest Login, Profile, Mobile, Smoke and EPP are normalized. Checkout/payment, BackOffice and QST remain on legacy `tests/st2` paths and must not be assumed migrated.
 
 ### Target convention
 
@@ -168,7 +168,7 @@ npx playwright test tests/s1/mx/dst/base-store --project=chromium --workers=1 --
 npx playwright test tests/s1/mx/dst/backoffice --project=chromium --workers=1
 ```
 
-PE commands continue to use compatibility paths while the legacy structure is migrated.
+PE commands continue to collect both normalized and compatibility paths while checkout/payment, BackOffice and QST remain under the legacy structure.
 
 ## Authentication
 

@@ -1,13 +1,13 @@
 import { test } from "@playwright/test";
-import ProductPage from "../../../../pages/ProductPage";
-import CartPage from "../../../../pages/CartPage";
-import CheckoutPage from "../../../../pages/CheckoutPage";
-import PaymentPage from "../../../../pages/PaymentPage";
-import OrderConfirmationPage from "../../../../pages/OrderConfirmationPage";
-import ProfilePage from "../../../../pages/ProfilePage";
-import MyOrdersPage from "../../../../pages/MyOrdersPage";
-import authState from "../../../../utils/authState";
-import { testData } from "../../../../utils/testData";
+import ProductPage from "../../../../../../pages/ProductPage";
+import CartPage from "../../../../../../pages/CartPage";
+import CheckoutPage from "../../../../../../pages/CheckoutPage";
+import PaymentPage from "../../../../../../pages/PaymentPage";
+import OrderConfirmationPage from "../../../../../../pages/OrderConfirmationPage";
+import ProfilePage from "../../../../../../pages/ProfilePage";
+import MyOrdersPage from "../../../../../../pages/MyOrdersPage";
+import authState from "../../../../../../utils/authState";
+import { testData } from "../../../../../../utils/testData";
 
 const {
   AUTH_STATE_PATH,

@@ -1,14 +1,14 @@
 import { test, expect } from "@playwright/test";
 
-import ProductPage from "../../../../pages/ProductPage";
-import GuestLoginPage from "../../../../pages/GuestLoginPage";
-import CartPage from "../../../../pages/CartPage";
-import CheckoutPage from "../../../../pages/CheckoutPage";
-import PaymentPage from "../../../../pages/PaymentPage";
-import OrderConfirmationPage from "../../../../pages/OrderConfirmationPage";
-import MailinatorPage from "../../../../pages/MailinatorPage";
+import ProductPage from "../../../../../../pages/ProductPage";
+import GuestLoginPage from "../../../../../../pages/GuestLoginPage";
+import CartPage from "../../../../../../pages/CartPage";
+import CheckoutPage from "../../../../../../pages/CheckoutPage";
+import PaymentPage from "../../../../../../pages/PaymentPage";
+import OrderConfirmationPage from "../../../../../../pages/OrderConfirmationPage";
+import MailinatorPage from "../../../../../../pages/MailinatorPage";
 
-import { testData } from "../../../../utils/testData";
+import { testData } from "../../../../../../utils/testData";
 
 const VALIDATE_ORDER_EMAIL = process.env.VALIDATE_ORDER_EMAIL === "1";
 
