@@ -1,0 +1,14 @@
+# EPP External Dependencies
+
+Only dependencies that cannot be resolved from the repository are listed here.
+
+| Dependency | Why it blocks automation | Exact information/access required | Related TCs | Priority | Current evidence | Status |
+|---|---|---|---|---|---|---|
+| Peru EPP staging entry and store identifiers | No EPP page can be opened safely, so DOM/API compatibility cannot be tested | Exact non-Production URL, program variant, Site UID and Base Store UID | QST EPP 01-22; DST EPP TC01-TC59 | P0 | Known ST2 employee paths attempt to leave staging for Production | Open |
+| EPP entitlement/bootstrap | Base Store authentication does not expose EPP and eligibility cannot be inferred | QA EPP account plus documented entitlement assignment; identify SSO, employee domain/ID, campaign, special cookie or VPN requirement if applicable | QST EPP 01-17; DST EPP TC01-TC46, TC59 | P0 | Current Samsung Account is valid only for Base Store; no EPP entry appears | Open |
+| Stable EPP product mass | Product, cart, service and checkout behavior cannot be validated without eligible catalog items | Current EPP smoke SKU, CE SKU, IM SKU, Trade-In SKU, SC+ SKU and one SKU eligible for both services | QST EPP 02-14,16; DST EPP TC11-TC45, TC59 | P0 | Base Store SKUs are not evidence of EPP eligibility | Open |
+| EPP payment configuration | A safe order cannot be created without knowing supported staging providers | Current EPP payment-mode codes, limits/test data and recommended smoke provider | QST EPP 13-17; DST EPP TC38-TC46, TC58-TC59 | P1 | Base Store modes differ over time and Pago Efectivo previously returned a functional error for registered Base Store | Open |
+| EPP QA inbox/template | Email and email-login scenarios require a causal EPP order and correlatable recipient | Approved synthetic/shared QA inbox and current EPP acknowledgment/payment templates/CTA behavior | QST EPP 17; DST EPP TC02, TC46 | P1 | Mailinator helper exists, but no EPP email has been observed | Open |
+| EPP BackOffice mapping | Existing S1/S2/S3 access cannot be assumed to contain EPP orders | Exact environment/URL, order discriminator/type and runtime CS/Admin authorities | QST EPP 18-22; DST EPP TC47-TC57 | P1 | No EPP order or BackOffice mapping exists in repo evidence | Open |
+| Safe EPP cancellation and fulfillment mass | Cancellation/CronJobs are state-changing and require causal, disposable staging data | Disposable cancelable order; Waiting for Send Financial and Order Split orders; expected transition ownership | QST EPP 20-22; DST EPP TC50, TC53-TC57 | P2 | Existing S1 Base Store scan found only COMPLETED orders; not evidence for EPP | Open |
+| EPP job codes | Running Base Store Peru jobs against an unknown EPP flow is unsafe | Exact EPP financial-initial and warehouse-transfer CronJob codes/prefixes | QST EPP 20-21; DST EPP TC54, TC56 | P2 | Existing `pe-toko*` jobs are proven for other staging flows only | Open |

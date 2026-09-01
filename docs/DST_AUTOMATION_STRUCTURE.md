@@ -14,10 +14,14 @@ tests/st2/base-store/
   payment/
   pdp/
   profile/
-  search/
   smoke/
 tests/st2/backoffice/
+tests/st2/dst/base-store/
+  search/
+tests/st2/dst/epp/
 ```
+
+`tests/st2/dst/epp/` contains guarded thin EPP wrappers. `search/` is the completed Base Store migration pilot; the remaining Base Store and BackOffice paths stay incremental.
 
 QST is already separate under `tests/st2/qst/`. Page Objects in `pages/`, fixtures and utilities remain shared infrastructure and must not be copied into either suite.
 
@@ -27,6 +31,7 @@ QST is already separate under `tests/st2/qst/`. Page Objects in `pages/`, fixtur
 tests/st2/
   dst/
     base-store/
+    epp/
     backoffice/
   qst/
     base-store/
@@ -39,11 +44,20 @@ A big-bang move would change every relative import depth in the DST specs and in
 
 ## Incremental plan
 
-1. Add explicit `dst:*` npm commands pointing at the current paths, without moving files.
+1. ✅ Add explicit `dst:*` npm commands pointing at the current paths, without moving files.
 2. Identify external CI/Confluence commands that reference `tests/st2/base-store` or `tests/st2/backoffice`.
-3. Move one low-coupling DST area, such as `search/`, into `tests/st2/dst/base-store/` and update only its imports and commands.
-4. Validate `playwright --list` plus that area's tests.
+3. ✅ Move the low-coupling `search/` area into `tests/st2/dst/base-store/` and update its import and runner paths.
+4. ✅ Validate discovery plus the moved test. The test is collected correctly; its headed regression reached a blank ST2 document and failed before the search control, an environment load failure rather than an import/migration failure.
 5. Repeat by logical area; move BackOffice last because its environment commands and discovery documentation are widely referenced.
 6. Remove compatibility paths only after all consumers use `tests/st2/dst`.
 
-No DST files are moved in this QST expansion round. This preserves the committed 83-case suite and keeps the current work focused on QST evidence.
+The Search pilot is the only legacy DST move in this round. The new EPP folder uses the target layout immediately, while the rest of Base Store and BackOffice remains incremental.
+
+## Current commands
+
+```bash
+npm run dst:base-store
+npm run dst:backoffice
+npm run dst:epp
+npm run dst:list
+```

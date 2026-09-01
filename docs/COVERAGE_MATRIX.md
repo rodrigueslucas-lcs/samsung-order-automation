@@ -10,7 +10,7 @@
 | Scope | Total | Automated | Partial | Blocked | Not Applicable | Pending |
 |---|---:|---:|---:|---:|---:|---:|
 | Base Store | 83 | 63 | 9 | 9 | 2 | 0 |
-| EPP | ~60 | 0 | 0 | 0 | 0 | ~60 |
+| EPP | 59 | 0 | 0 | 18 | 0 | 41* |
 
 ### Status Legend
 
@@ -124,4 +124,4 @@
 
 ## EPP
 
-> EPP Detailed Smoke coverage will use the same status model. The official EPP scenarios will be added here preserving their Confluence names and order.
+> DST EPP is now tracked independently in [DST_EPP_COVERAGE_MATRIX.md](DST_EPP_COVERAGE_MATRIX.md). The 41 entries shown as Pending here correspond to `Reusable - needs EPP wrapper` in that dedicated matrix; none is Automated. Historic manual Pass is not current automation evidence.

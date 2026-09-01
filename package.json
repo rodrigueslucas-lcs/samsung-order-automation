@@ -9,6 +9,7 @@
     "auth:verify": "node scripts/auth-verify.cjs",
     "dst:base-store": "playwright test tests/st2/base-store tests/st2/dst/base-store --project=chromium --workers=1",
     "dst:backoffice": "playwright test tests/st2/backoffice --project=chromium --workers=1",
+    "dst:epp": "playwright test tests/st2/dst/epp --project=chromium --workers=1",
     "dst:list": "playwright test tests/st2/base-store tests/st2/backoffice tests/st2/dst/base-store tests/st2/dst/epp --project=chromium --list",
     "qst:normal": "node scripts/qst-run.cjs normal",
     "qst:modified": "node scripts/qst-run.cjs modified",

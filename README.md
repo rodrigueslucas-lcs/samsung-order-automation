@@ -16,10 +16,13 @@ npx playwright test tests/st2/backoffice --project=chromium --workers=1
 npx playwright test --grep "TC<number>" --project=chromium --workers=1
 npm run dst:base-store
 npm run dst:backoffice
+npm run dst:epp
 npm run dst:list
 ```
 
 Detailed status and evidence: [DST Coverage Matrix](docs/COVERAGE_MATRIX.md). DST currently uses the paths above; migration to `tests/st2/dst/` remains planned and incremental.
+
+DST EPP is tracked independently in the [DST EPP Coverage Matrix](docs/DST_EPP_COVERAGE_MATRIX.md). Its 59 historical manual Pass results are reuse context, not current automation evidence; a guarded staging bootstrap is ready for the real EPP environment configuration.
 
 ## QST — Quick Smoke Test
 
@@ -44,6 +47,7 @@ tests/
   st2/
     base-store/         Current DST storefront specs
     backoffice/         Current DST BackOffice specs
+    dst/epp/            Guarded DST EPP staging bootstrap
     qst/
       base-store/       QST Base Store specs
       epp/              QST EPP safe staging discovery and future specs
@@ -87,7 +91,7 @@ npx playwright test --grep "TC<number>" --project=chromium --workers=1
 npx playwright show-report
 ```
 
-There are no `dst:*` npm scripts yet; current DST execution uses the explicit paths documented in the DST section.
+The `dst:*` scripts preserve the legacy Base Store/BackOffice paths while new DST EPP work starts under the target `tests/st2/dst/epp/` structure.
 
 ## Samsung Account authentication
 
@@ -171,7 +175,9 @@ Playwright reports, traces, screenshots, auth state and browser profiles are loc
 ## Documentation
 
 - [DST Coverage](docs/COVERAGE_MATRIX.md)
+- [DST EPP Coverage](docs/DST_EPP_COVERAGE_MATRIX.md)
 - [QST Coverage](docs/QST_COVERAGE_MATRIX.md)
 - [QST Automation Guide](docs/QST_AUTOMATION_GUIDE.md)
 - [DST Automation Structure](docs/DST_AUTOMATION_STRUCTURE.md)
 - [Office QA Handoff](docs/OFFICE_QA_HANDOFF.md)
+- [Documentation index](docs/README.md)
