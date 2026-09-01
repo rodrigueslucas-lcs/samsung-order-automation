@@ -1,15 +1,32 @@
 import BasePage from './BasePage';
 
 export default class ProductPage extends BasePage {
-  constructor(page) {
+  constructor(page, options = {}) {
     super(page);
 
-    this.cookieUrl = 'https://stg2.shop.samsung.com/getcookie.html';
+    this.cookieUrl = options.setupUrl === undefined
+      ? 'https://stg2.shop.samsung.com/getcookie.html'
+      : options.setupUrl;
+    this.sku = options.sku || 'RB45DG6300B1PE';
+    this.pdpUrl = options.pdpUrl || null;
 
     this.addToCartUrl =
       'https://stg2.shop.samsung.com/pe/ng/p4v1/addToCart?products[0].productCode=RB45DG6300B1PE&products[0].quantity=1&callback=jQuery111305177703263619047_1595407056965&_=1595407056969';
 
-    this.cartUrl = 'https://stg2.shop.samsung.com/pe/cart';
+    this.cartUrl = options.cartUrl || 'https://stg2.shop.samsung.com/pe/cart';
+  }
+
+  async addConfiguredPdpToCart() {
+    if (!this.pdpUrl) throw new Error('A configured PDP URL is required.');
+    await this.safeGoto(this.pdpUrl);
+    const addButton = this.page
+      .getByRole('button', { name: /Agregar al carrito|Add to cart|Add to basket/i })
+      .filter({ visible: true })
+      .first();
+    await addButton.waitFor({ state: 'visible', timeout: 60000 });
+    await addButton.click();
+    await this.safeGoto(this.cartUrl);
+    await this.waitForCartSkus([this.sku]);
   }
 
   async validateProductLoaded() {

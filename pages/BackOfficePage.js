@@ -11,7 +11,8 @@ const BACKOFFICE_URLS = {
   s3: "https://backoffice.cnmzsgcaar-samsunge12-s3-public.model-t.cc.commerce.ondemand.com/backoffice/",
 };
 
-export function getBackOfficeUrl() {
+export function getBackOfficeUrl(explicitUrl) {
+  if (explicitUrl) return explicitUrl;
   if (process.env.BACKOFFICE_URL) return process.env.BACKOFFICE_URL;
 
   const environment = (process.env.BACKOFFICE_ENV || "s2").toLowerCase();
@@ -25,10 +26,10 @@ export function getBackOfficeUrl() {
 }
 
 export default class BackOfficePage extends BasePage {
-  constructor(page) {
+  constructor(page, options = {}) {
     super(page);
 
-    this.url = getBackOfficeUrl();
+    this.url = getBackOfficeUrl(options.url);
   }
 
   async login({ username, password, authority }) {

@@ -14,6 +14,9 @@ DST tracks 83 Base Store scenarios: 63 Automated, 9 Partial, 9 Blocked and 2 Not
 npx playwright test tests/st2/base-store --project=chromium --workers=1
 npx playwright test tests/st2/backoffice --project=chromium --workers=1
 npx playwright test --grep "TC<number>" --project=chromium --workers=1
+npm run dst:base-store
+npm run dst:backoffice
+npm run dst:list
 ```
 
 Detailed status and evidence: [DST Coverage Matrix](docs/COVERAGE_MATRIX.md). DST currently uses the paths above; migration to `tests/st2/dst/` remains planned and incremental.
@@ -28,6 +31,7 @@ npm run qst:modified
 npm run qst:sanity
 npm run qst:base-store
 npm run qst:epp
+npm run qst:list
 ```
 
 Detailed status and execution guidance: [QST Coverage Matrix](docs/QST_COVERAGE_MATRIX.md) and [QST Automation Guide](docs/QST_AUTOMATION_GUIDE.md).

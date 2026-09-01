@@ -16,23 +16,7 @@ test.describe("ST2 - Base Store - Cart Page", () => {
 
     await cartPage.validateProductInCart();
 
-    const quantity = page.getByRole("textbox", { name: "Quantity" });
-    const plusButton = page.getByRole("button", { name: "+" });
-    const minusButton = page.getByRole("button", { name: "-" });
-
-    await expect(quantity).toHaveValue("1");
-
-    await plusButton.click();
-
-    await expect(quantity).toHaveValue("2", {
-      timeout: 30000,
-    });
-
-    await minusButton.click();
-
-    await expect(quantity).toHaveValue("1", {
-      timeout: 30000,
-    });
+    await cartPage.validateQuantityCanChange();
   });
 
 

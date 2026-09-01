@@ -1,28 +1,34 @@
 import BasePage from './BasePage';
 
 export default class CartPage extends BasePage {
-  constructor(page) {
+  constructor(page, options = {}) {
     super(page);
 
-    this.cartUrl = 'https://stg2.shop.samsung.com/pe/cart';
+    this.cartUrl = options.cartUrl || 'https://stg2.shop.samsung.com/pe/cart';
+    this.sku = options.sku || 'RB45DG6300B1PE';
 
-    this.continueButton = page.getByRole('button', { name: /^continuar$/i });
-
-    this.cartPageTitle = page.getByText(/Tienes 1 producto en tu carrito/i);
-    this.cartProductSku = page.getByText('RB45DG6300B1PE', { exact: true });
-    this.cartProductName = page.getByRole('heading', {
-      name: /Refrigeradora Bottom Freezer/i
+    this.continueButton = page.getByRole('button', {
+      name: options.checkoutButtonPattern || /^continuar$/i
     });
 
+    this.cartPageTitle = page.getByText(/Tienes 1 producto en tu carrito/i);
+    this.cartProductSku = page.getByText(this.sku, { exact: true });
+    this.cartProductName = options.productNamePattern === null
+      ? null
+      : page.getByRole('heading', {
+        name: options.productNamePattern || /Refrigeradora Bottom Freezer/i
+      });
+
     this.orderSummaryTitle = page.getByRole('heading', {
-      name: /Resumen de la orden/i
+      name: options.orderSummaryPattern || /Resumen de la orden/i
     });
 
     this.subtotalLabel = page.getByText('Subtotal', { exact: true });
 
     this.totalTitle = page.getByRole('heading', {
-      name: /^Total$/i
+      name: options.totalPattern || /^Total$/i
     });
+    this.currencyPattern = options.currencyPattern || /S\/\s*[\d,.]+/;
   }
 
   async openCart() {
@@ -31,7 +37,8 @@ export default class CartPage extends BasePage {
   }
 
   async validateCartPage() {
-    await this.page.waitForURL(/\/pe\/cart/, {
+    const expectedPath = new URL(this.cartUrl).pathname;
+    await this.page.waitForURL((url) => url.pathname === expectedPath, {
       timeout: 30000
     });
 
@@ -45,9 +52,35 @@ export default class CartPage extends BasePage {
 
   async validateProductInCart() {
     await this.cartProductSku.waitFor({ state: 'visible', timeout: 30000 });
-    await this.cartProductName.waitFor({ state: 'visible', timeout: 30000 });
+    if (this.cartProductName) {
+      await this.cartProductName.waitFor({ state: 'visible', timeout: 30000 });
+    }
 
     await this.screenshot('02-cart-validation');
+  }
+
+  async validateQuantityCanChange() {
+    const quantity = this.page.getByRole('textbox', { name: 'Quantity' });
+    const plusButton = this.page.getByRole('button', { name: '+', exact: true });
+    const minusButton = this.page.getByRole('button', { name: '-', exact: true });
+    await quantity.waitFor({ state: 'visible', timeout: 30000 });
+    const initial = await quantity.inputValue();
+    await plusButton.click();
+    await this.waitForQuantityValue(quantity, String(Number(initial) + 1));
+    await minusButton.click();
+    await this.waitForQuantityValue(quantity, initial);
+  }
+
+  async waitForQuantityValue(quantity, expected, timeout = 30000) {
+    const deadline = Date.now() + timeout;
+    let actual = await quantity.inputValue();
+    while (actual !== expected && Date.now() < deadline) {
+      await this.page.waitForTimeout(200);
+      actual = await quantity.inputValue();
+    }
+    if (actual !== expected) {
+      throw new Error(`Cart quantity was ${actual}; expected ${expected}.`);
+    }
   }
 
   async validateOrderSummary() {
@@ -72,8 +105,8 @@ export default class CartPage extends BasePage {
     const subtotalText = await subtotalContainer.textContent();
     const totalText = await totalContainer.textContent();
 
-    const subtotal = subtotalText?.match(/S\/\s*[\d,.]+/)?.[0];
-    const total = totalText?.match(/S\/\s*[\d,.]+/)?.[0];
+    const subtotal = subtotalText?.match(this.currencyPattern)?.[0];
+    const total = totalText?.match(this.currencyPattern)?.[0];
 
     await this.screenshot('cart-order-summary');
 

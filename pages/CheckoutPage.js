@@ -310,7 +310,7 @@ export default class CheckoutPage extends BasePage {
     await this.screenshot("checkout-login-option");
   }
 
-  async validateCheckoutProductSummary() {
+  async validateCheckoutProductSummary({ sku } = {}) {
     await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
       timeout: 30000,
     });
@@ -319,28 +319,28 @@ export default class CheckoutPage extends BasePage {
       .getByText(/Tienes 1 producto en tu carrito/i)
       .first();
 
-    const productName = this.page.getByRole("heading", {
-      name: /Refrigeradora Bottom Freezer 409L Black/i,
-    }).first();
-
-    const productColor = this.page
-      .getByText("Black Doi", { exact: true })
-      .first();
+    const productEvidence = sku
+      ? this.page.getByText(sku, { exact: true }).first()
+      : this.page.getByRole("heading", {
+        name: /Refrigeradora Bottom Freezer 409L Black/i,
+      }).first();
+    const productColor = sku
+      ? null
+      : this.page.getByText("Black Doi", { exact: true }).first();
 
     await cartQuantity.waitFor({
       state: "visible",
       timeout: 30000,
     });
 
-    await productName.waitFor({
+    await productEvidence.waitFor({
       state: "visible",
       timeout: 30000,
     });
 
-    await productColor.waitFor({
-      state: "visible",
-      timeout: 30000,
-    });
+    if (productColor) {
+      await productColor.waitFor({ state: "visible", timeout: 30000 });
+    }
 
     await this.screenshot("checkout-product-summary");
   }

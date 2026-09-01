@@ -1,11 +1,14 @@
 import BasePage from "./BasePage";
 
 export default class HomePage extends BasePage {
-  constructor(page) {
+  constructor(page, options = {}) {
     super(page);
 
-    this.setupUrl = "https://stg2.shop.samsung.com/getcookie.html";
-    this.homeUrl = "https://stg2.shop.samsung.com/pe/";
+    this.setupUrl = options.setupUrl === undefined
+      ? "https://stg2.shop.samsung.com/getcookie.html"
+      : options.setupUrl;
+    this.homeUrl = options.homeUrl || "https://stg2.shop.samsung.com/pe/";
+    this.footerHeadingPattern = options.footerHeadingPattern || "Tienda";
 
     this.header = page.getByRole("banner");
     this.footer = page.getByRole("contentinfo");
@@ -13,14 +16,12 @@ export default class HomePage extends BasePage {
   }
 
   async openHome() {
-    await this.page.goto(this.setupUrl);
-
-    await this.page
-      .getByText(/You can access pages now/i)
-      .waitFor({
-        state: "visible",
-        timeout: 60000,
-      });
+    if (this.setupUrl) {
+      await this.page.goto(this.setupUrl);
+      await this.page
+        .getByText(/You can access pages now/i)
+        .waitFor({ state: "visible", timeout: 60000 });
+    }
 
     await this.page.goto(this.homeUrl);
 
@@ -88,7 +89,7 @@ export default class HomePage extends BasePage {
     await this.footer.scrollIntoViewIfNeeded();
 
     await this.footer
-      .getByRole("heading", { name: "Tienda" })
+      .getByRole("heading", { name: this.footerHeadingPattern })
       .waitFor({
         state: "visible",
         timeout: 30000,

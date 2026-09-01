@@ -7,11 +7,15 @@
     "auth:open-profile": "node scripts/auth-open-profile.cjs",
     "auth:export": "node scripts/auth-bootstrap.cjs",
     "auth:verify": "node scripts/auth-verify.cjs",
+    "dst:base-store": "playwright test tests/st2/base-store tests/st2/dst/base-store --project=chromium --workers=1",
+    "dst:backoffice": "playwright test tests/st2/backoffice --project=chromium --workers=1",
+    "dst:list": "playwright test tests/st2/base-store tests/st2/backoffice tests/st2/dst/base-store tests/st2/dst/epp --project=chromium --list",
     "qst:normal": "node scripts/qst-run.cjs normal",
     "qst:modified": "node scripts/qst-run.cjs modified",
     "qst:sanity": "node scripts/qst-run.cjs sanity",
     "qst:base-store": "node scripts/qst-run.cjs normal base-store",
-    "qst:epp": "node scripts/qst-run.cjs normal epp"
+    "qst:epp": "node scripts/qst-run.cjs normal epp",
+    "qst:list": "playwright test tests/st2/qst --project=chromium --list"
   },
   "keywords": [],
   "author": "",

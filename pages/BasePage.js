@@ -4,13 +4,20 @@ export default class BasePage {
   }
 
   async screenshot(name) {
-    await this.page.screenshot({
-      path: `evidence/screenshots/${name}.png`,
-      fullPage: true
-    });
+    const path = `evidence/screenshots/${name}.png`;
+
+    try {
+      await this.page.screenshot({ path, fullPage: true, timeout: 30000, animations: "disabled" });
+    } catch (error) {
+      if (!/screenshot.*timeout|timeout.*screenshot/i.test(error.message)) {
+        throw error;
+      }
+
+      await this.page.screenshot({ path, fullPage: false, timeout: 30000, animations: "disabled" });
+    }
   }
 
- async waitForPageLoad() {
-  await this.page.waitForLoadState('domcontentloaded');
-}
+  async waitForPageLoad() {
+    await this.page.waitForLoadState("domcontentloaded");
+  }
 }
