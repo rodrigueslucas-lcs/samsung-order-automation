@@ -5,7 +5,6 @@
 The existing DST suite is the 83-case ST2 Peru automation currently stored under:
 
 ```text
-tests/st2/backoffice/
 tests/s2/pe/dst/base-store/
   cart/
   checkout/
@@ -18,9 +17,10 @@ tests/s2/pe/dst/base-store/
   search/
   smoke/
 tests/s2/pe/dst/epp/
+tests/s2/pe/dst/backoffice/
 ```
 
-`tests/s2/pe/dst/epp/` contains guarded thin EPP wrappers. The complete PE DST Base Store now uses the country-scoped target convention; BackOffice remains incremental.
+`tests/s2/pe/dst/epp/` contains guarded thin EPP wrappers. PE DST Base Store and BackOffice now use the country-scoped target convention; fulfillment evidence remains explicitly S3.
 
 QST is already separate under `tests/st2/qst/`. Page Objects in `pages/`, fixtures and utilities remain shared infrastructure and must not be copied into either suite.
 
@@ -49,10 +49,10 @@ A big-bang move would change every relative import depth in the DST specs and in
 4. ✅ Validate discovery plus the moved test. The test is collected correctly; its headed regression reached a blank ST2 document and failed before the search control, an environment load failure rather than an import/migration failure.
 5. ✅ Move Home, PDP, Cart, Guest Login, Profile, Mobile and Smoke by logical area.
 6. ✅ Move Checkout and Payment, validate guarded submit specs by list only, and remove the legacy Base Store collection path.
-7. Move BackOffice last because its environment commands and discovery documentation are widely referenced.
-8. Remove remaining compatibility paths only after BackOffice and QST consumers use country-scoped paths.
+7. ✅ Move BackOffice last, preserve its S2/S3 environment behavior, and keep CronJob execution out of the default command.
+8. Remove the remaining compatibility path only after QST consumers use country-scoped paths.
 
-The complete PE DST Base Store and EPP now use the country-scoped target layout. BackOffice and QST remain on legacy `tests/st2` paths and will continue incrementally.
+PE DST Base Store, EPP and BackOffice now use the country-scoped target layout. QST remains on legacy `tests/st2/qst` paths and will continue incrementally.
 
 ## Current commands
 

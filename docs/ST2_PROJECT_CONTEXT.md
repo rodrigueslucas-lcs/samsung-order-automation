@@ -112,4 +112,4 @@ The add-to-cart endpoint response is sufficient to continue to Cart; wait for SK
 - Full safe storefront regression: run the smoke, Cart, Checkout pre-submit, Payment read-only, PDP and Search groups explicitly; do not include order, auth, tracking-to-Production, provider-submit or BackOffice write specs.
 - Authenticated block after renewal: `npx playwright test tests/s2/pe/dst/base-store/checkout/authenticated-checkout.spec.js --project=chromium --workers=1 --headed`
 - TC12 with existing order: run the read-only authenticated profile spec against direct ST2 Orders with `AUTHENTICATED_ORDER_CODE=PE260826-74796841`; never follow the Production menu URL.
-- BackOffice read-only: `npx playwright test tests/st2/backoffice/backoffice.spec.js --project=chromium --grep "TC64|TC65|TC66|TC69|TC71" --workers=1 --headed` with runtime credentials and the intended staging environment.
+- BackOffice read-only: `npx playwright test tests/s2/pe/dst/backoffice/backoffice.spec.js --project=chromium --grep "TC64|TC65|TC66|TC69|TC71" --workers=1 --headed` with runtime credentials and the intended staging environment.

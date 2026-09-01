@@ -149,7 +149,7 @@ $env:AUTHENTICATED_ORDER_CODE="PE260826-74796841"
 npx playwright test tests/s2/pe/dst/base-store/profile/authenticated-profile.spec.js --project=chromium --grep "TC12 -" --workers=1 --headed
 
 # I. BackOffice read-only, future use with runtime staging credentials
-npx playwright test tests/st2/backoffice/backoffice.spec.js --project=chromium --grep "TC64|TC65|TC66|TC69|TC71" --workers=1 --headed
+npx playwright test tests/s2/pe/dst/backoffice/backoffice.spec.js --project=chromium --grep "TC64|TC65|TC66|TC69|TC71" --workers=1 --headed
 ```
 
 ## Stop conditions

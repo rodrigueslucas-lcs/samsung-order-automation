@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
-import BackOfficePage from "../../../pages/BackOfficePage";
-import BackOfficeOrderPage from "../../../pages/BackOfficeOrderPage";
-import BackOfficeCronJobsPage from "../../../pages/BackOfficeCronJobsPage";
+import BackOfficePage from "../../../../../pages/BackOfficePage";
+import BackOfficeOrderPage from "../../../../../pages/BackOfficeOrderPage";
+import BackOfficeCronJobsPage from "../../../../../pages/BackOfficeCronJobsPage";
 const credentials = {
   username: process.env.BACKOFFICE_USERNAME,
   password: process.env.BACKOFFICE_PASSWORD,
