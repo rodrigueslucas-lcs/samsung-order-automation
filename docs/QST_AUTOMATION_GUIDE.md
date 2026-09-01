@@ -17,7 +17,7 @@ A scenario has one implementation and carries every applicable tag; implementati
 ## Structure and tags
 
 ```text
-tests/st2/qst/
+tests/s2/pe/qst/
   base-store/
   epp/
 ```
@@ -34,7 +34,7 @@ npm run qst:base-store
 npm run qst:epp
 ```
 
-The cross-platform runner sets `QST_TYPE`, selects the matching tag and uses one worker. Playwright currently uses the real Chrome channel and visible mode through `playwright.config.js`.
+The cross-platform runner sets `QST_TYPE`, selects the matching tag, excludes `@destructive`, and uses one worker with zero retries. Playwright uses the real Chrome channel and visible mode through `playwright.config.js`.
 
 ## Execution summary
 

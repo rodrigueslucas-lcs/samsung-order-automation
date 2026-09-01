@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
-import authState from "../../../../utils/authState";
-import { annotateQstExecution } from "../../../../utils/qstExecutionSummary";
+import authState from "../../../../../utils/authState";
+import { annotateQstExecution } from "../../../../../utils/qstExecutionSummary";
 
 const {
   AUTH_STATE_PATH,

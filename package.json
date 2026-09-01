@@ -8,8 +8,8 @@
     "auth:export": "node scripts/auth-bootstrap.cjs",
     "auth:verify": "node scripts/auth-verify.cjs",
     "dst:base-store": "playwright test tests/s2/pe/dst/base-store --project=chromium --workers=1 --grep-invert @destructive",
-    "dst:backoffice": "playwright test tests/s2/pe/dst/backoffice --project=chromium --workers=1 --grep-invert \"TC73|TC75\"",
-    "dst:epp": "playwright test tests/s2/pe/dst/epp --project=chromium --workers=1",
+    "dst:backoffice": "playwright test tests/s2/pe/dst/backoffice --project=chromium --workers=1 --grep-invert \"@destructive|TC73|TC75\"",
+    "dst:epp": "playwright test tests/s2/pe/dst/epp --project=chromium --workers=1 --grep-invert @destructive",
     "dst:mx:base-store": "playwright test tests/s1/mx/dst/base-store --project=chromium --workers=1 --grep-invert @destructive",
     "dst:mx:order": "playwright test tests/s1/mx/dst/base-store/order.spec.js --project=chromium --workers=1 --retries=0",
     "dst:mx:list": "playwright test tests/s1/mx/dst/base-store --project=chromium --list",
@@ -19,7 +19,7 @@
     "qst:sanity": "node scripts/qst-run.cjs sanity",
     "qst:base-store": "node scripts/qst-run.cjs normal base-store",
     "qst:epp": "node scripts/qst-run.cjs normal epp",
-    "qst:list": "playwright test tests/st2/qst --project=chromium --list"
+    "qst:list": "playwright test tests/s2/pe/qst --project=chromium --list"
   },
   "keywords": [],
   "author": "",

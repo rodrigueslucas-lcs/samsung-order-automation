@@ -13,7 +13,7 @@ if (store && !validStores.has(store)) {
   throw new Error(`Unsupported QST store: ${store}`);
 }
 
-const testPath = store ? `tests/st2/qst/${store}` : "tests/st2/qst";
+const testPath = store ? `tests/s2/pe/qst/${store}` : "tests/s2/pe/qst";
 const grep = store ? "@qst" : `@qst-${type}`;
 const playwrightCli = path.join(
   path.dirname(require.resolve("@playwright/test")),
@@ -21,7 +21,7 @@ const playwrightCli = path.join(
 );
 const result = spawnSync(
   process.execPath,
-  [playwrightCli, "test", testPath, "--grep", grep, "--workers=1"],
+  [playwrightCli, "test", testPath, "--grep", grep, "--grep-invert", "@destructive", "--workers=1", "--retries=0"],
   {
     env: { ...process.env, QST_TYPE: type },
     stdio: "inherit",

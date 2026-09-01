@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
-import BackOfficePage from "../../../../pages/BackOfficePage";
-import BackOfficeOrderPage from "../../../../pages/BackOfficeOrderPage";
-import { annotateQstExecution } from "../../../../utils/qstExecutionSummary";
+import BackOfficePage from "../../../../../pages/BackOfficePage";
+import BackOfficeOrderPage from "../../../../../pages/BackOfficeOrderPage";
+import { annotateQstExecution } from "../../../../../utils/qstExecutionSummary";
 
 const credentials = {
   username: process.env.BACKOFFICE_USERNAME,

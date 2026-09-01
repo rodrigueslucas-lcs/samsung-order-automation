@@ -1,12 +1,12 @@
 import { test, expect } from "@playwright/test";
-import ProductPage from "../../../../pages/ProductPage";
-import CartPage from "../../../../pages/CartPage";
-import GuestLoginPage from "../../../../pages/GuestLoginPage";
-import CheckoutPage from "../../../../pages/CheckoutPage";
-import PaymentPage from "../../../../pages/PaymentPage";
-import OrderConfirmationPage from "../../../../pages/OrderConfirmationPage";
-import { testData } from "../../../../utils/testData";
-import { annotateQstExecution } from "../../../../utils/qstExecutionSummary";
+import ProductPage from "../../../../../pages/ProductPage";
+import CartPage from "../../../../../pages/CartPage";
+import GuestLoginPage from "../../../../../pages/GuestLoginPage";
+import CheckoutPage from "../../../../../pages/CheckoutPage";
+import PaymentPage from "../../../../../pages/PaymentPage";
+import OrderConfirmationPage from "../../../../../pages/OrderConfirmationPage";
+import { testData } from "../../../../../utils/testData";
+import { annotateQstExecution } from "../../../../../utils/qstExecutionSummary";
 
 test("@destructive QST-BS-13 QST-BS-14 @qst @qst-normal @qst-modified @base-store - Payment and Order Confirmation", async ({ page }, testInfo) => {
   test.skip(

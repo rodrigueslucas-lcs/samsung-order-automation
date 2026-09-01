@@ -1,13 +1,13 @@
 import { test, expect } from "@playwright/test";
-import ProductPage from "../../../../pages/ProductPage";
-import CartPage from "../../../../pages/CartPage";
-import CheckoutPage from "../../../../pages/CheckoutPage";
-import PaymentPage from "../../../../pages/PaymentPage";
-import MyOrdersPage from "../../../../pages/MyOrdersPage";
-import ProfilePage from "../../../../pages/ProfilePage";
-import authState from "../../../../utils/authState";
-import { testData } from "../../../../utils/testData";
-import { annotateQstExecution } from "../../../../utils/qstExecutionSummary";
+import ProductPage from "../../../../../pages/ProductPage";
+import CartPage from "../../../../../pages/CartPage";
+import CheckoutPage from "../../../../../pages/CheckoutPage";
+import PaymentPage from "../../../../../pages/PaymentPage";
+import MyOrdersPage from "../../../../../pages/MyOrdersPage";
+import ProfilePage from "../../../../../pages/ProfilePage";
+import authState from "../../../../../utils/authState";
+import { testData } from "../../../../../utils/testData";
+import { annotateQstExecution } from "../../../../../utils/qstExecutionSummary";
 
 const {
   AUTH_STATE_PATH,

@@ -12,7 +12,7 @@ The official Base Store matrix contains 83 scenarios:
 
 ## Architecture
 
-- Specs under `tests/st2/` orchestrate business scenarios.
+- PE specs under `tests/s2/pe/` orchestrate DST and QST business scenarios; `ST2` remains environment terminology in scenario names and evidence.
 - Page Objects under `pages/` own locators, interaction and reusable UI assertions.
 - Deterministic customer/address/payment fixtures are exposed through `utils/testData.js`.
 - Storefront reusable authentication is handled by `utils/authState.js` plus the `auth:*` npm scripts.

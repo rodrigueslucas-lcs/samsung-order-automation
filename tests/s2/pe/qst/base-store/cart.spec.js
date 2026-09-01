@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
-import ProductPage from "../../../../pages/ProductPage";
-import CartPage from "../../../../pages/CartPage";
-import { annotateQstExecution } from "../../../../utils/qstExecutionSummary";
+import ProductPage from "../../../../../pages/ProductPage";
+import CartPage from "../../../../../pages/CartPage";
+import { annotateQstExecution } from "../../../../../utils/qstExecutionSummary";
 
 async function openCartWithProduct(page) {
   const product = new ProductPage(page);

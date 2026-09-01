@@ -18,11 +18,13 @@ tests/s2/pe/dst/base-store/
   smoke/
 tests/s2/pe/dst/epp/
 tests/s2/pe/dst/backoffice/
+tests/s2/pe/qst/base-store/
+tests/s2/pe/qst/epp/
 ```
 
 `tests/s2/pe/dst/epp/` contains guarded thin EPP wrappers. PE DST Base Store and BackOffice now use the country-scoped target convention; fulfillment evidence remains explicitly S3.
 
-QST is already separate under `tests/st2/qst/`. Page Objects in `pages/`, fixtures and utilities remain shared infrastructure and must not be copied into either suite.
+QST is normalized under `tests/s2/pe/qst/`. Page Objects in `pages/`, fixtures and utilities remain shared infrastructure and must not be copied into either suite.
 
 ## Desired target
 
@@ -50,9 +52,9 @@ A big-bang move would change every relative import depth in the DST specs and in
 5. ✅ Move Home, PDP, Cart, Guest Login, Profile, Mobile and Smoke by logical area.
 6. ✅ Move Checkout and Payment, validate guarded submit specs by list only, and remove the legacy Base Store collection path.
 7. ✅ Move BackOffice last, preserve its S2/S3 environment behavior, and keep CronJob execution out of the default command.
-8. Remove the remaining compatibility path only after QST consumers use country-scoped paths.
+8. ✅ Move QST Base Store and EPP, update the cross-platform runner, and eliminate the active `tests/st2` tree.
 
-PE DST Base Store, EPP and BackOffice now use the country-scoped target layout. QST remains on legacy `tests/st2/qst` paths and will continue incrementally.
+All active PE DST and QST tests now use the country-scoped `tests/s2/pe` layout. Historical ST2 terminology remains evidence context rather than an executable path.
 
 ## Current commands
 

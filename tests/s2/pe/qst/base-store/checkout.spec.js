@@ -1,10 +1,10 @@
 import { test } from "@playwright/test";
-import ProductPage from "../../../../pages/ProductPage";
-import CartPage from "../../../../pages/CartPage";
-import GuestLoginPage from "../../../../pages/GuestLoginPage";
-import CheckoutPage from "../../../../pages/CheckoutPage";
-import { testData } from "../../../../utils/testData";
-import { annotateQstExecution } from "../../../../utils/qstExecutionSummary";
+import ProductPage from "../../../../../pages/ProductPage";
+import CartPage from "../../../../../pages/CartPage";
+import GuestLoginPage from "../../../../../pages/GuestLoginPage";
+import CheckoutPage from "../../../../../pages/CheckoutPage";
+import { testData } from "../../../../../utils/testData";
+import { annotateQstExecution } from "../../../../../utils/qstExecutionSummary";
 
 test("QST-BS-12 @qst @qst-normal @qst-modified @base-store - Enter delivery address", async ({ page }, testInfo) => {
   test.setTimeout(240000);

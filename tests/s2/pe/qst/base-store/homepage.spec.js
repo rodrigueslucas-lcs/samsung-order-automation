@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
-import HomePage from "../../../../pages/HomePage";
-import { annotateQstExecution } from "../../../../utils/qstExecutionSummary";
+import HomePage from "../../../../../pages/HomePage";
+import { annotateQstExecution } from "../../../../../utils/qstExecutionSummary";
 
 test("QST-BS-01 @qst @qst-normal @qst-modified @qst-sanity @base-store - Homepage attributes", async ({ page }, testInfo) => {
   test.setTimeout(180000);

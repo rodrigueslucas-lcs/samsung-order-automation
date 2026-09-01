@@ -1,6 +1,6 @@
 import { test } from "@playwright/test";
-import ProductPage from "../../../../pages/ProductPage";
-import { annotateQstExecution } from "../../../../utils/qstExecutionSummary";
+import ProductPage from "../../../../../pages/ProductPage";
+import { annotateQstExecution } from "../../../../../utils/qstExecutionSummary";
 
 test("QST-BS-04 @qst @qst-normal @qst-modified @base-store - Navigate to Hybris PDP", async ({ page }, testInfo) => {
   test.setTimeout(180000);

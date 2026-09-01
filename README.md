@@ -21,10 +21,10 @@ Current implementations include:
 
 - MX S1 DST Base Store and read-only BackOffice wrappers under the country-scoped structure.
 - PE DST Base Store, EPP and BackOffice are normalized under `tests/s2/pe/dst`.
-- PE QST Base Store and EPP discovery under the existing legacy `tests/st2/qst` structure.
+- PE QST Base Store and EPP discovery are normalized under `tests/s2/pe/qst`.
 - PE fulfillment evidence that may execute against S3 through explicit BackOffice environment configuration.
 
-`ST2` remains in legacy Peru QST paths, test names and historical documentation. It represents the repository's historical naming; normalization to the `s2/pe/...` convention is incremental and does not rewrite execution evidence.
+`ST2` remains in Peru test names and historical documentation as environment terminology. It no longer represents an active filesystem path, and historical execution evidence is not rewritten.
 
 ## Coverage
 
@@ -96,23 +96,22 @@ tests/
       dst/
         base-store/                 MX S1 DST storefront and checkout specs
         backoffice/                 MX S1 DST BackOffice specs
-  st2/                              Legacy PE environment/path naming
-    qst/
-      base-store/                   PE QST Base Store specs
-      epp/                          PE QST EPP discovery
   s2/
     pe/
       dst/
         base-store/                 Normalized PE DST Base Store specs
         epp/                        Guarded PE DST EPP wrappers
         backoffice/                 Normalized PE DST BackOffice and S3 fulfillment specs
+      qst/
+        base-store/                 Normalized PE QST Base Store specs
+        epp/                        Normalized PE QST EPP discovery
 fixtures/                           Synthetic QA test data
 utils/                              Configuration, auth, safety and reporting helpers
 scripts/                            Authentication bootstrap and QST execution helpers
 docs/                               Coverage, discovery and operational documentation
 ```
 
-PE DST Base Store, EPP and BackOffice are normalized. QST remains on legacy `tests/st2/qst` paths and must not be assumed migrated.
+All active PE DST and QST tests are normalized under `tests/s2/pe`; `tests/st2` is retained only in historical documentation when it describes past evidence.
 
 ### Target convention
 
@@ -128,8 +127,10 @@ Examples:
 tests/s1/mx/dst/base-store/
 tests/s1/mx/dst/backoffice/
 tests/s2/pe/dst/base-store/
+tests/s2/pe/dst/epp/
+tests/s2/pe/dst/backoffice/
+tests/s2/pe/qst/base-store/
 tests/s2/pe/qst/epp/
-tests/s3/pe/dst/backoffice/
 ```
 
 Directories for unsupported targets are not created in advance. Migration remains structural and incremental so validated tests, imports, commands and evidence can be checked after each move.
@@ -167,7 +168,7 @@ npx playwright test tests/s1/mx/dst/base-store --project=chromium --workers=1 --
 npx playwright test tests/s1/mx/dst/backoffice --project=chromium --workers=1
 ```
 
-PE Base Store and BackOffice commands now collect only normalized paths. QST continues to use its legacy compatibility path.
+All PE DST and QST commands collect only normalized `tests/s2/pe` paths.
 
 ## Authentication
 
@@ -229,7 +230,7 @@ ALLOW_CRONJOB_RUN=1
 Additional rules:
 
 - Every destructive test must carry `@destructive`.
-- Default non-destructive commands must exclude `@destructive`.
+- Default DST and QST commands exclude `@destructive`; PE BackOffice additionally excludes the untagged CronJob cases TC73/TC75 by title.
 - Destructive execution must use `--workers=1 --retries=0`.
 - Never perform a blind or automatic retry after an ambiguous submit.
 - Do not create another order only to obtain confirmation or email evidence.
