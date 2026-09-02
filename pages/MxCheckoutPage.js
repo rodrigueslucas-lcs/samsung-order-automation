@@ -39,7 +39,34 @@ export default class MxCheckoutPage extends BasePage {
     await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, { timeout: 60000 });
   }
 
-  async fillDelivery({ postalCode, street, exteriorNumber }) {
+  async fillRegisteredContact({ firstName, lastName, phone }) {
+    await this.page.getByRole("textbox", { name: "firstName" }).fill(firstName);
+    await this.page.getByRole("textbox", { name: "lastName" }).fill(lastName);
+    await this.page.getByRole("textbox", { name: "phone", exact: true }).fill(phone);
+
+    for (const name of [/T[eé]rminos y condiciones/i, /Aviso de Privacidad/i]) {
+      const checkbox = this.page.getByRole("checkbox", { name }).first();
+      await checkbox.waitFor({ state: "visible", timeout: 30000 });
+      if (!(await checkbox.isChecked())) await checkbox.check({ force: true });
+    }
+
+    const optionalAccountChoices = this.page.getByRole("checkbox", {
+      name: /ofertas y promociones|Samsung Rewards/i,
+    });
+    for (let index = 0; index < await optionalAccountChoices.count(); index += 1) {
+      const checkbox = optionalAccountChoices.nth(index);
+      if (await checkbox.isChecked()) await checkbox.uncheck({ force: true });
+    }
+
+    await this.contactContinue.waitFor({ state: "visible", timeout: 30000 });
+    if (!(await this.contactContinue.isEnabled())) {
+      throw new Error("MX registered Contact continue remained disabled after required QA data.");
+    }
+    await this.contactContinue.click();
+    await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, { timeout: 60000 });
+  }
+
+  async fillDelivery({ postalCode, street, exteriorNumber }, { registered = false } = {}) {
     const postal = this.page.getByRole("textbox", { name: /postal|c[oó]digo postal/i });
     await postal.waitFor({ state: "visible", timeout: 60000 });
     const addressResponse = this.page.waitForResponse(
@@ -89,7 +116,13 @@ export default class MxCheckoutPage extends BasePage {
       .getByRole("checkbox", { name: /Guardar.*(direcci[oó]n|env[ií]o)/i })
       .filter({ visible: true });
     if (await visibleSaveAddress.count()) {
-      throw new Error("Guest checkout unexpectedly exposed address persistence.");
+      if (!registered) {
+        throw new Error("Guest checkout unexpectedly exposed address persistence.");
+      }
+      for (let index = 0; index < await visibleSaveAddress.count(); index += 1) {
+        const checkbox = visibleSaveAddress.nth(index);
+        if (await checkbox.isChecked()) await checkbox.uncheck({ force: true });
+      }
     }
     return result;
   }
