@@ -14,12 +14,12 @@ export default class PaymentPage extends BasePage {
     this.cardHolderInput = page.locator("#input-checkout__cardholderName");
 
     this.installmentsCombobox = page.getByRole("combobox", {
-      name: /cuántas cuotas/i,
+      name: /cuántas cuotas|Mensualidades/i,
     });
 
-    this.placeOrderButton = page.getByRole("button", {
-      name: /realizar pedido/i,
-    });
+    this.placeOrderButton = page
+      .getByRole("button", { name: /realizar pedido|pagar ahora/i })
+      .filter({ visible: true });
   }
 
   async validatePaymentPage({
@@ -325,6 +325,44 @@ export default class PaymentPage extends BasePage {
   async selectCreditCard() {
     await this.creditCardOption.click();
 
+    if ((await this.creditCardOption.getAttribute("aria-expanded")) !== "true") {
+      throw new Error("Credit/Debit Card did not become the selected payment mode.");
+    }
+
+    const newPaymentMethod = this.page.getByRole("radio", {
+      name: "Nuevo método de pago",
+      exact: true,
+    });
+    await newPaymentMethod.waitFor({ state: "visible", timeout: 30000 });
+    if (!(await newPaymentMethod.isChecked())) {
+      await this.page.locator(".overlay-spinner").waitFor({
+        state: "hidden",
+        timeout: 30000,
+      });
+
+      const cartReminderText = this.page
+        .getByText(/Tus productos aún están disponibles\. Finaliza ahora/i)
+        .filter({ visible: true });
+      if (await cartReminderText.count()) {
+        const cartReminder = cartReminderText.first().locator(
+          "xpath=ancestor::*[.//*[normalize-space()='x']][1]"
+        );
+        const closeReminder = cartReminder.getByText("x", { exact: true });
+        await closeReminder.click();
+        await cartReminder.waitFor({ state: "hidden", timeout: 30000 });
+      }
+
+      const newPaymentMethodLabel = this.page
+        .getByText("Nuevo método de pago", { exact: true })
+        .filter({ visible: true });
+      await newPaymentMethodLabel.waitFor({ state: "visible", timeout: 30000 });
+      await newPaymentMethodLabel.scrollIntoViewIfNeeded();
+      await newPaymentMethodLabel.click();
+    }
+    if (!(await newPaymentMethod.isChecked())) {
+      throw new Error("Nuevo método de pago did not remain selected.");
+    }
+
     await this.page
       .frameLocator('iframe[name="cardNumber"]')
       .locator("#cardNumber")
@@ -357,7 +395,28 @@ export default class PaymentPage extends BasePage {
       card.cvv
     );
 
+    if (card.document) {
+      const documentInput = await this.cardDocumentInput();
+      if (await documentInput.isVisible().catch(() => false)) {
+        await documentInput.fill(card.document);
+      }
+    }
+
     await this.selectInstallments();
+
+    const requiredSubscriptionTerms = this.page
+      .getByRole("checkbox", {
+        name: /Confirmo que he leído y acepto los t[eé]minos de la suscripci[oó]n SC\+ mensual/i,
+      })
+      .filter({ visible: true });
+    if (await requiredSubscriptionTerms.count()) {
+      if (!(await requiredSubscriptionTerms.first().isChecked())) {
+        await requiredSubscriptionTerms.first().check();
+      }
+      if (!(await requiredSubscriptionTerms.first().isChecked())) {
+        throw new Error("MX monthly SC+ subscription terms did not remain accepted.");
+      }
+    }
 
     await this.screenshot("10-card-data-filled");
   }
@@ -373,14 +432,31 @@ export default class PaymentPage extends BasePage {
       .frameLocator('iframe[name="securityCode"]')
       .locator("#securityCode");
 
-    for (const input of [cardNumber, expirationDate, securityCode]) {
-      if (!(await input.inputValue()).trim()) {
-        throw new Error("A required Mercado Pago card field was empty before submission.");
-      }
+    const digits = (value) => value.replace(/\D/g, "");
+    const actualCardNumber = digits(await cardNumber.inputValue());
+    const actualExpiry = digits(await expirationDate.inputValue());
+    const actualSecurityCode = digits(await securityCode.inputValue());
+    if (actualCardNumber !== digits(card.number)) {
+      throw new Error("Mercado Pago did not retain the complete card number.");
+    }
+    if (actualExpiry !== digits(card.expiry)) {
+      throw new Error("Mercado Pago did not retain the expected expiry.");
+    }
+    if (actualSecurityCode !== digits(card.cvv)) {
+      throw new Error("Mercado Pago did not retain the complete security code.");
     }
 
     if ((await this.cardHolderInput.inputValue()).trim() !== card.holderName) {
       throw new Error("The cardholder name was not populated correctly.");
+    }
+    if (card.document) {
+      const documentInput = await this.cardDocumentInput();
+      if (
+        (await documentInput.isVisible().catch(() => false)) &&
+        digits(await documentInput.inputValue()) !== digits(card.document)
+      ) {
+        throw new Error("Mercado Pago did not retain the expected document number.");
+      }
     }
 
     await this.placeOrderButton.waitFor({ state: "visible", timeout: 30000 });
@@ -408,11 +484,30 @@ export default class PaymentPage extends BasePage {
       timeout: 30000,
     });
 
-    await this.installmentsCombobox.selectOption({ index: 0 }).catch(async () => {
+    const options = await this.installmentsCombobox.locator("option").evaluateAll((items) =>
+      items
+        .filter((option) => !option.disabled && option.value)
+        .map((option) => option.value)
+    );
+    if (options.length) {
+      await this.installmentsCombobox.selectOption(options[0]);
+    } else {
       await this.installmentsCombobox.click();
       await this.page.keyboard.press("ArrowDown");
       await this.page.keyboard.press("Enter");
+    }
+  }
+
+  async cardDocumentInput() {
+    const semanticDocument = this.page.getByRole("textbox", {
+      name: /documento|identificaci[oó]n/i,
     });
+    if (await semanticDocument.first().isVisible().catch(() => false)) {
+      return semanticDocument.first();
+    }
+    return this.page
+      .locator('#input-checkout__identificationNumber, input[name="identificationNumber"]')
+      .first();
   }
 
   async placeOrder() {
@@ -450,5 +545,90 @@ export default class PaymentPage extends BasePage {
   if (result !== "CONFIRMATION") {
     throw new Error(`Pedido não foi confirmado. Resultado após clicar: ${result}`);
   }
-}
+  }
+
+  async placeOrderAndCapture({ orderCodePattern = /\bMX\d{6}-\d{8}(?:_\d+)?\b/i } = {}) {
+    requirePaymentSubmitOptIn();
+    await this.placeOrderButton.scrollIntoViewIfNeeded();
+    await this.placeOrderButton.waitFor({ state: "visible", timeout: 30000 });
+    if (!(await this.placeOrderButton.isEnabled())) {
+      throw new Error("Realizar pedido remained disabled before the single authorized submit.");
+    }
+
+    const responses = [];
+    const responseBodies = [];
+    let resolveResponseOrderCode;
+    const responseOrderCode = new Promise((resolve) => {
+      resolveResponseOrderCode = resolve;
+    });
+    const recordResponse = (response) => {
+      if (!/payment|checkout|order|placeorder|transaction/i.test(response.url())) return;
+      responses.push({
+        method: response.request().method(),
+        status: response.status(),
+        endpoint: new URL(response.url()).origin + new URL(response.url()).pathname,
+      });
+      const body = response.text().catch(() => "");
+      responseBodies.push(body);
+      body.then((text) => {
+        const code = text.match(orderCodePattern)?.[0];
+        if (code) resolveResponseOrderCode(code);
+      });
+    };
+    this.page.on("response", recordResponse);
+
+    await this.screenshot("11-before-mx-registered-card-submit");
+    await this.placeOrderButton.click();
+
+    const outcome = await Promise.race([
+      this.page.waitForURL(/confirmation|confirmacion|order-confirmation|checkout\/order|success/i, {
+        timeout: 120000,
+      }).then(() => ({ type: "CONFIRMATION" })),
+      this.page.waitForFunction(
+        ({ source, flags }) => new RegExp(source, flags).test(document.body.innerText),
+        { source: orderCodePattern.source, flags: orderCodePattern.flags },
+        { timeout: 120000 }
+      ).then(() => ({ type: "ORDER_CODE" })),
+      responseOrderCode.then((orderCode) => ({ type: "ORDER_CODE_RESPONSE", orderCode })),
+      this.page.getByRole("alert")
+        .filter({ hasText: /error|rechazad|no pudimos|problema|inv[aá]lid/i })
+        .first()
+        .waitFor({ state: "visible", timeout: 120000 })
+        .then(() => ({ type: "ERROR_MESSAGE" })),
+      this.page.waitForTimeout(120000).then(() => ({ type: "TIMEOUT" })),
+    ]);
+
+    this.page.off("response", recordResponse);
+    const bodies = await Promise.all(responseBodies);
+    let pageText = await this.page.locator("body").innerText({ timeout: 15000 }).catch(() => "");
+    let orderCode =
+      outcome.orderCode ||
+      pageText.match(orderCodePattern)?.[0] ||
+      bodies.map((body) => body.match(orderCodePattern)?.[0]).find(Boolean) ||
+      null;
+
+    if (!orderCode && outcome.type === "CONFIRMATION") {
+      await this.page.waitForFunction(
+        ({ source, flags }) => new RegExp(source, flags).test(document.body.innerText),
+        { source: orderCodePattern.source, flags: orderCodePattern.flags },
+        { timeout: 30000 }
+      ).catch(() => {});
+      pageText = await this.page.locator("body").innerText({ timeout: 15000 }).catch(() => "");
+      orderCode = pageText.match(orderCodePattern)?.[0] || null;
+    }
+
+    await this.screenshot(`11-after-mx-registered-card-${outcome.type.toLowerCase()}`);
+    if (!orderCode) {
+      throw new Error(
+        `The single MX registered-card submit completed with ${outcome.type}, but no order number was observable. Do not retry blindly. Network evidence: ${JSON.stringify(responses.slice(-20))}`
+      );
+    }
+
+    return {
+      outcome: outcome.type,
+      orderCode,
+      finalUrl: new URL(this.page.url()).origin + new URL(this.page.url()).pathname,
+      responses: responses.slice(-20),
+    };
+  }
 }

@@ -40,9 +40,29 @@ export default class MxCheckoutPage extends BasePage {
   }
 
   async fillRegisteredContact({ firstName, lastName, phone }) {
-    await this.page.getByRole("textbox", { name: "firstName" }).fill(firstName);
-    await this.page.getByRole("textbox", { name: "lastName" }).fill(lastName);
-    await this.page.getByRole("textbox", { name: "phone", exact: true }).fill(phone);
+    const deliveryRegion = this.page.getByRole("region", {
+      name: /2\. M[eé]todo de Entrega/i,
+    });
+    const firstNameInput = this.page
+      .getByRole("textbox", { name: "firstName", exact: true })
+      .filter({ visible: true });
+    const deliveryOpened = await deliveryRegion
+      .waitFor({ state: "visible", timeout: 15000 })
+      .then(() => true)
+      .catch(() => false);
+    if (deliveryOpened) return;
+
+    await firstNameInput.waitFor({ state: "visible", timeout: 30000 });
+
+    const lastNameInput = this.page
+      .getByRole("textbox", { name: "lastName", exact: true })
+      .filter({ visible: true });
+    const phoneInput = this.page
+      .getByRole("textbox", { name: "phone", exact: true })
+      .filter({ visible: true });
+    await firstNameInput.fill(firstName);
+    await lastNameInput.fill(lastName);
+    await phoneInput.fill(phone);
 
     for (const name of [/T[eé]rminos y condiciones/i, /Aviso de Privacidad/i]) {
       const checkbox = this.page.getByRole("checkbox", { name }).first();
@@ -89,6 +109,12 @@ export default class MxCheckoutPage extends BasePage {
     await options.first().waitFor({ state: "visible", timeout: 30000 });
     const selectedColonia = (await options.first().innerText()).trim();
     await options.first().click();
+
+    await this.page.waitForFunction(() => {
+      const district = document.querySelector('input[name="district"], input[aria-label="district"]');
+      const region = document.querySelector('input[name="regionIso"], input[aria-label="regionIso"]');
+      return Boolean(district?.value && region?.value);
+    }, null, { timeout: 30000 });
 
     await this.page.getByRole("textbox", { name: "line2" }).fill(street);
     await this.page.getByRole("textbox", { name: "line1" }).fill(exteriorNumber);
@@ -147,51 +173,166 @@ export default class MxCheckoutPage extends BasePage {
   }
 
   async selectDeliveryAndContinue() {
-    const addressContinue = this.page.getByRole("button", {
-      name: /^Continuar$/i,
-    });
-    await addressContinue.waitFor({ state: "visible", timeout: 30000 });
-    if (!(await addressContinue.isEnabled())) {
-      throw new Error("MX Address continue remained disabled.");
-    }
-    await addressContinue.click();
+    const standardDeliveryCards = this.page
+      .locator("label")
+      .filter({ hasText: /Entrega Est[aá]ndar/i })
+      .filter({ visible: true });
+    const deliveryEta = this.page
+      .getByText(/Recibir[aá]s tu producto|Enviaremos tu producto/i)
+      .filter({ visible: true })
+      .first();
 
-    if (/CHECKOUT_STEP_PAYMENT/.test(this.page.url())) return;
+    await standardDeliveryCards.first().waitFor({ state: "visible", timeout: 60000 });
+    await deliveryEta.waitFor({ state: "visible", timeout: 60000 });
 
-    const delivery = this.page.locator('input[type="radio"][name*="delivery"]');
-    await delivery.first().waitFor({ state: "attached", timeout: 60000 });
-    if (!(await delivery.first().isChecked())) {
-      await this.page
-        .getByText(/Entrega Est.ndar/i)
-        .filter({ visible: true })
-        .first()
-        .click();
+    const visibleCardCount = await standardDeliveryCards.count();
+    if (visibleCardCount !== 1) {
+      throw new Error(
+        `MX Delivery expected exactly one visible Standard delivery card; found ${visibleCardCount}.`
+      );
     }
 
-    const checked = await delivery.evaluateAll(
-      (inputs) => inputs.filter((input) => input.checked).length
-    );
-    if (!checked) throw new Error("No MX delivery mode became selected.");
-    await this.page.getByText(/Recibir[aá]s tu producto|Enviaremos tu producto/i).first().waitFor({
-      state: "visible",
-      timeout: 30000,
-    });
+    const standardDeliveryCard = standardDeliveryCards.first();
+    await standardDeliveryCard.click();
+    const selected = await this.page
+      .waitForFunction(
+        (card) => Boolean(card.control?.checked || card.querySelector('input[type="radio"]')?.checked),
+        await standardDeliveryCard.elementHandle(),
+        { timeout: 30000 }
+      )
+      .then(() => true)
+      .catch(() => false);
+    if (!selected) {
+      throw new Error("MX Standard delivery card did not become selected.");
+    }
 
-    const continueButton = this.page.getByRole("button", { name: /^Continuar$/i });
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
-      await continueButton.waitFor({ state: "visible", timeout: 30000 });
-      if (!(await continueButton.isEnabled())) {
+    const resolveContinueButton = async () => {
+      const buttons = this.page
+        .getByRole("button", { name: /^Continuar$/i })
+        .filter({ visible: true });
+      await buttons.first().waitFor({ state: "visible", timeout: 30000 });
+      const count = await buttons.count();
+      if (count !== 1) {
+        throw new Error(`MX Delivery expected exactly one visible Continue button; found ${count}.`);
+      }
+
+      const button = buttons.first();
+      await button.scrollIntoViewIfNeeded();
+      await button.waitFor({ state: "visible", timeout: 30000 });
+      if (!(await button.isEnabled())) {
         throw new Error("MX Delivery continue remained disabled.");
       }
-      await continueButton.click();
-      const reachedPayment = await this.page.waitForFunction(
-        () => window.location.href.includes("CHECKOUT_STEP_PAYMENT"),
+      await button.click({ trial: true });
+
+      return this.page
+        .getByRole("button", { name: /^Continuar$/i })
+        .filter({ visible: true })
+        .first();
+    };
+
+    const observeTransition = async (timeout) => this.page
+      .waitForFunction(
+        () => {
+          const isVisible = (element) => {
+            const style = window.getComputedStyle(element);
+            const bounds = element.getBoundingClientRect();
+            return (
+              style.visibility !== "hidden" &&
+              style.display !== "none" &&
+              style.opacity !== "0" &&
+              bounds.width > 0 &&
+              bounds.height > 0
+            );
+          };
+          const visibleElements = Array.from(document.querySelectorAll("body *")).filter(isVisible);
+
+          if (
+            visibleElements.some((element) =>
+              /^Por favor, selecciona una opci[oó]n de entrega\.?$/i.test(
+                element.textContent?.trim() || ""
+              )
+            )
+          ) {
+            return "DELIVERY_SELECTION_ERROR";
+          }
+
+          if (window.location.href.includes("CHECKOUT_STEP_PAYMENT")) {
+            return "PAYMENT";
+          }
+
+          const paymentRegions = Array.from(
+            document.querySelectorAll('[role="region"], [role="tabpanel"]')
+          );
+          const visiblePaymentRegion = paymentRegions.find((region) => {
+            if (!isVisible(region) || region.getAttribute("aria-hidden") === "true") return false;
+
+            const labelledBy = region.getAttribute("aria-labelledby");
+            const label = [
+              region.getAttribute("aria-label") || "",
+              labelledBy ? document.getElementById(labelledBy)?.textContent || "" : "",
+              region.querySelector("h1, h2, h3, h4, h5, h6")?.textContent || "",
+            ].join(" ");
+            if (!/3\.\s*M[eé]todos de Pago/i.test(label)) return false;
+
+            return Array.from(
+              region.querySelectorAll('button, input, iframe, [role="button"], [role="tab"]')
+            ).some(isVisible);
+          });
+          if (visiblePaymentRegion) return "PAYMENT";
+
+          return null;
+        },
         null,
-        { timeout: 30000 }
-      ).then(() => true).catch(() => false);
-      if (reachedPayment) return;
+        { timeout }
+      )
+      .then((result) => result.jsonValue())
+      .catch((error) => {
+        if (error?.name === "TimeoutError") return "NO_TRANSITION";
+        throw error;
+      });
+
+    const firstContinue = await resolveContinueButton();
+    await firstContinue.click();
+    const firstTransition = await observeTransition(15000);
+
+    if (firstTransition === "PAYMENT") return;
+    if (firstTransition === "DELIVERY_SELECTION_ERROR") {
+      throw new Error("MX Standard delivery was rejected after Continue.");
     }
-    throw new Error("MX Delivery did not reach Payment after three confirmed Continue attempts.");
+
+    if (!this.page.url().includes("CHECKOUT_STEP_DELIVERY")) {
+      throw new Error(`MX Delivery Continue reached an unexpected URL: ${this.page.url()}`);
+    }
+
+    const stillSelected = await standardDeliveryCards.first().evaluate(
+      (card) => Boolean(card.control?.checked || card.querySelector('input[type="radio"]')?.checked)
+    );
+    if (!stillSelected) {
+      throw new Error("MX Standard delivery became unselected after the first Continue attempt.");
+    }
+
+    const selectionAlert = this.page
+      .getByText(/^Por favor, selecciona una opci[oó]n de entrega\.?$/i)
+      .filter({ visible: true });
+    if (await selectionAlert.count()) {
+      throw new Error("MX Standard delivery was rejected after Continue.");
+    }
+
+    const secondContinue = await resolveContinueButton();
+    await secondContinue.click();
+    const secondTransition = await observeTransition(90000);
+
+    if (secondTransition === "DELIVERY_SELECTION_ERROR") {
+      throw new Error("MX Standard delivery was rejected after Continue.");
+    }
+    if (secondTransition !== "PAYMENT") {
+      if (this.page.url().includes("CHECKOUT_STEP_DELIVERY")) {
+        throw new Error(
+          "MX Delivery Continue remained on Delivery after re-scroll and second controlled click."
+        );
+      }
+      throw new Error(`MX Delivery Continue reached an unexpected URL: ${this.page.url()}`);
+    }
   }
 
   async inspectPayment() {

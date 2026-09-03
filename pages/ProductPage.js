@@ -16,7 +16,7 @@ export default class ProductPage extends BasePage {
     this.cartUrl = options.cartUrl || 'https://stg2.shop.samsung.com/pe/cart';
   }
 
-  async addConfiguredPdpToCart() {
+  async addConfiguredPdpToCart({ waitForCartMutation = false } = {}) {
     if (!this.pdpUrl) throw new Error('A configured PDP URL is required.');
     await this.safeGoto(this.pdpUrl);
     const addButton = this.page
@@ -24,7 +24,21 @@ export default class ProductPage extends BasePage {
       .filter({ visible: true })
       .first();
     await addButton.waitFor({ state: 'visible', timeout: 60000 });
+    const cartMutation = waitForCartMutation
+      ? this.page.waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            /\/users\/current\/carts\/(?:current|[^/]+)\/entries(?:\?|$)/.test(response.url()),
+          { timeout: 60000 }
+        )
+      : null;
     await addButton.click();
+    if (cartMutation) {
+      const response = await cartMutation;
+      if (response.status() < 200 || response.status() >= 300) {
+        throw new Error(`Configured PDP add-to-cart returned HTTP ${response.status()}.`);
+      }
+    }
     await this.safeGoto(this.cartUrl);
     await this.waitForCartSkus([this.sku]);
   }

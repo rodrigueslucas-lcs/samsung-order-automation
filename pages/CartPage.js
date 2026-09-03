@@ -36,6 +36,138 @@ export default class CartPage extends BasePage {
     await this.screenshot('02-cart-page');
   }
 
+  async loadMxCartState() {
+    const cartUrl = new URL(this.cartUrl);
+    if (cartUrl.hostname !== 'stg.shop.samsung.com' || cartUrl.pathname !== '/mx/cart') {
+      throw new Error('MX cart control is restricted to https://stg.shop.samsung.com/mx/cart.');
+    }
+
+    const currentCartResponse = this.page.waitForResponse(
+      (response) => {
+        const url = new URL(response.url());
+        return response.request().method() === 'GET' &&
+          /\/v2\/mx\/users\/current\/carts\/current$/.test(url.pathname);
+      },
+      { timeout: 60000 }
+    );
+    await this.page.goto(this.cartUrl, { waitUntil: 'domcontentloaded' });
+    const response = await currentCartResponse;
+    if (response.status() !== 200) {
+      throw new Error(`MX current-cart request returned HTTP ${response.status()}.`);
+    }
+    const cart = await response.json();
+    await this.page.getByRole('main').waitFor({ state: 'attached', timeout: 30000 });
+    const productEntries = (cart.entries || []).filter(
+      (entry) => entry.product?.code && !entry.isHideForDisplay && !entry.serviceEntry
+    );
+    return { productEntries };
+  }
+
+  async clearMxCartAndConfirmEmpty() {
+    for (let removed = 0; removed < 20; removed += 1) {
+      const { productEntries } = await this.loadMxCartState();
+      const main = this.page.getByRole('main');
+      const removeButtons = main.getByRole('button', { name: /^Remove$/i });
+
+      if (!productEntries.length) {
+        if (await removeButtons.count()) {
+          throw new Error('MX cart API is empty but a visible product row is still rendered.');
+        }
+        return;
+      }
+
+      const sku = productEntries[0].product.code;
+      const skuLabels = main.getByText(sku, { exact: true }).filter({ visible: true });
+      await skuLabels.first().waitFor({ state: 'visible', timeout: 30000 });
+      if ((await skuLabels.count()) !== 1) {
+        throw new Error(`MX cart expected exactly one visible row for ${sku}.`);
+      }
+
+      const item = skuLabels.first().locator(
+        "xpath=ancestor::*[.//input[@aria-label='Quantity'] and .//button[@aria-label='Remove']][1]"
+      );
+      const removeButton = item.getByRole('button', { name: /^Remove$/i });
+      await removeButton.waitFor({ state: 'visible', timeout: 30000 });
+      if ((await removeButton.count()) !== 1) {
+        throw new Error(`MX cart row for ${sku} does not expose exactly one Remove button.`);
+      }
+
+      const itemHandle = await item.elementHandle();
+      if (!itemHandle) throw new Error(`MX cart row for ${sku} detached before removal.`);
+      await removeButton.click();
+
+      const semanticDialog = this.page
+        .getByRole('dialog')
+        .or(this.page.getByRole('alertdialog'))
+        .filter({ hasText: /Eliminar producto del carrito/i });
+      const dialogFromTitle = this.page
+        .getByText(/^Eliminar producto del carrito$/i)
+        .filter({ visible: true })
+        .locator(
+          "xpath=ancestor::*[.//button[normalize-space()='Sí' or normalize-space()='Si']][1]"
+        );
+      const dialog = semanticDialog
+        .or(dialogFromTitle)
+        .filter({ visible: true });
+      await dialog.first().waitFor({ state: 'visible', timeout: 30000 });
+      if ((await dialog.count()) !== 1) {
+        throw new Error(`MX cart expected one visible removal dialog for ${sku}.`);
+      }
+
+      const confirmButton = dialog.first().getByRole('button', { name: /^S[ií]$/i });
+      await confirmButton.waitFor({ state: 'visible', timeout: 30000 });
+      if ((await confirmButton.count()) !== 1) {
+        throw new Error(`MX cart removal dialog for ${sku} does not expose exactly one Sí button.`);
+      }
+
+      await Promise.all([
+        dialog.first().waitFor({ state: 'hidden', timeout: 30000 }),
+        this.page.waitForFunction((row) => !row.isConnected, itemHandle, { timeout: 30000 }),
+        confirmButton.click(),
+      ]);
+    }
+    throw new Error('MX cart cleanup exceeded the 20-item safety limit.');
+  }
+
+  async validateControlledSingleSku(sku) {
+    const { productEntries } = await this.loadMxCartState();
+    if (
+      productEntries.length !== 1 ||
+      productEntries[0].product.code !== sku ||
+      Number(productEntries[0].quantity) !== 1
+    ) {
+      const summary = productEntries.map((entry) => ({
+        sku: entry.product.code,
+        quantity: entry.quantity,
+      }));
+      throw new Error(
+        `Controlled MX cart requires only ${sku} quantity 1; found ${JSON.stringify(summary)}.`
+      );
+    }
+
+    const main = this.page.getByRole('main');
+    const skuLabel = main.getByText(sku, { exact: true });
+    await skuLabel.waitFor({ state: 'visible', timeout: 30000 });
+    if ((await skuLabel.count()) !== 1) {
+      throw new Error(`Controlled MX cart expected one rendered ${sku} row.`);
+    }
+
+    // MX cart items have no semantic row role or stable item data attribute.
+    // The nearest ancestor owning this SKU's Quantity and Remove controls is the item boundary.
+    const item = skuLabel.locator(
+      "xpath=ancestor::*[.//input[@aria-label='Quantity'] and .//button[@aria-label='Remove']][1]"
+    );
+    const quantity = item.getByRole('textbox', { name: 'Quantity' });
+    const remove = item.getByRole('button', { name: /^Remove$/i });
+    await quantity.waitFor({ state: 'visible', timeout: 30000 });
+    if ((await quantity.inputValue()) !== '1' || (await remove.count()) !== 1) {
+      throw new Error(`Rendered MX cart row for ${sku} is not exactly quantity 1.`);
+    }
+    if ((await main.getByRole('button', { name: /^Remove$/i }).count()) !== 1) {
+      throw new Error('Controlled MX cart rendered more than one product row.');
+    }
+  }
+
   async validateCartPage() {
     const expectedPath = new URL(this.cartUrl).pathname;
     await this.page.waitForURL((url) => url.pathname === expectedPath, {
