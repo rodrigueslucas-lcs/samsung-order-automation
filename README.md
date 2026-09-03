@@ -20,6 +20,7 @@ Chile (`CL`) and Colombia (`CO`) are planned target countries only. No CL or CO 
 Current implementations include:
 
 - MX S1 DST Base Store and read-only BackOffice wrappers under the country-scoped structure.
+- MX S1 QST Base Store wrappers under `tests/s1/mx/qst/base-store`, with safe scenarios separated from guarded order submission.
 - PE DST Base Store, EPP and BackOffice are normalized under `tests/s2/pe/dst`.
 - PE QST Base Store and EPP discovery are normalized under `tests/s2/pe/qst`.
 - PE fulfillment evidence that may execute against S3 through explicit BackOffice environment configuration.
@@ -47,7 +48,7 @@ PE DST EPP is tracked independently in the [DST EPP Coverage Matrix](docs/DST_EP
 
 ### Mexico DST
 
-The verified MX S1 Base Store matrix contains 84 official scenarios: 31 Automated, 13 Reusable, 4 Partial and 36 Blocked.
+The current MX S1 Base Store matrix contains 84 official scenarios: 33 Automated, 2 Reusable, 10 Partial and 39 Blocked. These categories are intentionally distinct: `Reusable` means suitable implementation exists but MX execution evidence is incomplete; `Partial` means only part of the official scenario has been demonstrated; `Blocked` records a concrete dependency rather than inferred coverage.
 
 ```bash
 npm run dst:mx:list
@@ -68,6 +69,26 @@ npm run dst:mx:order
 ```
 
 Detailed evidence: [MX S1 DST Base Store Coverage Matrix](docs/DST_MX_BASE_STORE_COVERAGE_MATRIX.md).
+
+### Mexico QST
+
+MX S1 QST Base Store is implemented under `tests/s1/mx/qst/base-store/`. Its current 22-scenario status is 8 Automated, 2 Partial, 5 Blocked, 3 Implemented — not run and 4 Not implemented.
+
+- QST01 is Partial after a headed S1 diagnostic: the Samsung header and `Productos y Servicios` footer rendered, but the current homepage had no hero or Top Seller section. The test was not weakened to force a pass.
+- QST09 is Partial because the real Galaxy Canje journey opened, but valuation/application was not completed.
+- QST13/14 and QST16 are implemented but have not been run as QST. They remain guarded `@destructive` order flows.
+- QST18/19 are Blocked by an S1 gateway HTTP 403 before the BackOffice login form; this is not classified as a credential or test success.
+
+The default command excludes every `@destructive` scenario:
+
+```bash
+npm run qst:mx:base-store
+npm run qst:mx:list
+```
+
+Explicit destructive execution, when separately authorized, must target the individual spec with `ALLOW_PAYMENT_SUBMIT=1`, `--workers=1` and `--retries=0`. It must never be added to the default command.
+
+Detailed evidence: [MX S1 QST Base Store Coverage Matrix](docs/MX_QST_COVERAGE_MATRIX.md).
 
 ### Peru QST
 
@@ -96,6 +117,8 @@ tests/
       dst/
         base-store/                 MX S1 DST storefront and checkout specs
         backoffice/                 MX S1 DST BackOffice specs
+      qst/
+        base-store/                 MX S1 QST safe and guarded reusable wrappers
   s2/
     pe/
       dst/
@@ -126,6 +149,7 @@ Examples:
 ```text
 tests/s1/mx/dst/base-store/
 tests/s1/mx/dst/backoffice/
+tests/s1/mx/qst/base-store/
 tests/s2/pe/dst/base-store/
 tests/s2/pe/dst/epp/
 tests/s2/pe/dst/backoffice/
@@ -166,6 +190,8 @@ MX S1 direct paths use the country-scoped structure:
 ```bash
 npx playwright test tests/s1/mx/dst/base-store --project=chromium --workers=1 --grep-invert @destructive
 npx playwright test tests/s1/mx/dst/backoffice --project=chromium --workers=1
+npm run qst:mx:base-store
+npm run qst:mx:list
 ```
 
 All PE DST and QST commands collect only normalized `tests/s2/pe` paths.
@@ -179,7 +205,15 @@ The current Samsung Account bootstrap is PE S2-specific and may require human in
 3. Keep Chrome open and run `npm run auth:export` in another terminal.
 4. Run `npm run auth:verify` to validate the exported session.
 
-Dedicated profiles and `playwright/.auth/` state are ignored by Git. Credentials, cookies and tokens must remain runtime-only. PE authentication state must not be assumed valid for MX, CL, CO or EPP.
+MX S1 has an independent authenticated-session flow:
+
+```bash
+npm run auth:open-profile:mx
+npm run auth:export:mx
+npm run auth:verify:mx
+```
+
+Dedicated profiles and `playwright/.auth/` state are ignored by Git. Credentials, cookies and tokens must remain runtime-only. PE authentication state must not be assumed valid for MX, CL, CO or EPP, and MX state must be renewed when its independent verification fails.
 
 ## EPP
 
@@ -254,6 +288,7 @@ Coverage status changes require an explicit scenario mapping, executable asserti
 
 - [PE DST Coverage](docs/COVERAGE_MATRIX.md)
 - [MX S1 DST Base Store Coverage](docs/DST_MX_BASE_STORE_COVERAGE_MATRIX.md)
+- [MX S1 QST Base Store Coverage](docs/MX_QST_COVERAGE_MATRIX.md)
 - [PE DST EPP Coverage](docs/DST_EPP_COVERAGE_MATRIX.md)
 - [PE QST Coverage](docs/QST_COVERAGE_MATRIX.md)
 - [QST Automation Guide](docs/QST_AUTOMATION_GUIDE.md)

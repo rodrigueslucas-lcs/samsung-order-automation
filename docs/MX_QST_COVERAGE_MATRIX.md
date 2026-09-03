@@ -4,7 +4,7 @@
 
 | ID | Scenario | Initial status | Evidence / dependency |
 |---|---|---|---|
-| QST 01 | Homepage | Not implemented | Explicitly outside this batch. |
+| QST 01 | Homepage | Partial | Headed S1 diagnostic validated the Samsung header and `Productos y Servicios` footer, but the rendered homepage had no hero or Top Seller section; it transitioned from benefit tiles to `Accenture Samsung Store Offers` and the footer. No permissive locator was added. |
 | QST 02 | Open PLP from navigation | Not implemented | Explicitly outside this batch. |
 | QST 03 | PLP details/facets/variant | Not implemented | Explicitly outside this batch. |
 | QST 04 | Navigate to PDP | Automated | Headed Chrome passed using the configured MX PDP flow. |
@@ -39,8 +39,8 @@
 | Status | Count |
 |---|---:|
 | Automated | 8 |
-| Partial | 1 |
+| Partial | 2 |
 | Implemented — not run | 3 |
 | Blocked | 5 |
-| Not implemented | 5 |
+| Not implemented | 4 |
 | **Total** | **22** |
