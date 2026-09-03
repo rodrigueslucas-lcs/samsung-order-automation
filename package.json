@@ -22,7 +22,9 @@
     "qst:sanity": "node scripts/qst-run.cjs sanity",
     "qst:base-store": "node scripts/qst-run.cjs normal base-store",
     "qst:epp": "node scripts/qst-run.cjs normal epp",
-    "qst:list": "playwright test tests/s2/pe/qst --project=chromium --list"
+    "qst:list": "playwright test tests/s2/pe/qst --project=chromium --list",
+    "qst:mx:base-store": "playwright test tests/s1/mx/qst/base-store --project=chromium --workers=1 --grep-invert @destructive",
+    "qst:mx:list": "playwright test tests/s1/mx/qst/base-store --project=chromium --list"
   },
   "keywords": [],
   "author": "",
