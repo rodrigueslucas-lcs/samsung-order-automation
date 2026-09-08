@@ -11,16 +11,16 @@ function normalizeMarket(value) {
 }
 
 function getMarketQst(value) {
-  return mapping.markets[normalizeMarket(value)];
+  const market = normalizeMarket(value);
+  return mapping.markets[market].cases;
 }
 
 function getQstCase(marketValue, id) {
   const market = normalizeMarket(marketValue);
-  const testCase = mapping.markets[market].find((item) => item.id === id);
-  if (!testCase) {
+  if (!mapping.markets[market].cases.includes(id)) {
     throw new Error(`QST case ${id} was not found for ${market}.`);
   }
-  return testCase;
+  return { market, id };
 }
 
 function validateQstMapping() {
@@ -28,15 +28,15 @@ function validateQstMapping() {
   let total = 0;
 
   for (const [market, expected] of Object.entries(EXPECTED_COUNTS)) {
-    const cases = mapping.markets[market] || [];
+    const marketMapping = mapping.markets[market];
+    const cases = marketMapping?.cases || [];
     total += cases.length;
 
-    if (cases.length !== expected) {
+    if (marketMapping?.count !== expected || cases.length !== expected) {
       errors.push(`${market}: expected ${expected}, found ${cases.length}`);
     }
 
-    const ids = cases.map((item) => item.id);
-    const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
+    const duplicates = cases.filter((id, index) => cases.indexOf(id) !== index);
     if (duplicates.length) {
       errors.push(`${market}: duplicate IDs ${[...new Set(duplicates)].join(", ")}`);
     }
