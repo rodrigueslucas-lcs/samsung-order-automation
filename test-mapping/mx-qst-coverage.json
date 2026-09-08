@@ -1,0 +1,63 @@
+{
+  "$schemaVersion": 1,
+  "market": "MX",
+  "officialTotal": 37,
+  "policy": "Conservative mapping: full only when the current Playwright test covers the official Zephyr intent end-to-end; partial when only part of the official steps/expected result is proven.",
+  "mapped": {
+    "SAM-24962": {
+      "coverage": "full",
+      "spec": "tests/s1/mx/qst/base-store/authenticated-safe.spec.js",
+      "test": "MX QST 15 - Login via Home Page",
+      "notes": "Registered user session is verified on the MX storefront via visible account control."
+    },
+    "SAM-24971": {
+      "coverage": "partial",
+      "spec": "tests/s1/mx/qst/base-store/safe-reuse.spec.js",
+      "test": "MX QST 06 + QST 07 + QST 08 - Add product and validate Cart",
+      "notes": "Cart, SKU and order summary are validated; the official Cart UI case also calls out thumbnail, services, info icons and footer, which are not all asserted in this test."
+    },
+    "SAM-24981": {
+      "coverage": "partial",
+      "spec": "tests/s1/mx/qst/base-store/safe-storefront.spec.js",
+      "test": "MX QST 10 - Add Samsung Care+",
+      "notes": "Samsung Care+ is added and reflected in cart, but the official case is specifically BC/PDP-oriented and uses WMC/PreQA context."
+    },
+    "SAM-24982": {
+      "coverage": "partial",
+      "spec": "tests/s1/mx/qst/base-store/safe-storefront.spec.js",
+      "test": "MX QST 09 - Add Trade-In",
+      "notes": "Trade-in UI is opened and validated, but the current test does not complete and prove the full official cart result."
+    },
+    "SAM-24988": {
+      "coverage": "full",
+      "spec": "tests/s1/mx/qst/base-store/safe-reuse.spec.js",
+      "test": "MX QST 11 - Navigate to Checkout",
+      "notes": "A controlled cart proceeds through the checkout button and proves navigation to checkout/guest entry."
+    },
+    "SAM-24994": {
+      "coverage": "partial",
+      "spec": "tests/s1/mx/qst/base-store/safe-reuse.spec.js",
+      "test": "MX QST 12 - Enter guest address",
+      "notes": "A new address is accepted through payment navigation, but the official scenario covers new shipping and billing address behavior more broadly."
+    },
+    "SAM-25002": {
+      "coverage": "full",
+      "spec": "tests/s1/mx/qst/base-store/registered-order.spec.js",
+      "test": "MX QST 16 - Registered Amex order",
+      "notes": "Registered Base Store user reaches payment, fills card data, submits exactly once and captures the created MX order code."
+    },
+    "SAM-25011": {
+      "coverage": "partial",
+      "spec": "tests/s1/mx/qst/base-store/backoffice.spec.js",
+      "test": "MX QST 19 - See exact order status",
+      "notes": "The automation searches and opens an exact order in BackOffice. The official case also mentions order/product basic and advanced search, so full coverage is not claimed."
+    }
+  },
+  "extraAutomation": [
+    {
+      "spec": "tests/s1/mx/qst/base-store/backoffice-fulfillment.spec.js",
+      "scope": "Order fulfillment / controlled S1 cron flow",
+      "notes": "Useful business-flow automation, but not mapped to SAM-25011 because the official MX Backoffice TC is a search-validation case."
+    }
+  ]
+}
