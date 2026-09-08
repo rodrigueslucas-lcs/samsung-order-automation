@@ -50,13 +50,25 @@ export default class BackOfficeOrderPage extends BackOfficePage {
     await searchInput.fill(orderCode);
 
     const searchToolbar = searchInput.locator("xpath=../..");
-    await searchToolbar.locator('button[title="Search"]').click();
+    await this.waitForZkUpdate(() =>
+      searchToolbar.locator('button[title="Search"]').click()
+    );
 
     const result = this.page.getByRole("row", {
       name: new RegExp(`Order Nr\\.: ${this.escapeRegExp(orderCode)}`),
     });
     await result.waitFor({ state: "visible", timeout: 30000 });
     return result;
+  }
+
+  async openAdminOrderByCode(orderCode) {
+    const row = await this.searchAdminOrder(orderCode);
+    await this.waitForZkUpdate(() => row.click());
+    await this.page
+      .locator(`input[value="${orderCode}"]`)
+      .filter({ visible: true })
+      .first()
+      .waitFor({ state: "visible", timeout: 30000 });
   }
 
   async readVisibleAdminOrders() {
@@ -92,15 +104,37 @@ export default class BackOfficeOrderPage extends BackOfficePage {
     return { orderCode: order.orderCode, status };
   }
 
-  async readOpenAdminOrderStatus() {
-    const statusControl = this.page
-      .getByRole("button", {
-        name: /^(created|processing|completed|shipped|cancelled|waiting for send financial|order split|shipping requested|temporary[_ ]\w+)$/i,
-      })
+  async readOpenAdminOrderStatus(expectedOrderCode = null) {
+    if (expectedOrderCode) {
+      const orderNumberControl = this.page
+        .locator(`input[value="${expectedOrderCode}"]`)
+        .filter({ visible: true })
+        .first();
+      await orderNumberControl.waitFor({ state: "visible", timeout: 30000 });
+    }
+
+    let orderStatusLabel = this.page
+      .getByText("Order Status", { exact: true })
       .filter({ visible: true })
-      .last();
+      .first();
+    if (!(await orderStatusLabel.isVisible().catch(() => false))) {
+      const paymentAndDeliveryTab = this.page.getByRole("tab", {
+        name: "Payment and Delivery",
+        exact: true,
+      });
+      await this.waitForZkUpdate(() => paymentAndDeliveryTab.click());
+      orderStatusLabel = this.page
+        .getByText("Order Status", { exact: true })
+        .filter({ visible: true })
+        .first();
+    }
+    await orderStatusLabel.waitFor({ state: "visible", timeout: 30000 });
+
+    const statusControl = orderStatusLabel
+      .locator("xpath=ancestor::*[@role='cell' or self::td][1]")
+      .getByRole("textbox");
     await statusControl.waitFor({ state: "visible", timeout: 30000 });
-    const status = (await statusControl.innerText()).replace(/\s+/g, " ").trim();
+    const status = (await statusControl.inputValue()).replace(/\s+/g, " ").trim();
     if (!status) {
       throw new Error("The opened Admin order had an empty Status control.");
     }

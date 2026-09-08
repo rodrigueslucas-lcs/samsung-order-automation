@@ -193,6 +193,14 @@ export default class MxCheckoutPage extends BasePage {
     }
 
     const standardDeliveryCard = standardDeliveryCards.first();
+    const deliveryModeUpdate = this.page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        /\/users\/current\/carts\/current\/deliverymodes\/update(?:\?|$)/.test(
+          new URL(response.url()).pathname
+        ),
+      { timeout: 30000 }
+    );
     await standardDeliveryCard.click();
     const selected = await this.page
       .waitForFunction(
@@ -204,6 +212,12 @@ export default class MxCheckoutPage extends BasePage {
       .catch(() => false);
     if (!selected) {
       throw new Error("MX Standard delivery card did not become selected.");
+    }
+    const deliveryModeResponse = await deliveryModeUpdate;
+    if (!deliveryModeResponse.ok()) {
+      throw new Error(
+        `MX Standard delivery update failed with HTTP ${deliveryModeResponse.status()}.`
+      );
     }
 
     const resolveContinueButton = async () => {

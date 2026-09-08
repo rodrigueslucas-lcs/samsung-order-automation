@@ -32,7 +32,10 @@ test("MX TC1 TC2 authenticated subset @dst @mx @registered - saved Samsung Accou
   const profile = page.getByRole("button", { name: "My Profile", exact: true });
   await profile.hover();
   await expect(
-    page.getByRole("link", { name: /^Cerrar Sesi[oó]n$/i }).filter({ visible: true })
+    page
+      .locator('[role="menu"].profile-menu')
+      .filter({ hasText: /Cerrar Sesi[oó]n/i })
+      .filter({ visible: true })
   ).toBeVisible();
 });
 

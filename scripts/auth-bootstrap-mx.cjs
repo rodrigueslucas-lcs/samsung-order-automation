@@ -52,17 +52,25 @@ async function openAuthenticatedProfileMenu(page) {
   reportStep("My Profile is visible");
   await profileButton.hover();
 
-  const logout = page
-    .getByRole("link", { name: /^Cerrar Sesi[oó]n$/i })
-    .filter({ visible: true });
-  if (!(await logout.isVisible().catch(() => false))) {
-    await profileButton.click();
-  }
-  await logout.waitFor({ state: "visible", timeout: 30000 }).catch(() => {
+  await page.waitForFunction(() => {
+    return [...document.querySelectorAll('[role="menu"].profile-menu')].some(
+      (menu) =>
+        menu.offsetParent !== null &&
+        !menu.classList.contains("mat-menu-panel-animating") &&
+        /Cerrar Sesi[oó]n|Iniciar Sesi[oó]n/i.test(menu.innerText)
+    );
+  }, null, { timeout: 30000 });
+
+  const profileMenu = page
+    .locator('[role="menu"].profile-menu')
+    .filter({ hasText: /Cerrar Sesi[oó]n|Iniciar Sesi[oó]n/i })
+    .filter({ visible: true })
+    .last();
+  if (!/Cerrar Sesi[oó]n/i.test(await profileMenu.innerText())) {
     throw new Error(
       "the S1 MX profile menu is signed out; complete the manual login and keep Chrome open"
     );
-  });
+  }
   reportStep("authenticated profile menu is open and Cerrar sesión is visible");
 }
 

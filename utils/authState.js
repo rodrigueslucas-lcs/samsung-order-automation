@@ -12,6 +12,8 @@ function createAuthState({
   enforceHostname = true,
   profileMenuTrigger = "click",
   logoutLinkName = null,
+  logoutTextName = "Cerrar sesión",
+  authenticatedMenuSelector = null,
 }) {
   const AUTH_STATE_PATH = path.resolve(authStatePath);
   const AUTH_SESSION_STORAGE_PATH = path.resolve(sessionStoragePath);
@@ -67,13 +69,23 @@ function createAuthState({
     await profileButton.waitFor({ state: "visible", timeout: 60000 });
     await page.keyboard.press("Escape");
 
-    const logout = logoutLinkName
-      ? page.getByRole("link", { name: logoutLinkName }).filter({ visible: true })
-      : page.getByText("Cerrar sesión", { exact: true }).filter({ visible: true });
+    const logout = authenticatedMenuSelector
+      ? page
+          .locator(authenticatedMenuSelector)
+          .filter({ hasText: logoutTextName })
+          .filter({ visible: true })
+          .last()
+      : logoutLinkName
+        ? page.getByRole("link", { name: logoutLinkName }).filter({ visible: true })
+        : page.getByText(logoutTextName, { exact: true }).filter({ visible: true });
 
     if (profileMenuTrigger === "hover") {
       await profileButton.hover();
-      if (!(await logout.isVisible().catch(() => false))) {
+      const openedFromHover = await logout
+        .waitFor({ state: "visible", timeout: authenticatedMenuSelector ? 10000 : 1000 })
+        .then(() => true)
+        .catch(() => false);
+      if (!openedFromHover) {
         await profileButton.click();
       }
     } else {
@@ -88,13 +100,15 @@ function createAuthState({
   }
 
   async function validateAuthenticatedSession(page) {
-    await page.goto(setupUrl, { waitUntil: "domcontentloaded" });
-    if (enforceHostname && new URL(page.url()).hostname !== hostname) {
-      throw new Error(`Unexpected ${label} setup host.`);
+    if (setupUrl) {
+      await page.goto(setupUrl, { waitUntil: "domcontentloaded" });
+      if (enforceHostname && new URL(page.url()).hostname !== hostname) {
+        throw new Error(`Unexpected ${label} setup host.`);
+      }
+      await page
+        .getByText(/You can access pages now/i)
+        .waitFor({ state: "visible", timeout: 60000 });
     }
-    await page
-      .getByText(/You can access pages now/i)
-      .waitFor({ state: "visible", timeout: 60000 });
 
     await page.goto(validationUrl, { waitUntil: "domcontentloaded" });
 

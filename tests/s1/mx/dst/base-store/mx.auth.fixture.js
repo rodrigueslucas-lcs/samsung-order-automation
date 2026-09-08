@@ -22,14 +22,16 @@ test.use({
   launchOptions: { args: ["--start-maximized"] },
 });
 
-test.beforeEach(async ({ context, page }) => {
+test.beforeEach(async ({ context, page }, testInfo) => {
+  testInfo.setTimeout(180000);
   test.skip(!hasAuthState(), "Dedicated MX S1 authenticated state is required.");
   await applyAuthSessionStorage(context);
   await validateAuthenticatedSession(page);
   await page.mouse.move(20, 500);
   await page.keyboard.press("Escape");
   await page
-    .getByRole("link", { name: /^Cerrar Sesi[oó]n$/i })
+    .locator('[role="menu"].profile-menu')
+    .filter({ hasText: /Cerrar Sesi[oó]n/i })
     .filter({ visible: true })
     .waitFor({ state: "hidden", timeout: 30000 });
 });

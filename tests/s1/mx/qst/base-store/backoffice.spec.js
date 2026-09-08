@@ -24,10 +24,8 @@ test("MX QST 19 @qst @mx @base-store @backoffice @safe - See exact order status"
   const orders = new BackOfficeOrderPage(page);
   await orders.login({ username, password, authority: "admin" });
   await orders.openAdminOrders();
-  const row = await orders.searchAdminOrder(orderCode);
-  await expect(row).toContainText(orderCode);
-  await row.click();
-  const status = await orders.readOpenAdminOrderStatus();
+  await orders.openAdminOrderByCode(orderCode);
+  const status = await orders.readOpenAdminOrderStatus(orderCode);
   expect(status).toBeTruthy();
   console.log("MX_QST_ORDER_STATUS", JSON.stringify({ orderCode, status }));
 });

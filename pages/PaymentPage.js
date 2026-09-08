@@ -333,8 +333,15 @@ export default class PaymentPage extends BasePage {
       name: "Nuevo método de pago",
       exact: true,
     });
-    await newPaymentMethod.waitFor({ state: "visible", timeout: 30000 });
-    if (!(await newPaymentMethod.isChecked())) {
+    const cardNumberField = this.page
+      .frameLocator('iframe[name="cardNumber"]')
+      .locator("#cardNumber");
+    const paymentState = await Promise.race([
+      cardNumberField.waitFor({ state: "visible", timeout: 30000 }).then(() => "CARD_FORM"),
+      newPaymentMethod.waitFor({ state: "visible", timeout: 30000 }).then(() => "NEW_METHOD"),
+    ]);
+
+    if (paymentState === "NEW_METHOD" && !(await newPaymentMethod.isChecked())) {
       await this.page.locator(".overlay-spinner").waitFor({
         state: "hidden",
         timeout: 30000,
@@ -359,14 +366,11 @@ export default class PaymentPage extends BasePage {
       await newPaymentMethodLabel.scrollIntoViewIfNeeded();
       await newPaymentMethodLabel.click();
     }
-    if (!(await newPaymentMethod.isChecked())) {
+    if (paymentState === "NEW_METHOD" && !(await newPaymentMethod.isChecked())) {
       throw new Error("Nuevo método de pago did not remain selected.");
     }
 
-    await this.page
-      .frameLocator('iframe[name="cardNumber"]')
-      .locator("#cardNumber")
-      .waitFor({ state: "visible", timeout: 60000 });
+    await cardNumberField.waitFor({ state: "visible", timeout: 60000 });
 
     await this.cardHolderInput.waitFor({ state: "visible", timeout: 60000 });
 
