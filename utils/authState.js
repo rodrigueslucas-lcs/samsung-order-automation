@@ -66,7 +66,15 @@ function createAuthState({
       exact: true,
     });
 
-    await profileButton.waitFor({ state: "visible", timeout: 60000 });
+    const profileVisible = await profileButton
+      .waitFor({ state: "visible", timeout: 60000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!profileVisible) {
+      throw new Error(
+        `The saved ${label} storefront access/auth state is not usable; the storefront did not render My Profile. ${AUTH_REFRESH_INSTRUCTION}`
+      );
+    }
     await page.keyboard.press("Escape");
 
     const logout = authenticatedMenuSelector
