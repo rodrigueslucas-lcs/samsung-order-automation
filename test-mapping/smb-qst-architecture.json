@@ -2,6 +2,7 @@
   "$schemaVersion": 1,
   "source": "Samsung_SMB_QST_Master_144_Architecture_Matrix.xlsx (official Zephyr detailed pages + Folder exports, 2026-09-08)",
   "total": 144,
+  "populatedMarkets": ["MX"],
   "markets": {
     "MX": {
       "count": 37,
@@ -49,5 +50,5 @@
     "CO": {"count":35,"cases":[]},
     "PE": {"count":34,"cases":[]}
   },
-  "note": "MX architecture metadata is populated first. CL/CO/PE counts are reserved for incremental population from the already-verified 144-case master; empty case arrays are intentionally not treated as complete catalogs. Store is null where the Folder label did not expose Site."
+  "note": "Only markets listed in populatedMarkets have case-level architecture metadata in this file. CL/CO/PE counts are official reference counts reserved for incremental population from the already-verified 144-case master. Store is null where the Folder label did not expose Site."
 }
