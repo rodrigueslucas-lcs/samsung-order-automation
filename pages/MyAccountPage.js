@@ -19,35 +19,73 @@ export function toStagingSamsungUrl(value) {
   return url.toString();
 }
 
+function normalizeOrigin(value) {
+  const url = new URL(value);
+  if (url.protocol !== "https:") {
+    throw new Error("My Account storefront origin must use https.");
+  }
+  return url.origin;
+}
+
+function normalizeMarket(value) {
+  const market = String(value || "pe").trim().toLowerCase();
+  if (!/^[a-z]{2}$/.test(market)) {
+    throw new Error(`Invalid My Account market route: ${value}`);
+  }
+  return market;
+}
+
 export default class MyAccountPage extends BasePage {
-  constructor(page) {
+  constructor(page, options = {}) {
     super(page);
+    this.origin = normalizeOrigin(options.origin || STAGING_ORIGIN);
+    this.market = normalizeMarket(options.market || "pe");
+    const root = `/${this.market}`;
     this.routes = {
-      root: "/pe/mypage",
-      myProducts: "/pe/mypage/myproducts",
-      rewards: "/pe/mypage/rewards",
-      orders: "/pe/mypage/orders",
-      wishlist: "/pe/mypage/wishlist",
-      selectAi: "/pe/campaign/select-ai",
+      root: `${root}/mypage`,
+      myProducts: `${root}/mypage/myproducts`,
+      rewards: `${root}/mypage/rewards`,
+      orders: `${root}/mypage/orders`,
+      wishlist: `${root}/mypage/wishlist`,
+      selectAi: `${root}/campaign/select-ai`,
     };
   }
 
   assertStagingUrl(value = this.page.url()) {
     const url = new URL(value);
-    if (url.hostname !== "stg2.shop.samsung.com") {
-      throw new Error(`Refusing My Account interaction outside ST2: ${url.origin}`);
+    const expected = new URL(this.origin);
+    if (url.origin !== expected.origin) {
+      throw new Error(
+        `Refusing My Account interaction outside configured storefront: ${url.origin}`
+      );
+    }
+    if (!url.pathname.toLowerCase().startsWith(`/${this.market}/`)) {
+      throw new Error(
+        `Refusing My Account interaction outside /${this.market}/: ${url.pathname}`
+      );
     }
     return url;
   }
 
   async openRoute(route) {
-    const target = toStagingSamsungUrl(route);
-    const response = await this.page.goto(target, {
+    const target = new URL(route, `${this.origin}/`);
+    if (target.origin !== this.origin) {
+      throw new Error(`Refusing unexpected My Account target: ${target.origin}`);
+    }
+    if (!target.pathname.toLowerCase().startsWith(`/${this.market}/`)) {
+      throw new Error(
+        `Refusing My Account route outside /${this.market}/: ${target.pathname}`
+      );
+    }
+
+    const response = await this.page.goto(target.href, {
       waitUntil: "domcontentloaded",
       timeout: 60000,
     });
     this.assertStagingUrl();
-    await expect(this.page).toHaveURL(new RegExp(route.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    await expect(this.page).toHaveURL(
+      new RegExp(route.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    );
     return response;
   }
 
