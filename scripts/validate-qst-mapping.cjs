@@ -3,6 +3,7 @@ const { validateMxQstCoverage } = require("../utils/qstCoverage");
 const { validateMxPartialPlan } = require("../utils/qstPartialPlan");
 const { validateSharedCoreFamilies } = require("../utils/qstArchitecture");
 const { validatePeQstReusePlan } = require("../utils/qstPeReusePlan");
+const { validateS1OfficialImplementation } = require("../utils/qstS1Implementation");
 
 const result = validateQstMapping();
 console.log(`SMB QST mapping OK: ${result.total} test cases`);
@@ -32,4 +33,12 @@ console.log(
   `PE QST reuse plan OK: ${peReuse.officialTotal} official cases ` +
     `(direct=${peReuse.directCandidate}, extension=${peReuse.extensionCandidate}, ` +
     `destructive=${peReuse.destructiveCandidate}, missing=${peReuse.missing})`
+);
+
+const implementation = validateS1OfficialImplementation();
+console.log(
+  "S1 official QST implementation inventory OK: " +
+    Object.entries(implementation)
+      .map(([market, entry]) => `${market}=${entry.implementedCount}/${entry.officialTotal}`)
+      .join(", ")
 );
