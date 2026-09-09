@@ -38,6 +38,7 @@ test("recognizes the observed WMC authentication gate", () => {
 
 test("classifies WMC, SSO, SingleID MFA and PreQA2 without retaining query strings", () => {
   assert.equal(classifyWmcUrl("https://wds.samsung.com/wds/sso/login/forwardLogin.do"), "wmc-login");
+  assert.equal(classifyWmcUrl("https://wds.samsung.com/wds/sso/login/ssoLoginSuccess.do"), "wmc");
   assert.equal(classifyWmcUrl("https://wds.samsung.com/wds/main.do"), "wmc");
   assert.equal(
     classifyWmcUrl("https://scloud.singleid.samsung.net/secdx/common/verification/select?requestId=secret"),

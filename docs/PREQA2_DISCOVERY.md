@@ -14,7 +14,7 @@ The approved sequence is:
 
 No credentials, cookies, tokens, or storage state are persisted by the repository helper. `utils/preqa2Bootstrap.js` validates the exact PreQA2 host and fails closed when the WMC gate is present.
 
-`npm run preqa2:bootstrap` launches real Chrome with the Git-ignored persistent profile `playwright/profiles/preqa2-smb`. It first reuses a valid WMC session when one exists. Otherwise it opens Samsung Employees AD SSO and detects Samsung SSO/SingleID; MFA selection and approval remain manual. The process stays alive for up to two hours by default, detects the authenticated WMC return, opens the approved Preqa2 target, and performs `/sites/` → `/getcookies` → the requested market route automatically.
+`npm run preqa2:bootstrap` launches real Chrome with the Git-ignored persistent profile `playwright/profiles/preqa2-smb`. For a user-visible Chrome started with that same profile and a local debugging port, set `PREQA2_CDP_URL`; the bootstrap attaches to its existing context instead of creating another browser. It first reuses a valid WMC session when one exists. Otherwise it opens Samsung Employees AD SSO and detects Samsung SSO/SingleID; MFA selection and approval remain manual. The process stays alive for up to two hours by default, detects the authenticated WMC return, opens the approved Preqa2 target, and performs `/sites/` → `/getcookies` → the requested market route automatically.
 
 For a one-time corporate sign-in, `WMC_SSO_EMAIL` and `WMC_SSO_PASSWORD` may be supplied only in the runtime process. The bootstrap removes both entries from `process.env` after reading them, submits the SSO form at most once, never logs their values, and never writes them to disk. SingleID option selection and biometric approval are always manual.
 
@@ -22,16 +22,37 @@ For repeatable local-only execution, the same keys may be stored in `.env.preqa2
 
 Diagnostics contain only origin/path identities; SSO/MFA query strings are never written. Discovery output remains below the Git-ignored `test-results/preqa2/` directory. The profile persists browser-managed session state locally but is never versioned or exported as evidence.
 
-## Discovery status — 2026-09-09
+## Runtime proof — 2026-09-09
 
-The controlled browser did not share the user's existing WMC session. The live request reached the official AEM gate, so storefront DOM discovery could not safely proceed in this run.
+The complete flow passed in a user-visible Chrome through local CDP while retaining one persistent browser context:
+
+1. WMC opened **Samsung Employees / AD SSO**.
+2. Samsung SSO accepted runtime-only credentials.
+3. SingleID displayed **SingleID Authenticator - Bio**; the user selected it and approved MFA on the enrolled phone.
+4. The same browser returned to authenticated WMC.
+5. WMC opened **QA / Preqa2**.
+6. The bootstrap completed `/sites/` → `/getcookies` → `/mx/`.
+7. MX rendered at `https://p6-pre-qa2.samsung.com/mx/`, and the ignored `discovery.json` was written.
+
+This proves the complete bootstrap in the current session. It does not yet prove that WMC authentication will remain reusable after expiry, revocation, browser restart, or a later execution.
+
+## Safe MX storefront discovery — 2026-09-09
 
 | Market | Route | Status |
 |---|---|---|
-| MX | `/mx/` | Not opened after bootstrap; WMC session required |
-| CL | `/cl/` | Not opened after bootstrap; WMC session required |
-| CO | `/co/` | Not opened after bootstrap; WMC session required |
-| PE | `/pe/` | Not opened after bootstrap; WMC session required |
+| MX | `/mx/` | Opened successfully after the full WMC bootstrap |
+| CL | `/cl/` | Not opened; no live evidence in this run |
+| CO | `/co/` | Not opened; no live evidence in this run |
+| PE | `/pe/` | Not opened; no live evidence in this run |
+
+Observed MX evidence, without cart or account mutation:
+
+- Home exposes a semantic `banner`, `navigation` labelled `main navigation`, and footer content. The current `HomePage` constructor can reuse this target through configured `setupUrl`, `homeUrl`, and footer heading pattern; its PE defaults must not be used implicitly.
+- The linked smartphones category page opened at `/mx/smartphones/all-smartphones/`. It renders a `Filtros` heading, but this run did not expose a stable interactive facets control or prove a filtered result. `SAM-24968` therefore remains Missing.
+- A PDP discovered from that page opened at `/mx/smartphones/galaxy-z-flip6/buy/`. It exposes semantic headings for `Dispositivo`, `Almacenamiento`, `Color`, and `Galaxy Canje`; visible labels included the `256GB | 12GB` and `512GB | 12GB` variants. No add-to-cart action was executed.
+- The storefront account control rendered `Manage Account` / `Iniciar Sesión/Registrarme`. WMC authentication protects PreQA content access but is not evidence of a signed-in Samsung Account storefront user.
+
+The S1 MX `mxConfig.js` hard guard remains intentionally scoped to `stg.shop.samsung.com`; it must not be weakened for PreQA2. Generic Page Objects that already accept target URLs can be reused, while S1 MX cart, checkout, auth-state, and order helpers remain environment-specific until equivalent PreQA2 behavior is observed safely.
 
 ## Official MX candidates
 

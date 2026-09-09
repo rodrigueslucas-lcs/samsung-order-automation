@@ -30,7 +30,7 @@ function classifyWmcUrl(value) {
     return /singleid|verification|mfa/i.test(`${hostname}${url.pathname}`) ? "mfa" : "sso";
   }
   if (hostname === WMC_HOST) {
-    return /\/sso\/login\//i.test(url.pathname) ? "wmc-login" : "wmc";
+    return /\/sso\/login\/forwardLogin\.do$/i.test(url.pathname) ? "wmc-login" : "wmc";
   }
   return "other";
 }
