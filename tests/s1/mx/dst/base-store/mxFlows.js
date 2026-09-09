@@ -24,7 +24,7 @@ function configuredCart(page, config) {
   });
 }
 
-export async function reachMxGuestPayment(page, config, email) {
+export async function reachMxGuestDelivery(page, config, email) {
   await page.goto(config.bootstrapUrl.toString(), { waitUntil: "domcontentloaded" });
   await expect(page.getByText(/You can access pages now/i)).toBeVisible({ timeout: 60000 });
   const product = configuredProduct(page, config);
@@ -35,6 +35,11 @@ export async function reachMxGuestPayment(page, config, email) {
   await checkout.startGuest(email);
   await checkout.fillContact({ firstName: "MX", lastName: "Automation", phone: "5512345678" });
   await checkout.validateCheckoutSummary(config.sku);
+  return { checkout, cart };
+}
+
+export async function reachMxGuestPayment(page, config, email) {
+  const { checkout } = await reachMxGuestDelivery(page, config, email);
   const address = await checkout.fillDelivery({
     postalCode: "01000",
     street: "Avenida Revolucion",
