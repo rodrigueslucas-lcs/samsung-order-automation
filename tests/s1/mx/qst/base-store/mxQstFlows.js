@@ -46,6 +46,26 @@ export async function prepareMxQstCart(page, config) {
   return cart;
 }
 
+export async function validateMxCartProductPresentation(page, config) {
+  const main = page.getByRole("main");
+  const sku = main.getByText(config.sku, { exact: true }).filter({ visible: true });
+  await expect(sku).toHaveCount(1);
+
+  const item = sku.locator(
+    "xpath=ancestor::*[.//input[@aria-label='Quantity'] and .//button[@aria-label='Remove']][1]"
+  );
+  await expect(item).toBeVisible({ timeout: 30000 });
+
+  const price = item.getByText(/\$\s*[\d,.]+/).filter({ visible: true }).first();
+  await expect(price).toBeVisible({ timeout: 30000 });
+
+  const images = item.locator("img:visible");
+  expect(await images.count()).toBeGreaterThan(0);
+  const image = images.first();
+  await expect(image).toBeVisible({ timeout: 30000 });
+  expect((await image.getAttribute("src")) || (await image.getAttribute("data-src"))).toBeTruthy();
+}
+
 export async function openMxService(page, name) {
   const button = page.getByRole("button", {
     name: new RegExp(`Agregar ahora\\s*${name}`, "i"),
