@@ -57,7 +57,8 @@
     "reporting:preqa2": "node reporters/preqa2/generatePreqa2Report.cjs",
     "reporting:preqa2:status": "node reporters/preqa2/generatePreqa2Status.cjs",
     "reporting:preqa2:test": "node --test reporter-tests/preqa2Executive.test.cjs reporter-tests/preqa2Status.test.cjs",
-    "reporting:all": "npm run reporting:evidence:test && npm run reporting:executive:test && npm run reporting:preqa2:test && npm run reporting:executive && npm run reporting:preqa2 && npm run reporting:preqa2:status"
+    "reporting:all": "npm run reporting:evidence:test && npm run reporting:executive:test && npm run reporting:preqa2:test && npm run reporting:executive && npm run reporting:preqa2 && npm run reporting:preqa2:status",
+    "preqa2:validate:safe": "node scripts/preqa2-safe-validation.cjs"
   },
   "keywords": [],
   "author": "",

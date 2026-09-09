@@ -41,14 +41,14 @@ This proves the complete bootstrap in the current session. It does not yet prove
 | Market | Route | Status |
 |---|---|---|
 | MX | `/mx/` | Opened successfully after the full WMC bootstrap |
-| CL | `/cl/` | Not opened; no live evidence in this run |
-| CO | `/co/` | Not opened; no live evidence in this run |
-| PE | `/pe/` | Not opened; no live evidence in this run |
+| CL | `/cl/` | Opened through the approved bootstrap; navigation landmark observed, but no official TC executed |
+| CO | `/co/` | Opened through the approved bootstrap; navigation landmark observed, but no official TC executed |
+| PE | `/pe/` | Opened through the approved bootstrap; navigation landmark observed, but no official TC executed |
 
 Observed MX evidence, without cart or account mutation:
 
 - Home exposes a semantic `banner`, `navigation` labelled `main navigation`, and footer content. The current `HomePage` constructor can reuse this target through configured `setupUrl`, `homeUrl`, and footer heading pattern; its PE defaults must not be used implicitly.
-- The linked smartphones category page opened at `/mx/smartphones/all-smartphones/`. It renders a `Filtros` heading, but this run did not expose a stable interactive facets control or prove a filtered result. `SAM-24968` therefore remains Missing.
+- The linked smartphones category page opened at `/mx/smartphones/all-smartphones/`. It renders a `Filtros` heading, but no visible filter button or checkbox. The visible `Ordenar` control only changes sorting and does not satisfy the official facet/filter intent. `SAM-24968` therefore failed authoritative PreQA2 validation and remains Missing in automation coverage.
 - A PDP discovered from that page opened at `/mx/smartphones/galaxy-z-flip6/buy/`. It exposes semantic headings for `Dispositivo`, `Almacenamiento`, `Color`, and `Galaxy Canje`; visible labels included the `256GB | 12GB` and `512GB | 12GB` variants. No add-to-cart action was executed.
 - The storefront account control rendered `Manage Account` / `Iniciar Sesión/Registrarme`. WMC authentication protects PreQA content access but is not evidence of a signed-in Samsung Account storefront user.
 
@@ -58,7 +58,7 @@ The S1 MX `mxConfig.js` hard guard remains intentionally scoped to `stg.shop.sam
 
 No coverage classification changed. The following remain candidates for authenticated DOM discovery:
 
-- `SAM-24964` — GNB menu: Missing.
+- `SAM-24964` — GNB menu: PASS in authoritative PreQA2; implemented by the CDP live-validation runner.
 - `SAM-24968` — Base Store PLP facets/filter: Missing.
 - `SAM-25001` — Base Store Back to Top: Missing.
 - `SAM-25016` — mobile sticky checkout: Missing.

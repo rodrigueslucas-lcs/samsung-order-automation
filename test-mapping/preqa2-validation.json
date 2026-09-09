@@ -1,5 +1,5 @@
 {
-  "$schemaVersion": 1,
+  "": 1,
   "environment": "PREQA2",
   "authority": "PreQA2 is the official validation environment for the SMB scenarios assigned to this scope. A TC may be marked PASS when its official Expected Result is fully proven here with runtime evidence.",
   "policy": [
@@ -12,9 +12,480 @@
     "Payment/order submission, cron jobs and profile writes remain behind their existing explicit destructive guards."
   ],
   "markets": {
-    "MX": { "officialTotal": 37, "status": "ACTIVE", "results": {} },
-    "CL": { "officialTotal": 38, "status": "NOT_STARTED", "results": {} },
-    "CO": { "officialTotal": 35, "status": "NOT_STARTED", "results": {} },
-    "PE": { "officialTotal": 34, "status": "NOT_STARTED", "results": {} }
-  }
+    "MX": {
+      "officialTotal": 37,
+      "status": "COMPLETE",
+      "results": {
+        "SAM-25046": {
+          "title": "Pay in Cash",
+          "store": "EPP",
+          "feature": "Payment",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-25045": {
+          "title": "Payment using credit card with reg user",
+          "store": "EPP",
+          "feature": "Payment",
+          "status": "NOT_APPLICABLE",
+          "context": "registered",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-25044": {
+          "title": "Back to Top",
+          "store": "EPP",
+          "feature": "UI/Other",
+          "status": "BLOCKED",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": null,
+          "automation": "not-assessed",
+          "blocker": "A legitimate MX EPP PreQA2 entitlement, storefront context and EPP test data were not available; Base Store evidence was not substituted.",
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-25034": {
+          "title": "Step 1: Contact information",
+          "store": "EPP",
+          "feature": "Checkout",
+          "status": "BLOCKED",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": null,
+          "automation": "not-assessed",
+          "blocker": "A legitimate MX EPP PreQA2 entitlement, storefront context and EPP test data were not available; Base Store evidence was not substituted.",
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-25022": {
+          "title": "Cart page UI",
+          "store": "EPP",
+          "feature": "Cart",
+          "status": "BLOCKED",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": null,
+          "automation": "not-assessed",
+          "blocker": "A legitimate MX EPP PreQA2 entitlement, storefront context and EPP test data were not available; Base Store evidence was not substituted.",
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-25021": {
+          "title": "Able to add to Cart from PDP",
+          "store": "EPP",
+          "feature": "Product",
+          "status": "BLOCKED",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": null,
+          "automation": "not-assessed",
+          "blocker": "A legitimate MX EPP PreQA2 entitlement, storefront context and EPP test data were not available; Base Store evidence was not substituted.",
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-25020": {
+          "title": "Facets/Filter",
+          "store": "EPP",
+          "feature": "Product",
+          "status": "BLOCKED",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": null,
+          "automation": "not-assessed",
+          "blocker": "A legitimate MX EPP PreQA2 entitlement, storefront context and EPP test data were not available; Base Store evidence was not substituted.",
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-25016": {
+          "title": "Sticky checkout button on mobile",
+          "store": "BS",
+          "feature": "UI/Other",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-25011": {
+          "title": "Backoffice",
+          "store": "BS",
+          "feature": "Order/BackOffice",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-25010": {
+          "title": "Track Order",
+          "store": "BS",
+          "feature": "Order/BackOffice",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-25006": {
+          "title": "Rewards",
+          "store": "BS",
+          "feature": "Payment",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-25005": {
+          "title": "Pay in Cash",
+          "store": "BS",
+          "feature": "Payment",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-25004": {
+          "title": "Paypal",
+          "store": "BS",
+          "feature": "Payment",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-25002": {
+          "title": "Payment using credit card with reg user",
+          "store": "BS",
+          "feature": "Payment",
+          "status": "NOT_APPLICABLE",
+          "context": "registered",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-25001": {
+          "title": "Back to Top",
+          "store": "BS",
+          "feature": "UI/Other",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-25000": {
+          "title": "Switching delivery modes or saved/new address",
+          "store": "BS",
+          "feature": "Checkout",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24999": {
+          "title": "Invalid address",
+          "store": "BS",
+          "feature": "Checkout",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24995": {
+          "title": "Save option not visible",
+          "store": "BS",
+          "feature": "Checkout",
+          "status": "NOT_APPLICABLE",
+          "context": "guest",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24994": {
+          "title": "Able to checkout with a New address",
+          "store": "BS",
+          "feature": "Checkout",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24993": {
+          "title": "Save option for reg user",
+          "store": "BS",
+          "feature": "Checkout",
+          "status": "NOT_APPLICABLE",
+          "context": "registered",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24992": {
+          "title": "Select saved address",
+          "store": "BS",
+          "feature": "Checkout",
+          "status": "NOT_APPLICABLE",
+          "context": "registered",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24991": {
+          "title": "Able to add/edit new/saved address",
+          "store": "BS",
+          "feature": "Checkout",
+          "status": "NOT_APPLICABLE",
+          "context": "registered",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24990": {
+          "title": "Step 1: Contact information",
+          "store": "BS",
+          "feature": "Checkout",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24989": {
+          "title": "Order Summary on checkout page",
+          "store": "BS",
+          "feature": "Checkout",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24988": {
+          "title": "Checkout button on cart page",
+          "store": "BS",
+          "feature": "Checkout",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24986": {
+          "title": "Cart value on logout",
+          "store": "BS",
+          "feature": "Cart",
+          "status": "NOT_APPLICABLE",
+          "context": "registered",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24985": {
+          "title": "Add Extended Warranty on Cart",
+          "store": "BS",
+          "feature": "Cart",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24982": {
+          "title": "Verify trade-up cart page",
+          "store": "BS",
+          "feature": "Cart",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24981": {
+          "title": "Add SC+ from BC/PDP Page",
+          "store": "BS",
+          "feature": "Cart",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24975": {
+          "title": "Rewards text on cart/checkout/payment",
+          "store": "BS",
+          "feature": "Checkout",
+          "status": "NOT_APPLICABLE",
+          "context": "guest",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24972": {
+          "title": "Increase/decrease/delete the quantity",
+          "store": "BS",
+          "feature": "Cart",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24971": {
+          "title": "Cart page UI",
+          "store": "BS",
+          "feature": "Cart",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24969": {
+          "title": "Add product from BC Page",
+          "store": "BS",
+          "feature": "Product",
+          "status": "NOT_APPLICABLE",
+          "context": "unknown",
+          "runtimePath": null,
+          "evidence": "This Cart, Checkout, Payment, Order, mobile-commerce or BackOffice scenario is not applicable to PreQA2 and is handed off to the Staging validation campaign.",
+          "automation": "not-assessed",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24968": {
+          "title": "Facets/Filter",
+          "store": "BS",
+          "feature": "Product",
+          "status": "FAIL",
+          "context": "unknown",
+          "runtimePath": "/mx/smartphones/all-smartphones/",
+          "evidence": "Gama de productos expanded and Galaxy Z became selected, but the observable result count remained 43 and no product-set change was proven.",
+          "automation": "implemented-live-cdp",
+          "blocker": "The selected official facet did not change the observable PreQA2 product results.",
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24964": {
+          "title": "GNB Menu",
+          "store": "BS",
+          "feature": "UI/Other",
+          "status": "PASS",
+          "context": "unknown",
+          "runtimePath": "/mx/smartphones/all-smartphones/",
+          "evidence": "Móviles expanded through the semantic GNB and the visible category link opened the PreQA2 smartphones category page.",
+          "automation": "implemented-live-cdp",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24963": {
+          "title": "My Account",
+          "store": "BS",
+          "feature": "Auth/Home",
+          "status": "PASS",
+          "context": "registered",
+          "runtimePath": "/mx/mypage/",
+          "evidence": "The authenticated menu exposed all eight official account options, and Mi cuenta opened the PreQA2 account dashboard with account navigation.",
+          "automation": "implemented-live-cdp",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        },
+        "SAM-24962": {
+          "title": "Login Home page",
+          "store": "BS",
+          "feature": "Auth/Home",
+          "status": "PASS",
+          "context": "registered",
+          "runtimePath": "/mx/",
+          "evidence": "Authenticated Samsung Account user rendered on the PreQA2 MX Home page; the account control and Cerrar sesión proved the registered session.",
+          "automation": "implemented-live-cdp",
+          "blocker": null,
+          "validatedAt": "2026-09-09T23:30:00.000Z"
+        }
+      }
+    },
+    "CL": {
+      "officialTotal": 38,
+      "status": "NOT_STARTED",
+      "results": {}
+    },
+    "CO": {
+      "officialTotal": 35,
+      "status": "NOT_STARTED",
+      "results": {}
+    },
+    "PE": {
+      "officialTotal": 34,
+      "status": "NOT_STARTED",
+      "results": {}
+    }
+  },
+  "discoveries": [
+    {
+      "market": "MX",
+      "title": "PDP storage variants",
+      "runtimePath": "/mx/smartphones/galaxy-z-flip6/buy/",
+      "status": "PASS",
+      "evidence": "The PDP exposed semantic Dispositivo, Almacenamiento, Color and Galaxy Canje sections, including visible 256GB/12GB and 512GB/12GB storage labels.",
+      "validatedAt": "2026-09-09T21:10:42.891Z"
+    }
+  ]
 }
