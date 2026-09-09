@@ -7,6 +7,7 @@ const { validateMxPartialPlan } = require("../utils/qstPartialPlan");
 const { validateSharedCoreFamilies } = require("../utils/qstArchitecture");
 const { validatePeQstReusePlan } = require("../utils/qstPeReusePlan");
 const { getPeQstEvidenceMetadata } = require("../utils/qstPeEvidenceMetadata");
+const { validateS1OfficialImplementation } = require("../utils/qstS1Implementation");
 const { getPeS1QstConfig } = require("../config/markets/pe");
 
 test("SMB registry keeps the official 144-case market totals", () => {
@@ -65,6 +66,14 @@ test("PE reuse plan classifies all 34 official cases without claiming coverage",
       missing: 6,
     }
   );
+});
+
+test("S1 implementation inventory only binds official IDs to the correct market", () => {
+  const inventory = validateS1OfficialImplementation();
+  assert.equal(inventory.MX.implementedCount, 10);
+  assert.equal(inventory.PE.implementedCount, 10);
+  assert.equal(inventory.CL.implementedCount, 0);
+  assert.equal(inventory.CO.implementedCount, 0);
 });
 
 test("PE S1 config stays runtime-driven and market-scoped", () => {
