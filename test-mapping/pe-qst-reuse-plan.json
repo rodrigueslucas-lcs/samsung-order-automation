@@ -8,16 +8,16 @@
   "summary": {
     "directCandidate": 11,
     "extensionCandidate": 14,
-    "destructiveCandidate": 5,
-    "missing": 4
+    "destructiveCandidate": 3,
+    "missing": 6
   },
   "cases": {
-    "SAM-25140": { "title": "Order confirmation screen", "store": "EPP", "feature": "Order/BackOffice", "reuse": "destructiveCandidate", "candidate": "tests/s2/pe/qst/epp/discovery.spec.js", "notes": "EPP confirmation requires a real EPP order; keep destructive guard and do not infer from Base Store." },
-    "SAM-25138": { "title": "Payment using credit card with reg user", "store": "EPP", "feature": "Payment", "reuse": "destructiveCandidate", "candidate": "tests/s2/pe/qst/epp/discovery.spec.js", "notes": "EPP CC order candidate only; requires real EPP context and one authorized submit." },
-    "SAM-25125": { "title": "Checkout button on cart page", "store": "EPP", "feature": "Checkout", "reuse": "extensionCandidate", "candidate": "tests/s2/pe/qst/epp/discovery.spec.js", "notes": "EPP discovery exists; wire official checkout navigation only after S1 EPP bootstrap is proven." },
-    "SAM-25114": { "title": "Cart page UI", "store": "EPP", "feature": "Cart", "reuse": "extensionCandidate", "candidate": "tests/s2/pe/qst/epp/discovery.spec.js", "notes": "Reuse cart presentation assertions only in actual EPP context; official UI includes info icons/footer." },
-    "SAM-25113": { "title": "Able to add to Cart from PDP", "store": "EPP", "feature": "Cart", "reuse": "extensionCandidate", "candidate": "tests/s2/pe/qst/epp/discovery.spec.js", "notes": "EPP PDP origin must be preserved; Base Store add-to-cart is not sufficient." },
-    "SAM-25109": { "title": "Epp Login", "store": "EPP", "feature": "Auth/Home", "reuse": "extensionCandidate", "candidate": "tests/s2/pe/qst/epp/discovery.spec.js", "notes": "Requires legitimate EPP login/session; no SSO bypass or committed credentials." },
+    "SAM-25140": { "title": "Order confirmation screen", "store": "EPP", "feature": "Order/BackOffice", "reuse": "missing", "candidate": null, "notes": "Current PE EPP code is discovery-only and does not place/confirm an EPP order. A real guarded EPP order flow is still required." },
+    "SAM-25138": { "title": "Payment using credit card with reg user", "store": "EPP", "feature": "Payment", "reuse": "missing", "candidate": null, "notes": "Current PE EPP code is discovery-only and does not submit a registered-user credit-card order. Do not infer coverage from Base Store." },
+    "SAM-25125": { "title": "Checkout button on cart page", "store": "EPP", "feature": "Checkout", "reuse": "extensionCandidate", "candidate": "tests/s2/pe/qst/epp/discovery.spec.js", "notes": "EPP route/session discovery exists; official checkout navigation still needs implementation after S1 EPP bootstrap is proven." },
+    "SAM-25114": { "title": "Cart page UI", "store": "EPP", "feature": "Cart", "reuse": "extensionCandidate", "candidate": "tests/s2/pe/qst/epp/discovery.spec.js", "notes": "EPP route/session discovery exists; reuse cart presentation assertions only in actual EPP context. Official UI includes info icons/footer." },
+    "SAM-25113": { "title": "Able to add to Cart from PDP", "store": "EPP", "feature": "Cart", "reuse": "extensionCandidate", "candidate": "tests/s2/pe/qst/epp/discovery.spec.js", "notes": "EPP route/session discovery exists; real EPP PDP origin and add-to-cart still need implementation." },
+    "SAM-25109": { "title": "Epp Login", "store": "EPP", "feature": "Auth/Home", "reuse": "extensionCandidate", "candidate": "tests/s2/pe/qst/epp/discovery.spec.js", "notes": "EPP authenticated discovery infrastructure exists, but official login/home proof needs a legitimate S1 EPP session; no SSO bypass or committed credentials." },
     "SAM-25104": { "title": "Order Process", "store": "BS", "feature": "Order/BackOffice", "reuse": "extensionCandidate", "candidate": "tests/s2/pe/qst/base-store/backoffice.spec.js", "notes": "Existing read-only Shipping Requested discovery is reusable, but official case requires same placed order to reach Shipping Requested." },
     "SAM-25103": { "title": "Backoffice", "store": "BS", "feature": "Order/BackOffice", "reuse": "extensionCandidate", "candidate": "tests/s2/pe/qst/base-store/backoffice.spec.js", "notes": "Existing BackOffice login/order status is partial; official Expected Result also requires order/product basic/advanced search." },
     "SAM-25099": { "title": "Order confirmation screen", "store": "BS", "feature": "Order/BackOffice", "reuse": "destructiveCandidate", "candidate": "tests/s2/pe/qst/base-store/order.spec.js", "notes": "Existing destructive order flow validates order number; parameterize host/environment before S1 use." },
