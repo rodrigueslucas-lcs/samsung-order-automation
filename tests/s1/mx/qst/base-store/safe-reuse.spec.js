@@ -7,7 +7,7 @@ import {
   validateMxCartProductPresentation,
   validateMxCheckoutSummaryPresentation,
 } from "./mxQstFlows";
-import { reachMxGuestPayment } from "../../dst/base-store/mxFlows";
+import { reachMxGuestDelivery } from "../../dst/base-store/mxFlows";
 
 const { recordBusinessEvidence } = evidenceContext;
 const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
@@ -52,11 +52,20 @@ test("SAM-24989 @qst @mx @base-store @safe - Order Summary on checkout page", as
     ...getMxQstEvidenceMetadata("SAM-24989"),
     relatedZephyrIds: ["SAM-24990", "SAM-24994", "SAM-24995"],
   });
-  const { address } = await reachMxGuestPayment(page, mxConfig, "mx.qst.address@example.com");
-  expect(address.lookupStatus).toBe(200);
-  expect(address.selectedColonia).toBeTruthy();
+
+  const { checkout } = await reachMxGuestDelivery(page, mxConfig, "mx.qst.address@example.com");
   const summary = await validateMxCheckoutSummaryPresentation(page, mxConfig);
   expect(summary.subtotal).toBeGreaterThan(0);
   expect(summary.total).toBeGreaterThan(0);
+
+  const address = await checkout.fillDelivery({
+    postalCode: "01000",
+    street: "Avenida Revolucion",
+    exteriorNumber: "1000",
+  });
+  expect(address.lookupStatus).toBe(200);
+  expect(address.selectedColonia).toBeTruthy();
+  await checkout.selectDeliveryAndContinue();
+  await checkout.validatePaymentPage({ postalCode: "01000" });
   await expect(page).toHaveURL(/CHECKOUT_STEP_PAYMENT/i);
 });
