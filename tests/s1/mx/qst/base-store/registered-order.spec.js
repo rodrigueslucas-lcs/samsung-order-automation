@@ -1,4 +1,4 @@
-import PaymentPage from "../../../../../pages/PaymentPage";
+import MarketPaymentPage from "../../../../../pages/MarketPaymentPage";
 import destructiveGuards from "../../../../../utils/destructiveGuards";
 import { test, expect } from "../../dst/base-store/mx.auth.fixture";
 import { reachMxRegisteredPayment } from "../../dst/base-store/mxFlows";
@@ -18,7 +18,7 @@ test("MX QST 16 @destructive @qst @mx @base-store @registered - Registered Amex 
   const sku = "SM-F741BLBKLTM";
   const config = { ...mxConfig, sku, pdpUrl: new URL(`/mx/p/${sku}`, mxConfig.baseUrl.origin) };
   await reachMxRegisteredPayment(page, config);
-  const payment = new PaymentPage(page);
+  const payment = new MarketPaymentPage(page, { market: "MX" });
   const card = {
     number: required("MX_TEST_CARD_NUMBER"),
     holderName: required("MX_TEST_CARD_HOLDER"),
