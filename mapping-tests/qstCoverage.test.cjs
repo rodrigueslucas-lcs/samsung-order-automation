@@ -6,6 +6,8 @@ const { getMxQstEvidenceMetadata } = require("../utils/qstEvidenceMetadata");
 const { validateMxPartialPlan } = require("../utils/qstPartialPlan");
 const { validateSharedCoreFamilies } = require("../utils/qstArchitecture");
 const { validatePeQstReusePlan } = require("../utils/qstPeReusePlan");
+const { getPeQstEvidenceMetadata } = require("../utils/qstPeEvidenceMetadata");
+const { getPeS1QstConfig } = require("../config/markets/pe");
 
 test("SMB registry keeps the official 144-case market totals", () => {
   const result = validateQstMapping();
@@ -62,6 +64,51 @@ test("PE reuse plan classifies all 34 official cases without claiming coverage",
       destructiveCandidate: 6,
       missing: 7,
     }
+  );
+});
+
+test("PE S1 config stays runtime-driven and market-scoped", () => {
+  const config = getPeS1QstConfig({
+    PE_STOREFRONT_URL: "https://staging.example.test/pe/",
+    PE_SETUP_URL: "https://staging.example.test/getcookie.html",
+    PE_QST_SKU: "PE-SKU",
+    PE_QST_PDP_URL: "https://staging.example.test/pe/p/PE-SKU",
+  });
+  assert.equal(config.market, "PE");
+  assert.equal(config.environment, "S1");
+  assert.equal(config.baseUrl.href, "https://staging.example.test/pe/");
+  assert.equal(config.cartUrl.href, "https://staging.example.test/pe/cart");
+  assert.equal(config.sku, "PE-SKU");
+  assert.equal(config.pdpUrl.href, "https://staging.example.test/pe/p/PE-SKU");
+
+  assert.throws(
+    () => getPeS1QstConfig({ PE_STOREFRONT_URL: "https://staging.example.test/mx/" }),
+    /PE storefront root/
+  );
+  assert.throws(
+    () =>
+      getPeS1QstConfig({
+        PE_STOREFRONT_URL: "https://staging.example.test/pe/",
+        PE_QST_PDP_URL: "https://other.example.test/pe/p/PE-SKU",
+      }),
+    /same host/
+  );
+});
+
+test("PE evidence metadata comes from the official reuse plan without claiming coverage", () => {
+  assert.deepEqual(getPeQstEvidenceMetadata("SAM-25081"), {
+    zephyrId: "SAM-25081",
+    market: "PE",
+    store: "BS",
+    suite: "QST",
+    feature: "Checkout",
+    environment: "S1",
+    officialTitle: "Checkout button on cart page",
+    reuseCandidate: "directCandidate",
+  });
+  assert.throws(
+    () => getPeQstEvidenceMetadata("SAM-00000"),
+    /metadata was not found/
   );
 });
 
