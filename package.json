@@ -31,6 +31,7 @@
     "qst:mx:list": "playwright test tests/s1/mx/qst/base-store --project=chromium --list",
     "qst:pe:base-store": "playwright test tests/s1/pe/qst/base-store --project=chromium --workers=1 --grep-invert @destructive",
     "qst:pe:list": "playwright test tests/s1/pe/qst/base-store --project=chromium --list",
+    "qst:pe:progress": "node scripts/print-pe-qst-progress.cjs",
     "qst:smb:basic": "playwright test tests/s1/smb/qst/base-store/basic-storefront.spec.js --project=chromium --workers=1",
     "qst:smb:basic:list": "playwright test tests/s1/smb/qst/base-store/basic-storefront.spec.js --project=chromium --list",
     "qst:smb:backoffice": "playwright test tests/s1/smb/qst/backoffice --project=chromium --workers=1",
