@@ -1,3 +1,4 @@
+import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
 import { test, expect } from "./mxQst.fixture";
 import {
   openMxQstPdp,
@@ -7,6 +8,8 @@ import {
 } from "./mxQstFlows";
 import { reachMxGuestPayment } from "../../dst/base-store/mxFlows";
 
+const { recordBusinessEvidence } = evidenceContext;
+
 test.describe.configure({ timeout: 420000 });
 
 test("MX QST 04 @qst @mx @base-store @safe - Navigate to PDP", async ({ page, mxConfig }) => {
@@ -14,7 +17,15 @@ test("MX QST 04 @qst @mx @base-store @safe - Navigate to PDP", async ({ page, mx
   await expect(page.getByText(mxConfig.sku, { exact: true }).first()).toBeVisible();
 });
 
-test("MX QST 06 + QST 07 + QST 08 @qst @mx @base-store @safe - Add product and validate Cart", async ({ page, mxConfig }) => {
+test("SAM-24971 @qst @mx @base-store @safe - Cart page UI", async ({ page, mxConfig }, testInfo) => {
+  recordBusinessEvidence(testInfo, {
+    zephyrId: "SAM-24971",
+    market: "MX",
+    store: "BS",
+    suite: "QST",
+    feature: "Cart",
+    environment: "S1",
+  });
   const cart = await prepareMxQstCart(page, mxConfig);
   await cart.validateCartPage();
   await cart.validateProductInCart();
@@ -26,14 +37,30 @@ test("MX QST 06 + QST 07 + QST 08 @qst @mx @base-store @safe - Add product and v
   await cart.validateCartFooter();
 });
 
-test("SAM-24972 @qst @mx @base-store @safe - Increase decrease and delete cart quantity", async ({ page, mxConfig }) => {
+test("SAM-24972 @qst @mx @base-store @safe - Increase decrease and delete cart quantity", async ({ page, mxConfig }, testInfo) => {
+  recordBusinessEvidence(testInfo, {
+    zephyrId: "SAM-24972",
+    market: "MX",
+    store: "BS",
+    suite: "QST",
+    feature: "Cart",
+    environment: "S1",
+  });
   const cart = await prepareMxQstCart(page, mxConfig);
   await cart.validateControlledSingleSku(mxConfig.sku);
   await cart.validateQuantityCanChange();
   await cart.clearMxCartAndConfirmEmpty();
 });
 
-test("MX QST 11 @qst @mx @base-store @safe - Navigate to Checkout", async ({ page, mxConfig }) => {
+test("SAM-24988 @qst @mx @base-store @safe - Checkout button on cart page", async ({ page, mxConfig }, testInfo) => {
+  recordBusinessEvidence(testInfo, {
+    zephyrId: "SAM-24988",
+    market: "MX",
+    store: "BS",
+    suite: "QST",
+    feature: "Checkout",
+    environment: "S1",
+  });
   const cart = await prepareMxQstCart(page, mxConfig);
   await cart.proceedToCheckout();
   await expect(page.getByText(/Samsung Checkout Express|Continuar como (usuario )?invitado/i).filter({ visible: true }).first()).toBeVisible({ timeout: 60000 });
