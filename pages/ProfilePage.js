@@ -1,14 +1,29 @@
 import { expect } from "@playwright/test";
 import MyAccountPage from "./MyAccountPage";
 
+const LEGACY_PE_ST2_ADDRESS_API =
+  "https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/pe/users/current/addresses";
+
 export default class ProfilePage extends MyAccountPage {
-  constructor(page) {
-    super(page);
+  constructor(page, options = {}) {
+    super(page, options);
     this.profileButton = page.getByRole("button", { name: "My Profile", exact: true });
     this.qaMarker = "QA AUTOMATION";
+    this.addressApiUrl = options.addressApiUrl || LEGACY_PE_ST2_ADDRESS_API;
     this.addressCards = page.locator(
       'article, [class*="address-card" i], [class*="address-item" i], [data-testid*="address" i]'
     );
+  }
+
+  assertAddressApiUrl() {
+    const url = new URL(this.addressApiUrl);
+    if (url.protocol !== "https:") {
+      throw new Error("Profile address API must use https.");
+    }
+    if (!/\/users\/current\/addresses$/.test(url.pathname)) {
+      throw new Error(`Unexpected profile address API path: ${url.pathname}`);
+    }
+    return url.href;
   }
 
   async openProfileMenu() {
@@ -54,8 +69,7 @@ export default class ProfilePage extends MyAccountPage {
   }
 
   async inspectSavedAddressesApi() {
-    const endpoint =
-      "https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/pe/users/current/addresses";
+    const endpoint = this.assertAddressApiUrl();
     const response = await this.page.request.get(endpoint);
     const evidence = {
       endpoint,
@@ -77,8 +91,7 @@ export default class ProfilePage extends MyAccountPage {
     if (!marker.startsWith(this.qaMarker)) {
       throw new Error("Refusing API lookup for a non-QA address.");
     }
-    const endpoint =
-      "https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/pe/users/current/addresses";
+    const endpoint = this.assertAddressApiUrl();
     for (let attempt = 1; attempt <= attempts; attempt++) {
       const response = await this.page.request.get(endpoint);
       if (!response.ok()) {
@@ -197,8 +210,7 @@ export default class ProfilePage extends MyAccountPage {
     if (!marker.startsWith(this.qaMarker)) {
       throw new Error("Refusing API cleanup for a non-QA address.");
     }
-    const endpoint =
-      "https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/pe/users/current/addresses";
+    const endpoint = this.assertAddressApiUrl();
     const response = await this.page.request.get(endpoint);
     if (!response.ok()) {
       throw new Error(`Address cleanup listing returned HTTP ${response.status()}.`);
