@@ -1,19 +1,19 @@
-const ledger = require("../test-mapping/preqa2-validation.json");
+const defaultLedger = require("../test-mapping/preqa2-validation.json");
 const mxCoverage = require("../test-mapping/mx-qst-coverage.json");
 const peReuse = require("../test-mapping/pe-qst-reuse-plan.json");
 
-function resultFor(market, id) {
-  return ledger.markets?.[market]?.results?.[id] || null;
+function resultFor(market, id, sourceLedger = defaultLedger) {
+  return sourceLedger.markets?.[market]?.results?.[id] || null;
 }
 
-function getMxPreqa2PromotionPlan() {
+function getMxPreqa2PromotionPlan({ sourceLedger = defaultLedger } = {}) {
   const coverageReviewCandidates = [];
   const validationPassAutomationGap = [];
   const retained = [];
   const failedOrBlocked = [];
 
   for (const [id, coverage] of Object.entries(mxCoverage.cases || {})) {
-    const result = resultFor("MX", id);
+    const result = resultFor("MX", id, sourceLedger);
     if (!result) continue;
     const common = {
       id,
@@ -56,12 +56,12 @@ function getMxPreqa2PromotionPlan() {
   };
 }
 
-function getPePreqa2ValidationImpact() {
+function getPePreqa2ValidationImpact({ sourceLedger = defaultLedger } = {}) {
   const passed = [];
   const passedAutomationProven = [];
   const failedOrBlocked = [];
   for (const [id, baseline] of Object.entries(peReuse.cases || {})) {
-    const result = resultFor("PE", id);
+    const result = resultFor("PE", id, sourceLedger);
     if (!result) continue;
     const entry = {
       id,
@@ -84,9 +84,9 @@ function getPePreqa2ValidationImpact() {
   return { passed, passedAutomationProven, failedOrBlocked };
 }
 
-function getPreqa2PromotionSummary() {
-  const mx = getMxPreqa2PromotionPlan();
-  const pe = getPePreqa2ValidationImpact();
+function getPreqa2PromotionSummary({ sourceLedger = defaultLedger } = {}) {
+  const mx = getMxPreqa2PromotionPlan({ sourceLedger });
+  const pe = getPePreqa2ValidationImpact({ sourceLedger });
   return {
     MX: {
       coverageReviewCandidates: mx.coverageReviewCandidates.length,
