@@ -17,6 +17,19 @@ function emptyLedger() {
   return ledger;
 }
 
+function validResult(overrides = {}) {
+  return {
+    status: "PASS",
+    context: "either",
+    runtimePath: "/mx/",
+    evidence: "Official Expected Result observed in PreQA2.",
+    automation: "not-assessed",
+    blocker: null,
+    validatedAt: timestamp,
+    ...overrides,
+  };
+}
+
 test("PreQA2 validation ledger stays aligned to official SMB totals as execution grows", () => {
   const result = validatePreqa2ValidationLedger();
   assert.deepEqual(
@@ -40,7 +53,7 @@ test("PASS FAIL and NOT_APPLICABLE require evidence; BLOCKED requires blocker", 
     .some((error) => /BLOCKED requires a concrete blocker/.test(error)));
 });
 
-test("executed result requires valid timestamp and context", () => {
+test("executed result requires valid timestamp and allowed context", () => {
   assert.ok(validateResult("MX", "SAM-24968", {
     status: "PASS",
     evidence: "filter changed product set",
@@ -52,6 +65,34 @@ test("executed result requires valid timestamp and context", () => {
     validatedAt: timestamp,
     context: "admin",
   }).some((error) => /unsupported context/.test(error)));
+});
+
+test("known registered official TCs cannot be recorded from WMC/either context", () => {
+  const wrong = validateResult("MX", "SAM-24963", validResult({
+    context: "either",
+    runtimePath: "/mx/my-account/",
+  }));
+  assert.ok(wrong.some((error) => /requires registered Samsung Account context/.test(error)));
+
+  const correct = validateResult("MX", "SAM-24963", validResult({
+    context: "registered",
+    runtimePath: "/mx/my-account/",
+  }));
+  assert.equal(correct.some((error) => /registered Samsung Account context/.test(error)), false);
+});
+
+test("known guest official TCs cannot be recorded from registered/either context", () => {
+  const wrong = validateResult("MX", "SAM-24995", validResult({
+    context: "registered",
+    runtimePath: "/mx/checkout/",
+  }));
+  assert.ok(wrong.some((error) => /requires guest context/.test(error)));
+
+  const correct = validateResult("MX", "SAM-24995", validResult({
+    context: "guest",
+    runtimePath: "/mx/checkout/",
+  }));
+  assert.equal(correct.some((error) => /requires guest context/.test(error)), false);
 });
 
 test("runtime evidence path cannot leak query strings or cross markets", () => {
