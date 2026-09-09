@@ -1,17 +1,14 @@
 import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
+import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import { test, expect } from "../../dst/base-store/mx.auth.fixture";
 
 const { recordBusinessEvidence } = evidenceContext;
+const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
 
 test("SAM-24962 + SAM-24963 @qst @mx @base-store @safe @registered - Login Home and My Account menu", async ({ page, mxConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, {
-    zephyrId: "SAM-24962",
+    ...getMxQstEvidenceMetadata("SAM-24962"),
     relatedZephyrIds: ["SAM-24963"],
-    market: "MX",
-    store: "BS",
-    suite: "QST",
-    feature: "Auth/Home",
-    environment: "S1",
   });
 
   expect(new URL(page.url()).hostname).toBe(mxConfig.hostname);
