@@ -1,16 +1,27 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const defaultLedger = require("../test-mapping/preqa2-validation.json");
 const {
   getCampaignSummary,
   getPreqa2CampaignPlan,
   metadataFor,
 } = require("../utils/preqa2CampaignPlan");
 
-test("campaign plan covers all official IDs without inventing execution", () => {
-  const mx = getPreqa2CampaignPlan("MX");
-  const cl = getPreqa2CampaignPlan("CL");
-  const co = getPreqa2CampaignPlan("CO");
-  const pe = getPreqa2CampaignPlan("PE");
+function emptyLedger() {
+  const ledger = JSON.parse(JSON.stringify(defaultLedger));
+  for (const market of ["MX", "CL", "CO", "PE"]) {
+    ledger.markets[market].status = "NOT_STARTED";
+    ledger.markets[market].results = {};
+  }
+  return ledger;
+}
+
+test("campaign plan covers all official IDs without depending on current live results", () => {
+  const sourceLedger = emptyLedger();
+  const mx = getPreqa2CampaignPlan("MX", { sourceLedger });
+  const cl = getPreqa2CampaignPlan("CL", { sourceLedger });
+  const co = getPreqa2CampaignPlan("CO", { sourceLedger });
+  const pe = getPreqa2CampaignPlan("PE", { sourceLedger });
   assert.deepEqual(
     [mx.officialTotal, cl.officialTotal, co.officialTotal, pe.officialTotal],
     [37, 38, 35, 34]
@@ -23,8 +34,27 @@ test("campaign plan covers all official IDs without inventing execution", () => 
   }
 });
 
+test("campaign plan consumes official live results instead of reclassifying them", () => {
+  const sourceLedger = emptyLedger();
+  sourceLedger.markets.MX.status = "ACTIVE";
+  sourceLedger.markets.MX.results["SAM-24964"] = {
+    status: "PASS",
+    context: "either",
+    runtimePath: "/mx/smartphones/all-smartphones/",
+    evidence: "GNB menu opened and navigated to the expected PreQA2 category.",
+    automation: "not-assessed",
+    blocker: null,
+    validatedAt: "2026-09-09T20:00:00.000Z",
+  };
+  const plan = getPreqa2CampaignPlan("MX", { sourceLedger });
+  const current = plan.cases.find((entry) => entry.id === "SAM-24964");
+  assert.equal(plan.executed, 1);
+  assert.equal(plan.pending, 36);
+  assert.equal(current.executionStatus, "PASS");
+});
+
 test("MX plan prioritizes safe Missing and quick Partial before EPP/guarded work", () => {
-  const plan = getPreqa2CampaignPlan("MX");
+  const plan = getPreqa2CampaignPlan("MX", { sourceLedger: emptyLedger() });
   const byId = Object.fromEntries(plan.cases.map((entry) => [entry.id, entry]));
   assert.equal(byId["SAM-24968"].baseline, "missing");
   assert.equal(byId["SAM-24968"].safety, "safe-candidate");
@@ -34,7 +64,7 @@ test("MX plan prioritizes safe Missing and quick Partial before EPP/guarded work
 });
 
 test("PE plan preserves reuse classifications and guards payment/order review", () => {
-  const plan = getPreqa2CampaignPlan("PE");
+  const plan = getPreqa2CampaignPlan("PE", { sourceLedger: emptyLedger() });
   const byId = Object.fromEntries(plan.cases.map((entry) => [entry.id, entry]));
   assert.equal(byId["SAM-25061"].baseline, "directCandidate");
   assert.equal(byId["SAM-25061"].safety, "safe-candidate");
@@ -57,7 +87,7 @@ test("CL and CO only use titles from verified shared families and keep store unk
 });
 
 test("campaign summary keeps execution separate and exposes official-review backlog", () => {
-  const summary = getCampaignSummary();
+  const summary = getCampaignSummary({ sourceLedger: emptyLedger() });
   assert.deepEqual(
     Object.fromEntries(Object.entries(summary).map(([market, entry]) => [market, entry.officialTotal])),
     { MX: 37, CL: 38, CO: 35, PE: 34 }
