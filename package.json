@@ -13,6 +13,7 @@
     "auth:verify:mx": "node scripts/auth-verify-mx.cjs",
     "auth:open-profile:pe": "node scripts/auth-open-profile-pe.cjs",
     "auth:export:pe": "node scripts/auth-bootstrap-pe.cjs",
+    "auth:verify:pe": "node scripts/auth-verify-pe.cjs",
     "dst:base-store": "playwright test tests/s2/pe/dst/base-store --project=chromium --workers=1 --grep-invert @destructive",
     "dst:backoffice": "playwright test tests/s2/pe/dst/backoffice --project=chromium --workers=1 --grep-invert \"@destructive|TC73|TC75\"",
     "dst:epp": "playwright test tests/s2/pe/dst/epp --project=chromium --workers=1 --grep-invert @destructive",
