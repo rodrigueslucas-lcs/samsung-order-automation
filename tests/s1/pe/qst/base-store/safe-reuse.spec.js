@@ -29,7 +29,7 @@ function requirePeProductConfig() {
   const config = requirePeStorefront();
   test.skip(
     !config.sku || !config.pdpUrl,
-    "Set PE_QST_SKU and PE_QST_PDP_URL to a verified PE S1 PDP before running product/cart reuse tests."
+    "A verified PE product is required before running product/cart reuse tests."
   );
   return config;
 }
@@ -111,7 +111,7 @@ test("SAM-25061 @qst @pe @base-store @safe @reuse - Able to add to Cart from PDP
 
   testInfo.annotations.push({
     type: "qst-reuse-note",
-    description: "Live S1 PDP add-to-cart is exercised; official PLP-to-PDP origin still needs explicit proof before Full coverage.",
+    description: "Uses the proven PE ST2 QST SKU by default and exercises the S1 PDP add-to-cart path; live S1 proof is still required before coverage promotion.",
   });
 });
 
