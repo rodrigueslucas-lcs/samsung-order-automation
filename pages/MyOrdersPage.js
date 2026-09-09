@@ -1,10 +1,18 @@
 import { expect } from "@playwright/test";
 import MyAccountPage from "./MyAccountPage";
 
+function marketOrderCodePattern(market) {
+  const prefix = String(market || "pe").trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(prefix)) {
+    throw new Error(`Invalid My Orders market prefix: ${market}`);
+  }
+  return new RegExp(`\\b${prefix}\\d{6}-\\d{8}(?:_\\d+)?\\b`, "g");
+}
+
 export default class MyOrdersPage extends MyAccountPage {
   async visibleOrderCodes() {
     const text = await this.page.getByRole("main").innerText();
-    return [...new Set(text.match(/\bPE\d{6}-\d{8}(?:_\d+)?\b/g) || [])];
+    return [...new Set(text.match(marketOrderCodePattern(this.market)) || [])];
   }
 
   async visibleOrderCode(orderCode) {
