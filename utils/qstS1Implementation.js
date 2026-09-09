@@ -28,31 +28,69 @@ function officialIdsFromTitle(title) {
   return [...new Set(String(title).match(/SAM-\d+/g) || [])];
 }
 
+function marketTagsFromTitle(title) {
+  const tags = String(title).match(/@(mx|pe|cl|co)\b/gi) || [];
+  return [...new Set(tags.map((tag) => tag.slice(1).toUpperCase()))];
+}
+
+function collectTitlesFromFiles(files) {
+  const entries = [];
+  for (const file of files) {
+    const source = fs.readFileSync(file, "utf8");
+    for (const title of testTitles(source)) {
+      entries.push({
+        title,
+        spec: path.relative(process.cwd(), file).replace(/\\/g, "/"),
+      });
+    }
+  }
+  return entries;
+}
+
 function collectMarketImplementation(market, { root = path.resolve("tests/s1") } = {}) {
   const code = String(market).toUpperCase();
   if (!SUPPORTED_MARKETS.includes(code)) {
     throw new Error(`Unsupported S1 QST implementation market: ${market}`);
   }
 
-  const marketRoot = path.join(root, code.toLowerCase(), "qst");
   const cases = [];
-  for (const file of walkSpecFiles(marketRoot)) {
-    const source = fs.readFileSync(file, "utf8");
-    for (const title of testTitles(source)) {
-      for (const id of officialIdsFromTitle(title)) {
-        cases.push({
-          id,
-          title,
-          spec: path.relative(process.cwd(), file).replace(/\\/g, "/"),
-        });
-      }
+  const marketRoot = path.join(root, code.toLowerCase(), "qst");
+  for (const entry of collectTitlesFromFiles(walkSpecFiles(marketRoot))) {
+    for (const id of officialIdsFromTitle(entry.title)) {
+      cases.push({ ...entry, id, source: "market" });
     }
   }
+
+  const sharedRoot = path.join(root, "smb", "qst");
+  for (const entry of collectTitlesFromFiles(walkSpecFiles(sharedRoot))) {
+    const tags = marketTagsFromTitle(entry.title);
+    if (!tags.includes(code)) continue;
+    for (const id of officialIdsFromTitle(entry.title)) {
+      cases.push({ ...entry, id, source: "shared" });
+    }
+  }
+
   return cases;
 }
 
-function validateS1OfficialImplementation() {
+function validateSharedSpecMarketTags({ root = path.resolve("tests/s1") } = {}) {
   const errors = [];
+  const sharedRoot = path.join(root, "smb", "qst");
+  for (const entry of collectTitlesFromFiles(walkSpecFiles(sharedRoot))) {
+    const ids = officialIdsFromTitle(entry.title);
+    if (!ids.length) continue;
+    const tags = marketTagsFromTitle(entry.title);
+    if (tags.length !== 1) {
+      errors.push(
+        `${entry.spec}: official shared test title must contain exactly one market tag; found ${tags.join(", ") || "none"}.`
+      );
+    }
+  }
+  return errors;
+}
+
+function validateS1OfficialImplementation() {
+  const errors = validateSharedSpecMarketTags();
   const inventory = {};
 
   for (const market of SUPPORTED_MARKETS) {
@@ -75,10 +113,11 @@ function validateS1OfficialImplementation() {
       }
     }
 
+    const implementedIds = [...byId.keys()].filter((id) => official.has(id)).sort();
     inventory[market] = {
       officialTotal: official.size,
-      implementedIds: [...byId.keys()].filter((id) => official.has(id)).sort(),
-      implementedCount: [...byId.keys()].filter((id) => official.has(id)).length,
+      implementedIds,
+      implementedCount: implementedIds.length,
     };
   }
 
@@ -92,6 +131,7 @@ function validateS1OfficialImplementation() {
 module.exports = {
   SUPPORTED_MARKETS,
   collectMarketImplementation,
+  marketTagsFromTitle,
   officialIdsFromTitle,
   testTitles,
   validateS1OfficialImplementation,
