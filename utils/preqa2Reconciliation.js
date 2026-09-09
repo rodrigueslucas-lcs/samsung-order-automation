@@ -1,13 +1,17 @@
 const registry = require("../test-mapping/smb-qst.json");
-const ledger = require("../test-mapping/preqa2-validation.json");
+const defaultLedger = require("../test-mapping/preqa2-validation.json");
 const { getPreqa2CampaignPlan, MARKET_ORDER } = require("./preqa2CampaignPlan");
 const { validateS1OfficialImplementation } = require("./qstS1Implementation");
 
-function reconcileMarket(market) {
-  const plan = getPreqa2CampaignPlan(market);
-  const implementation = validateS1OfficialImplementation()[market];
-  const implemented = new Set(implementation.implementedIds);
-  const results = ledger.markets?.[market]?.results || {};
+function reconcileMarket(market, { sourceLedger = defaultLedger, implementation } = {}) {
+  const currentImplementation = implementation || validateS1OfficialImplementation();
+  const plan = getPreqa2CampaignPlan(market, {
+    sourceLedger,
+    implementation: currentImplementation,
+  });
+  const marketImplementation = currentImplementation[market];
+  const implemented = new Set(marketImplementation.implementedIds);
+  const results = sourceLedger.markets?.[market]?.results || {};
   const buckets = {
     passImplemented: [],
     passAutomationGap: [],
@@ -29,6 +33,7 @@ function reconcileMarket(market) {
       feature: entry.feature,
       baseline: entry.baseline,
       safety: entry.safety,
+      status,
     };
     if (status === "PASS") {
       buckets[isImplemented ? "passImplemented" : "passAutomationGap"].push(item);
@@ -46,27 +51,34 @@ function reconcileMarket(market) {
   return {
     market,
     officialTotal: registry.markets[market].count,
-    implementedCount: implementation.implementedCount,
+    implementedCount: marketImplementation.implementedCount,
     executedCount: Object.keys(results).length,
     ...buckets,
   };
 }
 
-function reconcileAllMarkets() {
-  return Object.fromEntries(MARKET_ORDER.map((market) => [market, reconcileMarket(market)]));
+function reconcileAllMarkets({ sourceLedger = defaultLedger, implementation } = {}) {
+  const currentImplementation = implementation || validateS1OfficialImplementation();
+  return Object.fromEntries(MARKET_ORDER.map((market) => [market, reconcileMarket(market, {
+    sourceLedger,
+    implementation: currentImplementation,
+  })]));
 }
 
-function reconciliationSummary() {
-  const all = reconcileAllMarkets();
+function reconciliationSummary(options = {}) {
+  const all = reconcileAllMarkets(options);
   return Object.fromEntries(Object.entries(all).map(([market, item]) => [market, {
     officialTotal: item.officialTotal,
     implemented: item.implementedCount,
     executed: item.executedCount,
+    passedWithAutomation: item.passImplemented.length,
     passedWithoutAutomation: item.passAutomationGap.length,
     failedWithAutomation: item.failImplemented.length,
+    failedWithoutAutomation: item.failAutomationGap.length,
     pendingImplemented: item.notRunImplemented.length,
     pendingAutomationGap: item.notRunAutomationGap.length,
     blocked: item.blocked.length,
+    notApplicable: item.notApplicable.length,
   }]));
 }
 
