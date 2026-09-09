@@ -5,6 +5,7 @@ const peReusePlan = require("../test-mapping/pe-qst-reuse-plan.json");
 const defaultLedger = require("../test-mapping/preqa2-validation.json");
 const { getSharedCandidatesByMarket } = require("./qstSharedCandidates");
 const { validateS1OfficialImplementation } = require("./qstS1Implementation");
+const { getExecutionRequirement } = require("./preqa2ExecutionRequirements");
 
 const MARKET_ORDER = Object.freeze(["MX", "CL", "CO", "PE"]);
 const GUARDED_FEATURES = new Set(["Payment", "Order/BackOffice", "Order/Backoffice"]);
@@ -99,6 +100,7 @@ function getPreqa2CampaignPlan(market, { sourceLedger = defaultLedger, implement
   const cases = officialIds.map((id) => {
     const meta = metadataFor(code, id);
     const execution = results[id] || null;
+    const requirement = getExecutionRequirement(code, id);
     return {
       id,
       market: code,
@@ -108,7 +110,10 @@ function getPreqa2CampaignPlan(market, { sourceLedger = defaultLedger, implement
       baseline: meta?.baseline || "unknown",
       implemented: implemented.has(id),
       executionStatus: execution?.status || "NOT_RUN",
-      context: execution?.context || "unknown",
+      context: execution?.context || requirement.accountContext,
+      requiresSamsungAccount: requirement.requiresSamsungAccount,
+      requiresGuestState: requirement.requiresGuestState,
+      requiresEppContext: requirement.requiresEppContext,
       safety: safetyFor(meta),
       priority: priorityFor(code, id, meta, implemented.has(id), partialGroups),
       notes: execution?.evidence || meta?.notes || null,
@@ -134,13 +139,17 @@ function getCampaignSummary({ sourceLedger = defaultLedger, implementation } = {
   const currentImplementation = implementation || validateS1OfficialImplementation();
   return Object.fromEntries(MARKET_ORDER.map((market) => {
     const plan = getPreqa2CampaignPlan(market, { sourceLedger, implementation: currentImplementation });
+    const pending = plan.cases.filter((entry) => entry.executionStatus === "NOT_RUN");
     return [market, {
       officialTotal: plan.officialTotal,
       executed: plan.executed,
       pending: plan.pending,
-      safeCandidates: plan.cases.filter((entry) => entry.executionStatus === "NOT_RUN" && entry.safety === "safe-candidate").length,
-      guardedReview: plan.cases.filter((entry) => entry.executionStatus === "NOT_RUN" && entry.safety === "guarded-review").length,
-      needsOfficialReview: plan.cases.filter((entry) => entry.executionStatus === "NOT_RUN" && entry.safety === "needs-official-review").length,
+      safeCandidates: pending.filter((entry) => entry.safety === "safe-candidate").length,
+      guardedReview: pending.filter((entry) => entry.safety === "guarded-review").length,
+      needsOfficialReview: pending.filter((entry) => entry.safety === "needs-official-review").length,
+      registeredPending: pending.filter((entry) => entry.requiresSamsungAccount).length,
+      guestPending: pending.filter((entry) => entry.requiresGuestState).length,
+      eppPending: pending.filter((entry) => entry.requiresEppContext).length,
     }];
   }));
 }
