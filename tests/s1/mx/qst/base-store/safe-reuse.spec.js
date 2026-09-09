@@ -66,7 +66,16 @@ test("SAM-24988 @qst @mx @base-store @safe - Checkout button on cart page", asyn
   await expect(page.getByText(/Samsung Checkout Express|Continuar como (usuario )?invitado/i).filter({ visible: true }).first()).toBeVisible({ timeout: 60000 });
 });
 
-test("MX QST 12 @qst @mx @base-store @safe - Enter guest address", async ({ page, mxConfig }) => {
+test("SAM-24989 @qst @mx @base-store @safe - Order Summary on checkout page", async ({ page, mxConfig }, testInfo) => {
+  recordBusinessEvidence(testInfo, {
+    zephyrId: "SAM-24989",
+    relatedZephyrIds: ["SAM-24990", "SAM-24994", "SAM-24995"],
+    market: "MX",
+    store: "BS",
+    suite: "QST",
+    feature: "Checkout",
+    environment: "S1",
+  });
   const { address } = await reachMxGuestPayment(page, mxConfig, "mx.qst.address@example.com");
   expect(address.lookupStatus).toBe(200);
   expect(address.selectedColonia).toBeTruthy();
