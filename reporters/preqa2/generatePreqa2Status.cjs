@@ -1,22 +1,22 @@
 #!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
-const ledger = require("../../test-mapping/preqa2-validation.json");
+const defaultLedger = require("../../test-mapping/preqa2-validation.json");
 const { getCampaignSummary } = require("../../utils/preqa2CampaignPlan");
 const { reconciliationSummary } = require("../../utils/preqa2Reconciliation");
 const { getPreqa2PromotionSummary } = require("../../utils/preqa2PromotionPlan");
 const { validatePreqa2ValidationLedger } = require("../../utils/preqa2ValidationLedger");
 const { sanitizeString } = require("../evidence/sanitizer");
 
-function buildStatusModel() {
-  validatePreqa2ValidationLedger();
-  const campaign = getCampaignSummary();
-  const reconciliation = reconciliationSummary();
-  const promotions = getPreqa2PromotionSummary();
+function buildStatusModel({ sourceLedger = defaultLedger } = {}) {
+  validatePreqa2ValidationLedger(sourceLedger);
+  const campaign = getCampaignSummary({ sourceLedger });
+  const reconciliation = reconciliationSummary({ sourceLedger });
+  const promotions = getPreqa2PromotionSummary({ sourceLedger });
   const markets = {};
 
   for (const market of ["MX", "CL", "CO", "PE"]) {
-    const results = ledger.markets[market].results || {};
+    const results = sourceLedger.markets[market].results || {};
     const counts = { PASS: 0, FAIL: 0, BLOCKED: 0, NOT_APPLICABLE: 0 };
     for (const result of Object.values(results)) {
       if (Object.hasOwn(counts, result.status)) counts[result.status] += 1;
@@ -25,17 +25,18 @@ function buildStatusModel() {
       ...campaign[market],
       ...reconciliation[market],
       ...counts,
-      status: ledger.markets[market].status,
+      status: sourceLedger.markets[market].status,
     };
   }
 
   return {
-    authority: ledger.authority,
+    authority: sourceLedger.authority,
     total: Object.values(markets).reduce((sum, entry) => sum + entry.officialTotal, 0),
     executed: Object.values(markets).reduce((sum, entry) => sum + entry.executed, 0),
     pass: Object.values(markets).reduce((sum, entry) => sum + entry.PASS, 0),
     fail: Object.values(markets).reduce((sum, entry) => sum + entry.FAIL, 0),
     blocked: Object.values(markets).reduce((sum, entry) => sum + entry.BLOCKED, 0),
+    notApplicable: Object.values(markets).reduce((sum, entry) => sum + entry.NOT_APPLICABLE, 0),
     markets,
     promotions,
   };
@@ -47,7 +48,7 @@ function renderStatusMarkdown(model = buildStatusModel()) {
     "",
     sanitizeString(model.authority),
     "",
-    `Official: ${model.total} | Executed: ${model.executed} | PASS: ${model.pass} | FAIL: ${model.fail} | BLOCKED: ${model.blocked}`,
+    `Official: ${model.total} | Executed: ${model.executed} | PASS: ${model.pass} | FAIL: ${model.fail} | BLOCKED: ${model.blocked} | N/A: ${model.notApplicable}`,
     "",
     "| Market | Official | Executed | PASS | FAIL | Blocked | Pending | Safe | Guarded | Official review | Implemented |",
     "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
@@ -63,22 +64,25 @@ function renderStatusMarkdown(model = buildStatusModel()) {
 
   lines.push(
     "",
-    "## Evidence-backed promotion review",
+    "## Evidence-backed automation review",
     "",
-    `MX promotion candidates: ${model.promotions.MX.promotionCandidates}`,
+    `MX coverage review candidates: ${model.promotions.MX.coverageReviewCandidates}`,
+    `MX official PASS with automation gap: ${model.promotions.MX.officialPassCoverageGap}`,
     `MX retained Full: ${model.promotions.MX.retainedFull}`,
     `PE official PASS results: ${model.promotions.PE.officialPasses}`,
+    `PE automation-proven PASS results: ${model.promotions.PE.automationProvenPasses}`,
     "",
+    "Official PASS and automation coverage are intentionally independent.",
     "No PASS is inferred from implementation presence or navigation-only discovery.",
     ""
   );
   return lines.join("\n");
 }
 
-function generatePreqa2Status({ outputPath = "test-results/preqa2/status.md" } = {}) {
+function generatePreqa2Status({ outputPath = "test-results/preqa2/status.md", sourceLedger = defaultLedger } = {}) {
   const target = path.resolve(outputPath);
   fs.mkdirSync(path.dirname(target), { recursive: true });
-  const model = buildStatusModel();
+  const model = buildStatusModel({ sourceLedger });
   fs.writeFileSync(target, renderStatusMarkdown(model));
   return { outputPath: target, model };
 }
