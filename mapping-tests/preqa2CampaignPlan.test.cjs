@@ -63,6 +63,18 @@ test("MX plan prioritizes safe Missing and quick Partial before EPP/guarded work
   assert.equal(byId["SAM-25045"].store, "EPP");
 });
 
+test("campaign exposes verified account and EPP prerequisites instead of treating WMC as customer login", () => {
+  const plan = getPreqa2CampaignPlan("MX", { sourceLedger: emptyLedger() });
+  const byId = Object.fromEntries(plan.cases.map((entry) => [entry.id, entry]));
+  assert.equal(byId["SAM-24962"].requiresSamsungAccount, true);
+  assert.equal(byId["SAM-24962"].context, "registered");
+  assert.equal(byId["SAM-24963"].requiresSamsungAccount, true);
+  assert.equal(byId["SAM-24995"].requiresGuestState, true);
+  assert.equal(byId["SAM-24995"].context, "guest");
+  assert.equal(byId["SAM-25045"].requiresEppContext, true);
+  assert.equal(byId["SAM-25045"].requiresSamsungAccount, true);
+});
+
 test("PE plan preserves reuse classifications and guards payment/order review", () => {
   const plan = getPreqa2CampaignPlan("PE", { sourceLedger: emptyLedger() });
   const byId = Object.fromEntries(plan.cases.map((entry) => [entry.id, entry]));
@@ -70,6 +82,8 @@ test("PE plan preserves reuse classifications and guards payment/order review", 
   assert.equal(byId["SAM-25061"].safety, "safe-candidate");
   assert.equal(byId["SAM-25095"].baseline, "destructiveCandidate");
   assert.equal(byId["SAM-25095"].safety, "guarded-review");
+  assert.equal(byId["SAM-25055"].requiresSamsungAccount, true);
+  assert.equal(byId["SAM-25088"].requiresGuestState, true);
 });
 
 test("CL and CO only use titles from verified shared families and keep store unknown", () => {
@@ -86,13 +100,16 @@ test("CL and CO only use titles from verified shared families and keep store unk
   assert.equal(unclassified.store, "Unknown");
 });
 
-test("campaign summary keeps execution separate and exposes official-review backlog", () => {
+test("campaign summary keeps execution separate and exposes auth/store backlogs", () => {
   const summary = getCampaignSummary({ sourceLedger: emptyLedger() });
   assert.deepEqual(
     Object.fromEntries(Object.entries(summary).map(([market, entry]) => [market, entry.officialTotal])),
     { MX: 37, CL: 38, CO: 35, PE: 34 }
   );
   assert.ok(summary.MX.safeCandidates > 0);
+  assert.ok(summary.MX.registeredPending > 0);
+  assert.ok(summary.MX.guestPending > 0);
+  assert.ok(summary.MX.eppPending > 0);
   assert.ok(summary.PE.guardedReview > 0);
   assert.ok(summary.CL.needsOfficialReview > 0);
   assert.ok(summary.CO.needsOfficialReview > 0);
