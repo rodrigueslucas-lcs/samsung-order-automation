@@ -5,17 +5,17 @@
   "policy": "Expected-result-first mapping: full when the current Playwright test proves the official Zephyr Expected Result through the intended business path; partial when the final expected state or a required path/store element is only partly proven. Test Data notes and operational guidance are supporting instructions, not extra pass criteria unless they are required to reach the Expected Result.",
   "summary": {
     "full": 5,
-    "partial": 13,
-    "missing": 19
+    "partial": 14,
+    "missing": 18
   },
   "cases": {
-    "SAM-24962": {"coverage":"full","spec":"tests/s1/mx/qst/base-store/authenticated-safe.spec.js","test":"MX QST 15 - Login via Home Page","notes":"Current registered-user flow proves successful login and landing on the MX storefront homepage; auxiliary source URL text is not treated as an extra acceptance criterion."},
-    "SAM-24963": {"coverage":"partial","spec":"tests/s1/mx/qst/base-store/authenticated-safe.spec.js","test":"MX QST 15 - Login via Home Page","notes":"Authenticated account control is visible, but the test does not open My Account and verify the available menu options."},
+    "SAM-24962": {"coverage":"full","spec":"tests/s1/mx/qst/base-store/authenticated-safe.spec.js","test":"SAM-24962 + SAM-24963 - Login Home and My Account menu","notes":"Current registered-user flow proves successful login and landing on the MX storefront homepage; auxiliary source URL text is not treated as an extra acceptance criterion."},
+    "SAM-24963": {"coverage":"partial","spec":"tests/s1/mx/qst/base-store/authenticated-safe.spec.js","test":"SAM-24962 + SAM-24963 - Login Home and My Account menu","notes":"The test now opens My Account and asserts the eight official menu options. Keep Partial until the updated assertion set is proven in a live MX S1 execution; the current saved auth/bootstrap state must first be refreshed."},
     "SAM-24964": {"coverage":"missing","notes":"No current QST test validates GNB rendering and navigation to a BC page."},
     "SAM-24968": {"coverage":"missing","notes":"No current QST test exercises PLP facets/filters and proves filtered products."},
     "SAM-24969": {"coverage":"partial","spec":"tests/s1/mx/qst/base-store/safe-reuse.spec.js","test":"MX QST 04 / QST 06+07+08","notes":"Current flow navigates PDP and adds the configured product, but does not prove the official BC-page-origin journey."},
-    "SAM-24971": {"coverage":"partial","spec":"tests/s1/mx/qst/base-store/safe-reuse.spec.js","test":"MX QST 06 + QST 07 + QST 08 - Add product and validate Cart","notes":"Cart/SKU/order summary are validated, but the official Expected Result also calls out item price, thumbnail, services, info icons and footer."},
-    "SAM-24972": {"coverage":"missing","notes":"No current QST test performs increase, decrease and delete quantity actions."},
+    "SAM-24971": {"coverage":"partial","spec":"tests/s1/mx/qst/base-store/safe-reuse.spec.js","test":"MX QST 06 + QST 07 + QST 08 - Add product and validate Cart","notes":"Current cart flow now covers SKU, item price, product thumbnail, available services, order summary and footer. Official info-icon coverage remains, and the new presentation assertions still need live MX S1 verification."},
+    "SAM-24972": {"coverage":"partial","spec":"tests/s1/mx/qst/base-store/safe-reuse.spec.js","test":"SAM-24972 - Increase decrease and delete cart quantity","notes":"A dedicated safe test now increases quantity, restores it with decrease, deletes the controlled product and confirms the cart is empty. Keep Partial until this new official flow passes in live MX S1."},
     "SAM-24975": {"coverage":"missing","notes":"No current QST test validates Rewards text and tooltip across cart, checkout and payment."},
     "SAM-24981": {"coverage":"partial","spec":"tests/s1/mx/qst/base-store/safe-storefront.spec.js","test":"MX QST 10 - Add Samsung Care+","notes":"Samsung Care+ is added and reflected in cart, but the current route starts from the controlled cart rather than proving the official BC/PDP-origin journey."},
     "SAM-24982": {"coverage":"partial","spec":"tests/s1/mx/qst/base-store/safe-storefront.spec.js","test":"MX QST 09 - Add Trade-In","notes":"Trade-in UI is opened, but the test does not complete the add action and prove the resulting cart/delete state."},
