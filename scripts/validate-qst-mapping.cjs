@@ -1,6 +1,7 @@
 const { validateQstMapping } = require("../utils/qstMapping");
 const { validateMxQstCoverage } = require("../utils/qstCoverage");
 const { validateMxPartialPlan } = require("../utils/qstPartialPlan");
+const { validateSharedCoreFamilies } = require("../utils/qstArchitecture");
 
 const result = validateQstMapping();
 console.log(`SMB QST mapping OK: ${result.total} test cases`);
@@ -21,3 +22,6 @@ console.log(
       .map(([group, count]) => `${group}=${count}`)
       .join(", ")
 );
+
+const architecture = validateSharedCoreFamilies();
+console.log(`SMB shared-core architecture OK: ${architecture.familyCount} families`);
