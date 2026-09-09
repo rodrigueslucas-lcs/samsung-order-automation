@@ -1,11 +1,20 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const baseLedger = require("../test-mapping/preqa2-validation.json");
+const defaultLedger = require("../test-mapping/preqa2-validation.json");
 const {
   applyResultToLedger,
   buildRecordedResult,
   normalizeStatus,
 } = require("../utils/preqa2ResultRecorder");
+
+function emptyLedger() {
+  const ledger = JSON.parse(JSON.stringify(defaultLedger));
+  for (const market of ["MX", "CL", "CO", "PE"]) {
+    ledger.markets[market].status = "NOT_STARTED";
+    ledger.markets[market].results = {};
+  }
+  return ledger;
+}
 
 test("recorder builds evidence-backed PASS and strips sensitive URL data", () => {
   const result = buildRecordedResult({
@@ -40,6 +49,7 @@ test("BLOCKED cannot be recorded without a blocker", () => {
 });
 
 test("ledger update preserves official totals and activates market", () => {
+  const baseLedger = emptyLedger();
   const recorded = buildRecordedResult({
     market: "MX",
     id: "SAM-24968",
@@ -52,6 +62,33 @@ test("ledger update preserves official totals and activates market", () => {
   assert.equal(next.markets.MX.status, "ACTIVE");
   assert.equal(next.markets.MX.results["SAM-24968"].status, "PASS");
   assert.equal(baseLedger.markets.MX.results["SAM-24968"], undefined);
+});
+
+test("different existing official result cannot be overwritten silently", () => {
+  const baseLedger = emptyLedger();
+  const pass = buildRecordedResult({
+    market: "MX",
+    id: "SAM-24964",
+    status: "PASS",
+    runtimeUrl: "/mx/smartphones/all-smartphones/",
+    evidence: "GNB navigation passed.",
+    validatedAt: "2026-09-09T20:00:00.000Z",
+  });
+  const withPass = applyResultToLedger(baseLedger, "MX", "SAM-24964", pass);
+  const fail = buildRecordedResult({
+    market: "MX",
+    id: "SAM-24964",
+    status: "FAIL",
+    runtimeUrl: "/mx/smartphones/all-smartphones/",
+    evidence: "Later official run failed.",
+    validatedAt: "2026-09-09T21:00:00.000Z",
+  });
+  assert.throws(
+    () => applyResultToLedger(withPass, "MX", "SAM-24964", fail),
+    /already has a different official PreQA2 result/
+  );
+  const replaced = applyResultToLedger(withPass, "MX", "SAM-24964", fail, { allowOverwrite: true });
+  assert.equal(replaced.markets.MX.results["SAM-24964"].status, "FAIL");
 });
 
 test("unsupported statuses and non-official IDs fail closed", () => {
