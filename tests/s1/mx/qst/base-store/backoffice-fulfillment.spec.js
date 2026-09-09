@@ -230,6 +230,14 @@ test.describe("MX S1 - QST BackOffice fulfillment", () => {
 
     async ({ page }) => {
 
+      test.skip(
+
+        !orderCode,
+
+        "MX QST 20 verification needs MX_QST_FULFILLMENT_ORDER_CODE or the causal QST 20 flow in the same run."
+
+      );
+
       expect(orderCode).toMatch(/^MX\d{6}-\d+$/i);
 
       const orders = new BackOfficeOrderPage(page);
@@ -356,6 +364,14 @@ test.describe("MX S1 - QST BackOffice fulfillment", () => {
 
     async ({ page }) => {
 
+      test.skip(
+
+        !orderCode,
+
+        "MX QST 22 verification needs MX_QST_FULFILLMENT_ORDER_CODE or the causal fulfillment flow in the same run."
+
+      );
+
       expect(orderCode).toMatch(/^MX\d{6}-\d+$/i);
 
       const orders = new BackOfficeOrderPage(page);
@@ -399,4 +415,3 @@ test.describe("MX S1 - QST BackOffice fulfillment", () => {
   );
 
 });
-
