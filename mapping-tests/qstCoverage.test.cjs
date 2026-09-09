@@ -3,6 +3,7 @@ const test = require("node:test");
 const { validateQstMapping } = require("../utils/qstMapping");
 const { validateMxQstCoverage } = require("../utils/qstCoverage");
 const { getMxQstEvidenceMetadata } = require("../utils/qstEvidenceMetadata");
+const { validateMxPartialPlan } = require("../utils/qstPartialPlan");
 
 test("SMB registry keeps the official 144-case market totals", () => {
   const result = validateQstMapping();
@@ -18,6 +19,17 @@ test("MX coverage classifies every official case consistently", () => {
     { full: result.full, partial: result.partial, missing: result.missing },
     { full: 5, partial: 14, missing: 18 }
   );
+});
+
+test("MX partial plan contains every current Partial exactly once", () => {
+  const result = validateMxPartialPlan();
+  assert.equal(result.partialTotal, 14);
+  assert.deepEqual(result.groups, {
+    quickAssertion: 4,
+    existingFlowExtension: 2,
+    newBusinessFlow: 4,
+    eppContext: 4,
+  });
 });
 
 test("MX evidence metadata is derived from official mapping", () => {
