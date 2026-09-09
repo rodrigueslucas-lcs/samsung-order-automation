@@ -80,7 +80,7 @@ test("PE reuse plan classifies all 34 official cases without claiming coverage",
 test("S1 implementation inventory only binds official IDs to the correct market", () => {
   const inventory = validateS1OfficialImplementation();
   assert.equal(inventory.MX.implementedCount, 10);
-  assert.equal(inventory.PE.implementedCount, 12);
+  assert.equal(inventory.PE.implementedCount, 16);
   assert.equal(inventory.CL.implementedCount, 0);
   assert.equal(inventory.CO.implementedCount, 0);
 });
