@@ -1,4 +1,5 @@
 const registry = require("../test-mapping/smb-qst.json");
+const { PREQA2_HOST } = require("./preqa2Config");
 
 const PREQA2_VALIDATION_STATUSES = Object.freeze([
   "NOT_RUN",
@@ -24,7 +25,12 @@ function officialIds(market) {
 
 function sanitizeRuntimePath(value) {
   if (!value) return null;
-  const url = new URL(value, "https://p6-pre-qa2.samsung.com");
+  const raw = String(value).trim();
+  const absolute = /^[a-z][a-z\d+.-]*:\/\//i.test(raw);
+  const url = new URL(raw, `https://${PREQA2_HOST}`);
+  if (absolute && (url.protocol !== "https:" || url.hostname !== PREQA2_HOST)) {
+    throw new Error(`PreQA2 runtime evidence URL must use https://${PREQA2_HOST}.`);
+  }
   return url.pathname;
 }
 
