@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const { validateQstMapping } = require("../utils/qstMapping");
 const { validateMxQstCoverage } = require("../utils/qstCoverage");
+const { getMxQstEvidenceMetadata } = require("../utils/qstEvidenceMetadata");
 
 test("SMB registry keeps the official 144-case market totals", () => {
   const result = validateQstMapping();
@@ -16,5 +17,25 @@ test("MX coverage classifies every official case consistently", () => {
   assert.deepEqual(
     { full: result.full, partial: result.partial, missing: result.missing },
     { full: 5, partial: 14, missing: 18 }
+  );
+});
+
+test("MX evidence metadata is derived from official mapping", () => {
+  assert.deepEqual(getMxQstEvidenceMetadata("SAM-24988"), {
+    zephyrId: "SAM-24988",
+    market: "MX",
+    store: "BS",
+    suite: "QST",
+    feature: "Checkout",
+    environment: "S1",
+    coverage: "full",
+    officialTitle: "Checkout button on cart page",
+  });
+});
+
+test("unknown MX evidence IDs are rejected", () => {
+  assert.throws(
+    () => getMxQstEvidenceMetadata("SAM-00000"),
+    /metadata was not found/
   );
 });
