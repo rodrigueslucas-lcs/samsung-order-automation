@@ -6,10 +6,10 @@
   "source": "Zephyr PE QST baseline plus existing tests/s2/pe/qst automation",
   "policy": "This file is a reuse plan, not coverage proof. Existing ST2 automation must be adapted and live-validated in S1 before any official coverage promotion.",
   "summary": {
-    "directCandidate": 9,
-    "extensionCandidate": 12,
-    "destructiveCandidate": 6,
-    "missing": 7
+    "directCandidate": 11,
+    "extensionCandidate": 14,
+    "destructiveCandidate": 5,
+    "missing": 4
   },
   "cases": {
     "SAM-25140": { "title": "Order confirmation screen", "store": "EPP", "feature": "Order/BackOffice", "reuse": "destructiveCandidate", "candidate": "tests/s2/pe/qst/epp/discovery.spec.js", "notes": "EPP confirmation requires a real EPP order; keep destructive guard and do not infer from Base Store." },
