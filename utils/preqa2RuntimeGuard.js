@@ -10,7 +10,7 @@ function normalizeMarket(value) {
 }
 
 function assertApprovedPreqa2Url(value, { market = null, allowInfrastructurePath = false } = {}) {
-  const url = value instanceof URL ? value : new URL(String(value));
+  const url = value instanceof URL ? value : new URL(String(value), `https://${PREQA2_HOST}`);
   if (url.protocol !== "https:" || url.hostname !== PREQA2_HOST) {
     throw new Error(`PreQA2 runtime left approved host https://${PREQA2_HOST}.`);
   }
