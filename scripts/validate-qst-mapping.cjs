@@ -2,6 +2,7 @@ const { validateQstMapping } = require("../utils/qstMapping");
 const { validateMxQstCoverage } = require("../utils/qstCoverage");
 const { validateMxPartialPlan } = require("../utils/qstPartialPlan");
 const { validateSharedCoreFamilies } = require("../utils/qstArchitecture");
+const { validatePeQstReusePlan } = require("../utils/qstPeReusePlan");
 
 const result = validateQstMapping();
 console.log(`SMB QST mapping OK: ${result.total} test cases`);
@@ -25,3 +26,10 @@ console.log(
 
 const architecture = validateSharedCoreFamilies();
 console.log(`SMB shared-core architecture OK: ${architecture.familyCount} families`);
+
+const peReuse = validatePeQstReusePlan();
+console.log(
+  `PE QST reuse plan OK: ${peReuse.officialTotal} official cases ` +
+    `(direct=${peReuse.directCandidate}, extension=${peReuse.extensionCandidate}, ` +
+    `destructive=${peReuse.destructiveCandidate}, missing=${peReuse.missing})`
+);
