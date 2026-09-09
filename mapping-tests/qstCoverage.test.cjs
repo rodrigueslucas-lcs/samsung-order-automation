@@ -4,6 +4,7 @@ const { validateQstMapping } = require("../utils/qstMapping");
 const { validateMxQstCoverage } = require("../utils/qstCoverage");
 const { getMxQstEvidenceMetadata } = require("../utils/qstEvidenceMetadata");
 const { validateMxPartialPlan } = require("../utils/qstPartialPlan");
+const { validateSharedCoreFamilies } = require("../utils/qstArchitecture");
 
 test("SMB registry keeps the official 144-case market totals", () => {
   const result = validateQstMapping();
@@ -30,6 +31,11 @@ test("MX partial plan contains every current Partial exactly once", () => {
     newBusinessFlow: 4,
     eppContext: 4,
   });
+});
+
+test("SMB shared-core families only reference official market IDs", () => {
+  const result = validateSharedCoreFamilies();
+  assert.equal(result.familyCount, 13);
 });
 
 test("MX evidence metadata is derived from official mapping", () => {
