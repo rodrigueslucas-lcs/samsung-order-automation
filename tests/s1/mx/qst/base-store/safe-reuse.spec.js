@@ -20,6 +20,13 @@ test("MX QST 06 + QST 07 + QST 08 @qst @mx @base-store @safe - Add product and v
   await cart.validateCartFooter();
 });
 
+test("SAM-24972 @qst @mx @base-store @safe - Increase decrease and delete cart quantity", async ({ page, mxConfig }) => {
+  const cart = await prepareMxQstCart(page, mxConfig);
+  await cart.validateControlledSingleSku(mxConfig.sku);
+  await cart.validateQuantityCanChange();
+  await cart.clearMxCartAndConfirmEmpty();
+});
+
 test("MX QST 11 @qst @mx @base-store @safe - Navigate to Checkout", async ({ page, mxConfig }) => {
   const cart = await prepareMxQstCart(page, mxConfig);
   await cart.proceedToCheckout();
