@@ -2,11 +2,14 @@ import { test, expect } from "@playwright/test";
 import HomePage from "../../../../../pages/HomePage";
 import ProductPage from "../../../../../pages/ProductPage";
 import CartPage from "../../../../../pages/CartPage";
+import GuestLoginPage from "../../../../../pages/GuestLoginPage";
+import CheckoutPage from "../../../../../pages/CheckoutPage";
 import peConfigModule from "../../../../../config/markets/pe";
 import storefrontAccess from "../../../../../flows/smb/storefrontAccess";
 import cartPresentation from "../../../../../flows/smb/cartPresentation";
 import evidenceContext from "../../../../../reporters/evidence/evidenceContext";
 import peEvidenceMetadata from "../../../../../utils/qstPeEvidenceMetadata";
+import { testData } from "../../../../../utils/testData";
 
 const { getPeS1QstConfig } = peConfigModule;
 const { openStorefront } = storefrontAccess;
@@ -58,6 +61,18 @@ async function addConfiguredProductToPeCart(page, config) {
     productNamePattern: null,
     currencyPattern: /S\/\s*[\d,.]+/,
   });
+}
+
+async function reachPeGuestDelivery(page, config) {
+  const cart = await addConfiguredProductToPeCart(page, config);
+  await cart.proceedToCheckout();
+
+  const guest = new GuestLoginPage(page);
+  await guest.checkoutAsGuest(`pe-qst-${Date.now()}@mailinator.com`);
+
+  const checkout = new CheckoutPage(page);
+  await checkout.fillCustomerData(testData.customer);
+  return checkout;
 }
 
 test("SAM-25079 @qst @pe @base-store @safe @reuse - UI validation in desktop view baseline", async ({ page }, testInfo) => {
@@ -152,4 +167,16 @@ test("SAM-25081 @qst @pe @base-store @safe @reuse - Checkout button on cart page
   const cart = await addConfiguredProductToPeCart(page, config);
   await cart.validateCheckoutButton();
   await cart.proceedToCheckout();
+});
+
+test("SAM-25088 @qst @pe @base-store @safe @guest @reuse - Save option not visible", async ({ page }, testInfo) => {
+  test.setTimeout(240000);
+  const config = requirePeProductConfig();
+  recordOfficialEvidence(testInfo, "SAM-25088");
+
+  await reachPeGuestDelivery(page, config);
+  const saveAddress = page
+    .getByRole("checkbox", { name: /Guardar datos de env[ií]o en Mi cuenta/i })
+    .filter({ visible: true });
+  await expect(saveAddress).toHaveCount(0);
 });
