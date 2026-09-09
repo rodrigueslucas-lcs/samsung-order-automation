@@ -3,6 +3,7 @@ import {
   openMxQstPdp,
   prepareMxQstCart,
   validateMxCartProductPresentation,
+  validateMxCheckoutSummaryPresentation,
 } from "./mxQstFlows";
 import { reachMxGuestPayment } from "../../dst/base-store/mxFlows";
 
@@ -42,5 +43,8 @@ test("MX QST 12 @qst @mx @base-store @safe - Enter guest address", async ({ page
   const { address } = await reachMxGuestPayment(page, mxConfig, "mx.qst.address@example.com");
   expect(address.lookupStatus).toBe(200);
   expect(address.selectedColonia).toBeTruthy();
+  const summary = await validateMxCheckoutSummaryPresentation(page, mxConfig);
+  expect(summary.subtotal).toBeGreaterThan(0);
+  expect(summary.total).toBeGreaterThan(0);
   await expect(page).toHaveURL(/CHECKOUT_STEP_PAYMENT/i);
 });
