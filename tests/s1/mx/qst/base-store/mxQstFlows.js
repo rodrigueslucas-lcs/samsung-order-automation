@@ -66,6 +66,49 @@ export async function validateMxCartProductPresentation(page, config) {
   expect((await image.getAttribute("src")) || (await image.getAttribute("data-src"))).toBeTruthy();
 }
 
+function parseMxCurrency(text) {
+  const match = String(text || "").match(/\$\s*([\d,.]+)/);
+  if (!match) return null;
+  return Number(match[1].replace(/,/g, ""));
+}
+
+export async function validateMxCheckoutSummaryPresentation(page, config) {
+  const sku = page.getByText(config.sku, { exact: true }).filter({ visible: true }).first();
+  await expect(sku).toBeVisible({ timeout: 30000 });
+
+  const subtotalLabel = page.getByText(/^Subtotal$/i).filter({ visible: true }).first();
+  const totalLabel = page
+    .getByText(/^Total(?:\s+con\s+IVA)?$/i)
+    .filter({ visible: true })
+    .first();
+  await expect(subtotalLabel).toBeVisible({ timeout: 30000 });
+  await expect(totalLabel).toBeVisible({ timeout: 30000 });
+
+  const subtotalText = await subtotalLabel.locator("..").innerText();
+  const totalText = await totalLabel.locator("..").innerText();
+  const subtotal = parseMxCurrency(subtotalText);
+  const total = parseMxCurrency(totalText);
+
+  expect(subtotal).not.toBeNull();
+  expect(total).not.toBeNull();
+  expect(subtotal).toBeGreaterThan(0);
+  expect(total).toBeGreaterThan(0);
+
+  const optionalVoucher = page
+    .getByText(/Voucher|Cup[oó]n/i)
+    .filter({ visible: true });
+  const optionalPromo = page
+    .getByText(/Promoci[oó]n|Promo/i)
+    .filter({ visible: true });
+
+  return {
+    subtotal,
+    total,
+    voucherVisible: (await optionalVoucher.count()) > 0,
+    promoVisible: (await optionalPromo.count()) > 0,
+  };
+}
+
 export async function openMxService(page, name) {
   const button = page.getByRole("button", {
     name: new RegExp(`Agregar ahora\\s*${name}`, "i"),
