@@ -14,7 +14,10 @@ export default defineConfig({
 
   reporter: [
     ['html', { open: 'always' }],
-    ['list']
+    ['list'],
+    ['./reporters/evidence/SmbEvidenceReporter.js', {
+      outputDir: process.env.SMB_EVIDENCE_DIR || 'test-results/evidence'
+    }]
   ],
 
   use: {
