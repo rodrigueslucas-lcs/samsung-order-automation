@@ -56,6 +56,10 @@ console.log(
 console.log(
   "PreQA2 pending campaign: " +
     Object.entries(campaign)
-      .map(([market, entry]) => `${market}=${entry.pending} pending (${entry.safeCandidates} safe, ${entry.guardedReview} guarded-review)`)
+      .map(([market, entry]) =>
+        `${market}=${entry.pending} pending (` +
+        `${entry.safeCandidates} safe, ${entry.guardedReview} guarded-review, ` +
+        `${entry.needsOfficialReview} needs-official-review)`
+      )
       .join(", ")
 );
