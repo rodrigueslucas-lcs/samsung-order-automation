@@ -5,6 +5,7 @@ import peConfigModule from "../../../../../config/markets/pe";
 import evidenceContext from "../../../../../reporters/evidence/evidenceContext";
 import peEvidenceMetadata from "../../../../../utils/qstPeEvidenceMetadata";
 import { testData } from "../../../../../utils/testData";
+import { reachPeRegisteredDelivery } from "./peQstFlows";
 
 const {
   PE_AUTH_STATE_PATH,
@@ -73,6 +74,40 @@ test.describe("PE S1 QST - guarded profile writes", () => {
     } finally {
       await profile.deleteQaAddressesViaApi(created.street).catch(() => {});
       await profile.deleteQaAddressesViaApi(updated.street).catch(() => {});
+    }
+  });
+
+  test("SAM-25084 @destructive @qst @pe @base-store @registered @reuse - Add Edit saved new address baseline", async ({ page }, testInfo) => {
+    test.setTimeout(420000);
+    recordBusinessEvidence(testInfo, getPeQstEvidenceMetadata("SAM-25084"));
+
+    const auth = getPeAuthState();
+    await auth.validateAuthenticatedSession(page);
+    await page.keyboard.press("Escape");
+
+    const config = getPeS1QstConfig();
+    const profile = new ProfilePage(page, {
+      origin: config.baseUrl.origin,
+      market: "pe",
+      addressApiUrl: config.addressApiUrl.href,
+    });
+    const qaAddress = profile.qaAddress(`CHECKOUT ${Date.now()}`, testData.address);
+
+    try {
+      const { checkout } = await reachPeRegisteredDelivery(page, config);
+      await checkout.saveNewAuthenticatedAddress(qaAddress);
+      await checkout.selectShippingMethod();
+      await checkout.acceptTerms();
+      await checkout.continueToPayment();
+      await profile.waitForQaAddressViaApi(qaAddress.street);
+
+      testInfo.annotations.push({
+        type: "qst-reuse-note",
+        description:
+          "The new-address Save path from registered checkout is persisted and API-read back using a QA-only marker, then cleaned up. The official Edit-existing-address path remains pending live selector proof before Full coverage.",
+      });
+    } finally {
+      await profile.deleteQaAddressesViaApi(qaAddress.street).catch(() => {});
     }
   });
 });
