@@ -1,6 +1,8 @@
 const mxConfigModule = require("../../utils/mxConfig");
+const peConfigModule = require("./pe");
 
 const { getMxConfig } = mxConfigModule;
+const { getPeS1QstConfig } = peConfigModule;
 
 const MARKET_DEFINITIONS = Object.freeze({
   MX: Object.freeze({ code: "MX", locale: "es-MX", currency: "MXN" }),
@@ -42,8 +44,17 @@ function getMarketConfig(value, environment = process.env) {
     };
   }
 
-  // CL/CO/PE are intentionally env-driven until each market is validated live.
-  // This avoids baking unverified staging hosts, routes, SKUs or test data into the framework.
+  // PE now has an explicit S1 QST config because there is substantial ST2 automation to reuse.
+  // It remains runtime-driven: no unverified S1 host, SKU or PDP is baked into the framework.
+  if (code === "PE") {
+    return {
+      ...getPeS1QstConfig(environment),
+      ...definition,
+      market: code,
+    };
+  }
+
+  // CL/CO remain env-driven until each market is validated live.
   const variable = `${code}_STOREFRONT_URL`;
   const rawBaseUrl = environment[variable];
   if (!rawBaseUrl) {
