@@ -27,6 +27,10 @@ function main() {
   console.log(`- implementation: ${Object.entries(implementation).map(([m, e]) => `${m}=${e.implementedCount}/${e.officialTotal}`).join(", ")}`);
   console.log(`- official execution: ${Object.entries(ledger).map(([m, e]) => `${m}=${e.executed}/${e.officialTotal}`).join(", ")}`);
   console.log(`- pending: ${Object.entries(campaign).map(([m, e]) => `${m}=${e.pending}`).join(", ")}`);
+  console.log(`- registered pending: ${Object.entries(campaign).map(([m, e]) => `${m}=${e.registeredPending}`).join(", ")}`);
+  console.log(`- guest pending: ${Object.entries(campaign).map(([m, e]) => `${m}=${e.guestPending}`).join(", ")}`);
+  console.log(`- EPP pending: ${Object.entries(campaign).map(([m, e]) => `${m}=${e.eppPending}`).join(", ")}`);
+  console.log(`- official metadata review: ${Object.entries(campaign).map(([m, e]) => `${m}=${e.needsOfficialReview}`).join(", ")}`);
 
   const requested = String(process.env.PREQA2_REQUIRE_SAFE_EXHAUSTED || "")
     .split(",")
