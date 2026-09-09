@@ -4,6 +4,8 @@ const { validateMxPartialPlan } = require("../utils/qstPartialPlan");
 const { validateSharedCoreFamilies } = require("../utils/qstArchitecture");
 const { validatePeQstReusePlan } = require("../utils/qstPeReusePlan");
 const { validateS1OfficialImplementation } = require("../utils/qstS1Implementation");
+const { validatePreqa2ValidationLedger } = require("../utils/preqa2ValidationLedger");
+const { getCampaignSummary } = require("../utils/preqa2CampaignPlan");
 
 const result = validateQstMapping();
 console.log(`SMB QST mapping OK: ${result.total} test cases`);
@@ -40,5 +42,20 @@ console.log(
   "S1 official QST implementation inventory OK: " +
     Object.entries(implementation)
       .map(([market, entry]) => `${market}=${entry.implementedCount}/${entry.officialTotal}`)
+      .join(", ")
+);
+
+const preqa2Ledger = validatePreqa2ValidationLedger();
+const campaign = getCampaignSummary();
+console.log(
+  "PreQA2 official validation ledger OK: " +
+    Object.entries(preqa2Ledger)
+      .map(([market, entry]) => `${market}=${entry.executed}/${entry.officialTotal} executed`)
+      .join(", ")
+);
+console.log(
+  "PreQA2 pending campaign: " +
+    Object.entries(campaign)
+      .map(([market, entry]) => `${market}=${entry.pending} pending (${entry.safeCandidates} safe, ${entry.guardedReview} guarded-review)`)
       .join(", ")
 );
