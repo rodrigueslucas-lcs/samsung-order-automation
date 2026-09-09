@@ -1,8 +1,8 @@
 {
   "$schemaVersion": 1,
   "source": "Samsung_SMB_QST_Master_144_Architecture_Matrix.xlsx / Similarity_Matrix",
-  "familyCount": 13,
-  "policy": "Architecture candidates only. A shared family does not prove that every market has identical selectors, data or steps; market/store deltas remain configuration or explicit overrides.",
+  "familyCount": 12,
+  "policy": "Architecture candidates only. A shared family does not prove that every market has identical selectors, data or steps; market/store deltas remain configuration or explicit overrides. Families with an official ID collision across markets are excluded until the source is reconciled.",
   "families": [
     {"family":"Able to add to Cart from PDP","feature":"Cart","stores":["BS","EPP","Unknown"],"marketCount":4,"markets":["CL","CO","MX","PE"],"ids":{"MX":["SAM-25021"],"CL":["SAM-24840","SAM-24790"],"CO":["SAM-24930"],"PE":["SAM-25113","SAM-25061"]}},
     {"family":"Able to checkout with a New address","feature":"Checkout","stores":["BS","Unknown"],"marketCount":4,"markets":["CL","CO","MX","PE"],"ids":{"MX":["SAM-24994"],"CL":["SAM-24814"],"CO":["SAM-24904"],"PE":["SAM-25087"]}},
@@ -15,7 +15,6 @@
     {"family":"Save option not visible","feature":"Checkout","stores":["BS","Unknown"],"marketCount":4,"markets":["CL","CO","MX","PE"],"ids":{"MX":["SAM-24995"],"CL":["SAM-24815"],"CO":["SAM-24905"],"PE":["SAM-25088"]}},
     {"family":"Select saved address","feature":"Checkout","stores":["BS","Unknown"],"marketCount":4,"markets":["CL","CO","MX","PE"],"ids":{"MX":["SAM-24992"],"CL":["SAM-24812"],"CO":["SAM-24902"],"PE":["SAM-25085"]}},
     {"family":"Verifiy Back to Top","feature":"Cart","stores":["BS","EPP","Unknown"],"marketCount":4,"markets":["CL","CO","MX","PE"],"ids":{"MX":["SAM-25044","SAM-25001"],"CL":["SAM-24821"],"CO":["SAM-24952","SAM-24911"],"PE":["SAM-25094"]}},
-    {"family":"UI validation in desktop view","feature":"UI/Other","stores":["BS","Unknown"],"marketCount":3,"markets":["CL","CO","PE"],"ids":{"MX":[],"CL":["SAM-24806"],"CO":["SAM-24806"],"PE":["SAM-25079"]}},
     {"family":"Validate switching between delivery modes or saved/new address","feature":"Checkout","stores":["BS","Unknown"],"marketCount":3,"markets":["CL","CO","MX"],"ids":{"MX":["SAM-25000"],"CL":["SAM-24819"],"CO":["SAM-24910"],"PE":[]}}
   ]
 }
