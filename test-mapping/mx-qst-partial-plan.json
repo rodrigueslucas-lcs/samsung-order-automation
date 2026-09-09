@@ -1,0 +1,103 @@
+{
+  "$schemaVersion": 1,
+  "market": "MX",
+  "source": "test-mapping/mx-qst-coverage.json",
+  "policy": "Expected-result-first. This file is an implementation plan only; coverage remains partial until the official Expected Result is proven in the intended store/business path.",
+  "summary": {
+    "partialTotal": 13,
+    "quickAssertion": 3,
+    "existingFlowExtension": 2,
+    "newBusinessFlow": 4,
+    "eppContext": 4
+  },
+  "groups": {
+    "quickAssertion": [
+      {
+        "id": "SAM-24963",
+        "title": "My Account",
+        "reason": "Authentication is already proven. Remaining gap is opening My Account and asserting the official menu/options without creating a new business flow."
+      },
+      {
+        "id": "SAM-24971",
+        "title": "Cart page UI",
+        "reason": "The controlled cart already exists and CartPage already exposes reusable footer/service assertions. Remaining UI assertions can be layered onto the same safe flow."
+      },
+      {
+        "id": "SAM-24989",
+        "title": "Order Summary on checkout page",
+        "reason": "The guest checkout already reaches Delivery and validates the summary. Remaining work is assertion depth in the existing checkout path."
+      }
+    ],
+    "existingFlowExtension": [
+      {
+        "id": "SAM-24982",
+        "title": "Verify trade-up cart page",
+        "reason": "Trade-in UI is already opened. The existing safe storefront flow must complete the add action and verify resulting cart/delete state."
+      },
+      {
+        "id": "SAM-25011",
+        "title": "Backoffice",
+        "reason": "Exact order search/open is proven. Product search and basic/advanced search coverage should extend the existing BackOffice page object rather than create a separate architecture."
+      }
+    ],
+    "newBusinessFlow": [
+      {
+        "id": "SAM-24969",
+        "title": "Add product from BC Page",
+        "reason": "Current path starts from PDP. Official BC-page-origin behavior needs a distinct route/context and should not be simulated by renaming the existing PDP flow."
+      },
+      {
+        "id": "SAM-24981",
+        "title": "Add SC+ from BC/PDP Page",
+        "reason": "SC+ add itself is proven, but the official BC/PDP-origin journey still needs the WMC/PreQA storefront context."
+      },
+      {
+        "id": "SAM-24991",
+        "title": "Able to add/edit new/saved address",
+        "reason": "Registered checkout exists, but save/edit/change of persisted addresses requires stateful registered-address behavior not currently exercised."
+      },
+      {
+        "id": "SAM-24994",
+        "title": "Able to checkout with a New address",
+        "reason": "Current flow proves a new shipping address only. Shipping plus billing-address behavior must be exercised explicitly."
+      }
+    ],
+    "eppContext": [
+      {
+        "id": "SAM-25021",
+        "title": "Able to add to Cart from PDP",
+        "reason": "Base Store PDP behavior is proven, but the official case belongs to EPP and cannot be promoted without running in EPP context."
+      },
+      {
+        "id": "SAM-25022",
+        "title": "Cart page UI",
+        "reason": "Core cart behavior exists in Base Store, but this official case requires EPP execution plus complete official cart UI assertions."
+      },
+      {
+        "id": "SAM-25034",
+        "title": "Step 1: Contact information",
+        "reason": "Contact information is proven in Base Store, but the official case is EPP and needs EPP store context."
+      },
+      {
+        "id": "SAM-25045",
+        "title": "Payment using credit card with reg user",
+        "reason": "Registered credit-card order is proven in Base Store, but the official case is EPP and needs EPP order placement."
+      }
+    ]
+  },
+  "priority": [
+    "SAM-24971",
+    "SAM-24989",
+    "SAM-24963",
+    "SAM-24982",
+    "SAM-25011",
+    "SAM-24969",
+    "SAM-24981",
+    "SAM-24991",
+    "SAM-24994",
+    "SAM-25021",
+    "SAM-25022",
+    "SAM-25034",
+    "SAM-25045"
+  ]
+}
