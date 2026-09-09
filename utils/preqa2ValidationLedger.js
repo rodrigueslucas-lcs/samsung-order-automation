@@ -4,6 +4,7 @@ const {
   PREQA2_CONTEXTS,
   PREQA2_VALIDATION_STATUSES,
 } = require("./preqa2Validation");
+const { getExecutionRequirement } = require("./preqa2ExecutionRequirements");
 
 const MARKET_STATUSES = Object.freeze(["NOT_STARTED", "ACTIVE", "COMPLETE"]);
 const EXECUTED_STATUSES = new Set(["PASS", "FAIL", "BLOCKED", "NOT_APPLICABLE"]);
@@ -21,6 +22,17 @@ function validateResult(market, id, result) {
   if (!PREQA2_CONTEXTS.includes(result.context || "unknown")) {
     errors.push(`${market}/${id}: unsupported context ${result.context}.`);
   }
+
+  if (EXECUTED_STATUSES.has(result.status)) {
+    const requirement = getExecutionRequirement(market, id);
+    if (requirement.requiresSamsungAccount && result.context !== "registered") {
+      errors.push(`${market}/${id}: official TC requires registered Samsung Account context.`);
+    }
+    if (requirement.requiresGuestState && result.context !== "guest") {
+      errors.push(`${market}/${id}: official TC requires guest context.`);
+    }
+  }
+
   if (result.runtimePath && !String(result.runtimePath).startsWith(`/${market.toLowerCase()}/`)) {
     errors.push(`${market}/${id}: runtimePath must stay inside /${market.toLowerCase()}/.`);
   }
