@@ -1,5 +1,9 @@
 import { test, expect } from "./mxQst.fixture";
-import { openMxQstPdp, prepareMxQstCart } from "./mxQstFlows";
+import {
+  openMxQstPdp,
+  prepareMxQstCart,
+  validateMxCartProductPresentation,
+} from "./mxQstFlows";
 import { reachMxGuestPayment } from "../../dst/base-store/mxFlows";
 
 test.describe.configure({ timeout: 420000 });
@@ -13,6 +17,7 @@ test("MX QST 06 + QST 07 + QST 08 @qst @mx @base-store @safe - Add product and v
   const cart = await prepareMxQstCart(page, mxConfig);
   await cart.validateCartPage();
   await cart.validateProductInCart();
+  await validateMxCartProductPresentation(page, mxConfig);
   const summary = await cart.validateOrderSummary();
   expect(summary.subtotal).toBeTruthy();
   expect(summary.total).toBeTruthy();
