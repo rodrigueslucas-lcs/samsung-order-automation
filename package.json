@@ -26,6 +26,8 @@
     "qst:list": "playwright test tests/s2/pe/qst --project=chromium --list",
     "qst:mx:base-store": "playwright test tests/s1/mx/qst/base-store --project=chromium --workers=1 --grep-invert @destructive",
     "qst:mx:list": "playwright test tests/s1/mx/qst/base-store --project=chromium --list",
+    "qst:pe:base-store": "playwright test tests/s1/pe/qst/base-store --project=chromium --workers=1 --grep-invert @destructive",
+    "qst:pe:list": "playwright test tests/s1/pe/qst/base-store --project=chromium --list",
     "qst:mapping:validate": "node scripts/validate-qst-mapping.cjs",
     "reporting:evidence:test": "node --test reporter-tests/evidence.test.cjs && playwright test --config=reporter-tests/playwright.evidence.config.cjs",
     "reporting:executive": "node reporters/executive/generateExecutiveReport.cjs",
