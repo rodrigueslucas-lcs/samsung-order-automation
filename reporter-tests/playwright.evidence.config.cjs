@@ -7,7 +7,7 @@ module.exports = defineConfig({
   reporter: [
     ["line"],
     ["../reporters/evidence/SmbEvidenceReporter.js", {
-      outputDir: "test-results/evidence",
+      outputDir: "test-results/reporter-tests/evidence",
     }],
   ],
   use: { screenshot: "off", trace: "off", video: "off" },
