@@ -5,6 +5,7 @@ const { validateMxQstCoverage } = require("../utils/qstCoverage");
 const { getMxQstEvidenceMetadata } = require("../utils/qstEvidenceMetadata");
 const { validateMxPartialPlan } = require("../utils/qstPartialPlan");
 const { validateSharedCoreFamilies } = require("../utils/qstArchitecture");
+const { getSharedCandidateSummary } = require("../utils/qstSharedCandidates");
 const { validatePeQstReusePlan } = require("../utils/qstPeReusePlan");
 const { getPeQstEvidenceMetadata } = require("../utils/qstPeEvidenceMetadata");
 const { validateS1OfficialImplementation } = require("../utils/qstS1Implementation");
@@ -40,6 +41,14 @@ test("MX partial plan contains every current Partial exactly once", () => {
 test("SMB shared-core families only reference official market IDs", () => {
   const result = validateSharedCoreFamilies();
   assert.equal(result.familyCount, 12);
+});
+
+test("SMB shared-core candidates expose the current reusable market backlog", () => {
+  const summary = getSharedCandidateSummary();
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(summary).map(([market, entry]) => [market, entry.count])),
+    { MX: 14, CL: 15, CO: 14, PE: 14 }
+  );
 });
 
 test("PE reuse plan classifies all 34 official cases without claiming coverage", () => {
