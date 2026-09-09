@@ -1,5 +1,8 @@
+import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
 import { test, expect } from "./mxQst.fixture";
 import { openMxQstPdp, openMxService, prepareMxQstCart } from "./mxQstFlows";
+
+const { recordBusinessEvidence } = evidenceContext;
 
 test.describe.configure({ timeout: 300000 });
 
@@ -18,7 +21,15 @@ test("MX QST 05 @qst @mx @base-store @safe - PDP variants other than color", asy
   await expect(page.getByText(/Almacenamiento \(GB\)/i)).toBeVisible({ timeout: 30000 });
 });
 
-test("MX QST 09 @qst @mx @base-store @safe - Add Trade-In", async ({ page, mxConfig }) => {
+test("SAM-24982 @qst @mx @base-store @safe - Verify trade-up cart page", async ({ page, mxConfig }, testInfo) => {
+  recordBusinessEvidence(testInfo, {
+    zephyrId: "SAM-24982",
+    market: "MX",
+    store: "BS",
+    suite: "QST",
+    feature: "Cart",
+    environment: "S1",
+  });
   await prepareMxQstCart(page, mxConfig);
   await openMxService(page, "Galaxy Canje");
   await expect(page.getByText(/Selecciona el dispositivo/i).filter({ visible: true }).last()).toBeVisible();
@@ -26,7 +37,15 @@ test("MX QST 09 @qst @mx @base-store @safe - Add Trade-In", async ({ page, mxCon
   await expect(page.getByRole("button", { name: /Continuar/i }).filter({ visible: true })).toBeVisible();
 });
 
-test("MX QST 10 @qst @mx @base-store @safe - Add Samsung Care+", async ({ page, mxConfig }) => {
+test("SAM-24981 @qst @mx @base-store @safe - Add Samsung Care+", async ({ page, mxConfig }, testInfo) => {
+  recordBusinessEvidence(testInfo, {
+    zephyrId: "SAM-24981",
+    market: "MX",
+    store: "BS",
+    suite: "QST",
+    feature: "Cart",
+    environment: "S1",
+  });
   await prepareMxQstCart(page, mxConfig);
   await openMxService(page, "Samsung Care\\+");
   const careText = page.getByText(/Samsung Care\+/i).filter({ visible: true });
