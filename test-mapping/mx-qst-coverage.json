@@ -2,55 +2,55 @@
   "$schemaVersion": 1,
   "market": "MX",
   "officialTotal": 37,
-  "policy": "Conservative mapping: full only when the current Playwright test covers the official Zephyr intent end-to-end; partial when only part of the official steps/expected result is proven.",
+  "policy": "Expected-result-first mapping: full when the current Playwright test proves the official Zephyr Expected Result through the intended business path; partial when the final expected state or a required path element is only partly proven. Test Data notes and operational guidance are supporting instructions, not extra pass criteria unless they are required to reach the Expected Result.",
   "mapped": {
     "SAM-24962": {
       "coverage": "full",
       "spec": "tests/s1/mx/qst/base-store/authenticated-safe.spec.js",
       "test": "MX QST 15 - Login via Home Page",
-      "notes": "Registered user session is verified on the MX storefront via visible account control."
+      "notes": "Registered user session is verified on the MX storefront and the user lands successfully on the authenticated storefront/home context."
     },
     "SAM-24971": {
       "coverage": "partial",
       "spec": "tests/s1/mx/qst/base-store/safe-reuse.spec.js",
       "test": "MX QST 06 + QST 07 + QST 08 - Add product and validate Cart",
-      "notes": "Cart, SKU and order summary are validated; the official Cart UI case also calls out thumbnail, services, info icons and footer, which are not all asserted in this test."
+      "notes": "Cart, SKU and order summary are validated, but the official Expected Result requires the cart UI to display SKU name, item price, thumbnail, available services, order summary, info icons and footer; those are not all asserted."
     },
     "SAM-24981": {
       "coverage": "partial",
       "spec": "tests/s1/mx/qst/base-store/safe-storefront.spec.js",
       "test": "MX QST 10 - Add Samsung Care+",
-      "notes": "Samsung Care+ is added and reflected in cart, but the official case is specifically BC/PDP-oriented and uses WMC/PreQA context."
+      "notes": "Samsung Care+ is selected and reflected in cart, but the current automation does not yet prove the official BC/PDP entry path end-to-end. The WMC/PreQA note is treated as supporting setup, not an additional pass criterion."
     },
     "SAM-24982": {
       "coverage": "partial",
       "spec": "tests/s1/mx/qst/base-store/safe-storefront.spec.js",
       "test": "MX QST 09 - Add Trade-In",
-      "notes": "Trade-in UI is opened and validated, but the current test does not complete and prove the full official cart result."
+      "notes": "Trade-in UI is opened and validated, but the current test does not prove the official final state that trade-up was actually added on the cart page."
     },
     "SAM-24988": {
       "coverage": "full",
       "spec": "tests/s1/mx/qst/base-store/safe-reuse.spec.js",
       "test": "MX QST 11 - Navigate to Checkout",
-      "notes": "A controlled cart proceeds through the checkout button and proves navigation to checkout/guest entry."
+      "notes": "A controlled cart proceeds through the checkout button and proves the official Expected Result: navigation from cart to checkout."
     },
     "SAM-24994": {
       "coverage": "partial",
       "spec": "tests/s1/mx/qst/base-store/safe-reuse.spec.js",
       "test": "MX QST 12 - Enter guest address",
-      "notes": "A new address is accepted through payment navigation, but the official scenario covers new shipping and billing address behavior more broadly."
+      "notes": "A new guest shipping address is accepted through payment navigation, but the official Expected Result requires entering both new shipping and billing addresses for the registered-user scenario."
     },
     "SAM-25002": {
       "coverage": "full",
       "spec": "tests/s1/mx/qst/base-store/registered-order.spec.js",
       "test": "MX QST 16 - Registered Amex order",
-      "notes": "Registered Base Store user reaches payment, fills card data, submits exactly once and captures the created MX order code."
+      "notes": "Registered Base Store user reaches payment, selects/fills credit card, submits once and creates the order successfully, satisfying the official Expected Result. Clearsale/approval guidance is conditional operational Test Data and is not treated as an additional pass criterion when the order completes successfully."
     },
     "SAM-25011": {
       "coverage": "partial",
       "spec": "tests/s1/mx/qst/base-store/backoffice.spec.js",
       "test": "MX QST 19 - See exact order status",
-      "notes": "The automation searches and opens an exact order in BackOffice. The official case also mentions order/product basic and advanced search, so full coverage is not claimed."
+      "notes": "The automation searches and opens an exact order in BackOffice, but the official Expected Result explicitly requires order/product search through basic/advanced search, which is not fully covered."
     }
   },
   "extraAutomation": [
