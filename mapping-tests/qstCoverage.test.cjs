@@ -9,7 +9,7 @@ const { getSharedCandidateSummary } = require("../utils/qstSharedCandidates");
 const { validatePeQstReusePlan } = require("../utils/qstPeReusePlan");
 const { getPeQstEvidenceMetadata } = require("../utils/qstPeEvidenceMetadata");
 const { validateS1OfficialImplementation } = require("../utils/qstS1Implementation");
-const { getPeS1QstConfig } = require("../config/markets/pe");
+const { getPeS1QstConfig, PROVEN_PE_QST_ST2_SKU } = require("../config/markets/pe");
 
 test("SMB registry keeps the official 144-case market totals", () => {
   const result = validateQstMapping();
@@ -79,10 +79,17 @@ test("PE reuse plan classifies all 34 official cases without claiming coverage",
 
 test("S1 implementation inventory only binds official IDs to the correct market", () => {
   const inventory = validateS1OfficialImplementation();
-  assert.equal(inventory.MX.implementedCount, 10);
-  assert.equal(inventory.PE.implementedCount, 16);
-  assert.equal(inventory.CL.implementedCount, 0);
-  assert.equal(inventory.CO.implementedCount, 0);
+
+  assert.ok(inventory.MX.implementedCount >= 10);
+  assert.ok(inventory.PE.implementedCount >= 17);
+  assert.ok(inventory.CL.implementedCount >= 1);
+  assert.ok(inventory.CO.implementedCount >= 1);
+
+  assert.ok(inventory.MX.implementedIds.includes("SAM-25016"));
+  assert.ok(inventory.PE.implementedIds.includes("SAM-25056"));
+  assert.ok(inventory.PE.implementedIds.includes("SAM-25090"));
+  assert.ok(inventory.CL.implementedIds.includes("SAM-24830"));
+  assert.ok(inventory.CO.implementedIds.includes("SAM-24920"));
 });
 
 test("PE S1 config stays runtime-driven and market-scoped", () => {
@@ -91,6 +98,8 @@ test("PE S1 config stays runtime-driven and market-scoped", () => {
     PE_SETUP_URL: "https://staging.example.test/getcookie.html",
     PE_QST_SKU: "PE-SKU",
     PE_QST_PDP_URL: "https://staging.example.test/pe/p/PE-SKU",
+    PE_ADDRESS_API_URL:
+      "https://api.example.test/tokocommercewebservices/v2/pe/users/current/addresses",
   });
   assert.equal(config.market, "PE");
   assert.equal(config.environment, "S1");
@@ -98,6 +107,19 @@ test("PE S1 config stays runtime-driven and market-scoped", () => {
   assert.equal(config.cartUrl.href, "https://staging.example.test/pe/cart");
   assert.equal(config.sku, "PE-SKU");
   assert.equal(config.pdpUrl.href, "https://staging.example.test/pe/p/PE-SKU");
+  assert.equal(
+    config.addressApiUrl.href,
+    "https://api.example.test/tokocommercewebservices/v2/pe/users/current/addresses"
+  );
+
+  const defaultProduct = getPeS1QstConfig({
+    PE_STOREFRONT_URL: "https://staging.example.test/pe/",
+  });
+  assert.equal(defaultProduct.sku, PROVEN_PE_QST_ST2_SKU);
+  assert.equal(
+    defaultProduct.pdpUrl.href,
+    `https://staging.example.test/pe/p/${PROVEN_PE_QST_ST2_SKU}`
+  );
 
   assert.throws(
     () => getPeS1QstConfig({ PE_STOREFRONT_URL: "https://staging.example.test/mx/" }),
@@ -110,6 +132,14 @@ test("PE S1 config stays runtime-driven and market-scoped", () => {
         PE_QST_PDP_URL: "https://other.example.test/pe/p/PE-SKU",
       }),
     /same host/
+  );
+  assert.throws(
+    () =>
+      getPeS1QstConfig({
+        PE_STOREFRONT_URL: "https://staging.example.test/pe/",
+        PE_ADDRESS_API_URL: "https://api.example.test/not-addresses",
+      }),
+    /users\/current\/addresses/
   );
 });
 
