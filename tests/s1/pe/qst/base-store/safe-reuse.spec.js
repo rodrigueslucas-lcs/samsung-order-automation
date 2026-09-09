@@ -1,10 +1,12 @@
 import { test, expect } from "@playwright/test";
 import HomePage from "../../../../../pages/HomePage";
+import GuestLoginPage from "../../../../../pages/GuestLoginPage";
 import peConfigModule from "../../../../../config/markets/pe";
 import storefrontAccess from "../../../../../flows/smb/storefrontAccess";
 import cartPresentation from "../../../../../flows/smb/cartPresentation";
 import evidenceContext from "../../../../../reporters/evidence/evidenceContext";
 import peEvidenceMetadata from "../../../../../utils/qstPeEvidenceMetadata";
+import { testData } from "../../../../../utils/testData";
 import {
   addConfiguredProductToPeCart,
   reachPeGuestDelivery,
@@ -131,6 +133,23 @@ test("SAM-25081 @qst @pe @base-store @safe @reuse - Checkout button on cart page
   await cart.proceedToCheckout();
 });
 
+test("SAM-25080 @qst @pe @base-store @safe @reuse - Login from Checkout page", async ({ page }, testInfo) => {
+  test.setTimeout(180000);
+  const config = requirePeProductConfig();
+  recordOfficialEvidence(testInfo, "SAM-25080");
+
+  const cart = await addConfiguredProductToPeCart(page, config);
+  await cart.proceedToCheckout();
+  const guestLogin = new GuestLoginPage(page);
+  await guestLogin.openRegisteredLoginFromCheckout();
+
+  expect(new URL(page.url()).hostname).toBe("account.samsung.com");
+  testInfo.annotations.push({
+    type: "qst-reuse-note",
+    description: "The checkout login action is proven to route to the legitimate Samsung Account flow. No credentials or SSO bypass are automated here.",
+  });
+});
+
 test("SAM-25088 @qst @pe @base-store @safe @guest @reuse - Save option not visible", async ({ page }, testInfo) => {
   test.setTimeout(240000);
   const config = requirePeProductConfig();
@@ -141,4 +160,35 @@ test("SAM-25088 @qst @pe @base-store @safe @guest @reuse - Save option not visib
     .getByRole("checkbox", { name: /Guardar datos de env[ií]o en Mi cuenta/i })
     .filter({ visible: true });
   await expect(saveAddress).toHaveCount(0);
+});
+
+test("SAM-25089 @qst @pe @base-store @safe @guest @reuse - Different billing and shipping", async ({ page }, testInfo) => {
+  test.setTimeout(300000);
+  const config = requirePeProductConfig();
+  recordOfficialEvidence(testInfo, "SAM-25089");
+
+  const { checkout } = await reachPeGuestDelivery(page, config);
+  await checkout.fillAddress(testData.address);
+  await checkout.validateDifferentBillingAddress(testData.billingAddress);
+
+  testInfo.annotations.push({
+    type: "qst-reuse-note",
+    description: "Shipping and a distinct billing address are populated and validated in checkout without payment or order submission.",
+  });
+});
+
+test("SAM-25090 @qst @pe @base-store @safe @guest @reuse - Validate home delivery", async ({ page }, testInfo) => {
+  test.setTimeout(300000);
+  const config = requirePeProductConfig();
+  recordOfficialEvidence(testInfo, "SAM-25090");
+
+  const { checkout } = await reachPeGuestDelivery(page, config);
+  await checkout.fillAddress(testData.address);
+  await checkout.validateAvailableDeliveryModes();
+  await checkout.validateDeliveryModeSelection();
+
+  testInfo.annotations.push({
+    type: "qst-reuse-note",
+    description: "Available PE delivery modes and a regular-delivery selection reflected in Order Summary are validated without continuing to payment.",
+  });
 });
