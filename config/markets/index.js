@@ -31,11 +31,19 @@ function parseStagingUrl(value, name) {
   return url;
 }
 
+function assertMarketRoot(url, code, name) {
+  const expected = `/${code.toLowerCase()}`;
+  const normalized = url.pathname.replace(/\/+$/, "").toLowerCase();
+  if (normalized !== expected) {
+    throw new Error(`${name} must point to the ${code} storefront root (${expected}/).`);
+  }
+  return url;
+}
+
 function getMarketConfig(value, environment = process.env) {
   const code = normalizeMarketCode(value);
   const definition = getMarketDefinition(code);
 
-  // Preserve the already-proven MX configuration while the shared SMB layer is introduced.
   if (code === "MX") {
     return {
       ...getMxConfig(environment),
@@ -44,8 +52,6 @@ function getMarketConfig(value, environment = process.env) {
     };
   }
 
-  // PE now has an explicit S1 QST config because there is substantial ST2 automation to reuse.
-  // It remains runtime-driven: no unverified S1 host, SKU or PDP is baked into the framework.
   if (code === "PE") {
     return {
       ...getPeS1QstConfig(environment),
@@ -54,7 +60,6 @@ function getMarketConfig(value, environment = process.env) {
     };
   }
 
-  // CL/CO remain env-driven until each market is validated live.
   const variable = `${code}_STOREFRONT_URL`;
   const rawBaseUrl = environment[variable];
   if (!rawBaseUrl) {
@@ -65,7 +70,7 @@ function getMarketConfig(value, environment = process.env) {
     ...definition,
     market: code,
     environment: "S1",
-    baseUrl: parseStagingUrl(rawBaseUrl, variable),
+    baseUrl: assertMarketRoot(parseStagingUrl(rawBaseUrl, variable), code, variable),
   };
 }
 
