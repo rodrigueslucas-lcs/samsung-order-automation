@@ -13,17 +13,23 @@ function emptyLedger() {
   return ledger;
 }
 
-function resultFor(market, status = "PASS") {
+function resultFor(market, status = "PASS", context = "either") {
   const code = market.toLowerCase();
   return {
     status,
-    context: "either",
+    context,
     runtimePath: `/${code}/`,
     evidence: status === "FAIL" ? "Official Expected Result was not observed." : "Official Expected Result observed in PreQA2.",
     automation: "not-assessed",
     blocker: null,
     validatedAt: "2026-09-09T20:00:00.000Z",
   };
+}
+
+function contextFor(entry) {
+  if (entry.requiresSamsungAccount) return "registered";
+  if (entry.requiresGuestState) return "guest";
+  return "either";
 }
 
 test("closure state exposes safe, guarded, auth, EPP and metadata-review work", () => {
@@ -52,7 +58,7 @@ test("safe closure gate passes once every safe candidate has an official result"
   const sourceLedger = emptyLedger();
   const plan = getPreqa2CampaignPlan("MX", { sourceLedger });
   for (const entry of plan.cases.filter((item) => item.safety === "safe-candidate")) {
-    sourceLedger.markets.MX.results[entry.id] = resultFor("MX");
+    sourceLedger.markets.MX.results[entry.id] = resultFor("MX", "PASS", contextFor(entry));
   }
   sourceLedger.markets.MX.status = "ACTIVE";
   const state = assertSafeCampaignExhausted("MX", { sourceLedger });
@@ -66,7 +72,11 @@ test("FAIL still counts as executed closure, not as an unexecuted safe candidate
   const plan = getPreqa2CampaignPlan("MX", { sourceLedger });
   const safe = plan.cases.filter((item) => item.safety === "safe-candidate");
   safe.forEach((entry, index) => {
-    sourceLedger.markets.MX.results[entry.id] = resultFor("MX", index === 0 ? "FAIL" : "PASS");
+    sourceLedger.markets.MX.results[entry.id] = resultFor(
+      "MX",
+      index === 0 ? "FAIL" : "PASS",
+      contextFor(entry)
+    );
   });
   sourceLedger.markets.MX.status = "ACTIVE";
   const state = assertSafeCampaignExhausted("MX", { sourceLedger });
