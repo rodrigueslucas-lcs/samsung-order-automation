@@ -1,6 +1,10 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { assertApprovedPreqa2Url, normalizeMarket } = require("../utils/preqa2RuntimeGuard");
+const {
+  assertApprovedPreqa2Url,
+  guardedPopupInteraction,
+  normalizeMarket,
+} = require("../utils/preqa2RuntimeGuard");
 
 test("runtime guard accepts approved absolute and relative market routes", () => {
   const absolute = assertApprovedPreqa2Url(
@@ -43,6 +47,40 @@ test("infrastructure routes are only accepted when explicitly allowed", () => {
     "https://p6-pre-qa2.samsung.com/sites/",
     { market: "MX", allowInfrastructurePath: true }
   ));
+});
+
+test("popup guard closes a newly opened Production page and fails", async () => {
+  let closed = false;
+  const popup = {
+    url: () => "https://www.samsung.com/mx/",
+    waitForLoadState: async () => {},
+    close: async () => { closed = true; },
+  };
+  const page = {
+    url: () => "https://p6-pre-qa2.samsung.com/mx/",
+    context: () => ({ waitForEvent: async () => popup }),
+  };
+  await assert.rejects(
+    () => guardedPopupInteraction(page, async () => {}, { market: "MX" }),
+    /left approved host/
+  );
+  assert.equal(closed, true);
+});
+
+test("popup guard returns an approved PreQA2 popup", async () => {
+  const popup = {
+    url: () => "https://p6-pre-qa2.samsung.com/mx/my-account/",
+    waitForLoadState: async () => {},
+    close: async () => { throw new Error("should not close approved popup"); },
+  };
+  const page = {
+    url: () => "https://p6-pre-qa2.samsung.com/mx/",
+    context: () => ({ waitForEvent: async () => popup }),
+  };
+  assert.equal(
+    await guardedPopupInteraction(page, async () => {}, { market: "MX" }),
+    popup
+  );
 });
 
 test("market guard validates supported SMB codes", () => {
