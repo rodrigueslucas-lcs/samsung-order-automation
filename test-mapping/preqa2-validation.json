@@ -1,0 +1,20 @@
+{
+  "$schemaVersion": 1,
+  "environment": "PREQA2",
+  "authority": "PreQA2 is the official validation environment for the SMB scenarios assigned to this scope. A TC may be marked PASS when its official Expected Result is fully proven here with runtime evidence.",
+  "policy": [
+    "Do not mark PASS from page availability or superficial navigation.",
+    "PASS requires the official Expected Result to be exercised and observed in PreQA2.",
+    "Guest versus registered execution must follow the official TC.",
+    "WMC authentication does not imply Samsung Account authentication.",
+    "Do not invent Expected Results, selectors, SKUs, promotions or test data.",
+    "Never retain cookies, tokens, credentials, sensitive query strings or authentication URLs in this ledger.",
+    "Payment/order submission, cron jobs and profile writes remain behind their existing explicit destructive guards."
+  ],
+  "markets": {
+    "MX": { "officialTotal": 37, "status": "ACTIVE", "results": {} },
+    "CL": { "officialTotal": 38, "status": "NOT_STARTED", "results": {} },
+    "CO": { "officialTotal": 35, "status": "NOT_STARTED", "results": {} },
+    "PE": { "officialTotal": 34, "status": "NOT_STARTED", "results": {} }
+  }
+}
