@@ -47,10 +47,10 @@ function metadataFor(market, id) {
   const shared = getSharedCandidatesByMarket(market).find((entry) => entry.id === id);
   return shared ? {
     title: shared.family,
-    store: shared.stores.includes("BS") ? "BS" : "Unknown",
+    store: "Unknown",
     feature: shared.feature,
     baseline: "shared-core-candidate",
-    notes: `Official ${market} ID belongs to shared family ${shared.family}; market-specific runtime evidence is still required.`,
+    notes: `Official ${market} ID belongs to shared family ${shared.family}; exact store, market data and runtime behavior must be confirmed from the official TC before execution.`,
   } : {
     title: null,
     store: "Unknown",
@@ -61,7 +61,10 @@ function metadataFor(market, id) {
 }
 
 function safetyFor(meta) {
-  if (!meta) return "unknown";
+  if (!meta) return "needs-official-review";
+  if (meta.baseline === "official-unclassified" || meta.feature === "Unknown") {
+    return "needs-official-review";
+  }
   if (GUARDED_FEATURES.has(meta.feature)) return "guarded-review";
   return "safe-candidate";
 }
@@ -82,7 +85,7 @@ function priorityFor(market, id, meta, implemented, partialGroups) {
     return order[meta.baseline] ?? 50;
   }
   if (meta.baseline === "shared-core-candidate") return implemented ? 15 : 20;
-  return 50;
+  return 60;
 }
 
 function getPreqa2CampaignPlan(market) {
@@ -135,6 +138,7 @@ function getCampaignSummary() {
       pending: plan.pending,
       safeCandidates: plan.cases.filter((entry) => entry.executionStatus === "NOT_RUN" && entry.safety === "safe-candidate").length,
       guardedReview: plan.cases.filter((entry) => entry.executionStatus === "NOT_RUN" && entry.safety === "guarded-review").length,
+      needsOfficialReview: plan.cases.filter((entry) => entry.executionStatus === "NOT_RUN" && entry.safety === "needs-official-review").length,
     }];
   }));
 }
