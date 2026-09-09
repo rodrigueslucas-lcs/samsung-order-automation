@@ -10,7 +10,8 @@ for (const market of markets) {
   const current = summary[market];
   console.log(
     `\n${market}: official=${plan.officialTotal} executed=${plan.executed} pending=${plan.pending} ` +
-      `safe=${current.safeCandidates} guarded-review=${current.guardedReview}`
+      `safe=${current.safeCandidates} guarded-review=${current.guardedReview} ` +
+      `needs-official-review=${current.needsOfficialReview}`
   );
   for (const entry of plan.cases) {
     if (entry.executionStatus !== "NOT_RUN") continue;
