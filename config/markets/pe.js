@@ -18,6 +18,14 @@ function assertPeRoute(url, name) {
   return url;
 }
 
+function assertAddressApi(url) {
+  if (!url) return null;
+  if (!/\/users\/current\/addresses$/.test(url.pathname)) {
+    throw new Error("PE_ADDRESS_API_URL must end in /users/current/addresses.");
+  }
+  return url;
+}
+
 const PROVEN_PE_QST_ST2_SKU = "RB45DG6300B1PE";
 
 function getPeS1QstConfig(environment = process.env) {
@@ -43,6 +51,10 @@ function getPeS1QstConfig(environment = process.env) {
     throw new Error("PE_QST_PDP_URL must stay inside the /pe/ storefront route.");
   }
 
+  const addressApiUrl = assertAddressApi(
+    optionalHttpsUrl(environment.PE_ADDRESS_API_URL, "PE_ADDRESS_API_URL")
+  );
+
   return Object.freeze({
     market: "PE",
     environment: "S1",
@@ -53,6 +65,7 @@ function getPeS1QstConfig(environment = process.env) {
     sku,
     pdpUrl,
     cartUrl: new URL("/pe/cart", baseUrl),
+    addressApiUrl,
   });
 }
 
