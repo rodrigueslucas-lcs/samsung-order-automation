@@ -10,6 +10,9 @@ function getMarketClosureState(market, { sourceLedger = defaultLedger } = {}) {
     safe: [],
     guarded: [],
     needsOfficialReview: [],
+    registered: [],
+    guest: [],
+    epp: [],
   };
 
   for (const entry of plan.cases) {
@@ -19,6 +22,9 @@ function getMarketClosureState(market, { sourceLedger = defaultLedger } = {}) {
     if (entry.safety === "safe-candidate") remaining.safe.push(entry);
     else if (entry.safety === "guarded-review") remaining.guarded.push(entry);
     else remaining.needsOfficialReview.push(entry);
+    if (entry.requiresSamsungAccount) remaining.registered.push(entry);
+    if (entry.requiresGuestState) remaining.guest.push(entry);
+    if (entry.requiresEppContext) remaining.epp.push(entry);
   }
 
   return {
@@ -33,6 +39,8 @@ function getMarketClosureState(market, { sourceLedger = defaultLedger } = {}) {
     remaining,
     byStatus,
     safeExhausted: remaining.safe.length === 0,
+    registeredExhausted: remaining.registered.length === 0,
+    eppExhausted: remaining.epp.length === 0,
     fullyAccounted: plan.pending === 0,
   };
 }
