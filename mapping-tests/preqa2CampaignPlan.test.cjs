@@ -42,15 +42,21 @@ test("PE plan preserves reuse classifications and guards payment/order review", 
   assert.equal(byId["SAM-25095"].safety, "guarded-review");
 });
 
-test("CL and CO only use titles from verified shared families", () => {
-  assert.equal(metadataFor("CL", "SAM-24784").title, "Login Home page");
-  assert.equal(metadataFor("CO", "SAM-24873").title, "Login Home page");
+test("CL and CO only use titles from verified shared families and keep store unknown", () => {
+  const clLogin = metadataFor("CL", "SAM-24784");
+  const coLogin = metadataFor("CO", "SAM-24873");
+  assert.equal(clLogin.title, "Login Home page");
+  assert.equal(coLogin.title, "Login Home page");
+  assert.equal(clLogin.store, "Unknown");
+  assert.equal(coLogin.store, "Unknown");
+
   const unclassified = metadataFor("CL", "SAM-24866");
   assert.equal(unclassified.title, null);
   assert.equal(unclassified.baseline, "official-unclassified");
+  assert.equal(unclassified.store, "Unknown");
 });
 
-test("campaign summary keeps execution separate from planning candidates", () => {
+test("campaign summary keeps execution separate and exposes official-review backlog", () => {
   const summary = getCampaignSummary();
   assert.deepEqual(
     Object.fromEntries(Object.entries(summary).map(([market, entry]) => [market, entry.officialTotal])),
@@ -58,4 +64,6 @@ test("campaign summary keeps execution separate from planning candidates", () =>
   );
   assert.ok(summary.MX.safeCandidates > 0);
   assert.ok(summary.PE.guardedReview > 0);
+  assert.ok(summary.CL.needsOfficialReview > 0);
+  assert.ok(summary.CO.needsOfficialReview > 0);
 });
