@@ -4,11 +4,13 @@ import ProductPage from "../../../../../pages/ProductPage";
 import CartPage from "../../../../../pages/CartPage";
 import peConfigModule from "../../../../../config/markets/pe";
 import storefrontAccess from "../../../../../flows/smb/storefrontAccess";
+import cartPresentation from "../../../../../flows/smb/cartPresentation";
 import evidenceContext from "../../../../../reporters/evidence/evidenceContext";
 import peEvidenceMetadata from "../../../../../utils/qstPeEvidenceMetadata";
 
 const { getPeS1QstConfig } = peConfigModule;
 const { openStorefront } = storefrontAccess;
+const { inspectAvailableServices, validateCartItemPresentation } = cartPresentation;
 const { recordBusinessEvidence } = evidenceContext;
 const { getPeQstEvidenceMetadata } = peEvidenceMetadata;
 
@@ -105,16 +107,24 @@ test("SAM-25062 @qst @pe @base-store @safe @reuse - Cart page UI baseline", asyn
 
   const cart = await addConfiguredProductToPeCart(page, config);
   await cart.validateProductInCart();
+  await validateCartItemPresentation(page, {
+    sku: config.sku,
+    currencyPattern: /S\/\s*[\d,.]+/,
+  });
   const summary = await cart.validateOrderSummary();
-  await cart.validateExternalServicesVisible();
+  const services = await inspectAvailableServices(page);
   await cart.validateCartFooter();
 
   expect(summary.subtotal).toBeTruthy();
   expect(summary.total).toBeTruthy();
 
   testInfo.annotations.push({
+    type: "qst-cart-services",
+    description: services.visible ? "Available services are visible for the configured product." : "No available service was visible for the configured product; official criterion is services if any.",
+  });
+  testInfo.annotations.push({
     type: "qst-reuse-note",
-    description: "SKU, summary, services and footer baseline; price/thumbnail/info-icon acceptance remains to be proven explicitly.",
+    description: "SKU, item price, thumbnail, order summary and footer are asserted. Info icons remain to be proven explicitly before Full coverage.",
   });
 });
 
