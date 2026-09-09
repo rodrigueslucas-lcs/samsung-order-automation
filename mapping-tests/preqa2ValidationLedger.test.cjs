@@ -1,5 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const defaultLedger = require("../test-mapping/preqa2-validation.json");
 const {
   validatePreqa2ValidationLedger,
   validateResult,
@@ -7,14 +8,25 @@ const {
 
 const timestamp = "2026-09-09T20:00:00.000Z";
 
-test("PreQA2 validation ledger stays aligned to official SMB totals", () => {
+function emptyLedger() {
+  const ledger = JSON.parse(JSON.stringify(defaultLedger));
+  for (const market of ["MX", "CL", "CO", "PE"]) {
+    ledger.markets[market].status = "NOT_STARTED";
+    ledger.markets[market].results = {};
+  }
+  return ledger;
+}
+
+test("PreQA2 validation ledger stays aligned to official SMB totals as execution grows", () => {
   const result = validatePreqa2ValidationLedger();
-  assert.deepEqual(result, {
-    MX: { officialTotal: 37, executed: 0, status: "ACTIVE" },
-    CL: { officialTotal: 38, executed: 0, status: "NOT_STARTED" },
-    CO: { officialTotal: 35, executed: 0, status: "NOT_STARTED" },
-    PE: { officialTotal: 34, executed: 0, status: "NOT_STARTED" },
-  });
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(result).map(([market, entry]) => [market, entry.officialTotal])),
+    { MX: 37, CL: 38, CO: 35, PE: 34 }
+  );
+  for (const [market, entry] of Object.entries(result)) {
+    assert.equal(entry.executed, Object.keys(defaultLedger.markets[market].results || {}).length);
+    assert.equal(entry.status, defaultLedger.markets[market].status);
+  }
 });
 
 test("PASS FAIL and NOT_APPLICABLE require evidence; BLOCKED requires blocker", () => {
@@ -58,7 +70,7 @@ test("runtime evidence path cannot leak query strings or cross markets", () => {
 });
 
 test("custom ledgers are validated instead of silently using the imported default", () => {
-  const custom = JSON.parse(JSON.stringify(require("../test-mapping/preqa2-validation.json")));
+  const custom = emptyLedger();
   custom.markets.MX.results["SAM-24968"] = {
     status: "PASS",
     context: "guest",
