@@ -1,7 +1,7 @@
 const registry = require("../test-mapping/smb-qst.json");
 const { metadataFor, normalizeMarket } = require("./preqa2CampaignPlan");
 const { createValidationEntry } = require("./preqa2Validation");
-const { validateResult } = require("./preqa2ValidationLedger");
+const { validatePreqa2ValidationLedger, validateResult } = require("./preqa2ValidationLedger");
 const { sanitizeString } = require("../reporters/evidence/sanitizer");
 
 function cleanOptional(value) {
@@ -63,7 +63,12 @@ function buildRecordedResult({
   return persisted;
 }
 
-function applyResultToLedger(sourceLedger, market, id, recordedResult) {
+function sameResult(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function applyResultToLedger(sourceLedger, market, id, recordedResult, { allowOverwrite = false } = {}) {
+  validatePreqa2ValidationLedger(sourceLedger);
   const code = normalizeMarket(market);
   if (!registry.markets[code].cases.includes(id)) {
     throw new Error(`${id} is not an official ${code} SMB QST ID.`);
@@ -71,9 +76,19 @@ function applyResultToLedger(sourceLedger, market, id, recordedResult) {
   const next = JSON.parse(JSON.stringify(sourceLedger));
   if (!next.markets?.[code]) throw new Error(`${code} ledger entry is missing.`);
   next.markets[code].results ||= {};
+
+  const existing = next.markets[code].results[id];
+  if (existing && !sameResult(existing, recordedResult) && !allowOverwrite) {
+    throw new Error(
+      `${code}/${id} already has a different official PreQA2 result. ` +
+      "Review the evidence and use explicit overwrite only when the replacement is intentional."
+    );
+  }
+
   next.markets[code].results[id] = recordedResult;
   const executed = Object.keys(next.markets[code].results).length;
   next.markets[code].status = executed === registry.markets[code].count ? "COMPLETE" : "ACTIVE";
+  validatePreqa2ValidationLedger(next);
   return next;
 }
 
@@ -82,4 +97,5 @@ module.exports = {
   buildRecordedResult,
   cleanOptional,
   normalizeStatus,
+  sameResult,
 };
