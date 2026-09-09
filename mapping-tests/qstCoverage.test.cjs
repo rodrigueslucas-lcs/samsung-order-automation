@@ -38,7 +38,7 @@ test("MX partial plan contains every current Partial exactly once", () => {
 
 test("SMB shared-core families only reference official market IDs", () => {
   const result = validateSharedCoreFamilies();
-  assert.equal(result.familyCount, 13);
+  assert.equal(result.familyCount, 12);
 });
 
 test("PE reuse plan classifies all 34 official cases without claiming coverage", () => {
