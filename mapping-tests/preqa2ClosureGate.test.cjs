@@ -26,14 +26,19 @@ function resultFor(market, status = "PASS") {
   };
 }
 
-test("closure state exposes safe, guarded and metadata-review remaining work", () => {
+test("closure state exposes safe, guarded, auth, EPP and metadata-review work", () => {
   const state = getMarketClosureState("MX", { sourceLedger: emptyLedger() });
   assert.equal(state.officialTotal, 37);
   assert.equal(state.executed, 0);
   assert.equal(state.pending, 37);
   assert.ok(state.remaining.safe.length > 0);
   assert.ok(state.remaining.guarded.length > 0);
+  assert.ok(state.remaining.registered.length > 0);
+  assert.ok(state.remaining.guest.length > 0);
+  assert.ok(state.remaining.epp.length > 0);
   assert.equal(state.safeExhausted, false);
+  assert.equal(state.registeredExhausted, false);
+  assert.equal(state.eppExhausted, false);
 });
 
 test("safe closure gate fails while an executable official TC remains NOT_RUN", () => {
