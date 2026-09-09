@@ -35,6 +35,16 @@ function parseArgs(argv) {
   return options;
 }
 
+function writeLedgerAtomically(ledgerPath, next) {
+  const tempPath = `${ledgerPath}.tmp-${process.pid}`;
+  try {
+    fs.writeFileSync(tempPath, `${JSON.stringify(next, null, 2)}\n`, { flag: "wx" });
+    fs.renameSync(tempPath, ledgerPath);
+  } finally {
+    if (fs.existsSync(tempPath)) fs.rmSync(tempPath);
+  }
+}
+
 function main() {
   const options = parseArgs(process.argv.slice(2));
   const ledgerPath = path.resolve("test-mapping/preqa2-validation.json");
@@ -43,9 +53,7 @@ function main() {
   const next = applyResultToLedger(source, options.market, options.id, result, {
     allowOverwrite: options.allowOverwrite,
   });
-  const tempPath = `${ledgerPath}.tmp-${process.pid}`;
-  fs.writeFileSync(tempPath, `${JSON.stringify(next, null, 2)}\n`, { flag: "wx" });
-  fs.renameSync(tempPath, ledgerPath);
+  writeLedgerAtomically(ledgerPath, next);
   console.log(
     `${String(options.market).toUpperCase()} ${options.id}: ${result.status} recorded ` +
       `(${result.runtimePath || "no runtime path"})${options.allowOverwrite ? " with explicit replacement" : ""}.`
@@ -53,4 +61,4 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { parseArgs };
+module.exports = { parseArgs, writeLedgerAtomically };
