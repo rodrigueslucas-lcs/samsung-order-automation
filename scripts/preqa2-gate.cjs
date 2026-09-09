@@ -8,6 +8,27 @@ const { validatePreqa2ValidationLedger } = require("../utils/preqa2ValidationLed
 const { getCampaignSummary } = require("../utils/preqa2CampaignPlan");
 const { getMarketClosureState } = require("../utils/preqa2ClosureGate");
 
+function requestedMarkets(variable) {
+  return String(process.env[variable] || "")
+    .split(",")
+    .map((value) => value.trim().toUpperCase())
+    .filter(Boolean);
+}
+
+function assertRemainingEmpty(variable, bucket, label) {
+  for (const market of requestedMarkets(variable)) {
+    const state = getMarketClosureState(market);
+    const entries = state.remaining[bucket] || [];
+    if (entries.length) {
+      throw new Error(
+        `${market} still has ${entries.length} ${label} official TC(s) NOT_RUN: ` +
+        entries.map((entry) => entry.id).join(", ")
+      );
+    }
+    console.log(`- ${market} ${label} campaign exhausted`);
+  }
+}
+
 function main() {
   const mapping = validateQstMapping();
   const mxCoverage = validateMxQstCoverage();
@@ -32,18 +53,9 @@ function main() {
   console.log(`- EPP pending: ${Object.entries(campaign).map(([m, e]) => `${m}=${e.eppPending}`).join(", ")}`);
   console.log(`- official metadata review: ${Object.entries(campaign).map(([m, e]) => `${m}=${e.needsOfficialReview}`).join(", ")}`);
 
-  const requested = String(process.env.PREQA2_REQUIRE_SAFE_EXHAUSTED || "")
-    .split(",")
-    .map((value) => value.trim().toUpperCase())
-    .filter(Boolean);
-  for (const market of requested) {
-    const state = getMarketClosureState(market);
-    if (!state.safeExhausted) {
-      const ids = state.remaining.safe.map((entry) => entry.id).join(", ");
-      throw new Error(`${market} still has ${state.remaining.safe.length} safe official TC(s) NOT_RUN: ${ids}`);
-    }
-    console.log(`- ${market} safe campaign exhausted`);
-  }
+  assertRemainingEmpty("PREQA2_REQUIRE_SAFE_EXHAUSTED", "safe", "safe");
+  assertRemainingEmpty("PREQA2_REQUIRE_REGISTERED_EXHAUSTED", "registered", "registered-account");
+  assertRemainingEmpty("PREQA2_REQUIRE_EPP_EXHAUSTED", "epp", "EPP");
 }
 
 try {
@@ -52,3 +64,5 @@ try {
   console.error(`[preqa2-gate] ${error.message}`);
   process.exitCode = 1;
 }
+
+module.exports = { assertRemainingEmpty, main, requestedMarkets };
