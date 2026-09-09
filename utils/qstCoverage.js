@@ -2,6 +2,16 @@ const smbMapping = require("../test-mapping/smb-qst.json");
 const mxCoverage = require("../test-mapping/mx-qst-coverage.json");
 
 const COVERAGE_STATES = Object.freeze(["full", "partial", "missing"]);
+const STORES = Object.freeze(["BS", "EPP"]);
+const FEATURES = Object.freeze([
+  "Auth/Home",
+  "Product",
+  "Cart",
+  "Checkout",
+  "Payment",
+  "Order/BackOffice",
+  "UI/Other",
+]);
 
 function validateMxQstCoverage() {
   const errors = [];
@@ -28,6 +38,16 @@ function validateMxQstCoverage() {
   for (const id of officialIds) {
     const current = coverageCases[id];
     if (!current) continue;
+
+    if (!current.title || !String(current.title).trim()) {
+      errors.push(`${id}: official title is required`);
+    }
+    if (!STORES.includes(current.store)) {
+      errors.push(`${id}: invalid store ${current.store || "<missing>"}`);
+    }
+    if (!FEATURES.includes(current.feature)) {
+      errors.push(`${id}: invalid feature ${current.feature || "<missing>"}`);
+    }
 
     if (!COVERAGE_STATES.includes(current.coverage)) {
       errors.push(`${id}: invalid coverage state ${current.coverage || "<missing>"}`);
@@ -73,5 +93,7 @@ function validateMxQstCoverage() {
 
 module.exports = {
   COVERAGE_STATES,
+  FEATURES,
+  STORES,
   validateMxQstCoverage,
 };
