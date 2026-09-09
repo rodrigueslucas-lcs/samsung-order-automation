@@ -16,6 +16,8 @@ test("MX QST 06 + QST 07 + QST 08 @qst @mx @base-store @safe - Add product and v
   const summary = await cart.validateOrderSummary();
   expect(summary.subtotal).toBeTruthy();
   expect(summary.total).toBeTruthy();
+  await cart.validateExternalServicesVisible();
+  await cart.validateCartFooter();
 });
 
 test("MX QST 11 @qst @mx @base-store @safe - Navigate to Checkout", async ({ page, mxConfig }) => {
