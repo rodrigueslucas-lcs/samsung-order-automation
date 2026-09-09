@@ -1,6 +1,9 @@
 import { test, expect } from "@playwright/test";
 import BackOfficePage from "../../../../../pages/BackOfficePage";
 import BackOfficeOrderPage from "../../../../../pages/BackOfficeOrderPage";
+import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
+
+const { recordBusinessEvidence } = evidenceContext;
 
 test.describe.configure({ timeout: 240000 });
 
@@ -14,7 +17,16 @@ test("MX QST 18 @qst @mx @base-store @backoffice @safe - BackOffice login", asyn
   await backOffice.expectPerspective("admin");
 });
 
-test("MX QST 19 @qst @mx @base-store @backoffice @safe - See exact order status", async ({ page }) => {
+test("SAM-25011 @qst @mx @base-store @backoffice @safe - BackOffice order search", async ({ page }, testInfo) => {
+  recordBusinessEvidence(testInfo, {
+    zephyrId: "SAM-25011",
+    market: "MX",
+    store: "BS",
+    suite: "QST",
+    feature: "Order/BackOffice",
+    environment: "S1",
+  });
+
   const username = process.env.BACKOFFICE_ADMIN_USERNAME;
   const password = process.env.BACKOFFICE_ADMIN_PASSWORD;
   const orderCode = process.env.MX_QST_ORDER_CODE;
@@ -27,5 +39,6 @@ test("MX QST 19 @qst @mx @base-store @backoffice @safe - See exact order status"
   await orders.openAdminOrderByCode(orderCode);
   const status = await orders.readOpenAdminOrderStatus(orderCode);
   expect(status).toBeTruthy();
+  recordBusinessEvidence(testInfo, { orderCode, finalStatus: status });
   console.log("MX_QST_ORDER_STATUS", JSON.stringify({ orderCode, status }));
 });
