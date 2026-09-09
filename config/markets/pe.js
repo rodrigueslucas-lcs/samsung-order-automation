@@ -18,19 +18,28 @@ function assertPeRoute(url, name) {
   return url;
 }
 
+const PROVEN_PE_QST_ST2_SKU = "RB45DG6300B1PE";
+
 function getPeS1QstConfig(environment = process.env) {
   const baseUrl = assertPeRoute(
     requireHttpsUrl(environment.PE_STOREFRONT_URL, "PE_STOREFRONT_URL"),
     "PE_STOREFRONT_URL"
   );
   const setupUrl = optionalHttpsUrl(environment.PE_SETUP_URL, "PE_SETUP_URL");
-  const sku = String(environment.PE_QST_SKU || "").trim() || null;
-  const pdpUrl = optionalHttpsUrl(environment.PE_QST_PDP_URL, "PE_QST_PDP_URL");
+  if (setupUrl && setupUrl.hostname !== baseUrl.hostname) {
+    throw new Error("PE_SETUP_URL must use the same host as PE_STOREFRONT_URL.");
+  }
 
-  if (pdpUrl && pdpUrl.hostname !== baseUrl.hostname) {
+  // Proven existing PE ST2 QST product. Runtime env can override it if S1 differs.
+  const sku = String(environment.PE_QST_SKU || PROVEN_PE_QST_ST2_SKU).trim();
+  const pdpUrl =
+    optionalHttpsUrl(environment.PE_QST_PDP_URL, "PE_QST_PDP_URL") ||
+    new URL(`/pe/p/${sku}`, baseUrl.origin);
+
+  if (pdpUrl.hostname !== baseUrl.hostname) {
     throw new Error("PE_QST_PDP_URL must use the same host as PE_STOREFRONT_URL.");
   }
-  if (pdpUrl && !pdpUrl.pathname.startsWith("/pe/")) {
+  if (!pdpUrl.pathname.startsWith("/pe/")) {
     throw new Error("PE_QST_PDP_URL must stay inside the /pe/ storefront route.");
   }
 
@@ -47,4 +56,4 @@ function getPeS1QstConfig(environment = process.env) {
   });
 }
 
-module.exports = { getPeS1QstConfig };
+module.exports = { PROVEN_PE_QST_ST2_SKU, getPeS1QstConfig };
