@@ -50,4 +50,38 @@ async function inspectAvailableServices(page) {
   };
 }
 
-module.exports = { findCartItemBySku, inspectAvailableServices, validateCartItemPresentation };
+async function validateStickyControl(locator, label) {
+  await expect(locator).toBeVisible({ timeout: 30000 });
+  const stickyAncestor = await locator.evaluate((element) => {
+    let current = element;
+    while (current && current !== document.body) {
+      const style = window.getComputedStyle(current);
+      if (style.position === "sticky" || style.position === "fixed") {
+        const rect = current.getBoundingClientRect();
+        return {
+          position: style.position,
+          top: rect.top,
+          bottom: rect.bottom,
+          viewportHeight: window.innerHeight,
+        };
+      }
+      current = current.parentElement;
+    }
+    return null;
+  });
+
+  if (!stickyAncestor) {
+    throw new Error(`${label} is not inside a sticky/fixed control on mobile.`);
+  }
+  if (stickyAncestor.bottom < 0 || stickyAncestor.top > stickyAncestor.viewportHeight) {
+    throw new Error(`${label} sticky container is outside the mobile viewport.`);
+  }
+  return stickyAncestor;
+}
+
+module.exports = {
+  findCartItemBySku,
+  inspectAvailableServices,
+  validateCartItemPresentation,
+  validateStickyControl,
+};
