@@ -19,6 +19,18 @@ test("PreQA2 evidence never retains query strings or fragments", () => {
     sanitizeRuntimePath("https://p6-pre-qa2.samsung.com/mx/cart?token=secret#checkout"),
     "/mx/cart"
   );
+  assert.equal(sanitizeRuntimePath("/mx/cart?foo=bar#x"), "/mx/cart");
+});
+
+test("PreQA2 evidence rejects absolute URLs from foreign hosts", () => {
+  assert.throws(
+    () => sanitizeRuntimePath("https://example.test/mx/cart?token=secret"),
+    /must use https:\/\/p6-pre-qa2\.samsung\.com/
+  );
+  assert.throws(
+    () => sanitizeRuntimePath("http://p6-pre-qa2.samsung.com/mx/cart"),
+    /must use https:\/\/p6-pre-qa2\.samsung\.com/
+  );
 });
 
 test("PreQA2 PASS is a first-class official validation result", () => {
