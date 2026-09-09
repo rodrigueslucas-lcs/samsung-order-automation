@@ -59,10 +59,10 @@ test("PE reuse plan classifies all 34 official cases without claiming coverage",
       missing: result.missing,
     },
     {
-      directCandidate: 9,
-      extensionCandidate: 12,
-      destructiveCandidate: 6,
-      missing: 7,
+      directCandidate: 11,
+      extensionCandidate: 14,
+      destructiveCandidate: 5,
+      missing: 4,
     }
   );
 });
