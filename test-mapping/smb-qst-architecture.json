@@ -1,0 +1,53 @@
+{
+  "$schemaVersion": 1,
+  "source": "Samsung_SMB_QST_Master_144_Architecture_Matrix.xlsx (official Zephyr detailed pages + Folder exports, 2026-09-08)",
+  "total": 144,
+  "markets": {
+    "MX": {
+      "count": 37,
+      "cases": [
+        {"id":"SAM-24962","title":"Login Home page","store":null,"feature":"Auth/Home","architecture":"Shared Core","sameSummaryMarkets":["CL","CO","MX","PE"],"marketCount":4},
+        {"id":"SAM-24963","title":"Validate the My account menu","store":null,"feature":"Auth/Home","architecture":"Shared + Market Config","sameSummaryMarkets":["CO","MX"],"marketCount":2},
+        {"id":"SAM-24964","title":"GNB menu","store":null,"feature":"Auth/Home","architecture":"Shared + Market Config","sameSummaryMarkets":["CO","MX"],"marketCount":2},
+        {"id":"SAM-24968","title":"Facets/Filter on PLP","store":null,"feature":"Product","architecture":"Shared + Market Config","sameSummaryMarkets":["CO","MX"],"marketCount":2},
+        {"id":"SAM-24969","title":"Add product from BC Page","store":null,"feature":"Cart","architecture":"Shared + Market Config","sameSummaryMarkets":["MX"],"marketCount":1},
+        {"id":"SAM-24971","title":"Cart page UI","store":null,"feature":"Cart","architecture":"Shared Core","sameSummaryMarkets":["CL","CO","MX","PE"],"marketCount":4},
+        {"id":"SAM-24972","title":"Increase/decrease/delete the quantity","store":null,"feature":"UI/Other","architecture":"Shared + Market Config","sameSummaryMarkets":["CO","MX","PE"],"marketCount":3},
+        {"id":"SAM-24975","title":"Verify rewards text as a Guest User","store":null,"feature":"Payment","architecture":"Shared Skeleton + Market Payment Config","sameSummaryMarkets":["MX"],"marketCount":1},
+        {"id":"SAM-24981","title":"Add SC+ from BC/PDP Page","store":null,"feature":"Product","architecture":"Shared + Market Config","sameSummaryMarkets":["MX"],"marketCount":1},
+        {"id":"SAM-24982","title":"Verify trade-up cart page","store":null,"feature":"Cart","architecture":"Shared + Market Config","sameSummaryMarkets":["CO","MX"],"marketCount":2},
+        {"id":"SAM-24985","title":"Add Extended Warranty from cart page","store":null,"feature":"Cart","architecture":"Market Specific / Review","sameSummaryMarkets":["MX"],"marketCount":1},
+        {"id":"SAM-24986","title":"Cart value when Reg user logs out","store":null,"feature":"Cart","architecture":"Shared + Market Config","sameSummaryMarkets":["CO","MX"],"marketCount":2},
+        {"id":"SAM-24988","title":"Checkout button on cart page","store":null,"feature":"Checkout","architecture":"Shared Core","sameSummaryMarkets":["CL","CO","MX","PE"],"marketCount":4},
+        {"id":"SAM-24989","title":"Order Summary on checkout page","store":null,"feature":"Checkout","architecture":"Shared + Market Config","sameSummaryMarkets":["CO","MX"],"marketCount":2},
+        {"id":"SAM-24990","title":"Step 1: Contact information","store":null,"feature":"UI/Other","architecture":"Market Specific / Review","sameSummaryMarkets":["MX"],"marketCount":1},
+        {"id":"SAM-24991","title":"Add/Edit saved/new address on checkout page","store":null,"feature":"Checkout","architecture":"Shared Core","sameSummaryMarkets":["CL","CO","MX","PE"],"marketCount":4},
+        {"id":"SAM-24992","title":"Select saved address","store":null,"feature":"Checkout","architecture":"Shared Core","sameSummaryMarkets":["CL","CO","MX","PE"],"marketCount":4},
+        {"id":"SAM-24993","title":"Save option for reg user","store":null,"feature":"Checkout","architecture":"Shared Core","sameSummaryMarkets":["CL","CO","MX","PE"],"marketCount":4},
+        {"id":"SAM-24994","title":"Able to checkout with a New address","store":null,"feature":"Checkout","architecture":"Shared Core","sameSummaryMarkets":["CL","CO","MX","PE"],"marketCount":4},
+        {"id":"SAM-24995","title":"Save option not visible","store":null,"feature":"Checkout","architecture":"Shared Core","sameSummaryMarkets":["CL","CO","MX","PE"],"marketCount":4},
+        {"id":"SAM-24999","title":"Validate Invalid address details on checkout page","store":null,"feature":"Checkout","architecture":"Shared + Market Config","sameSummaryMarkets":["CO","MX"],"marketCount":2},
+        {"id":"SAM-25000","title":"Validate switching between delivery modes or saved/new address","store":null,"feature":"Checkout","architecture":"Shared Core","sameSummaryMarkets":["CL","CO","MX","PE"],"marketCount":4},
+        {"id":"SAM-25001","title":"Verifiy Back to Top","store":null,"feature":"Cart","architecture":"Shared Core","sameSummaryMarkets":["CL","CO","MX","PE"],"marketCount":4},
+        {"id":"SAM-25002","title":"Payment using credit card with reg user","store":null,"feature":"Payment","architecture":"Shared Skeleton + Market Payment Config","sameSummaryMarkets":["CL","CO","MX","PE"],"marketCount":4},
+        {"id":"SAM-25004","title":"Payment using Paypal","store":null,"feature":"Payment","architecture":"Market Specific / Review","sameSummaryMarkets":["MX"],"marketCount":1},
+        {"id":"SAM-25005","title":"Payment using Pay in Cash","store":null,"feature":"Payment","architecture":"Market Specific / Review","sameSummaryMarkets":["MX"],"marketCount":1},
+        {"id":"SAM-25006","title":"Payment using Rewards","store":null,"feature":"Payment","architecture":"Shared Skeleton + Market Payment Config","sameSummaryMarkets":["MX"],"marketCount":1},
+        {"id":"SAM-25010","title":"Track Order","store":null,"feature":"Order/Backoffice","architecture":"Shared + Market Config","sameSummaryMarkets":["CL","CO","MX","PE"],"marketCount":4},
+        {"id":"SAM-25011","title":"Backoffice","store":null,"feature":"Order/Backoffice","architecture":"Shared Core","sameSummaryMarkets":["CL","CO","MX","PE"],"marketCount":4},
+        {"id":"SAM-25016","title":"Mobile Sticky checkout","store":null,"feature":"Checkout","architecture":"Shared + Market Config","sameSummaryMarkets":["MX"],"marketCount":1},
+        {"id":"SAM-25020","title":"Facets/Filter on PLP","store":null,"feature":"Product","architecture":"Shared + Market Config","sameSummaryMarkets":["CO","MX"],"marketCount":2},
+        {"id":"SAM-25021","title":"Able to add to Cart from PDP","store":null,"feature":"Cart","architecture":"Shared Core","sameSummaryMarkets":["CL","CO","MX","PE"],"marketCount":4},
+        {"id":"SAM-25022","title":"Cart page UI","store":null,"feature":"Cart","architecture":"Shared Core","sameSummaryMarkets":["CL","CO","MX","PE"],"marketCount":4},
+        {"id":"SAM-25034","title":"Step 1: Contact information","store":null,"feature":"UI/Other","architecture":"Market Specific / Review","sameSummaryMarkets":["MX"],"marketCount":1},
+        {"id":"SAM-25044","title":"Verifiy Back to Top","store":null,"feature":"Cart","architecture":"Shared Core","sameSummaryMarkets":["CL","CO","MX","PE"],"marketCount":4},
+        {"id":"SAM-25045","title":"Payment using credit card with reg user","store":null,"feature":"Payment","architecture":"Shared Skeleton + Market Payment Config","sameSummaryMarkets":["CL","CO","MX","PE"],"marketCount":4},
+        {"id":"SAM-25046","title":"Payment using Pay in Cash","store":null,"feature":"Payment","architecture":"Market Specific / Review","sameSummaryMarkets":["MX"],"marketCount":1}
+      ]
+    },
+    "CL": {"count":38,"cases":[]},
+    "CO": {"count":35,"cases":[]},
+    "PE": {"count":34,"cases":[]}
+  },
+  "note": "MX architecture metadata is populated first. CL/CO/PE counts are reserved for incremental population from the already-verified 144-case master; empty case arrays are intentionally not treated as complete catalogs. Store is null where the Folder label did not expose Site."
+}
