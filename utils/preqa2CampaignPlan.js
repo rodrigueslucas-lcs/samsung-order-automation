@@ -2,7 +2,7 @@ const registry = require("../test-mapping/smb-qst.json");
 const mxCoverage = require("../test-mapping/mx-qst-coverage.json");
 const mxPartialPlan = require("../test-mapping/mx-qst-partial-plan.json");
 const peReusePlan = require("../test-mapping/pe-qst-reuse-plan.json");
-const ledger = require("../test-mapping/preqa2-validation.json");
+const defaultLedger = require("../test-mapping/preqa2-validation.json");
 const { getSharedCandidatesByMarket } = require("./qstSharedCandidates");
 const { validateS1OfficialImplementation } = require("./qstS1Implementation");
 
@@ -88,12 +88,12 @@ function priorityFor(market, id, meta, implemented, partialGroups) {
   return 60;
 }
 
-function getPreqa2CampaignPlan(market) {
+function getPreqa2CampaignPlan(market, { sourceLedger = defaultLedger, implementation } = {}) {
   const code = normalizeMarket(market);
   const officialIds = registry.markets[code].cases;
-  const results = ledger.markets?.[code]?.results || {};
-  const implementation = validateS1OfficialImplementation()[code];
-  const implemented = new Set(implementation.implementedIds);
+  const results = sourceLedger.markets?.[code]?.results || {};
+  const currentImplementation = implementation || validateS1OfficialImplementation();
+  const implemented = new Set(currentImplementation[code]?.implementedIds || []);
   const partialGroups = partialGroupById();
 
   const cases = officialIds.map((id) => {
@@ -102,15 +102,16 @@ function getPreqa2CampaignPlan(market) {
     return {
       id,
       market: code,
-      title: meta?.title || null,
-      store: meta?.store || "Unknown",
-      feature: meta?.feature || "Unknown",
+      title: execution?.title || meta?.title || null,
+      store: execution?.store || meta?.store || "Unknown",
+      feature: execution?.feature || meta?.feature || "Unknown",
       baseline: meta?.baseline || "unknown",
       implemented: implemented.has(id),
       executionStatus: execution?.status || "NOT_RUN",
+      context: execution?.context || "unknown",
       safety: safetyFor(meta),
       priority: priorityFor(code, id, meta, implemented.has(id), partialGroups),
-      notes: meta?.notes || null,
+      notes: execution?.evidence || meta?.notes || null,
     };
   });
 
@@ -129,9 +130,10 @@ function getPreqa2CampaignPlan(market) {
   };
 }
 
-function getCampaignSummary() {
+function getCampaignSummary({ sourceLedger = defaultLedger, implementation } = {}) {
+  const currentImplementation = implementation || validateS1OfficialImplementation();
   return Object.fromEntries(MARKET_ORDER.map((market) => {
-    const plan = getPreqa2CampaignPlan(market);
+    const plan = getPreqa2CampaignPlan(market, { sourceLedger, implementation: currentImplementation });
     return [market, {
       officialTotal: plan.officialTotal,
       executed: plan.executed,
@@ -150,4 +152,5 @@ module.exports = {
   getPreqa2CampaignPlan,
   metadataFor,
   normalizeMarket,
+  safetyFor,
 };
