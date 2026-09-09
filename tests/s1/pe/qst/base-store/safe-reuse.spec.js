@@ -1,15 +1,14 @@
 import { test, expect } from "@playwright/test";
 import HomePage from "../../../../../pages/HomePage";
-import ProductPage from "../../../../../pages/ProductPage";
-import CartPage from "../../../../../pages/CartPage";
-import GuestLoginPage from "../../../../../pages/GuestLoginPage";
-import CheckoutPage from "../../../../../pages/CheckoutPage";
 import peConfigModule from "../../../../../config/markets/pe";
 import storefrontAccess from "../../../../../flows/smb/storefrontAccess";
 import cartPresentation from "../../../../../flows/smb/cartPresentation";
 import evidenceContext from "../../../../../reporters/evidence/evidenceContext";
 import peEvidenceMetadata from "../../../../../utils/qstPeEvidenceMetadata";
-import { testData } from "../../../../../utils/testData";
+import {
+  addConfiguredProductToPeCart,
+  reachPeGuestDelivery,
+} from "./peQstFlows";
 
 const { getPeS1QstConfig } = peConfigModule;
 const { openStorefront } = storefrontAccess;
@@ -36,43 +35,6 @@ function requirePeProductConfig() {
 
 function recordOfficialEvidence(testInfo, zephyrId) {
   recordBusinessEvidence(testInfo, getPeQstEvidenceMetadata(zephyrId));
-}
-
-async function addConfiguredProductToPeCart(page, config) {
-  if (config.setupUrl) {
-    await openStorefront(page, {
-      baseUrl: config.baseUrl,
-      setupUrl: config.setupUrl,
-      expectedMarket: "PE",
-    });
-  }
-
-  const product = new ProductPage(page, {
-    setupUrl: null,
-    sku: config.sku,
-    pdpUrl: config.pdpUrl.href,
-    cartUrl: config.cartUrl.href,
-  });
-  await product.addConfiguredPdpToCart({ waitForCartMutation: true });
-
-  return new CartPage(page, {
-    cartUrl: config.cartUrl.href,
-    sku: config.sku,
-    productNamePattern: null,
-    currencyPattern: /S\/\s*[\d,.]+/,
-  });
-}
-
-async function reachPeGuestDelivery(page, config) {
-  const cart = await addConfiguredProductToPeCart(page, config);
-  await cart.proceedToCheckout();
-
-  const guest = new GuestLoginPage(page);
-  await guest.checkoutAsGuest(`pe-qst-${Date.now()}@mailinator.com`);
-
-  const checkout = new CheckoutPage(page);
-  await checkout.fillCustomerData(testData.customer);
-  return checkout;
 }
 
 test("SAM-25079 @qst @pe @base-store @safe @reuse - UI validation in desktop view baseline", async ({ page }, testInfo) => {
