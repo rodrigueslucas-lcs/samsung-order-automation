@@ -79,30 +79,31 @@ function parseMxCurrency(text) {
 }
 
 export async function validateMxCheckoutSummaryPresentation(page) {
-  const summary = page
-    .locator("body")
-    .getByText(/Resumen de tu pedido[\s\S]*Subtotal[\s\S]*IVA[\s\S]*Total con IVA/i)
-    .filter({ visible: true })
-    .first();
+  const summaryHeading = page.getByRole("heading", {
+    name: "Resumen de tu pedido",
+    level: 2,
+  });
+  const totalHeading = page.getByRole("heading", {
+    name: "Total con IVA",
+    level: 3,
+  });
 
-  let summaryText;
-  if (await summary.count()) {
-    summaryText = await summary.innerText();
-  } else {
-    summaryText = await page.locator("body").innerText();
-  }
+  await expect(summaryHeading).toBeVisible({ timeout: 30000 });
+  await expect(totalHeading).toBeVisible({ timeout: 30000 });
 
-  expect(summaryText).toMatch(/Resumen de tu pedido/i);
+  const summaryBlock = summaryHeading.locator("..");
+  const totalBlock = totalHeading.locator("..");
+  const summaryText = await summaryBlock.innerText();
+  const totalText = await totalBlock.innerText();
+
   expect(summaryText).toMatch(/Subtotal/i);
   expect(summaryText).toMatch(/\bIVA\b/i);
-  expect(summaryText).toMatch(/Total con IVA/i);
 
   const subtotalMatch = summaryText.match(/Subtotal\s*\$\s*([\d,.]+)/i);
   const ivaMatch = summaryText.match(/\bIVA\s*\$\s*([\d,.]+)/i);
-  const totalMatch = summaryText.match(/Total con IVA\s*\$\s*([\d,.]+)/i);
   const subtotal = parseMxCurrency(subtotalMatch ? `$${subtotalMatch[1]}` : "");
   const iva = parseMxCurrency(ivaMatch ? `$${ivaMatch[1]}` : "");
-  const total = parseMxCurrency(totalMatch ? `$${totalMatch[1]}` : "");
+  const total = parseMxCurrency(totalText);
 
   expect(subtotal).not.toBeNull();
   expect(iva).not.toBeNull();
@@ -115,8 +116,8 @@ export async function validateMxCheckoutSummaryPresentation(page) {
     subtotal,
     iva,
     total,
-    voucherVisible: /Voucher|Cup[oó]n/i.test(summaryText),
-    promoVisible: /Promoci[oó]n|Promo/i.test(summaryText),
+    voucherVisible: (await page.getByText(/Voucher|Cup[oó]n/i).filter({ visible: true }).count()) > 0,
+    promoVisible: (await page.getByText(/Promoci[oó]n|Promo/i).filter({ visible: true }).count()) > 0,
   };
 }
 
