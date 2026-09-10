@@ -5,6 +5,7 @@ const {
   buildMxFeatureCoverage,
   buildAutomationGaps,
   buildCaseCatalog,
+  buildEnvironmentHandoffs,
   buildMarketFeatureMatrix,
   buildTrend,
   buildConsistencyAudit,
@@ -24,6 +25,18 @@ function ledger() {
       PE: { officialTotal: 34, status: 'NOT_STARTED', results: {} },
     },
   };
+}
+
+function routedLedger() {
+  const value = ledger();
+  value.markets.MX.results['SAM-24971'] = {
+    status: 'NOT_APPLICABLE',
+    context: 'either',
+    validationEnvironment: 'PREQA2',
+    targetEnvironment: 'STAGING',
+    environmentReason: 'Cart redirects to staging and is not a PreQA storefront flow.',
+  };
+  return value;
 }
 
 test('executive v3 keeps 144 official scope and separates official execution from MX automation', () => {
@@ -72,6 +85,31 @@ test('TC catalog always contains exactly the 144 official IDs', () => {
   assert.equal(catalog.filter(row => row.status === 'NOT_RUN').length, 142);
 });
 
+test('N/A in PreQA is modeled as an environment handoff, not as an official pass', () => {
+  const catalog = buildCaseCatalog(routedLedger());
+  const handoffs = buildEnvironmentHandoffs(catalog);
+  assert.equal(handoffs.length, 1);
+  assert.equal(handoffs[0].id, 'SAM-24971');
+  assert.equal(handoffs[0].fromEnvironment, 'PREQA2');
+  assert.equal(handoffs[0].toEnvironment, 'STAGING');
+  assert.match(handoffs[0].reason, /Cart redirects to staging/);
+
+  const model = buildDashboardModel({ ledger: routedLedger() });
+  assert.equal(model.totals.notApplicable, 1);
+  assert.equal(model.totals.pass, 1);
+  assert.equal(model.validation.stagingRequired, 1);
+  assert.equal(model.validation.handoffUnspecified, 0);
+});
+
+test('N/A handoff without explicit target is surfaced instead of silently assumed', () => {
+  const value = routedLedger();
+  delete value.markets.MX.results['SAM-24971'].targetEnvironment;
+  const model = buildDashboardModel({ ledger: value });
+  assert.equal(model.validation.environmentHandoffs[0].toEnvironment, 'UNSPECIFIED');
+  assert.equal(model.validation.stagingRequired, 0);
+  assert.equal(model.validation.handoffUnspecified, 1);
+});
+
 test('Market x Feature matrix conserves all catalog rows across four markets', () => {
   const catalog = buildCaseCatalog(ledger());
   const matrix = buildMarketFeatureMatrix(catalog);
@@ -117,7 +155,6 @@ test('executive v3 exposes runtime attention separately from automation gaps', (
 test('executive v3 renders trend matrix audit and 144-TC drilldown', () => {
   const html = render(buildDashboardModel({ ledger: ledger() }));
   assert.match(html, /Samsung Automation Control Center/);
-  assert.match(html, /PREQA2 AUTHORITATIVE/);
   assert.match(html, /Coverage denominator is MX official scope \(37\), not all 144 SMB cases/);
   assert.match(html, /Official PASS does not automatically mean Full automation/);
   assert.match(html, /MX Coverage by Feature/);
@@ -139,6 +176,7 @@ test('executive v3 remains useful with no execution evidence', () => {
   assert.equal(model.releaseHealth, 'NO EXECUTION');
   assert.equal(model.validation.attention.length, 0);
   assert.equal(model.validation.catalog.length, 144);
+  assert.equal(model.validation.environmentHandoffs.length, 0);
   assert.equal(model.audit.ok, true);
   assert.match(render(model), /MX Automation Coverage/);
   assert.match(render(model), /No timestamped official validation evidence is available yet/);
