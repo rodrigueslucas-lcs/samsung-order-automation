@@ -2,11 +2,12 @@
 
 Playwright automation and QA campaign tooling for Samsung LATAM SMB eCommerce on SAP Commerce.
 
-The repository models the official Zephyr SMB scope across **Mexico, Chile, Colombia and Peru** and separates three concepts that must not be mixed:
+The repository models the official Zephyr SMB scope across **Mexico, Chile, Colombia and Peru** and separates four concepts that must not be mixed:
 
 1. **Official business scope** — 144 Zephyr QST cases.
-2. **Official runtime validation** — PASS/FAIL/BLOCKED/NOT_APPLICABLE/NOT_RUN from PreQA2 evidence.
-3. **Automation implementation coverage** — Full/Partial/Missing or reuse classifications, depending on the market.
+2. **Environment applicability** — which non-Production environment can legitimately execute the official flow.
+3. **Official runtime validation** — PASS/FAIL/BLOCKED/NOT_APPLICABLE/NOT_RUN from runtime evidence in the applicable environment.
+4. **Automation implementation coverage** — Full/Partial/Missing or reuse classifications, depending on the market.
 
 Production is read-only. State-changing automation is restricted to explicitly authorized non-Production targets and guarded at runtime.
 
@@ -24,15 +25,23 @@ The authoritative registry is `test-mapping/smb-qst.json`.
 
 CL and CO are **not future markets** in the business architecture. They are already part of the official 144-case Zephyr scope. What remains incomplete for those markets is case-level executable automation/configuration where official metadata and runtime behavior have not yet been verified.
 
-See [Current Architecture](docs/CURRENT_ARCHITECTURE.md) for the detailed model.
+See [Current Architecture](docs/CURRENT_ARCHITECTURE.md) and [Environment Validation Policy](docs/ENVIRONMENT_VALIDATION_POLICY.md).
 
-## Source of truth: PreQA2
+## Runtime source of truth: correct environment + official Expected Result
 
-PreQA2 is the authoritative validation environment for the official SMB campaign.
+The official Zephyr Expected Result is the acceptance criterion. The correct validation environment depends on the flow.
 
-If an official TC is executed in PreQA2 and its official Expected Result is proven with runtime evidence, that is the official result. S1/S2/S3 remain useful for implementation, diagnostics, comparison, legacy DST suites, BackOffice, destructive staging flows and fulfillment work, but they do not override a valid PreQA2 official result.
+PreQA2 is authoritative for scenarios that are actually supported there. The live MX campaign proved a split in which Home, supported Samsung Account/My Account, PLP, PDP and GNB can be validated in PreQA2, while Cart and downstream flows redirect into Staging and must be validated there.
 
-The canonical runtime ledger is:
+Therefore:
+
+- a valid PreQA2 PASS remains valid for a PreQA2-supported official flow;
+- a Cart/Checkout/Orders/Payment case that is not supported in PreQA2 is `NOT_APPLICABLE` to the PreQA2 leg, not automatically BLOCKED;
+- that N/A classification creates a Staging validation obligation rather than closing the official TC;
+- the final official runtime result is established in the applicable non-Production environment;
+- Production is never used as an alternative validation target.
+
+The current PreQA2 runtime ledger is:
 
 ```text
 test-mapping/preqa2-validation.json
@@ -44,9 +53,10 @@ Core rules:
 - Automation is promoted only when implementation exists and is actually proven.
 - Registered official cases require a real Samsung Account registered context where encoded.
 - Guest and EPP requirements are tracked separately.
-- PreQA2 navigation is host/market guarded; Production redirects must not be followed to continue a staging test.
+- PreQA2 and Staging navigation are environment/market guarded; Production redirects must not be followed.
+- `NOT_APPLICABLE in PreQA2` must not be misreported as `officially complete` when Staging still owns the flow.
 
-Useful campaign commands after integration:
+Useful PreQA2 campaign commands after integration:
 
 ```bash
 npm run preqa2:gate
@@ -58,19 +68,36 @@ npm run reporting:preqa2
 npm run reporting:preqa2:status
 ```
 
+## Current MX environment routing
+
+Based on live runtime evidence:
+
+| Flow family | Current validation environment |
+|---|---|
+| Home / supported Samsung Account / My Account | PreQA2 |
+| PLP / PDP / GNB | PreQA2 |
+| Cart / Checkout | Staging |
+| Orders / My Orders | Staging |
+| Payment / order creation | Authorized Staging only |
+| Mobile cart / checkout | Staging |
+| BackOffice / fulfillment | Applicable Staging environment |
+| EPP | Legitimate market-specific EPP context required |
+
+This is the current verified MX routing. CL/CO/PE routing must be learned from their official TCs and real environment behavior rather than copied blindly.
+
 ## Market implementation reality
 
 ### Mexico
 
 MX is currently the deepest market in the official QST automation model. `test-mapping/mx-qst-coverage.json` maps all **37 official MX cases** to Full/Partial/Missing coverage and case metadata.
 
-The active PreQA2 campaign validates those same official IDs and records runtime evidence independently from coverage state.
+The live campaign classifies the same 37 IDs by environment applicability and runtime result independently from coverage state.
 
 ### Peru
 
 PE contributes **34 official cases** to the same SMB baseline. Existing implementation/reuse analysis is represented in `test-mapping/pe-qst-reuse-plan.json` and the country-scoped Playwright implementation.
 
-A reuse candidate is not automatically an official PASS and is not automatically Full automation. It becomes authoritative only after the corresponding official TC is verified and executed in the correct context.
+A reuse candidate is not automatically an official PASS and is not automatically Full automation. It becomes authoritative only after the corresponding official TC is verified and executed in the correct environment/context.
 
 ### Chile and Colombia
 
@@ -79,8 +106,8 @@ CL contributes **38** official cases and CO contributes **35**.
 The architecture already includes them in:
 
 - the official registry;
-- PreQA2 campaign planning;
-- canonical ledger structure;
+- campaign planning;
+- ledger/reporting models;
 - closure/status reporting;
 - executive reporting;
 - shared-family candidate analysis where verified.
@@ -100,7 +127,12 @@ Market metadata / automation mapping
   test-mapping/pe-qst-reuse-plan.json       PE reuse/implementation plan
   shared-family metadata                    verified cross-market candidates
 
-PreQA2 campaign control plane
+Environment validation
+  PreQA2                                     storefront flows where supported
+  Staging                                    cart/checkout/orders/payment/backoffice where applicable
+  environment handoff                       N/A-in-PreQA -> Staging validation obligation
+
+PreQA2 control plane
   utils/preqa2ExecutionRequirements.js
   utils/preqa2CampaignPlan.js
   utils/preqa2RuntimeGuard.js
@@ -132,7 +164,7 @@ The filesystem convention is:
 tests/<environment>/<country>/<suite>/<area>/
 ```
 
-But country directories are created only when there is enough verified official metadata, configuration and runtime evidence to support a real executable implementation. We do not create empty or fake `cl/` and `co/` folders just to make the tree look symmetric.
+Country directories are created only when there is enough verified official metadata, configuration and runtime evidence to support a real executable implementation. We do not create empty or fake `cl/` and `co/` folders just to make the tree look symmetric.
 
 So today:
 
@@ -146,7 +178,7 @@ So today:
 There are two distinct authentication concerns in the PreQA2 campaign:
 
 - **WMC / PreQA2 access** establishes the storefront validation session.
-- **Samsung Account authentication** is additionally required for registered-user official TCs such as My Account and registered checkout cases.
+- **Samsung Account authentication** is additionally required for registered-user official TCs such as My Account and registered flows.
 
 A valid existing Samsung Account session should be reused when possible. Manual intervention is appropriate only when an actual human-only authentication step appears, such as MFA, CAPTCHA or phone approval.
 
@@ -169,7 +201,7 @@ Never:
 - submit a Production payment/order;
 - run a Production CronJob or cancellation;
 - alter Production customer/profile/address/order data;
-- leave PreQA2 for Production to complete a staging validation.
+- leave a non-Production validation environment for Production to complete a test.
 
 Payment/order submit requires explicit authorization and the runtime guard:
 
@@ -187,12 +219,7 @@ Profile writes and other state-changing flows remain separately guarded. Destruc
 
 ## Legacy DST / S1 / S2 / S3 assets
 
-The repository still contains substantial historical and operational DST/QST implementation under S1/S2/S3. Those assets remain useful and are not invalidated by the newer official PreQA2 architecture.
-
-The important distinction is:
-
-- S1/S2/S3 code and evidence = implementation, diagnostics and operational staging assets.
-- PreQA2 official ledger = authoritative SMB QST campaign result.
+The repository still contains substantial historical and operational DST/QST implementation under S1/S2/S3. Those assets remain useful and are now also relevant as execution targets for official flows that are not applicable in PreQA2.
 
 Do not compare old DST scenario totals directly with the 144 official SMB QST denominator; they represent different scopes.
 
@@ -210,15 +237,17 @@ Executive V3 lives under:
 reporters/executive-v3/
 ```
 
-The executive report must always keep these denominators separate:
+The reporting model must keep these dimensions separate:
 
 - Official SMB scope: **144**.
 - MX official scope: **37**.
 - CL official scope: **38**.
 - CO official scope: **35**.
 - PE official scope: **34**.
+- PreQA2 applicability/result.
+- Staging-required handoff.
+- Final official runtime result in the applicable environment.
 - MX Full/Partial/Missing automation coverage: denominator **37**, not 144.
-- Official runtime execution: derived only from the supplied PreQA2 ledger.
 
 ## Local setup
 
@@ -246,11 +275,12 @@ node reporters/executive-v3/generateExecutiveV3.cjs
 
 While a live browser/CDP campaign is running, remote architecture/reporting work may exist on a separate branch.
 
-Do not resolve `preqa2-validation.json` with a blanket `ours` or `theirs` merge. Preserve runtime evidence first, reconcile the canonical ledger, then run the full PreQA2 gates, reporting tests and `git diff --check` locally before declaring the integration official.
+Do not resolve `preqa2-validation.json` with a blanket `ours` or `theirs` merge. Preserve runtime evidence and environment-routing decisions first, reconcile the canonical ledger, then run the full gates, reporting tests and `git diff --check` locally before declaring the integration official.
 
 ## Documentation
 
-- [Current SMB / PreQA2 Architecture](docs/CURRENT_ARCHITECTURE.md)
+- [Current SMB Architecture](docs/CURRENT_ARCHITECTURE.md)
+- [Environment Validation Policy](docs/ENVIRONMENT_VALIDATION_POLICY.md)
 - [PreQA2 Validation Campaign](docs/PREQA2_VALIDATION_CAMPAIGN.md)
 - [PreQA2 Parallel Integration](docs/PREQA2_PARALLEL_INTEGRATION.md)
 - [Executive Report V3](docs/EXECUTIVE_REPORT_V3.md)
