@@ -30,7 +30,11 @@ test("SAM-24971 @qst @mx @base-store @safe - Cart page UI", async ({ page, mxCon
   expect(summary.subtotal).toBeTruthy();
   expect(summary.total).toBeTruthy();
   await validateMxExternalServicesPresentation(page);
-  await cart.validateCartFooter();
+
+  const footer = page.getByRole("contentinfo");
+  await footer.scrollIntoViewIfNeeded();
+  await expect(footer).toBeVisible({ timeout: 30000 });
+  await expect(footer.getByText(/Tipos de pago disponibles/i).first()).toBeVisible({ timeout: 30000 });
 });
 
 test("SAM-24972 @qst @mx @base-store @safe - Increase decrease and delete cart quantity", async ({ page, mxConfig }, testInfo) => {
