@@ -21,15 +21,83 @@ function requirePreqa(page) {
 async function main() {
   const browser = await chromium.connectOverCDP(CDP_URL);
   const context = browser.contexts()[0];
-  const authenticatedPage = context.pages().find((candidate) => {
+  const preqaPages = [...context.pages()].reverse().filter((candidate) => {
     try { return new URL(candidate.url()).hostname === PREQA2_HOST; } catch { return false; }
   });
+  let authenticatedPage = null;
+  for (const candidate of preqaPages) {
+    if (new URL(candidate.url()).pathname === `/${MARKET}/` &&
+        await candidate.getByText(/Cerrar sesi[oó]n/i).first().isVisible().catch(() => false)) {
+      authenticatedPage = candidate;
+      break;
+    }
+  }
   if (!authenticatedPage) throw new Error("An authenticated PreQA2 page is required in the attached Chrome.");
-  const page = await context.newPage();
-  await page.goto(`https://${PREQA2_HOST}/${MARKET}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
+  const page = authenticatedPage;
+  await page.bringToFront();
   requirePreqa(page);
 
   const evidence = [];
+  const authenticatedAccount = page.getByRole("button", {
+    name: "Go to the another page",
+    exact: true,
+  });
+  await authenticatedAccount.waitFor({ state: "visible", timeout: 60000 });
+  const openAuthenticatedMenu = async () => {
+    if (await authenticatedAccount.getAttribute("aria-expanded") !== "true") {
+      await authenticatedAccount.click();
+    }
+    await page.waitForFunction(() =>
+      document.querySelector('button[aria-label="Go to the another page"]')?.getAttribute("aria-expanded") === "true"
+    );
+  };
+  await openAuthenticatedMenu();
+  const expectedAccountOptions = [
+    "Mi cuenta",
+    "Mis pedidos",
+    "Wish List",
+    "Mis productos",
+    "Mis Cupones",
+    "Mis Rewards",
+    "Mis Suscripciones",
+    "Cerrar sesión",
+  ];
+  for (const option of expectedAccountOptions) {
+    await page.locator('a[role="menuitem"]', { hasText: new RegExp(`^${option.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") }).first().waitFor({
+      state: "attached",
+      timeout: 30000,
+    });
+  }
+  evidence.push({
+    market: MARKET.toUpperCase(),
+    officialTcId: "SAM-24962",
+    title: "Login Home page",
+    storeContext: "BS",
+    s1Coverage: "full",
+    preqa2ExecutionStatus: "PASS",
+    runtimePath: `/${MARKET}/`,
+    userType: "registered",
+    evidenceSummary: "The Home header rendered the authenticated Samsung Account user and exposed Cerrar sesión.",
+    automationStatus: "implemented-live-runner",
+    blockerDifference: "The authenticated callback/new-tab session is now reusable by the current persistent CDP context.",
+    timestamp: new Date().toISOString(),
+  });
+  evidence.push({
+    market: MARKET.toUpperCase(),
+    officialTcId: "SAM-24963",
+    title: "My Account",
+    storeContext: "BS",
+    s1Coverage: "partial",
+    preqa2ExecutionStatus: "PASS",
+    runtimePath: `/${MARKET}/ -> authenticated account menu`,
+    userType: "registered",
+    evidenceSummary: `Authenticated menu options: ${expectedAccountOptions.join(" | ")}.`,
+    automationStatus: "implemented-live-runner",
+    blockerDifference: "The complete official account-menu option set is asserted without following Production targets or logging out.",
+    timestamp: new Date().toISOString(),
+  });
+  await authenticatedAccount.click();
+
   const nav = page.getByRole("navigation", { name: /main navigation/i });
   await nav.waitFor({ state: "visible", timeout: 60000 });
   const mobile = nav.locator('button[role="menuitem"][aria-expanded]')
@@ -67,23 +135,56 @@ async function main() {
   });
 
   requirePreqa(page);
-  const filtersHeading = page.getByRole("heading", { name: /^Filtros$/i });
+  const filtersHeading = page.getByRole("heading", { name: /^Filtros(?:\s*\(\d+\))?$/i });
   await filtersHeading.waitFor({ state: "visible", timeout: 60000 });
-  const interactiveFilters = page.getByRole("button", { name: /^Filtros?/i })
-    .or(page.getByRole("checkbox"))
-    .filter({ visible: true });
+  const productRangeFilter = page.getByRole("button", { name: /^Gama de productos$/i });
+  await productRangeFilter.waitFor({ state: "visible", timeout: 60000 });
+  const resultCount = page.getByText(/\d+\s+Resultado/i).first();
+  await resultCount.waitFor({ state: "visible", timeout: 60000 });
+  const beforeFilterCount = await resultCount.innerText();
+  const productLinks = page.locator('a[href*="/smartphones/"][href*="/buy/"]:visible');
+  const beforeProductHrefs = await productLinks.evaluateAll((links) =>
+    [...new Set(links.map((link) => link.href))].sort()
+  );
+  await productRangeFilter.click();
+  const galaxyZ = page.getByRole("checkbox", { name: /^Galaxy Z$/i });
+  await galaxyZ.waitFor({ state: "visible", timeout: 30000 });
+  await galaxyZ.check();
+  await page.waitForFunction(
+    ({ previousCount, previousHrefs }) => {
+      const current = [...document.querySelectorAll("body *")]
+        .find((element) => /^\d+\s+Resultado(?:s)?$/i.test(element.textContent?.trim() || ""));
+      const selected = [...document.querySelectorAll(".pd21-filter__selected-item")]
+        .some((element) => /^Galaxy Z$/i.test(element.textContent?.trim() || ""));
+      const currentHrefs = [...new Set([...document.querySelectorAll('a[href*="/smartphones/"][href*="/buy/"]')]
+        .filter((link) => link.getClientRects().length > 0)
+        .map((link) => link.href))].sort();
+      return selected && (
+        current?.textContent?.trim() !== previousCount ||
+        JSON.stringify(currentHrefs) !== JSON.stringify(previousHrefs)
+      );
+    },
+    { previousCount: beforeFilterCount, previousHrefs: beforeProductHrefs },
+    { timeout: 60000 }
+  ).catch(() => {});
+  const afterFilterCount = await resultCount.innerText();
+  const afterProductHrefs = await productLinks.evaluateAll((links) =>
+    [...new Set(links.map((link) => link.href))].sort()
+  );
+  const filterPassed = beforeFilterCount !== afterFilterCount ||
+    JSON.stringify(beforeProductHrefs) !== JSON.stringify(afterProductHrefs);
   evidence.push({
     market: MARKET.toUpperCase(),
     officialTcId: "SAM-24968",
     title: "Facets/Filter",
     storeContext: "BS",
     s1Coverage: "missing",
-    preqa2ExecutionStatus: (await interactiveFilters.count()) ? "BLOCKED" : "FAIL",
+    preqa2ExecutionStatus: filterPassed ? "PASS" : "FAIL",
     runtimePath: `/${MARKET}/smartphones/all-smartphones/`,
     userType: "guest",
-    evidenceSummary: `Filtros heading rendered; visible candidate filter controls found: ${await interactiveFilters.count()}. No filter/result transition was proven.`,
-    automationStatus: "discovery-only",
-    blockerDifference: "Official facet interaction and changed product-set state are not available/proven on this page.",
+    evidenceSummary: `Gama de productos expanded and Galaxy Z was selected. Result count: ${beforeFilterCount} -> ${afterFilterCount}; visible product targets: ${beforeProductHrefs.length} -> ${afterProductHrefs.length}.`,
+    automationStatus: "implemented-live-runner",
+    blockerDifference: filterPassed ? "" : "The selected facet did not produce an observable product-result change.",
     timestamp: new Date().toISOString(),
   });
 
@@ -112,7 +213,7 @@ async function main() {
   fs.mkdirSync(path.dirname(output), { recursive: true });
   fs.writeFileSync(output, `${JSON.stringify({ generatedAt: new Date().toISOString(), evidence }, null, 2)}\n`);
   console.log(JSON.stringify(evidence, null, 2));
-  await page.close();
+  await page.goto(`https://${PREQA2_HOST}/${MARKET}/`, { waitUntil: "domcontentloaded", timeout: 60000 });
 }
 
 main().catch((error) => {
