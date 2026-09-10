@@ -38,6 +38,15 @@ function metadataForCase(market, id) {
   return { title: null, feature: 'Unknown', store: 'Unknown', coverage: null };
 }
 
+function environmentMetadata(result = null) {
+  if (!result) return { validationEnvironment: null, nextEnvironment: null, environmentReason: null };
+  return {
+    validationEnvironment: result.validationEnvironment || result.environment || result.sourceEnvironment || null,
+    nextEnvironment: result.nextEnvironment || result.targetEnvironment || result.routeTo || result.handoffEnvironment || null,
+    environmentReason: result.environmentReason || result.handoffReason || result.reason || null,
+  };
+}
+
 function buildMxFeatureCoverage() {
   const features = new Map();
   for (const [id, tc] of Object.entries(mxCoverage.cases || {})) {
@@ -66,6 +75,7 @@ function buildCaseCatalog(ledger = null) {
     for (const id of smb.markets?.[market]?.cases || []) {
       const result = results[id] || null;
       const meta = metadataForCase(market, id);
+      const environment = environmentMetadata(result);
       rows.push({
         id,
         market,
@@ -81,6 +91,7 @@ function buildCaseCatalog(ledger = null) {
         blocker: result?.blocker || null,
         validatedAt: result?.validatedAt || null,
         automation: result?.automation || null,
+        ...environment,
       });
     }
   }
@@ -101,6 +112,22 @@ function buildAutomationGaps() {
     });
 }
 
+function buildEnvironmentHandoffs(catalog) {
+  return catalog
+    .filter(row => row.status === 'NOT_APPLICABLE')
+    .map(row => ({
+      id: row.id,
+      market: row.market,
+      title: row.title,
+      feature: row.feature,
+      store: row.store,
+      fromEnvironment: row.validationEnvironment || 'PreQA2',
+      toEnvironment: row.nextEnvironment || 'UNSPECIFIED',
+      reason: row.environmentReason || row.evidence || row.blocker || 'Not applicable in the supplied validation environment.',
+      context: row.context,
+    }));
+}
+
 function buildMarketFeatureMatrix(catalog) {
   const features = [...new Set(catalog.map(row => row.feature || 'Unknown'))].sort((a, b) => a.localeCompare(b));
   return features.map(feature => {
@@ -113,6 +140,7 @@ function buildMarketFeatureMatrix(catalog) {
         pass: rows.filter(row => row.status === 'PASS').length,
         fail: rows.filter(row => row.status === 'FAIL').length,
         blocked: rows.filter(row => row.status === 'BLOCKED').length,
+        notApplicable: rows.filter(row => row.status === 'NOT_APPLICABLE').length,
         pending: rows.filter(row => row.status === 'NOT_RUN').length,
       };
     }
@@ -212,6 +240,7 @@ function buildDashboardModel({ ledger = null, execution = null, history = [] } =
   const catalog = buildCaseCatalog(ledger);
   const validationRows = catalog.filter(row => row.status !== 'NOT_RUN');
   const attention = validationRows.filter(row => row.status === 'FAIL' || row.status === 'BLOCKED');
+  const environmentHandoffs = buildEnvironmentHandoffs(catalog);
   const recent = validationRows
     .filter(row => row.validatedAt)
     .sort((a, b) => String(b.validatedAt).localeCompare(String(a.validatedAt)))
@@ -239,6 +268,9 @@ function buildDashboardModel({ ledger = null, execution = null, history = [] } =
       rows: validationRows,
       catalog,
       marketFeatureMatrix: buildMarketFeatureMatrix(catalog),
+      environmentHandoffs,
+      stagingRequired: environmentHandoffs.filter(row => /stag|s1|s2|st2/i.test(row.toEnvironment)).length,
+      handoffUnspecified: environmentHandoffs.filter(row => row.toEnvironment === 'UNSPECIFIED').length,
     },
     trend: buildTrend(history, ledger),
     audit,
@@ -253,8 +285,10 @@ module.exports = {
   buildMxFeatureCoverage,
   buildAutomationGaps,
   buildCaseCatalog,
+  buildEnvironmentHandoffs,
   buildMarketFeatureMatrix,
   buildTrend,
   buildConsistencyAudit,
+  environmentMetadata,
   flattenLedger,
 };
