@@ -1,13 +1,14 @@
 # Documentation Index
 
-## Current architecture and PreQA2 campaign
+## Current architecture and validation campaigns
 
-- [Current SMB / PreQA2 architecture](CURRENT_ARCHITECTURE.md)
+- [Current SMB architecture](CURRENT_ARCHITECTURE.md)
+- [Environment validation policy](ENVIRONMENT_VALIDATION_POLICY.md)
 - [PreQA2 validation campaign](PREQA2_VALIDATION_CAMPAIGN.md)
 - [PreQA2 parallel integration](PREQA2_PARALLEL_INTEGRATION.md)
 - [Executive Report V3](EXECUTIVE_REPORT_V3.md)
 
-These documents describe the current official SMB model: 144 Zephyr QST cases across MX, CL, CO and PE, with PreQA2 as the authoritative validation source and automation coverage tracked separately from official PASS/FAIL state.
+These documents describe the current official SMB model: 144 Zephyr QST cases across MX, CL, CO and PE, with the official Expected Result validated in the correct non-Production environment. PreQA2 is authoritative only for flows supported there; cases not applicable to PreQA2 are handed off to Staging rather than misclassified as blocked or complete.
 
 ## QST
 
@@ -15,7 +16,7 @@ These documents describe the current official SMB model: 144 Zephyr QST cases ac
 - [PE QST coverage](QST_COVERAGE_MATRIX.md)
 - [QST automation guide](QST_AUTOMATION_GUIDE.md)
 
-Historical S1/S2 QST implementation remains useful for implementation and diagnostics, but the official SMB campaign denominator is the 144-case registry in `test-mapping/smb-qst.json`.
+Historical S1/S2 QST implementation remains useful for implementation, diagnostics and for official flows whose applicable runtime environment is Staging. The official SMB campaign denominator is the 144-case registry in `test-mapping/smb-qst.json`.
 
 ## DST
 
@@ -40,12 +41,14 @@ EPP is a distinct store context. Base Store evidence does not by itself prove an
 - [Discovery and evidence](BACKOFFICE_DISCOVERY.md)
 - [Authentication investigation](BACKOFFICE_AUTH_INVESTIGATION.md)
 
+BackOffice and fulfillment validation belongs to the applicable Staging environment, never Production.
+
 ## Authentication and project context
 
 - [ST2 project context](ST2_PROJECT_CONTEXT.md)
 - Current authentication and safety rules are summarized in the [project README](../README.md).
 
-WMC/PreQA2 authentication and Samsung Account authentication are separate concerns for the live official campaign.
+WMC/PreQA2 authentication and Samsung Account authentication are separate concerns for the live campaign.
 
 ## Office and handoff
 
