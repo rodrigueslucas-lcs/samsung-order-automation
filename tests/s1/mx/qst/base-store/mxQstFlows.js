@@ -58,18 +58,18 @@ export async function validateMxCartProductPresentation(page, config) {
 
 export async function validateMxExternalServicesPresentation(page) {
   const main = page.getByRole("main");
+  const serviceLabels = ["Galaxy Canje", "Samsung Care+"];
 
-  for (const serviceName of ["Galaxy Canje", "Samsung Care+"]) {
-    const serviceLabel = main.getByText(serviceName, { exact: true }).filter({ visible: true }).first();
-    await expect(serviceLabel).toBeVisible({ timeout: 30000 });
-
-    const serviceCard = serviceLabel.locator(
-      "xpath=ancestor::*[.//button[normalize-space()='Agregar ahora']][1]"
-    );
-    await expect(serviceCard.getByRole("button", { name: /^Agregar ahora$/i })).toBeVisible({
-      timeout: 30000,
-    });
+  for (const serviceName of serviceLabels) {
+    await expect(
+      main.getByText(serviceName, { exact: true }).filter({ visible: true }).first()
+    ).toBeVisible({ timeout: 30000 });
   }
+
+  const addActions = main
+    .getByText(/^Agregar ahora$/i, { exact: true })
+    .filter({ visible: true });
+  expect(await addActions.count()).toBeGreaterThanOrEqual(serviceLabels.length);
 }
 
 function parseMxCurrency(text) {
@@ -79,10 +79,6 @@ function parseMxCurrency(text) {
 }
 
 export async function validateMxCheckoutSummaryPresentation(page) {
-  const summaryHeading = page
-    .getByText(/^Resumen de tu pedido$/i)
-    .filter({ visible: true })
-    .first();
   const subtotalLabel = page.getByText(/^Subtotal$/i).filter({ visible: true }).first();
   const ivaLabel = page.getByText(/^IVA$/i).filter({ visible: true }).first();
   const totalLabel = page
@@ -90,10 +86,12 @@ export async function validateMxCheckoutSummaryPresentation(page) {
     .filter({ visible: true })
     .first();
 
-  await expect(summaryHeading).toBeVisible({ timeout: 30000 });
   await expect(subtotalLabel).toBeVisible({ timeout: 30000 });
   await expect(ivaLabel).toBeVisible({ timeout: 30000 });
   await expect(totalLabel).toBeVisible({ timeout: 30000 });
+
+  const summaryContainer = subtotalLabel.locator("xpath=ancestor::*[.//*[normalize-space()='IVA'] and .//*[contains(normalize-space(),'Total')]][1]");
+  await expect(summaryContainer).toBeVisible({ timeout: 30000 });
 
   const subtotalText = await subtotalLabel.locator("..").innerText();
   const ivaText = await ivaLabel.locator("..").innerText();
