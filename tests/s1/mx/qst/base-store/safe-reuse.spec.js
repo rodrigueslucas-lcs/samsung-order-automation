@@ -6,6 +6,7 @@ import {
   prepareMxQstCart,
   validateMxCartProductPresentation,
   validateMxCheckoutSummaryPresentation,
+  validateMxExternalServicesPresentation,
 } from "./mxQstFlows";
 import { reachMxGuestDelivery } from "../../dst/base-store/mxFlows";
 
@@ -28,7 +29,7 @@ test("SAM-24971 @qst @mx @base-store @safe - Cart page UI", async ({ page, mxCon
   const summary = await cart.validateOrderSummary();
   expect(summary.subtotal).toBeTruthy();
   expect(summary.total).toBeTruthy();
-  await cart.validateExternalServicesVisible();
+  await validateMxExternalServicesPresentation(page);
   await cart.validateCartFooter();
 });
 
@@ -54,8 +55,9 @@ test("SAM-24989 @qst @mx @base-store @safe - Order Summary on checkout page", as
   });
 
   const { checkout } = await reachMxGuestDelivery(page, mxConfig, "mx.qst.address@example.com");
-  const summary = await validateMxCheckoutSummaryPresentation(page, mxConfig);
+  const summary = await validateMxCheckoutSummaryPresentation(page);
   expect(summary.subtotal).toBeGreaterThan(0);
+  expect(summary.iva).toBeGreaterThan(0);
   expect(summary.total).toBeGreaterThan(0);
 
   const address = await checkout.fillDelivery({
