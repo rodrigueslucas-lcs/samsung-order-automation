@@ -56,32 +56,57 @@ export async function validateMxCartProductPresentation(page, config) {
   });
 }
 
+export async function validateMxExternalServicesPresentation(page) {
+  const main = page.getByRole("main");
+
+  for (const serviceName of ["Galaxy Canje", "Samsung Care+"]) {
+    const serviceLabel = main.getByText(serviceName, { exact: true }).filter({ visible: true }).first();
+    await expect(serviceLabel).toBeVisible({ timeout: 30000 });
+
+    const serviceCard = serviceLabel.locator(
+      "xpath=ancestor::*[.//button[normalize-space()='Agregar ahora']][1]"
+    );
+    await expect(serviceCard.getByRole("button", { name: /^Agregar ahora$/i })).toBeVisible({
+      timeout: 30000,
+    });
+  }
+}
+
 function parseMxCurrency(text) {
   const match = String(text || "").match(/\$\s*([\d,.]+)/);
   if (!match) return null;
   return Number(match[1].replace(/,/g, ""));
 }
 
-export async function validateMxCheckoutSummaryPresentation(page, config) {
-  const sku = page.getByText(config.sku, { exact: true }).filter({ visible: true }).first();
-  await expect(sku).toBeVisible({ timeout: 30000 });
-
+export async function validateMxCheckoutSummaryPresentation(page) {
+  const summaryHeading = page
+    .getByText(/^Resumen de tu pedido$/i)
+    .filter({ visible: true })
+    .first();
   const subtotalLabel = page.getByText(/^Subtotal$/i).filter({ visible: true }).first();
+  const ivaLabel = page.getByText(/^IVA$/i).filter({ visible: true }).first();
   const totalLabel = page
     .getByText(/^Total(?:\s+con\s+IVA)?$/i)
     .filter({ visible: true })
     .first();
+
+  await expect(summaryHeading).toBeVisible({ timeout: 30000 });
   await expect(subtotalLabel).toBeVisible({ timeout: 30000 });
+  await expect(ivaLabel).toBeVisible({ timeout: 30000 });
   await expect(totalLabel).toBeVisible({ timeout: 30000 });
 
   const subtotalText = await subtotalLabel.locator("..").innerText();
+  const ivaText = await ivaLabel.locator("..").innerText();
   const totalText = await totalLabel.locator("..").innerText();
   const subtotal = parseMxCurrency(subtotalText);
+  const iva = parseMxCurrency(ivaText);
   const total = parseMxCurrency(totalText);
 
   expect(subtotal).not.toBeNull();
+  expect(iva).not.toBeNull();
   expect(total).not.toBeNull();
   expect(subtotal).toBeGreaterThan(0);
+  expect(iva).toBeGreaterThan(0);
   expect(total).toBeGreaterThan(0);
 
   const optionalVoucher = page
@@ -93,6 +118,7 @@ export async function validateMxCheckoutSummaryPresentation(page, config) {
 
   return {
     subtotal,
+    iva,
     total,
     voucherVisible: (await optionalVoucher.count()) > 0,
     promoVisible: (await optionalPromo.count()) > 0,
