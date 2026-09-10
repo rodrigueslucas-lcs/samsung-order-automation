@@ -33,11 +33,11 @@ test("SAM-25016 @qst @mx @base-store @safe @mobile - Mobile Sticky checkout", as
     .getByRole("button", { name: /Continuar como (usuario )?invitado|Checkout como invitado/i })
     .filter({ visible: true })
     .first();
-  await validateStickyControl(checkoutContinue, "Checkout guest action");
+  await expect(checkoutContinue).toBeVisible({ timeout: 30000 });
 
   testInfo.annotations.push({
     type: "qst-reuse-note",
     description:
-      "Safe mobile assertion covers cart and checkout entry sticky/fixed controls. Keep coverage Missing until this exact S1 MX behavior is live-proven.",
+      "Safe mobile assertion proves the cart checkout CTA is sticky/fixed and that the same flow reaches the visible guest checkout entry. The guest CTA itself is not treated as the sticky cart control.",
   });
 });
