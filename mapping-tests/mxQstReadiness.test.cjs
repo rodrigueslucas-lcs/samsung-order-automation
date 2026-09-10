@@ -26,15 +26,16 @@ test("PreQA live runner implementation is discovered independently from runtime 
   assert.equal(filter.nextAction, "INVESTIGATE_LIVE_FAIL");
 });
 
-test("readiness exposes coverage drift instead of confusing it with missing implementation", () => {
+test("implemented cases are no longer confused with missing automation", () => {
   const report = buildMxQstReadiness();
   const mobile = report.cases.find((item) => item.id === "SAM-25016");
   assert.equal(mobile.implemented, true);
-  assert.equal(mobile.coverage, "missing");
-  assert.equal(mobile.coverageDrift, true);
+  assert.equal(mobile.coverage, "partial");
+  assert.equal(mobile.coverageDrift, false);
 
   const filter = report.cases.find((item) => item.id === "SAM-24968");
   assert.equal(filter.implemented, true);
-  assert.equal(filter.coverage, "missing");
-  assert.equal(filter.coverageDrift, true);
+  assert.equal(filter.coverage, "partial");
+  assert.equal(filter.coverageDrift, false);
+  assert.equal(report.summary.coverageDrift, 0);
 });

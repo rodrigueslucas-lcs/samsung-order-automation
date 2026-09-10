@@ -53,10 +53,10 @@ test("campaign plan consumes official live results instead of reclassifying them
   assert.equal(current.executionStatus, "PASS");
 });
 
-test("MX plan prioritizes safe Missing and quick Partial before EPP/guarded work", () => {
+test("MX plan prioritizes safe automation work before EPP/guarded work", () => {
   const plan = getPreqa2CampaignPlan("MX", { sourceLedger: emptyLedger() });
   const byId = Object.fromEntries(plan.cases.map((entry) => [entry.id, entry]));
-  assert.equal(byId["SAM-24968"].baseline, "missing");
+  assert.equal(byId["SAM-24968"].baseline, "partial");
   assert.equal(byId["SAM-24968"].safety, "safe-candidate");
   assert.ok(byId["SAM-24968"].priority < byId["SAM-25020"].priority);
   assert.ok(byId["SAM-24963"].priority < byId["SAM-25045"].priority);

@@ -4,9 +4,9 @@
   "source": "test-mapping/mx-qst-coverage.json",
   "policy": "Expected-result-first. This file is an implementation plan only; coverage remains partial until the official Expected Result is proven in the intended store/business path.",
   "summary": {
-    "partialTotal": 14,
-    "quickAssertion": 4,
-    "existingFlowExtension": 2,
+    "partialTotal": 16,
+    "quickAssertion": 5,
+    "existingFlowExtension": 3,
     "newBusinessFlow": 4,
     "eppContext": 4
   },
@@ -31,6 +31,11 @@
         "id": "SAM-24989",
         "title": "Order Summary on checkout page",
         "reason": "The guest checkout already reaches Payment and now validates positive subtotal/total price details. Remaining work is live verification and any source-supported detail still not observed."
+      },
+      {
+        "id": "SAM-25016",
+        "title": "Sticky checkout button on mobile",
+        "reason": "The dedicated mobile test passed in S1 and proves the sticky cart CTA. Add an explicit checkout-page sticky assertion only if the updated official Expected Result requires both surfaces."
       }
     ],
     "existingFlowExtension": [
@@ -43,6 +48,11 @@
         "id": "SAM-25011",
         "title": "Backoffice",
         "reason": "Exact order search/open is proven. Product search and basic/advanced search coverage should extend the existing BackOffice page object rather than create a separate architecture."
+      },
+      {
+        "id": "SAM-24968",
+        "title": "Facets/Filter",
+        "reason": "The PreQA2 runner implements real facet selection and observable result comparison. Investigate the live FAIL; do not misclassify it as missing automation."
       }
     ],
     "newBusinessFlow": [
@@ -94,7 +104,9 @@
     "SAM-24971",
     "SAM-24972",
     "SAM-24989",
+    "SAM-25016",
     "SAM-24963",
+    "SAM-24968",
     "SAM-24982",
     "SAM-25011",
     "SAM-24969",

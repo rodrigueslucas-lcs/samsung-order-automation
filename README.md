@@ -4,7 +4,7 @@ Playwright automation and QA campaign tooling for Samsung LATAM SMB eCommerce on
 
 The repository models the official Zephyr SMB scope across **Mexico, Chile, Colombia and Peru** and separates four concepts that must not be mixed:
 
-1. **Official business scope** — 144 Zephyr QST cases.
+1. **Historical execution scope** — the preserved 144-case Zephyr campaign.
 2. **Environment applicability** — which non-Production environment can legitimately execute the official flow.
 3. **Official runtime validation** — PASS/FAIL/BLOCKED/NOT_APPLICABLE/NOT_RUN from runtime evidence in the applicable environment.
 4. **Automation implementation coverage** — Full/Partial/Missing or reuse classifications, depending on the market.
@@ -13,7 +13,7 @@ Production is read-only. State-changing automation is restricted to explicitly a
 
 ## Official SMB scope
 
-The authoritative registry is `test-mapping/smb-qst.json`.
+`test-mapping/smb-qst.json` is the preserved 2026-09-02 execution campaign, not the new P1/P2 source of truth. The current official model is `test-mapping/official-smb-inventory.json`; it remains fail-closed until the updated four-market templates with Priority are available. See `docs/OFFICIAL_SMB_PRIORITY_MODEL.md`.
 
 | Market | Official TCs |
 |---|---:|
@@ -119,8 +119,11 @@ This is why the business architecture is broader than the current `tests/` and `
 ## Architecture at a glance
 
 ```text
-Official business scope
-  test-mapping/smb-qst.json                 144 official TCs
+Current official priority scope
+  test-mapping/official-smb-inventory.json  P1/P2 Base Store + EPP model
+
+Historical execution campaign
+  test-mapping/smb-qst.json                 preserved 144-case baseline
 
 Market metadata / automation mapping
   test-mapping/mx-qst-coverage.json         MX 37-case Full/Partial/Missing model
@@ -283,6 +286,7 @@ Do not resolve `preqa2-validation.json` with a blanket `ours` or `theirs` merge.
 - [Environment Validation Policy](docs/ENVIRONMENT_VALIDATION_POLICY.md)
 - [PreQA2 Validation Campaign](docs/PREQA2_VALIDATION_CAMPAIGN.md)
 - [PreQA2 Parallel Integration](docs/PREQA2_PARALLEL_INTEGRATION.md)
+- [Official SMB Priority Model](docs/OFFICIAL_SMB_PRIORITY_MODEL.md)
 - [Executive Report V3](docs/EXECUTIVE_REPORT_V3.md)
 - [PE DST Coverage](docs/COVERAGE_MATRIX.md)
 - [MX S1 DST Base Store Coverage](docs/DST_MX_BASE_STORE_COVERAGE_MATRIX.md)

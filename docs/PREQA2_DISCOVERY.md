@@ -48,7 +48,7 @@ This proves the complete bootstrap in the current session. It does not yet prove
 Observed MX evidence, without cart or account mutation:
 
 - Home exposes a semantic `banner`, `navigation` labelled `main navigation`, and footer content. The current `HomePage` constructor can reuse this target through configured `setupUrl`, `homeUrl`, and footer heading pattern; its PE defaults must not be used implicitly.
-- The linked smartphones category page opened at `/mx/smartphones/all-smartphones/`. After the PLP completed its delayed render, the real `Gama de productos` facet exposed a `Galaxy Z` checkbox. The checkbox became selected, but the visible result count remained `43 Resultado`; no changed product set was proven. `SAM-24968` therefore failed authoritative PreQA2 validation and remains Missing in automation coverage.
+- The linked smartphones category page opened at `/mx/smartphones/all-smartphones/`. After the PLP completed its delayed render, the real `Gama de productos` facet exposed a `Galaxy Z` checkbox. The checkbox became selected, but the visible result count remained `43 Resultado`; no changed product set was proven. `SAM-24968` therefore failed authoritative PreQA2 validation. Its automation coverage is Partial because the dedicated runner detected the live failure; it is not missing automation.
 
 The registered campaign established the callback pattern used by the current environment. Samsung Account sign-in first returned to the commerce callback page; opening a new `https://p6-pre-qa2.samsung.com/mx/` tab in the same authenticated persistent Chrome context then rendered the Samsung Account user. The Home account menu exposed the user name, `Mi cuenta`, `Mis pedidos`, `Wish List`, `Mis productos`, `Mis Cupones`, `Mis Rewards`, `Mis Suscripciones`, and `Cerrar sesión`. `Mi cuenta` opened `/mx/mypage/` on PreQA2 and rendered the account dashboard plus navigation for products, rewards, orders, wishlist, coupons, repairs, and subscriptions. This is authoritative PASS evidence for `SAM-24962` and `SAM-24963`; WMC authentication alone is still not accepted as storefront-account evidence.
 
@@ -60,12 +60,12 @@ The S1 MX `mxConfig.js` hard guard remains intentionally scoped to `stg.shop.sam
 
 ## Official MX candidates
 
-No coverage classification changed. The following remain candidates for authenticated DOM discovery:
+Coverage now distinguishes implemented Partial automation from missing automation. The following remain candidates for authenticated DOM discovery or completeness review:
 
 - `SAM-24964` — GNB menu: PASS in authoritative PreQA2; implemented by the CDP live-validation runner.
-- `SAM-24968` — Base Store PLP facets/filter: Missing.
+- `SAM-24968` — Base Store PLP facets/filter: Partial; implemented runner, authoritative PreQA2 FAIL under investigation.
 - `SAM-25001` — Base Store Back to Top: Missing.
-- `SAM-25016` — mobile sticky checkout: Missing.
+- `SAM-25016` — mobile sticky checkout: Partial; cart sticky behavior passed live in S1, checkout-surface completeness remains under review.
 - `SAM-25020` — EPP facets/filter: Missing; requires a real EPP context.
 - `SAM-24971` — Cart page UI: Partial.
 - `SAM-24989` — Order Summary: Partial.

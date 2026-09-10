@@ -1,5 +1,6 @@
 const smbMapping = require("../test-mapping/smb-qst.json");
 const mxCoverage = require("../test-mapping/mx-qst-coverage.json");
+const { collectMarketImplementation } = require("./qstS1Implementation");
 
 const COVERAGE_STATES = Object.freeze(["full", "partial", "missing"]);
 const STORES = Object.freeze(["BS", "EPP"]);
@@ -35,6 +36,7 @@ function validateMxQstCoverage() {
   if (extraIds.length) errors.push(`MX coverage extra IDs: ${extraIds.join(", ")}`);
 
   const counts = { full: 0, partial: 0, missing: 0 };
+  const implementedIds = new Set(collectMarketImplementation("MX").map(({ id }) => id));
   for (const id of officialIds) {
     const current = coverageCases[id];
     if (!current) continue;
@@ -55,6 +57,10 @@ function validateMxQstCoverage() {
     }
 
     counts[current.coverage] += 1;
+
+    if (current.coverage === "missing" && implementedIds.has(id) && !current.coverageException) {
+      errors.push(`${id}: dedicated implementation exists but coverage is missing; classify it partial/full or document coverageException`);
+    }
 
     if (current.coverage !== "missing") {
       if (!current.spec || !current.test) {

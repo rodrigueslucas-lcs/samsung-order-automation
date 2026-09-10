@@ -1,0 +1,24 @@
+{
+  "$schemaVersion": 1,
+  "authority": "Updated Samsung Confluence market templates with Priority column",
+  "scopeRule": {
+    "P1": { "qstIncluded": true, "dstIncluded": true },
+    "P2": { "qstIncluded": false, "dstIncluded": true }
+  },
+  "sourceStatus": "BLOCKED_MISSING_UPDATED_EXPORTS",
+  "sourceBlocker": "The working context contains the legacy 144-case workbooks and execution CSV exports, but no updated MX/PE/CL/CO template export with a Priority column. Priority and current-template totals must not be inferred from the legacy campaign.",
+  "historicalInventories": [
+    {
+      "path": "test-mapping/smb-qst.json",
+      "kind": "LEGACY_EXECUTION_CAMPAIGN",
+      "total": 144,
+      "note": "Preserved for ID and runtime-evidence traceability. It is not the current P1/P2 source of truth."
+    }
+  ],
+  "markets": {
+    "MX": { "contexts": { "BASE_STORE": { "source": null, "rows": [] }, "EPP": { "source": null, "rows": [] } } },
+    "PE": { "contexts": { "BASE_STORE": { "source": null, "rows": [] }, "EPP": { "source": null, "rows": [] } } },
+    "CL": { "contexts": { "BASE_STORE": { "source": null, "rows": [] }, "EPP": { "source": null, "rows": [] } } },
+    "CO": { "contexts": { "BASE_STORE": { "source": null, "rows": [] }, "EPP": { "source": null, "rows": [] } } }
+  }
+}
