@@ -31,10 +31,8 @@ test("SAM-24971 @qst @mx @base-store @safe - Cart page UI", async ({ page, mxCon
   expect(summary.total).toBeTruthy();
   await validateMxExternalServicesPresentation(page);
 
-  const footer = page.getByRole("contentinfo");
-  await footer.scrollIntoViewIfNeeded();
-  await expect(footer).toBeVisible({ timeout: 30000 });
-  await expect(footer.getByText(/Tipos de pago disponibles/i).first()).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole("heading", { name: "Tipos de pago disponibles", level: 2 })).toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole("contentinfo")).toBeVisible({ timeout: 30000 });
 });
 
 test("SAM-24972 @qst @mx @base-store @safe - Increase decrease and delete cart quantity", async ({ page, mxConfig }, testInfo) => {
