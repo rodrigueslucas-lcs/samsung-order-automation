@@ -91,10 +91,13 @@ export async function validateMxCheckoutSummaryPresentation(page) {
   await expect(summaryHeading).toBeVisible({ timeout: 30000 });
   await expect(totalHeading).toBeVisible({ timeout: 30000 });
 
-  const summaryBlock = summaryHeading.locator("..");
-  const totalBlock = totalHeading.locator("..");
+  const summaryBlock = summaryHeading.locator(
+    "xpath=ancestor::*[.//*[normalize-space()='Subtotal'] and .//*[normalize-space()='IVA']][1]"
+  );
+  await expect(summaryBlock).toBeVisible({ timeout: 30000 });
+
   const summaryText = await summaryBlock.innerText();
-  const totalText = await totalBlock.innerText();
+  const totalText = await totalHeading.locator("..").innerText();
 
   expect(summaryText).toMatch(/Subtotal/i);
   expect(summaryText).toMatch(/\bIVA\b/i);
