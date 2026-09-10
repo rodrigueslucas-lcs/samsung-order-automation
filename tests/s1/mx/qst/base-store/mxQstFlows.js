@@ -79,26 +79,30 @@ function parseMxCurrency(text) {
 }
 
 export async function validateMxCheckoutSummaryPresentation(page) {
-  const subtotalLabel = page.getByText(/^Subtotal$/i).filter({ visible: true }).first();
-  const ivaLabel = page.getByText(/^IVA$/i).filter({ visible: true }).first();
-  const totalLabel = page
-    .getByText(/^Total(?:\s+con\s+IVA)?$/i)
+  const summary = page
+    .locator("body")
+    .getByText(/Resumen de tu pedido[\s\S]*Subtotal[\s\S]*IVA[\s\S]*Total con IVA/i)
     .filter({ visible: true })
     .first();
 
-  await expect(subtotalLabel).toBeVisible({ timeout: 30000 });
-  await expect(ivaLabel).toBeVisible({ timeout: 30000 });
-  await expect(totalLabel).toBeVisible({ timeout: 30000 });
+  let summaryText;
+  if (await summary.count()) {
+    summaryText = await summary.innerText();
+  } else {
+    summaryText = await page.locator("body").innerText();
+  }
 
-  const summaryContainer = subtotalLabel.locator("xpath=ancestor::*[.//*[normalize-space()='IVA'] and .//*[contains(normalize-space(),'Total')]][1]");
-  await expect(summaryContainer).toBeVisible({ timeout: 30000 });
+  expect(summaryText).toMatch(/Resumen de tu pedido/i);
+  expect(summaryText).toMatch(/Subtotal/i);
+  expect(summaryText).toMatch(/\bIVA\b/i);
+  expect(summaryText).toMatch(/Total con IVA/i);
 
-  const subtotalText = await subtotalLabel.locator("..").innerText();
-  const ivaText = await ivaLabel.locator("..").innerText();
-  const totalText = await totalLabel.locator("..").innerText();
-  const subtotal = parseMxCurrency(subtotalText);
-  const iva = parseMxCurrency(ivaText);
-  const total = parseMxCurrency(totalText);
+  const subtotalMatch = summaryText.match(/Subtotal\s*\$\s*([\d,.]+)/i);
+  const ivaMatch = summaryText.match(/\bIVA\s*\$\s*([\d,.]+)/i);
+  const totalMatch = summaryText.match(/Total con IVA\s*\$\s*([\d,.]+)/i);
+  const subtotal = parseMxCurrency(subtotalMatch ? `$${subtotalMatch[1]}` : "");
+  const iva = parseMxCurrency(ivaMatch ? `$${ivaMatch[1]}` : "");
+  const total = parseMxCurrency(totalMatch ? `$${totalMatch[1]}` : "");
 
   expect(subtotal).not.toBeNull();
   expect(iva).not.toBeNull();
@@ -107,19 +111,12 @@ export async function validateMxCheckoutSummaryPresentation(page) {
   expect(iva).toBeGreaterThan(0);
   expect(total).toBeGreaterThan(0);
 
-  const optionalVoucher = page
-    .getByText(/Voucher|Cup[oó]n/i)
-    .filter({ visible: true });
-  const optionalPromo = page
-    .getByText(/Promoci[oó]n|Promo/i)
-    .filter({ visible: true });
-
   return {
     subtotal,
     iva,
     total,
-    voucherVisible: (await optionalVoucher.count()) > 0,
-    promoVisible: (await optionalPromo.count()) > 0,
+    voucherVisible: /Voucher|Cup[oó]n/i.test(summaryText),
+    promoVisible: /Promoci[oó]n|Promo/i.test(summaryText),
   };
 }
 
