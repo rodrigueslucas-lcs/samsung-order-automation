@@ -59,7 +59,7 @@ test("MX plan prioritizes safe automation work before EPP/guarded work", () => {
   assert.equal(byId["SAM-24968"].baseline, "partial");
   assert.equal(byId["SAM-24968"].safety, "safe-candidate");
   assert.ok(byId["SAM-24968"].priority < byId["SAM-25020"].priority);
-  assert.ok(byId["SAM-24963"].priority < byId["SAM-25045"].priority);
+  assert.ok(byId["SAM-24971"].priority < byId["SAM-25045"].priority);
   assert.equal(byId["SAM-25045"].store, "EPP");
 });
 

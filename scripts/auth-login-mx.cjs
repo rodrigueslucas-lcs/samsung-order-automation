@@ -13,6 +13,7 @@ const authFile = path.join(authDir, "mx-s1-user.json");
 const sessionStorageFile = path.join(authDir, "mx-s1-session-storage.json");
 const devToolsActivePortFile = path.join(profileDir, "DevToolsActivePort");
 const interactiveTimeout = Number(process.env.MX_AUTH_INTERACTIVE_TIMEOUT_MS || 600000);
+const manualLogin = process.env.MX_AUTH_MANUAL === "1";
 
 function requiredRuntimeSecret(name) {
   const value = process.env[name]?.trim();
@@ -161,8 +162,8 @@ async function exportAuthenticatedState(context, page) {
 }
 
 async function loginMxSamsungAccount() {
-  const email = requiredRuntimeSecret("MX_SAMSUNG_EMAIL");
-  const password = requiredRuntimeSecret("MX_SAMSUNG_PASSWORD");
+  const email = manualLogin ? null : requiredRuntimeSecret("MX_SAMSUNG_EMAIL");
+  const password = manualLogin ? null : requiredRuntimeSecret("MX_SAMSUNG_PASSWORD");
   const browser = await connectDedicatedChrome();
   const context = browser.contexts()[0];
   if (!context) throw new Error("Dedicated MX Chrome did not expose a browser context.");
@@ -185,21 +186,34 @@ async function loginMxSamsungAccount() {
       await page.waitForURL((url) => url.hostname === ACCOUNT_HOSTNAME, { timeout: 60000 });
       assertAllowedHost(page, [ACCOUNT_HOSTNAME], "Samsung Account login");
 
-      const emailInput = page.getByRole("textbox", { name: /Direcci[oó]n de correo/i }).first();
-      await emailInput.click();
-      await emailInput.pressSequentially(email, { delay: 35 });
-      await emailInput.press("Tab");
-      await page.getByRole("button", { name: /^Siguiente$/i }).click();
-      console.log("[auth:login:mx] Samsung Account email step completed");
+      if (manualLogin) {
+        console.log("[auth:login:mx] Samsung Account login is ready in the visible Chrome. Complete login/CAPTCHA/MFA manually; automation will resume after the authenticated MX S1 return.");
+        const returnedPage = await Promise.race([
+          page.waitForURL((url) => url.hostname === HOSTNAME, { timeout: interactiveTimeout }).then(() => page),
+          context.waitForEvent("page", { timeout: interactiveTimeout }).then(async (candidate) => {
+            await candidate.waitForURL((url) => url.hostname === HOSTNAME, { timeout: interactiveTimeout });
+            return candidate;
+          }),
+        ]);
+        page = returnedPage;
+      } else {
 
-      const passwordInput = page.locator('input[type="password"]').first();
-      await passwordInput.waitFor({ state: "visible", timeout: 60000 });
-      await passwordInput.click();
-      await passwordInput.pressSequentially(password, { delay: 35 });
-      await passwordInput.press("Tab");
-      await page.getByRole("button", { name: /^Iniciar sesi[oó]n$/i }).click();
-      console.log("[auth:login:mx] Samsung Account password step completed");
-      await waitForStorefrontOrVerification(page);
+        const emailInput = page.getByRole("textbox", { name: /Direcci[oó]n de correo/i }).first();
+        await emailInput.click();
+        await emailInput.pressSequentially(email, { delay: 35 });
+        await emailInput.press("Tab");
+        await page.getByRole("button", { name: /^Siguiente$/i }).click();
+        console.log("[auth:login:mx] Samsung Account email step completed");
+
+        const passwordInput = page.locator('input[type="password"]').first();
+        await passwordInput.waitFor({ state: "visible", timeout: 60000 });
+        await passwordInput.click();
+        await passwordInput.pressSequentially(password, { delay: 35 });
+        await passwordInput.press("Tab");
+        await page.getByRole("button", { name: /^Iniciar sesi[oó]n$/i }).click();
+        console.log("[auth:login:mx] Samsung Account password step completed");
+        await waitForStorefrontOrVerification(page);
+      }
     }
 
     console.log("[auth:login:mx] validating authenticated storefront after return");

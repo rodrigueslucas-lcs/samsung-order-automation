@@ -26,8 +26,11 @@ async function main() {
   });
   let authenticatedPage = null;
   for (const candidate of preqaPages) {
-    if (new URL(candidate.url()).pathname === `/${MARKET}/` &&
-        await candidate.getByText(/Cerrar sesi[oó]n/i).first().isVisible().catch(() => false)) {
+    const url = new URL(candidate.url());
+    if (!url.pathname.startsWith(`/${MARKET}/`)) continue;
+
+    const bodyText = await candidate.locator("body").innerText().catch(() => "");
+    if (!/Please login through WMC/i.test(bodyText)) {
       authenticatedPage = candidate;
       break;
     }
@@ -63,8 +66,13 @@ async function main() {
     "Cerrar sesión",
   ];
   for (const option of expectedAccountOptions) {
-    await page.locator('a[role="menuitem"]', { hasText: new RegExp(`^${option.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") }).first().waitFor({
-      state: "attached",
+    const item = page
+      .getByText(option, { exact: true })
+      .filter({ visible: true })
+      .first();
+
+    await item.waitFor({
+      state: "visible",
       timeout: 30000,
     });
   }
@@ -135,44 +143,108 @@ async function main() {
   });
 
   requirePreqa(page);
+
+  // SAM-24968 must start from a clean, unfiltered PLP.
+  await page.goto(
+    `https://${PREQA2_HOST}/${MARKET}/smartphones/all-smartphones/`,
+    { waitUntil: "domcontentloaded", timeout: 60000 }
+  );
+  requirePreqa(page);
+  await page.waitForURL((url) =>
+    url.hostname === PREQA2_HOST &&
+    url.pathname === `/${MARKET}/smartphones/all-smartphones/` &&
+    url.search === "",
+  { timeout: 60000 });
+
   const filtersHeading = page.getByRole("heading", { name: /^Filtros(?:\s*\(\d+\))?$/i });
   await filtersHeading.waitFor({ state: "visible", timeout: 60000 });
   const productRangeFilter = page.getByRole("button", { name: /^Gama de productos$/i });
   await productRangeFilter.waitFor({ state: "visible", timeout: 60000 });
-  const resultCount = page.getByText(/\d+\s+Resultado/i).first();
-  await resultCount.waitFor({ state: "visible", timeout: 60000 });
-  const beforeFilterCount = await resultCount.innerText();
   const productLinks = page.locator('a[href*="/smartphones/"][href*="/buy/"]:visible');
+
+  const resultCount = page
+    .getByText(/^\d+\s+Resultado(?:s)?$/i)
+    .filter({ visible: true })
+    .first();
+
+  await resultCount.waitFor({ state: "visible", timeout: 60000 });
+
+  const beforeFilterText = await resultCount.innerText();
+  const beforeFilterCount = Number(beforeFilterText.match(/\d+/)?.[0]);
+
+  assert.ok(
+    Number.isFinite(beforeFilterCount),
+    `SAM-24968 could not read the unfiltered result count from "${beforeFilterText}"`
+  );
+
+  await productRangeFilter.click();
+
+  const galaxyZ = page.getByRole("checkbox", { name: /^Galaxy Z$/i });
+  await galaxyZ.waitFor({ state: "visible", timeout: 30000 });
+
+  assert.equal(
+    await galaxyZ.isChecked(),
+    false,
+    "SAM-24968 must start with Galaxy Z unselected"
+  );
+
   const beforeProductHrefs = await productLinks.evaluateAll((links) =>
     [...new Set(links.map((link) => link.href))].sort()
   );
-  await productRangeFilter.click();
-  const galaxyZ = page.getByRole("checkbox", { name: /^Galaxy Z$/i });
-  await galaxyZ.waitFor({ state: "visible", timeout: 30000 });
-  await galaxyZ.check();
+
+  await Promise.all([
+    page.waitForURL(
+      (url) =>
+        url.hostname === PREQA2_HOST &&
+        url.search.toLowerCase().includes("galaxy-z"),
+      { timeout: 60000 }
+    ),
+    galaxyZ.check(),
+  ]);
+
   await page.waitForFunction(
-    ({ previousCount, previousHrefs }) => {
-      const current = [...document.querySelectorAll("body *")]
-        .find((element) => /^\d+\s+Resultado(?:s)?$/i.test(element.textContent?.trim() || ""));
-      const selected = [...document.querySelectorAll(".pd21-filter__selected-item")]
-        .some((element) => /^Galaxy Z$/i.test(element.textContent?.trim() || ""));
-      const currentHrefs = [...new Set([...document.querySelectorAll('a[href*="/smartphones/"][href*="/buy/"]')]
-        .filter((link) => link.getClientRects().length > 0)
-        .map((link) => link.href))].sort();
-      return selected && (
-        current?.textContent?.trim() !== previousCount ||
-        JSON.stringify(currentHrefs) !== JSON.stringify(previousHrefs)
-      );
+    ({ previousCount }) => {
+      const candidates = [...document.querySelectorAll("body *")];
+
+      return candidates.some((element) => {
+        if (element.getClientRects().length === 0) return false;
+
+        const text = element.textContent?.trim() || "";
+        const match = text.match(/^(\d+)\s+Resultado(?:s)?$/i);
+
+        return match && Number(match[1]) !== previousCount;
+      });
     },
-    { previousCount: beforeFilterCount, previousHrefs: beforeProductHrefs },
+    { previousCount: beforeFilterCount },
     { timeout: 60000 }
-  ).catch(() => {});
-  const afterFilterCount = await resultCount.innerText();
+  );
+
+  const afterFilterText = await resultCount.innerText();
+  const afterFilterCount = Number(afterFilterText.match(/\d+/)?.[0]);
+
+  assert.ok(
+    Number.isFinite(afterFilterCount),
+    `SAM-24968 could not read the filtered result count from "${afterFilterText}"`
+  );
+
+  const galaxyZAfterRender = page.getByRole("checkbox", { name: /^Galaxy Z$/i });
+  await galaxyZAfterRender.waitFor({ state: "visible", timeout: 60000 });
+  assert.equal(await galaxyZAfterRender.isChecked(), true, "Galaxy Z checkbox did not remain selected after PLP update");
+  await page.waitForFunction(() => [...document.querySelectorAll("body *")].some((element) =>
+    element.getClientRects().length > 0 &&
+    /^Galaxy Z$/i.test(element.textContent?.trim() || "") &&
+    !element.closest("label")
+  ), undefined, { timeout: 60000 });
+
   const afterProductHrefs = await productLinks.evaluateAll((links) =>
     [...new Set(links.map((link) => link.href))].sort()
   );
-  const filterPassed = beforeFilterCount !== afterFilterCount ||
-    JSON.stringify(beforeProductHrefs) !== JSON.stringify(afterProductHrefs);
+
+  const filterPassed =
+    await galaxyZAfterRender.isChecked() &&
+    page.url().includes("galaxy-z") &&
+    afterFilterCount < beforeFilterCount;
+
   evidence.push({
     market: MARKET.toUpperCase(),
     officialTcId: "SAM-24968",

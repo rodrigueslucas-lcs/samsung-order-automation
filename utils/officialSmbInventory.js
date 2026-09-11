@@ -1,4 +1,6 @@
-const inventory = require("../test-mapping/official-smb-inventory.json");
+const inventoryMetadata = require("../test-mapping/official-smb-inventory.json");
+const { loadOfficialTemplates } = require("./officialTemplateParser");
+const { attachKnownEvidence } = require("./officialRowEvidence");
 
 const MARKETS = Object.freeze(["MX", "PE", "CL", "CO"]);
 const CONTEXTS = Object.freeze(["BASE_STORE", "EPP"]);
@@ -28,7 +30,23 @@ function nextAction(row) {
   return "RUN_IN_TARGET_ENVIRONMENT";
 }
 
-function validateOfficialInventory(source = inventory, { requireSources = false } = {}) {
+function loadOfficialInventory() {
+  const templates = loadOfficialTemplates();
+  const markets = {};
+  for (const market of MARKETS) {
+    const expected = inventoryMetadata.markets[market].expectedRows;
+    const parsed = templates[market];
+    markets[market] = { contexts: {} };
+    for (const context of CONTEXTS) {
+      const rows = parsed.contexts[context].map((row) => attachKnownEvidence(market, context, row));
+      if (rows.length !== expected[context]) throw new Error(`${market}/${context}: expected ${expected[context]} source rows, parsed ${rows.length}`);
+      markets[market].contexts[context] = { source: { file: parsed.sourceFilename, rowCount: expected[context] }, rows };
+    }
+  }
+  return { ...inventoryMetadata, markets };
+}
+
+function validateOfficialInventory(source = loadOfficialInventory(), { requireSources = false } = {}) {
   const errors = [];
   const seen = new Set();
   let representedRows = 0;
@@ -61,9 +79,9 @@ function validateOfficialInventory(source = inventory, { requireSources = false 
         if (seen.has(key)) errors.push(`${location}: duplicate official identity ${key}`);
         seen.add(key);
         if (!String(row.scenario || "").trim()) errors.push(`${location}: scenario is required`);
-        if (!String(row.expectedResult || "").trim()) errors.push(`${location}: expectedResult is required`);
         if (!PRIORITIES.includes(row.priority)) errors.push(`${location}: invalid priority ${row.priority || "<missing>"}`);
         if (row.coverage && !COVERAGE.includes(row.coverage)) errors.push(`${location}: invalid coverage ${row.coverage}`);
+        if (row.implemented && (row.coverage || "missing") === "missing" && !String(row.coverageException || "").trim()) errors.push(`${location}: implemented=true with missing coverage requires coverageException`);
         if (row.runtime?.status && !RUNTIME.includes(row.runtime.status)) errors.push(`${location}: invalid runtime status ${row.runtime.status}`);
         if (PRIORITIES.includes(row.priority)) {
           const derived = cycleScope(row.priority);
@@ -78,16 +96,16 @@ function validateOfficialInventory(source = inventory, { requireSources = false 
   return { representedRows, sourceStatus: source.sourceStatus };
 }
 
-function buildCycleReport(source = inventory) {
+function buildCycleReport(source = loadOfficialInventory()) {
   validateOfficialInventory(source);
   const report = { sourceStatus: source.sourceStatus, blocker: source.sourceBlocker || null, markets: {}, aggregate: null };
-  const aggregate = { official: 0, p1: 0, p2: 0, qst: 0, dst: 0, full: 0, partial: 0, missing: 0, implemented: 0, notImplemented: 0, runtimePass: 0, runtimeFail: 0, blocked: 0, notRun: 0 };
+  const aggregate = { official: 0, p1: 0, p2: 0, qst: 0, dst: 0, full: 0, partial: 0, missing: 0, implemented: 0, notImplemented: 0, runtimePass: 0, runtimeFail: 0, blocked: 0, notApplicable: 0, notRun: 0, pendingStaging: 0, pendingEpp: 0 };
 
   for (const market of MARKETS) {
     report.markets[market] = {};
     for (const context of CONTEXTS) {
       const rows = source.markets[market].contexts[context].rows;
-      const metrics = { official: rows.length, p1: 0, p2: 0, qst: 0, dst: 0, full: 0, partial: 0, missing: 0, implemented: 0, notImplemented: 0, runtimePass: 0, runtimeFail: 0, blocked: 0, notRun: 0 };
+      const metrics = { official: rows.length, p1: 0, p2: 0, qst: 0, dst: 0, full: 0, partial: 0, missing: 0, implemented: 0, notImplemented: 0, runtimePass: 0, runtimeFail: 0, blocked: 0, notApplicable: 0, notRun: 0, pendingStaging: 0, pendingEpp: 0 };
       for (const row of rows) {
         const scope = cycleScope(row.priority);
         metrics[row.priority.toLowerCase()] += 1;
@@ -100,7 +118,10 @@ function buildCycleReport(source = inventory) {
           if (status === "PASS") metrics.runtimePass += 1;
           else if (status === "FAIL") metrics.runtimeFail += 1;
           else if (status === "BLOCKED") metrics.blocked += 1;
+          else if (status === "NOT_APPLICABLE") metrics.notApplicable += 1;
           else if (status === "NOT_RUN") metrics.notRun += 1;
+          if (row.environmentRequired === "STAGING" && status !== "PASS") metrics.pendingStaging += 1;
+          if (row.environmentRequired === "EPP_CONTEXT" && status !== "PASS") metrics.pendingEpp += 1;
         }
       }
       report.markets[market][context] = {
@@ -124,4 +145,15 @@ function buildCycleReport(source = inventory) {
   return report;
 }
 
-module.exports = { MARKETS, CONTEXTS, PRIORITIES, cycleScope, nextAction, validateOfficialInventory, buildCycleReport };
+function buildReuseReport(source = loadOfficialInventory()) {
+  validateOfficialInventory(source);
+  const groups = new Map();
+  for (const market of MARKETS) for (const context of CONTEXTS) for (const row of source.markets[market].contexts[context].rows) {
+    const key = row.scenario.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/<br>/g, " ").replace(/[^a-z0-9+]+/gi, " ").trim().toLowerCase();
+    if (!groups.has(key)) groups.set(key, { scenario: row.scenario, occurrences: [] });
+    groups.get(key).occurrences.push({ market, context, sourceRowKey: row.sourceRowKey, priority: row.priority, qstIncluded: row.qstIncluded });
+  }
+  return [...groups.values()].filter((group) => new Set(group.occurrences.map(({ market }) => market)).size > 1).sort((a, b) => b.occurrences.length - a.occurrences.length || a.scenario.localeCompare(b.scenario));
+}
+
+module.exports = { MARKETS, CONTEXTS, PRIORITIES, cycleScope, nextAction, loadOfficialInventory, validateOfficialInventory, buildCycleReport, buildReuseReport };

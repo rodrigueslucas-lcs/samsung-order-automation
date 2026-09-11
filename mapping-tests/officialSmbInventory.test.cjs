@@ -1,6 +1,6 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const { cycleScope, nextAction, validateOfficialInventory, buildCycleReport } = require("../utils/officialSmbInventory");
+const { cycleScope, nextAction, validateOfficialInventory, buildCycleReport, buildReuseReport } = require("../utils/officialSmbInventory");
 
 function fixture(rows = []) {
   return {
@@ -24,6 +24,7 @@ test("official inventory rejects invalid scope, priority and duplicate identity"
   assert.throws(() => validateOfficialInventory(fixture([{ ...p1, qstIncluded: false }])), /contradicts P1/);
   assert.throws(() => validateOfficialInventory(fixture([{ ...p1, priority: "P3" }])), /invalid priority/);
   assert.throws(() => validateOfficialInventory(fixture([p1, { ...p1, sourceRowKey: "other" }])), /duplicate official identity/);
+  assert.throws(() => validateOfficialInventory(fixture([{ ...p1, coverage: "missing" }])), /requires coverageException/);
 });
 
 test("QST denominator is P1 and DST denominator is P1 plus P2", () => {
@@ -32,7 +33,7 @@ test("QST denominator is P1 and DST denominator is P1 plus P2", () => {
   assert.deepEqual(metrics, {
     official: 2, p1: 1, p2: 1, qst: 1, dst: 2,
     full: 1, partial: 0, missing: 0, implemented: 1, notImplemented: 0,
-    runtimePass: 1, runtimeFail: 0, blocked: 0, notRun: 0,
+    runtimePass: 1, runtimeFail: 0, blocked: 0, notApplicable: 0, notRun: 0, pendingStaging: 0, pendingEpp: 0,
   });
   assert.equal(cases[0].nextAction, "LIVE_PROVEN");
 });
@@ -58,9 +59,31 @@ test("readiness actions keep coverage and runtime as separate dimensions", () =>
   assert.equal(nextAction({ implemented: true, coverage: "partial", environmentRequired: "EPP_CONTEXT" }), "RUN_IN_EPP_CONTEXT");
 });
 
-test("repository scaffold validates but refuses to imply imported source completeness", () => {
+test("repository imports every authoritative source row", () => {
   const result = validateOfficialInventory();
-  assert.equal(result.representedRows, 0);
-  assert.equal(result.sourceStatus, "BLOCKED_MISSING_UPDATED_EXPORTS");
-  assert.throws(() => validateOfficialInventory(undefined, { requireSources: true }), /official source is missing/);
+  assert.equal(result.representedRows, 362);
+  assert.equal(result.sourceStatus, "READY");
+  assert.equal(validateOfficialInventory(undefined, { requireSources: true }).representedRows, 362);
+});
+
+test("official totals and cycle invariants match every source table", () => {
+  const report = buildCycleReport();
+  assert.deepEqual(Object.fromEntries(Object.entries(report.markets).map(([market, contexts]) => [market, {
+    BASE_STORE: [contexts.BASE_STORE.official, contexts.BASE_STORE.p1, contexts.BASE_STORE.p2],
+    EPP: [contexts.EPP.official, contexts.EPP.p1, contexts.EPP.p2],
+  }])), {
+    MX: { BASE_STORE: [56, 30, 26], EPP: [36, 8, 28] }, PE: { BASE_STORE: [55, 28, 27], EPP: [37, 6, 31] },
+    CL: { BASE_STORE: [53, 31, 22], EPP: [36, 7, 29] }, CO: { BASE_STORE: [54, 28, 26], EPP: [35, 6, 29] },
+  });
+  assert.equal(report.aggregate.qst, report.aggregate.p1);
+  assert.equal(report.aggregate.dst, report.aggregate.p1 + report.aggregate.p2);
+  assert.equal(report.aggregate.official, 362);
+});
+
+test("cross-market reuse retains priority and context per occurrence", () => {
+  const groups = buildReuseReport();
+  const facets = groups.find(({ scenario }) => scenario.includes("Facets are displayed"));
+  assert.ok(facets);
+  assert.equal(new Set(facets.occurrences.map(({ market }) => market)).size, 4);
+  assert.ok(facets.occurrences.every(({ context, priority, qstIncluded }) => ["BASE_STORE", "EPP"].includes(context) && qstIncluded === (priority === "P1")));
 });

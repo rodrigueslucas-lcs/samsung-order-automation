@@ -263,9 +263,38 @@ export default class CartPage extends BasePage {
     await this.continueButton.waitFor({ state: 'visible', timeout: 30000 });
     await this.continueButton.scrollIntoViewIfNeeded();
 
+    const cartReminder = this.page.locator(
+      '[class*="ins-custom-cart-reminder-container"]'
+    );
+
+    const dismissCartReminder = async () => {
+      if (!(await cartReminder.isVisible().catch(() => false))) {
+        return false;
+      }
+
+      const closeReminder = cartReminder.getByText(/^x$/i).first();
+
+      await closeReminder.click();
+      await cartReminder.waitFor({ state: 'hidden', timeout: 10000 });
+
+      return true;
+    };
+
+    await dismissCartReminder();
+
     await this.screenshot('02-before-cart-continue');
 
-    await this.continueButton.click();
+    try {
+      await this.continueButton.click({ timeout: 5000 });
+    } catch (error) {
+      const reminderWasDismissed = await dismissCartReminder();
+
+      if (!reminderWasDismissed) {
+        throw error;
+      }
+
+      await this.continueButton.click();
+    }
 
     const guestEmailInput = this.page.getByPlaceholder(/ingresa tu correo/i);
 

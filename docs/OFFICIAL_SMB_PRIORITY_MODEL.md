@@ -9,14 +9,20 @@ Priority is market- and store-context-specific. Base Store and EPP are independe
 
 ## Source state
 
-The repository currently has the legacy 2026-09-02 Zephyr execution campaign with 144 IDs (MX 37, CL 38, CO 35, PE 34). It also has execution CSV exports and derived workbooks created on 2026-09-08. None of the available files contains the new authoritative Priority column or the larger current Base Store plus EPP inventories described in the updated Samsung templates.
+The four current Samsung Confluence Markdown exports in `docs/smb_priority_templates/` are authoritative for scenario wording and Priority. The importer validates every serial and keeps Base Store and EPP independent.
 
-For that reason, `test-mapping/official-smb-inventory.json` intentionally contains no inferred rows and reports `BLOCKED_MISSING_UPDATED_EXPORTS`. Zeroes printed while blocked mean no current official rows have been imported; they are not official scenario totals.
+| Market | Base Store (P1/P2) | EPP (P1/P2) | QST/P1 | DST |
+| --- | ---: | ---: | ---: | ---: |
+| MX | 56 (30/26) | 36 (8/28) | 38 | 92 |
+| PE | 55 (28/27) | 37 (6/31) | 34 | 92 |
+| CL | 53 (31/22) | 36 (7/29) | 38 | 89 |
+| CO | 54 (28/26) | 35 (6/29) | 34 | 89 |
+| **SMB** | **218 (117/101)** | **144 (27/117)** | **144** | **362** |
 
-The legacy IDs remain available through `test-mapping/smb-qst.json`, the execution ledger, and `npm run qst:reconcile:legacy:mx`. Every legacy ID is retained as unresolved against the missing current source rather than silently deleted or matched by title.
+The 2026-09-02 Zephyr campaign remains a historical 144-ID inventory (MX 37, CL 38, CO 35, PE 34). Its coincidental total equality with current P1 does not make it the current denominator. `npm run qst:reconcile:legacy:mx` preserves every historical ID and reports conservative match confidence against current source rows.
 
 ## Required source fields
 
-Each imported current-template row must retain a stable source row key, market, context, scenario, Expected Result, and P1/P2 priority. Samsung ID is optional only when the template row cannot be mapped confidently. Such rows remain represented by the source row key; an ID must never be manufactured.
+Each imported row retains a stable source row key, serial, market, context, exact scenario cell, source filename and P1/P2 priority. These source templates do not contain a separate Expected Result column, so no Expected Result is fabricated. Samsung ID is optional and is attached only where existing detailed repository metadata proves the relationship.
 
 Run `npm run qst:cycle:status` for readable output or `npm run qst:cycle:status:json` for dashboard/CI input. The report calculates QST only from P1 and DST from P1 plus P2. It will not use the legacy 144-case campaign as the new denominator.

@@ -1,0 +1,14 @@
+{
+  "environment": "S1/STG",
+  "market": "MX",
+  "results": {
+    "SAM-24971": { "status": "PASS", "evidence": "Preserved validated S1/STG runtime result from the legacy campaign." },
+    "SAM-24972": { "status": "PASS", "evidence": "Preserved validated S1/STG runtime result from the legacy campaign." },
+    "SAM-24981": { "status": "PASS", "evidence": "Preserved validated S1/STG runtime result from the legacy campaign." },
+    "SAM-24982": { "status": "PASS", "evidence": "Preserved validated S1/STG runtime result from the legacy campaign." },
+    "SAM-24988": { "status": "PASS", "evidence": "Preserved validated S1/STG runtime result from the legacy campaign." },
+    "SAM-24989": { "status": "PASS", "evidence": "Preserved validated S1/STG runtime result from the legacy campaign." },
+    "SAM-25011": { "status": "PASS", "evidence": "Preserved validated S1/STG runtime result from the legacy campaign." },
+    "SAM-25016": { "status": "PASS", "evidence": "Preserved validated S1/STG runtime result from the legacy campaign." }
+  }
+}

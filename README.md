@@ -13,9 +13,9 @@ Production is read-only. State-changing automation is restricted to explicitly a
 
 ## Official SMB scope
 
-`test-mapping/smb-qst.json` is the preserved 2026-09-02 execution campaign, not the new P1/P2 source of truth. The current official model is `test-mapping/official-smb-inventory.json`; it remains fail-closed until the updated four-market templates with Priority are available. See `docs/OFFICIAL_SMB_PRIORITY_MODEL.md`.
+`test-mapping/smb-qst.json` is the preserved 2026-09-02 execution campaign, not the current P1/P2 source of truth. The current official model imports the four authoritative Markdown templates in `docs/smb_priority_templates/` through `test-mapping/official-smb-inventory.json`. It contains 362 source rows: 144 P1/QST and 218 P2; all 362 belong to DST. See `docs/OFFICIAL_SMB_PRIORITY_MODEL.md`.
 
-| Market | Official TCs |
+| Market | Historical campaign IDs |
 |---|---:|
 | MX | 37 |
 | CL | 38 |
@@ -224,7 +224,7 @@ Profile writes and other state-changing flows remain separately guarded. Destruc
 
 The repository still contains substantial historical and operational DST/QST implementation under S1/S2/S3. Those assets remain useful and are now also relevant as execution targets for official flows that are not applicable in PreQA2.
 
-Do not compare old DST scenario totals directly with the 144 official SMB QST denominator; they represent different scopes.
+Do not compare old DST scenario totals directly with either the historical 144-ID campaign or the current 144-row P1/QST denominator; they represent different scopes. The current official DST denominator is 362 rows.
 
 ## Reporting
 
@@ -242,9 +242,12 @@ reporters/executive-v3/
 
 The reporting model must keep these dimensions separate:
 
-- Official SMB scope: **144**.
-- MX official scope: **37**.
-- CL official scope: **38**.
+- Current official SMB template scope: **362** (144 P1/QST; 218 P2; 362 DST).
+- Historical execution campaign: **144 IDs** (MX 37, CL 38, CO 35, PE 34), retained separately.
+- Current official MX scope: **92** rows (38 P1/QST).
+- Current official CL scope: **89** rows (38 P1/QST).
+- Current official CO scope: **89** rows (34 P1/QST).
+- Current official PE scope: **92** rows (34 P1/QST).
 - CO official scope: **35**.
 - PE official scope: **34**.
 - PreQA2 applicability/result.

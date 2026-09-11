@@ -1,6 +1,7 @@
 import { test as base, expect } from "@playwright/test";
 import mxConfigModule from "../../../../../utils/mxConfig";
 import mxAuthState from "../../../../../utils/mxAuthState";
+import mxStagingGuard from "../../../../../utils/mxStagingGuard";
 
 const { getMxConfig } = mxConfigModule;
 const {
@@ -9,6 +10,7 @@ const {
   hasAuthState,
   validateAuthenticatedSession,
 } = mxAuthState;
+const { assertMxStagingPage } = mxStagingGuard;
 
 export const test = base.extend({
   mxConfig: async ({}, use) => {
@@ -27,6 +29,7 @@ test.beforeEach(async ({ context, page }, testInfo) => {
   test.skip(!hasAuthState(), "Dedicated MX S1 authenticated state is required.");
   await applyAuthSessionStorage(context);
   await validateAuthenticatedSession(page);
+  await assertMxStagingPage(page, "MX authenticated fixture");
   await page.mouse.move(20, 500);
   await page.keyboard.press("Escape");
   await page
@@ -34,6 +37,11 @@ test.beforeEach(async ({ context, page }, testInfo) => {
     .filter({ hasText: /Cerrar Sesi[oó]n/i })
     .filter({ visible: true })
     .waitFor({ state: "hidden", timeout: 30000 });
+});
+
+test.afterEach(async ({ page }) => {
+  if (!hasAuthState() || page.url() === "about:blank") return;
+  await assertMxStagingPage(page, "MX authenticated final environment guard");
 });
 
 export { expect };

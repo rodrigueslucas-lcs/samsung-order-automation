@@ -4,8 +4,8 @@
   "source": "test-mapping/mx-qst-coverage.json",
   "policy": "Expected-result-first. This file is an implementation plan only; coverage remains partial until the official Expected Result is proven in the intended store/business path.",
   "summary": {
-    "partialTotal": 16,
-    "quickAssertion": 5,
+    "partialTotal": 14,
+    "quickAssertion": 3,
     "existingFlowExtension": 3,
     "newBusinessFlow": 4,
     "eppContext": 4
@@ -13,19 +13,9 @@
   "groups": {
     "quickAssertion": [
       {
-        "id": "SAM-24963",
-        "title": "My Account",
-        "reason": "Authentication is already proven. The test now opens My Account and asserts the eight official menu options; live S1 verification remains after refreshing the saved bootstrap/auth state."
-      },
-      {
         "id": "SAM-24971",
         "title": "Cart page UI",
         "reason": "The controlled cart now asserts SKU, price, thumbnail, available services, order summary and footer. Info-icon coverage and live verification remain."
-      },
-      {
-        "id": "SAM-24972",
-        "title": "Increase/decrease/delete the quantity",
-        "reason": "Existing CartPage controls were reused to add a dedicated official flow for increase, decrease and delete. Live S1 verification remains before promotion to Full."
       },
       {
         "id": "SAM-24989",
@@ -102,10 +92,8 @@
   },
   "priority": [
     "SAM-24971",
-    "SAM-24972",
     "SAM-24989",
     "SAM-25016",
-    "SAM-24963",
     "SAM-24968",
     "SAM-24982",
     "SAM-25011",

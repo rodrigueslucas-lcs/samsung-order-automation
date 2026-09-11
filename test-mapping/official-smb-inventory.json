@@ -5,8 +5,9 @@
     "P1": { "qstIncluded": true, "dstIncluded": true },
     "P2": { "qstIncluded": false, "dstIncluded": true }
   },
-  "sourceStatus": "BLOCKED_MISSING_UPDATED_EXPORTS",
-  "sourceBlocker": "The working context contains the legacy 144-case workbooks and execution CSV exports, but no updated MX/PE/CL/CO template export with a Priority column. Priority and current-template totals must not be inferred from the legacy campaign.",
+  "sourceStatus": "READY",
+  "sourceDirectory": "docs/smb_priority_templates",
+  "sourceFormat": "Samsung Confluence Markdown export",
   "historicalInventories": [
     {
       "path": "test-mapping/smb-qst.json",
@@ -16,9 +17,9 @@
     }
   ],
   "markets": {
-    "MX": { "contexts": { "BASE_STORE": { "source": null, "rows": [] }, "EPP": { "source": null, "rows": [] } } },
-    "PE": { "contexts": { "BASE_STORE": { "source": null, "rows": [] }, "EPP": { "source": null, "rows": [] } } },
-    "CL": { "contexts": { "BASE_STORE": { "source": null, "rows": [] }, "EPP": { "source": null, "rows": [] } } },
-    "CO": { "contexts": { "BASE_STORE": { "source": null, "rows": [] }, "EPP": { "source": null, "rows": [] } } }
+    "MX": { "sourceFilename": "STG-MX-Smoke-Test-Template.md", "expectedRows": { "BASE_STORE": 56, "EPP": 36 } },
+    "PE": { "sourceFilename": "STG-PE-Smoke-Test-Template.md", "expectedRows": { "BASE_STORE": 55, "EPP": 37 } },
+    "CL": { "sourceFilename": "STG-CL-Smoke-Test-Template.md", "expectedRows": { "BASE_STORE": 53, "EPP": 36 } },
+    "CO": { "sourceFilename": "STG-CO-Smoke-Test-Template.md", "expectedRows": { "BASE_STORE": 54, "EPP": 35 } }
   }
 }

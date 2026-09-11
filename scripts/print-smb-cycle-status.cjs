@@ -13,6 +13,9 @@ for (const [market, contexts] of Object.entries(report.markets)) {
     console.log(`\n${market} ${context.replace("_", " ")}`);
     console.log(`Official=${value.official} P1/QST=${value.qst} P2=${value.p2} DST=${value.dst}`);
     console.log(`P1 coverage: full=${value.full} partial=${value.partial} missing=${value.missing}`);
-    console.log(`P1 runtime: PASS=${value.runtimePass} FAIL=${value.runtimeFail} BLOCKED=${value.blocked} NOT_RUN=${value.notRun}`);
+    console.log(`P1 implementation: implemented=${value.implemented} not-implemented=${value.notImplemented}`);
+    console.log(`P1 runtime: PASS=${value.runtimePass} FAIL=${value.runtimeFail} BLOCKED=${value.blocked} NOT_APPLICABLE=${value.notApplicable} NOT_RUN=${value.notRun}`);
+    console.log(`Pending: Staging=${value.pendingStaging} EPP-context=${value.pendingEpp}`);
   }
 }
+console.log(`\nSMB OVERALL Official=${report.aggregate.official} P1/QST=${report.aggregate.qst} P2=${report.aggregate.p2} DST=${report.aggregate.dst}`);
