@@ -40,8 +40,7 @@ test("SAM-24992 @qst @mx @base-store @safe @registered - Select saved address", 
   });
 });
 
-test("SAM-24993 @qst @mx @base-store @safe @registered - Save option is available for registered user", async ({ page, mxConfig }, testInfo) => {
-  recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24993"));
+test("MX QST registered Save-address discovery @qst @mx @base-store @safe @registered", async ({ page, mxConfig }, testInfo) => {
   await reachMxRegisteredDelivery(page, mxConfig);
   await openNewAddressMode(page);
 
@@ -54,6 +53,7 @@ test("SAM-24993 @qst @mx @base-store @safe @registered - Save option is availabl
   recordBusinessEvidence(testInfo, {
     saveOptionVisible: true,
     profileWritePerformed: false,
+    relatedZephyrIds: ["SAM-24993"],
   });
 });
 
