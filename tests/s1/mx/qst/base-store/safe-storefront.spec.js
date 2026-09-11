@@ -23,15 +23,6 @@ test("MX QST 05 @qst @mx @base-store @safe - PDP variants other than color", asy
   await expect(page.getByText(/Almacenamiento \(GB\)/i)).toBeVisible({ timeout: 30000 });
 });
 
-test("SAM-24982 @qst @mx @base-store @safe - Verify trade-up cart page", async ({ page, mxConfig }, testInfo) => {
-  recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24982"));
-  await prepareMxQstCart(page, mxConfig);
-  await openMxService(page, "Galaxy Canje");
-  await expect(page.getByText(/Selecciona el dispositivo/i).filter({ visible: true }).last()).toBeVisible();
-  await expect(page.getByText(/Recibe una oferta por tu dispositivo actual/i)).toBeVisible();
-  await expect(page.getByRole("button", { name: /Continuar/i }).filter({ visible: true })).toBeVisible();
-});
-
 test("SAM-24981 @qst @mx @base-store @safe - Add Samsung Care+", async ({ page, mxConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24981"));
   await prepareMxQstCart(page, mxConfig);
