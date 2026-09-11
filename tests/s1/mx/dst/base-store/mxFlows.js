@@ -50,7 +50,7 @@ export async function reachMxGuestPayment(page, config, email) {
   return { checkout, address };
 }
 
-export async function reachMxRegisteredPayment(page, config) {
+export async function reachMxRegisteredDelivery(page, config) {
   const cart = configuredCart(page, config);
   await cart.clearMxCartAndConfirmEmpty();
   await configuredProduct(page, config).addConfiguredPdpToCart({
@@ -64,6 +64,12 @@ export async function reachMxRegisteredPayment(page, config) {
     lastName: "Automation",
     phone: "5512345678",
   });
+  await checkout.validateCheckoutSummary(config.sku);
+  return { checkout, cart };
+}
+
+export async function reachMxRegisteredPayment(page, config) {
+  const { checkout } = await reachMxRegisteredDelivery(page, config);
   const address = await checkout.fillDelivery(
     { postalCode: "01000", street: "Avenida Revolucion", exteriorNumber: "1000" },
     { registered: true }
