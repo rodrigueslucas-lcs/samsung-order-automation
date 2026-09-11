@@ -12,8 +12,13 @@ function requireCronJobRunOptIn(environment) {
   requireOptIn("ALLOW_CRONJOB_RUN", "CronJob execution", environment);
 }
 
+function requireProfileWriteOptIn(environment) {
+  requireOptIn("ALLOW_PROFILE_WRITE", "Profile write", environment);
+}
+
 module.exports = {
   requireOptIn,
   requirePaymentSubmitOptIn,
   requireCronJobRunOptIn,
+  requireProfileWriteOptIn,
 };
