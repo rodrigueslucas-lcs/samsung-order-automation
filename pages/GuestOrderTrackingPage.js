@@ -1,8 +1,12 @@
 import BasePage from "./BasePage";
 
 export default class GuestOrderTrackingPage extends BasePage {
-  constructor(page) {
+  constructor(page, options = {}) {
     super(page);
+
+    this.market = String(options.market || "pe").toLowerCase();
+    this.currencyPattern = options.currencyPattern || /S\/\s*[\d,.]+/;
+    this.productPattern = options.productPattern || /RB45DG6300B1PE|Refrigeradora|producto/i;
 
     this.form = page.locator("form").filter({
       has: page.getByRole("button", { name: /Enviar código|Reenviar Código/i }),
@@ -21,6 +25,12 @@ export default class GuestOrderTrackingPage extends BasePage {
       name: "Buscar",
       exact: true,
     });
+  }
+
+  isOtpEndpoint(response) {
+    const pathname = new URL(response.url()).pathname;
+    return response.request().method() === "POST" &&
+      new RegExp(`/tokocommercewebservices/v2/${this.market}/guest/sendOrderOtp$`, "i").test(pathname);
   }
 
   async validateGuestTrackingForm() {
@@ -73,16 +83,12 @@ export default class GuestOrderTrackingPage extends BasePage {
 
   async validateInvalidVerificationRequest() {
     // Deliberately nonexistent data: validates the guest API contract without
-    // coupling TC13 to an existing order or sending mail to a real address.
+    // coupling the form check to an existing order or sending mail to a real address.
     await this.orderNumber.fill("QA-NOT-A-REAL-ORDER");
     await this.email.fill("qa.invalid@example.invalid");
 
     const responsePromise = this.page.waitForResponse(
-      (response) =>
-        response.request().method() === "POST" &&
-        /\/tokocommercewebservices\/v2\/pe\/guest\/sendOrderOtp$/i.test(
-          new URL(response.url()).pathname
-        ),
+      (response) => this.isOtpEndpoint(response),
       { timeout: 30000 }
     );
     await this.sendCodeButton.click();
@@ -115,11 +121,7 @@ export default class GuestOrderTrackingPage extends BasePage {
     await this.email.fill(email);
 
     const responsePromise = this.page.waitForResponse(
-      (response) =>
-        response.request().method() === "POST" &&
-        /\/tokocommercewebservices\/v2\/pe\/guest\/sendOrderOtp$/i.test(
-          new URL(response.url()).pathname
-        ),
+      (response) => this.isOtpEndpoint(response),
       { timeout: 30000 }
     );
 
@@ -177,7 +179,7 @@ export default class GuestOrderTrackingPage extends BasePage {
     await status.waitFor({ state: "visible", timeout: 30000 });
     const statusText = (await status.innerText()).trim();
 
-    await this.screenshot("tc13-guest-order-tracking-card");
+    await this.screenshot("guest-order-tracking-card");
     await details.click();
     await main.getByText(orderNumber, { exact: false }).last()
       .waitFor({ state: "visible", timeout: 60000 });
@@ -185,9 +187,9 @@ export default class GuestOrderTrackingPage extends BasePage {
     const tracking = main.getByText(statusPattern).first();
     await tracking.waitFor({ state: "visible", timeout: 30000 });
     const detailText = await main.innerText();
-    const hasOrderSummary = /S\/\s*[\d,.]+/.test(detailText);
-    const hasProduct = /RB45DG6300B1PE|Refrigeradora|producto/i.test(detailText);
-    await this.screenshot("tc13-guest-order-tracking-details");
+    const hasOrderSummary = this.currencyPattern.test(detailText);
+    const hasProduct = this.productPattern.test(detailText);
+    await this.screenshot("guest-order-tracking-details");
 
     return {
       status: statusText,
