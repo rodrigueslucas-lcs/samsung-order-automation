@@ -11,7 +11,7 @@ test.describe.configure({ timeout: 420000 });
 test("SAM-24999 @qst @mx @base-store @safe - Invalid address is rejected", async ({ page, mxConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24999"));
 
-  const { checkout } = await reachMxGuestDelivery(
+  await reachMxGuestDelivery(
     page,
     mxConfig,
     "mx.qst.invalid.address@example.com"
@@ -40,22 +40,7 @@ test("SAM-24999 @qst @mx @base-store @safe - Invalid address is rejected", async
     .getByText(/c[oó]digo postal.*(inv[aá]lido|no v[aá]lido|no encontrado)|direcci[oó]n.*(inv[aá]lida|no v[aá]lida)/i)
     .filter({ visible: true });
 
-  await expect
-    .poll(async () => ({
-      httpRejected: !response.ok(),
-      validationVisible: (await visibleValidation.count()) > 0,
-      coloniaUnavailable:
-        (await colonia.count()) === 0 ||
-        !(await colonia.first().isEnabled().catch(() => false)),
-      continueDisabled:
-        (await continueButton.count()) === 0 ||
-        !(await continueButton.first().isEnabled().catch(() => false)),
-    }), { timeout: 30000 })
-    .toMatchObject({
-      // At least one observable rejection signal is asserted below.
-    });
-
-  const rejection = {
+  const readRejection = async () => ({
     httpRejected: !response.ok(),
     validationVisible: (await visibleValidation.count()) > 0,
     coloniaUnavailable:
@@ -64,13 +49,16 @@ test("SAM-24999 @qst @mx @base-store @safe - Invalid address is rejected", async
     continueDisabled:
       (await continueButton.count()) === 0 ||
       !(await continueButton.first().isEnabled().catch(() => false)),
-  };
+  });
 
-  expect(
-    Object.values(rejection).some(Boolean),
-    `Invalid postal code was accepted without an observable validation barrier: ${JSON.stringify(rejection)}`
-  ).toBeTruthy();
+  await expect
+    .poll(async () => Object.values(await readRejection()).some(Boolean), {
+      timeout: 30000,
+      message: "Invalid postal code should produce an observable validation barrier.",
+    })
+    .toBeTruthy();
 
+  const rejection = await readRejection();
   await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i);
   recordBusinessEvidence(testInfo, {
     invalidPostalCode,
