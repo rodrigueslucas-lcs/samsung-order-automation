@@ -56,6 +56,21 @@ function createAuthState({
     );
   }
 
+  async function gotoWithNetworkRetry(page, url, options = {}) {
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        return await page.goto(url, options);
+      } catch (error) {
+        const transientNetworkChange = /net::ERR_NETWORK_CHANGED/i.test(
+          String(error?.message || error)
+        );
+        if (!transientNetworkChange || attempt === 2) throw error;
+        await page.waitForTimeout(1000);
+      }
+    }
+    return null;
+  }
+
   async function validateCurrentPageAuthenticated(page) {
     if (enforceHostname && new URL(page.url()).hostname !== hostname) {
       throw new Error(`Unexpected ${label} authentication host.`);
@@ -109,7 +124,7 @@ function createAuthState({
 
   async function validateAuthenticatedSession(page) {
     if (setupUrl) {
-      await page.goto(setupUrl, { waitUntil: "domcontentloaded" });
+      await gotoWithNetworkRetry(page, setupUrl, { waitUntil: "domcontentloaded" });
       if (enforceHostname && new URL(page.url()).hostname !== hostname) {
         throw new Error(`Unexpected ${label} setup host.`);
       }
@@ -118,7 +133,7 @@ function createAuthState({
         .waitFor({ state: "visible", timeout: 60000 });
     }
 
-    await page.goto(validationUrl, { waitUntil: "domcontentloaded" });
+    await gotoWithNetworkRetry(page, validationUrl, { waitUntil: "domcontentloaded" });
 
     const maintenanceMessage = page.getByText(
       /SystemParking|Page Under Maintenance/i
