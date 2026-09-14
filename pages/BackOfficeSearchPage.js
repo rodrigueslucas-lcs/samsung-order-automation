@@ -4,13 +4,15 @@ import BackOfficeCatalogPage from "./BackOfficeCatalogPage";
 
 export default class BackOfficeSearchPage extends BackOfficeOrderPage {
   async openAdvancedSearch() {
-    const advanced = this.page
-      .getByRole("button", { name: /Advanced Search|Advanced search/i })
-      .or(this.page.locator('button[title*="Advanced" i]'))
-      .filter({ visible: true })
-      .first();
-    await advanced.waitFor({ state: "visible", timeout: 30000 });
-    await this.waitForZkUpdate(() => advanced.click());
+    const quickSearch = this.page.getByRole("textbox", { name: "Type to search" }).filter({ visible: true }).first();
+    await quickSearch.waitFor({ state: "visible", timeout: 30000 });
+
+    // SAP CX Backoffice renders the Advanced Search control as an icon-only
+    // button next to the quick-search button, so it has no accessible text/title.
+    const searchButton = quickSearch.locator("xpath=following::button[1]");
+    const advancedButton = searchButton.locator("xpath=following::button[1]");
+    await advancedButton.waitFor({ state: "visible", timeout: 30000 });
+    await this.waitForZkUpdate(() => advancedButton.click());
   }
 
   async searchAdminOrderAdvanced(orderCode) {
