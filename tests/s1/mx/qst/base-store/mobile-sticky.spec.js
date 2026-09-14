@@ -1,5 +1,6 @@
 import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
+import MxCheckoutPage from "../../../../../pages/MxCheckoutPage";
 import { test, expect } from "./mxQst.fixture";
 import { prepareMxQstCart, validateStickyControl } from "./mxQstFlows";
 
@@ -22,23 +23,26 @@ test("SAM-25016 @qst @mx @base-store @safe @mobile - Mobile Sticky checkout", as
   await validateStickyControl(cartCheckout, "Cart checkout button");
 
   await cart.proceedToCheckout();
-  await expect(
-    page
-      .getByText(/Samsung Checkout Express|Continuar como (usuario )?invitado/i)
-      .filter({ visible: true })
-      .first()
-  ).toBeVisible({ timeout: 60000 });
+  const checkout = new MxCheckoutPage(page);
+  await checkout.startGuest("mx.qst.mobile.sticky@example.com");
 
-  const checkoutContinue = page
-    .getByRole("button", { name: /Continuar como (usuario )?invitado|Checkout como invitado/i })
-    .filter({ visible: true })
-    .first();
-  await expect(checkoutContinue).toBeVisible({ timeout: 30000 });
-  await validateStickyControl(checkoutContinue, "Checkout guest CTA");
+  await page.getByRole("textbox", { name: "firstName" }).fill("MX");
+  await page.getByRole("textbox", { name: "lastName" }).fill("Automation");
+  await page.getByRole("textbox", { name: "phone", exact: true }).fill("5512345678");
+
+  const requiredCheckboxes = page.locator('input[type="checkbox"]:visible');
+  for (let index = 0; index < await requiredCheckboxes.count(); index += 1) {
+    const checkbox = requiredCheckboxes.nth(index);
+    if (!(await checkbox.isChecked())) await checkbox.check({ force: true });
+  }
+
+  await expect(checkout.contactContinue).toBeVisible({ timeout: 30000 });
+  await expect(checkout.contactContinue).toBeEnabled({ timeout: 30000 });
+  await validateStickyControl(checkout.contactContinue, "Checkout contact Continue button");
 
   testInfo.annotations.push({
     type: "qst-reuse-note",
     description:
-      "Mobile assertion validates sticky/fixed checkout controls on both the Cart surface and the initial Checkout surface without submitting an order.",
+      "Mobile assertion validates the sticky/fixed Cart checkout CTA and the real Checkout Contact-step Continue CTA. The initial guest-login CTA is intentionally not treated as the checkout sticky control because live S1 proved it is not sticky/fixed.",
   });
 });
