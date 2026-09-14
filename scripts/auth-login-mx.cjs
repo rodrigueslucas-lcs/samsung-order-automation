@@ -15,10 +15,39 @@ const devToolsActivePortFile = path.join(profileDir, "DevToolsActivePort");
 const interactiveTimeout = Number(process.env.MX_AUTH_INTERACTIVE_TIMEOUT_MS || 600000);
 const manualLogin = process.env.MX_AUTH_MANUAL === "1";
 
-function requiredRuntimeSecret(name) {
-  const value = process.env[name]?.trim();
-  if (!value) throw new Error(`${name} is required at runtime.`);
-  return value;
+const localCredentialsFile = path.join(authDir, "mx-storefront-user.json");
+
+function readLocalCredentials() {
+  if (!fs.existsSync(localCredentialsFile)) return {};
+
+  const credentials = JSON.parse(
+    fs.readFileSync(localCredentialsFile, "utf8")
+  );
+
+  return {
+    email: String(credentials.email || "").trim(),
+    password: String(credentials.password || ""),
+  };
+}
+
+function resolveRuntimeCredentials() {
+  const local = readLocalCredentials();
+
+  const email =
+    process.env.MX_SAMSUNG_EMAIL?.trim() ||
+    local.email;
+
+  const password =
+    process.env.MX_SAMSUNG_PASSWORD ||
+    local.password;
+
+  if (!email || !password) {
+    throw new Error(
+      "MX Samsung credentials were not found. Set MX_SAMSUNG_EMAIL/MX_SAMSUNG_PASSWORD or create playwright/.auth/mx-storefront-user.json."
+    );
+  }
+
+  return { email, password };
 }
 
 function readDevToolsPort() {
@@ -162,8 +191,9 @@ async function exportAuthenticatedState(context, page) {
 }
 
 async function loginMxSamsungAccount() {
-  const email = manualLogin ? null : requiredRuntimeSecret("MX_SAMSUNG_EMAIL");
-  const password = manualLogin ? null : requiredRuntimeSecret("MX_SAMSUNG_PASSWORD");
+  const credentials = manualLogin ? null : resolveRuntimeCredentials();
+  const email = credentials?.email ?? null;
+  const password = credentials?.password ?? null;
   const browser = await connectDedicatedChrome();
   const context = browser.contexts()[0];
   if (!context) throw new Error("Dedicated MX Chrome did not expose a browser context.");
