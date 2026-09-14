@@ -11,13 +11,19 @@ const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
 
 test.describe.configure({ mode: "serial", timeout: 420000 });
 
+test.skip(
+  process.env.ALLOW_PROFILE_WRITE !== "1",
+  "Profile address persistence is destructive and requires ALLOW_PROFILE_WRITE=1."
+);
+
+test.skip(
+  !process.env.MX_ADDRESS_API_URL?.trim(),
+  "MX_ADDRESS_API_URL is required so QA-marked address persistence can be read back and cleaned up safely."
+);
+
 test("SAM-24991 + SAM-24993 @destructive @qst @mx @base-store @registered - Persist a QA checkout address", async ({ page, mxConfig }, testInfo) => {
   requireProfileWriteOptIn();
-  const addressApiUrl = process.env.MX_ADDRESS_API_URL?.trim();
-  test.skip(
-    !addressApiUrl,
-    "MX_ADDRESS_API_URL is required so QA-marked address persistence can be read back and cleaned up safely."
-  );
+  const addressApiUrl = process.env.MX_ADDRESS_API_URL.trim();
 
   recordBusinessEvidence(testInfo, {
     ...getMxQstEvidenceMetadata("SAM-24991"),
