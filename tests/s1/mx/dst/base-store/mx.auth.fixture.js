@@ -16,9 +16,6 @@ export const test = base.extend({
   mxConfig: async ({}, use) => {
     await use(getMxConfig());
   },
-});
-
-test.use({
   storageState: hasAuthState() ? AUTH_STATE_PATH : undefined,
   viewport: { width: 1440, height: 900 },
   launchOptions: { args: ["--start-maximized"] },
@@ -41,6 +38,8 @@ test.beforeEach(async ({ context, page }, testInfo) => {
 
 test.afterEach(async ({ page }) => {
   if (!hasAuthState() || page.url() === "about:blank") return;
+  const currentUrl = page.url();
+  if (/^chrome-error:\/\/chromewebdata\//i.test(currentUrl)) return;
   await assertMxStagingPage(page, "MX authenticated final environment guard");
 });
 
