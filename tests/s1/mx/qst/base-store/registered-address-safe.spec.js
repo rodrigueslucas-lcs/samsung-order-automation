@@ -41,17 +41,32 @@ test("SAM-24992 @qst @mx @base-store @safe @registered - Select saved address", 
 });
 
 test("MX QST registered Save-address discovery @qst @mx @base-store @safe @registered", async ({ page, mxConfig }, testInfo) => {
-  await reachMxRegisteredDelivery(page, mxConfig);
+  const { checkout } = await reachMxRegisteredDelivery(page, mxConfig);
   await openNewAddressMode(page);
+
+  const address = await checkout.fillDelivery(
+    {
+      postalCode: "01000",
+      street: "Avenida Revolucion",
+      exteriorNumber: "1000",
+    },
+    { registered: true }
+  );
+  expect(address.lookupStatus).toBe(200);
+  expect(address.selectedColonia).toBeTruthy();
 
   const saveAddress = page
     .getByRole("checkbox", { name: /Guardar.*(direcci[oó]n|env[ií]o|Mi cuenta)|Save.*address/i })
     .filter({ visible: true });
-  await expect(saveAddress.first()).toBeVisible({ timeout: 30000 });
+  await expect(
+    saveAddress.first(),
+    "Registered MX checkout should expose the Save-address option after a valid new address is populated."
+  ).toBeVisible({ timeout: 30000 });
   await expect(saveAddress.first()).not.toBeChecked();
 
   recordBusinessEvidence(testInfo, {
     saveOptionVisible: true,
+    validAddressPopulated: true,
     profileWritePerformed: false,
     relatedZephyrIds: ["SAM-24993"],
   });
