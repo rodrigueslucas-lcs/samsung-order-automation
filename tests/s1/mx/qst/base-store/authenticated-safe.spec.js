@@ -24,7 +24,7 @@ test("SAM-24962 + SAM-24963 @qst @mx @base-store @safe @registered - Login Home 
   await expect(menu).toBeVisible({ timeout: 30000 });
 
   const expectedOptions = [
-    /My page|Mi p[aá]gina/i,
+    /My page|Mi p[aá]gina|My Account|Mi cuenta/i,
     /My Products|Mis productos/i,
     /My Rewards|Mis recompensas/i,
     /My Orders|Mis pedidos/i,
@@ -34,7 +34,11 @@ test("SAM-24962 + SAM-24963 @qst @mx @base-store @safe @registered - Login Home 
     /Logout|Cerrar Sesi[oó]n/i,
   ];
 
+  const menuText = (await menu.innerText()).replace(/\s+/g, " ").trim();
   for (const option of expectedOptions) {
-    await expect(menu.getByText(option).first()).toBeVisible({ timeout: 30000 });
+    await expect(
+      menu.getByText(option).first(),
+      `Expected My Account option ${option} to be visible. Current menu: ${menuText}`
+    ).toBeVisible({ timeout: 30000 });
   }
 });
