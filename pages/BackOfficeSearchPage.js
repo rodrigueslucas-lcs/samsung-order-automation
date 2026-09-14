@@ -7,28 +7,33 @@ export default class BackOfficeSearchPage extends BackOfficeOrderPage {
     const quickSearch = this.page.getByRole("textbox", { name: "Type to search" }).filter({ visible: true }).first();
     await quickSearch.waitFor({ state: "visible", timeout: 30000 });
 
-    // SAP CX Backoffice renders the Advanced Search control as an icon-only
-    // button next to the quick-search button, so it has no accessible text/title.
-    const searchButton = quickSearch.locator("xpath=following::button[1]");
-    const advancedButton = searchButton.locator("xpath=following::button[1]");
+    const advancedButton = this.page
+      .locator('button.yw-toggle-advanced-search[title="Switch search mode"]:visible')
+      .first();
     await advancedButton.waitFor({ state: "visible", timeout: 30000 });
     await this.waitForZkUpdate(() => advancedButton.click());
+    await this.page.locator(".yw-advancedsearch:visible").first().waitFor({
+      state: "visible",
+      timeout: 30000,
+    });
   }
 
   async searchAdminOrderAdvanced(orderCode) {
     await this.openAdvancedSearch();
 
     const orderField = this.page
-      .getByRole("textbox", { name: /Order Number|Order No|Order Nr|Code/i })
-      .or(this.page.locator('input[placeholder*="order" i]'))
+      .getByRole("row")
+      .filter({ has: this.page.getByText("Order Nr.", { exact: true }) })
       .filter({ visible: true })
-      .first();
+      .first()
+      .getByRole("textbox")
+      .filter({ visible: true })
+      .last();
     await orderField.waitFor({ state: "visible", timeout: 30000 });
     await orderField.fill(orderCode);
 
     const searchButton = this.page
-      .getByRole("button", { name: /^Search$/i })
-      .or(this.page.locator('button[title="Search"]'))
+      .getByRole("button", { name: "Search", exact: true })
       .filter({ visible: true })
       .last();
     await this.waitForZkUpdate(() => searchButton.click());

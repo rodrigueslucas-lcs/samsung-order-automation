@@ -26,10 +26,19 @@ export default class BackOfficeOrderPage extends BackOfficePage {
       .getByText("Orders", { exact: true })
       .last()
       .waitFor({ state: "visible", timeout: 30000 });
-    await this.page
+    const searchMode = this.page.locator(".yw-textsearch:visible").first();
+    await searchMode.waitFor({ state: "visible", timeout: 30000 });
+    if (/\byw-toggle-open\b/.test((await searchMode.getAttribute("class")) || "")) {
+      const searchModeToggle = this.page
+        .locator('button.yw-toggle-advanced-search[title="Switch search mode"]:visible')
+        .first();
+      await searchModeToggle.waitFor({ state: "visible", timeout: 30000 });
+      await this.waitForZkUpdate(() => searchModeToggle.click());
+    }
+    const quickSearch = this.page
       .getByPlaceholder("Type to search", { exact: true })
-      .last()
-      .waitFor({ state: "visible", timeout: 30000 });
+      .filter({ visible: true });
+    await quickSearch.last().waitFor({ state: "visible", timeout: 30000 });
   }
 
   async expectAgentOrders() {
