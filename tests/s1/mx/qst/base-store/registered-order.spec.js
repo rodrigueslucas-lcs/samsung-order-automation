@@ -6,6 +6,11 @@ import { reachMxRegisteredPayment } from "../../dst/base-store/mxFlows";
 const { requirePaymentSubmitOptIn } = destructiveGuards;
 test.describe.configure({ retries: 0 });
 
+test.skip(
+  process.env.ALLOW_PAYMENT_SUBMIT !== "1",
+  "Registered order submit is destructive and requires ALLOW_PAYMENT_SUBMIT=1."
+);
+
 function required(name) {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`${name} is required at runtime.`);
