@@ -4,13 +4,11 @@ import BackOfficeCronJobsPage from "../../../../../pages/BackOfficeCronJobsPage"
 
 import BackOfficeOrderPage from "../../../../../pages/BackOfficeOrderPage";
 
-const adminCredentials = {
+import backofficeCredentials from "../../../../../utils/backofficeAdminCredentials.js";
 
-  username: process.env.BACKOFFICE_ADMIN_USERNAME,
+const { getBackOfficeAdminCredentials } = backofficeCredentials;
 
-  password: process.env.BACKOFFICE_ADMIN_PASSWORD,
-
-};
+const adminCredentials = getBackOfficeAdminCredentials();
 
 let orderCode = process.env.MX_QST_FULFILLMENT_ORDER_CODE || null;
 
@@ -52,7 +50,7 @@ test.describe("MX S1 - QST BackOffice fulfillment", () => {
 
   test.skip(
 
-    (process.env.BACKOFFICE_ENV || "").toLowerCase() !== "s1",
+    (process.env.BACKOFFICE_ENV || "s1").toLowerCase() !== "s1",
 
     "MX fulfillment is authorized for S1 only."
 
@@ -60,9 +58,9 @@ test.describe("MX S1 - QST BackOffice fulfillment", () => {
 
   test.skip(
 
-    !adminCredentials.username || !adminCredentials.password,
+    !adminCredentials.password,
 
-    "Admin credentials are required at runtime."
+    "Admin password is required via the ignored local auth file or runtime env."
 
   );
 
