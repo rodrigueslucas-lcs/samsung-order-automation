@@ -4,10 +4,14 @@ import BackOfficeSearchPage from "../../../../../pages/BackOfficeSearchPage";
 import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import backofficeCredentials from "../../../../../utils/backofficeAdminCredentials.js";
+import mxConfigModule from "../../../../../utils/mxConfig.js";
 
 const { recordBusinessEvidence } = evidenceContext;
 const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
 const { getBackOfficeAdminCredentials } = backofficeCredentials;
+const { getMxConfig } = mxConfigModule;
+
+const DEFAULT_MX_QST_ORDER_CODE = "MX260908-63926930";
 
 test.describe.configure({ timeout: 360000 });
 
@@ -33,10 +37,11 @@ test("SAM-25011 @qst @mx @base-store @backoffice @safe - BackOffice order and pr
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-25011"));
 
   const credentials = requireS1Admin(testInfo);
-  const orderCode = process.env.MX_QST_ORDER_CODE;
-  const productCode = process.env.MX_QST_PRODUCT_CODE || process.env.MX_SMOKE_SKU;
-  test.skip(!orderCode || !productCode, "MX_QST_ORDER_CODE and MX_QST_PRODUCT_CODE (or MX_SMOKE_SKU) are required.");
+  const mxConfig = getMxConfig();
+  const orderCode = process.env.MX_QST_ORDER_CODE || DEFAULT_MX_QST_ORDER_CODE;
+  const productCode = process.env.MX_QST_PRODUCT_CODE || mxConfig.sku;
   expect(orderCode).toMatch(/^MX/i);
+  expect(productCode).toBeTruthy();
 
   const backOffice = new BackOfficeSearchPage(page);
   await backOffice.login({ ...credentials, authority: "admin" });
