@@ -4,9 +4,11 @@ module.exports = createAuthState({
   authStatePath: "playwright/.auth/mx-s1-user.json",
   sessionStoragePath: "playwright/.auth/mx-s1-session-storage.json",
   hostname: "stg.shop.samsung.com",
-  // The dedicated profile performs getcookie setup before login. Reopening it
-  // after restoring storage replaces the authenticated MX storefront session.
-  setupUrl: null,
+  // Every fresh Playwright browser context needs the staging access cookie
+  // restored before opening the authenticated storefront. The exported
+  // storage/session state alone is not sufficient and otherwise redirects to
+  // /onlinestore/uk/SystemParking.html.
+  setupUrl: "https://stg.shop.samsung.com/getcookie.html",
   validationUrl: "https://stg.shop.samsung.com/mx/",
   label: "S1 MX",
   refreshInstruction:
