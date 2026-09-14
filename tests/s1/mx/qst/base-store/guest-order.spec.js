@@ -5,6 +5,11 @@ import { reachMxGuestPayment } from "../../dst/base-store/mxFlows";
 const { requirePaymentSubmitOptIn } = destructiveGuards;
 test.describe.configure({ retries: 0 });
 
+test.skip(
+  process.env.ALLOW_PAYMENT_SUBMIT !== "1",
+  "Guest order submit is destructive and requires ALLOW_PAYMENT_SUBMIT=1."
+);
+
 test("MX QST 13 + QST 14 @destructive @qst @mx @base-store - Guest SPEI order and confirmation", async ({ page, mxConfig }) => {
   test.setTimeout(600000);
   requirePaymentSubmitOptIn();
