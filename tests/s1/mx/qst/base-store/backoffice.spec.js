@@ -1,39 +1,73 @@
 import { test, expect } from "@playwright/test";
 import BackOfficePage from "../../../../../pages/BackOfficePage";
-import BackOfficeOrderPage from "../../../../../pages/BackOfficeOrderPage";
+import BackOfficeSearchPage from "../../../../../pages/BackOfficeSearchPage";
 import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
+import backofficeCredentials from "../../../../../utils/backofficeAdminCredentials.js";
 
 const { recordBusinessEvidence } = evidenceContext;
 const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
+const { getBackOfficeAdminCredentials } = backofficeCredentials;
 
-test.describe.configure({ timeout: 240000 });
+test.describe.configure({ timeout: 360000 });
 
-test("MX QST 18 @qst @mx @base-store @backoffice @safe - BackOffice login", async ({ page }) => {
-  const username = process.env.BACKOFFICE_ADMIN_USERNAME;
-  const password = process.env.BACKOFFICE_ADMIN_PASSWORD;
-  test.skip(!username || !password, "S1 BackOffice Admin credentials are required at runtime.");
-  expect((process.env.BACKOFFICE_ENV || "").toLowerCase()).toBe("s1");
+function requireS1Admin(testInfo) {
+  const credentials = getBackOfficeAdminCredentials();
+  test.skip(!credentials.password, "S1 BackOffice Admin password is required via the ignored local auth file or runtime env.");
+  expect((process.env.BACKOFFICE_ENV || "s1").toLowerCase()).toBe("s1");
+  testInfo.annotations.push({
+    type: "backoffice-admin-user",
+    description: credentials.username,
+  });
+  return credentials;
+}
+
+test("MX QST 18 @qst @mx @base-store @backoffice @safe - BackOffice login", async ({ page }, testInfo) => {
+  const credentials = requireS1Admin(testInfo);
   const backOffice = new BackOfficePage(page);
-  await backOffice.login({ username, password, authority: "admin" });
+  await backOffice.login({ ...credentials, authority: "admin" });
   await backOffice.expectPerspective("admin");
 });
 
-test("SAM-25011 @qst @mx @base-store @backoffice @safe - BackOffice order search", async ({ page }, testInfo) => {
+test("SAM-25011 @qst @mx @base-store @backoffice @safe - BackOffice order and product basic advanced search", async ({ page }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-25011"));
 
-  const username = process.env.BACKOFFICE_ADMIN_USERNAME;
-  const password = process.env.BACKOFFICE_ADMIN_PASSWORD;
+  const credentials = requireS1Admin(testInfo);
   const orderCode = process.env.MX_QST_ORDER_CODE;
-  test.skip(!username || !password || !orderCode, "S1 Admin credentials and MX_QST_ORDER_CODE are required.");
-  expect((process.env.BACKOFFICE_ENV || "").toLowerCase()).toBe("s1");
+  const productCode = process.env.MX_QST_PRODUCT_CODE || process.env.MX_SMOKE_SKU;
+  test.skip(!orderCode || !productCode, "MX_QST_ORDER_CODE and MX_QST_PRODUCT_CODE (or MX_SMOKE_SKU) are required.");
   expect(orderCode).toMatch(/^MX/i);
-  const orders = new BackOfficeOrderPage(page);
-  await orders.login({ username, password, authority: "admin" });
-  await orders.openAdminOrders();
-  await orders.openAdminOrderByCode(orderCode);
-  const status = await orders.readOpenAdminOrderStatus(orderCode);
+
+  const backOffice = new BackOfficeSearchPage(page);
+  await backOffice.login({ ...credentials, authority: "admin" });
+
+  await backOffice.openAdminOrders();
+  const basicOrderRow = await backOffice.searchAdminOrder(orderCode);
+  await expect(basicOrderRow).toBeVisible();
+
+  await backOffice.openAdminOrders();
+  const advancedOrderRow = await backOffice.searchAdminOrderAdvanced(orderCode);
+  await expect(advancedOrderRow).toBeVisible();
+
+  await backOffice.openAdminOrders();
+  await backOffice.openAdminOrderByCode(orderCode);
+  const status = await backOffice.readOpenAdminOrderStatus(orderCode);
   expect(status).toBeTruthy();
-  recordBusinessEvidence(testInfo, { orderCode, finalStatus: status });
-  console.log("MX_QST_ORDER_STATUS", JSON.stringify({ orderCode, status }));
+
+  await backOffice.validateProductBasicAndAdvancedSearch(productCode);
+
+  recordBusinessEvidence(testInfo, {
+    orderCode,
+    productCode,
+    basicOrderSearch: true,
+    advancedOrderSearch: true,
+    basicProductSearch: true,
+    advancedProductSearch: true,
+    finalStatus: status,
+  });
+
+  console.log(
+    "MX_QST_BACKOFFICE_SEARCH",
+    JSON.stringify({ orderCode, productCode, status, basic: true, advanced: true })
+  );
 });
