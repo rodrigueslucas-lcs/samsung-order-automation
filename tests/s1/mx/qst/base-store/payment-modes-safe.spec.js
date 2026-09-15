@@ -9,7 +9,7 @@ const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
 test.describe.configure({ timeout: 420000 });
 
 const cases = [
-  { id: "SAM-25004", label: /PayPal/i, title: "PayPal" },
+  { id: "SAM-25004", label: /Billeteras digitales/i, marker: /PayPal/i, title: "PayPal" },
   { id: "SAM-25005", label: /Pago en efectivo|Pay in Cash|Efectivo/i, title: "Pay in Cash" },
   { id: "SAM-25006", label: /Samsung Rewards|Rewards/i, title: "Rewards" },
 ];
@@ -33,6 +33,12 @@ for (const paymentCase of cases) {
       !(await button.isVisible().catch(() => false)),
       `${paymentCase.title} is not offered for the current MX S1 guest checkout context; do not fabricate payment availability.`
     );
+
+    if (paymentCase.marker) {
+      const paymentLogo = button.getByRole("img");
+      await expect(paymentLogo).toBeVisible();
+      await expect(paymentLogo).toHaveAttribute("class", paymentCase.marker);
+    }
 
     await checkout.selectPaymentMode(paymentCase.label);
     await expect(button).toHaveAttribute("aria-expanded", "true");

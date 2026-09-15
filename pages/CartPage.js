@@ -55,7 +55,32 @@ export default class CartPage extends BasePage {
     if (response.status() !== 200) {
       throw new Error(`MX current-cart request returned HTTP ${response.status()}.`);
     }
-    const cart = await response.json();
+
+    let cart;
+    try {
+      cart = await response.json();
+    } catch (error) {
+      const message = String(error?.message || error);
+      const bodyUnavailable =
+        /Network\.getResponseBody|No resource with given identifier/i.test(message);
+
+      if (!bodyUnavailable) {
+        throw error;
+      }
+
+      const fallbackResponse = await this.page.context().request.get(response.url(), {
+        failOnStatusCode: false,
+      });
+
+      if (!fallbackResponse.ok()) {
+        throw new Error(
+          `MX current-cart fallback request returned HTTP ${fallbackResponse.status()}.`
+        );
+      }
+
+      cart = await fallbackResponse.json();
+    }
+
     await this.page.getByRole('main').waitFor({ state: 'attached', timeout: 30000 });
     const productEntries = (cart.entries || []).filter(
       (entry) => entry.product?.code && !entry.isHideForDisplay && !entry.serviceEntry
@@ -272,10 +297,23 @@ export default class CartPage extends BasePage {
         return false;
       }
 
-      const closeReminder = cartReminder.getByText(/^x$/i).first();
+      const closeReminders = cartReminder.getByText(/^x$/i);
+      const visibleCloseIndex = await closeReminders.evaluateAll((items) =>
+        items.findIndex((item) => {
+          const rect = item.getBoundingClientRect();
+          return rect.right > 0 && rect.bottom > 0 &&
+            rect.left < window.innerWidth && rect.top < window.innerHeight;
+        })
+      );
+      if (visibleCloseIndex < 0) return false;
+
+      const closeReminder = closeReminders.nth(visibleCloseIndex);
+      const visibleReminder = closeReminder.locator(
+        'xpath=ancestor::*[contains(@class, "ins-custom-cart-reminder-container")][1]'
+      );
 
       await closeReminder.click();
-      await cartReminder.waitFor({ state: 'hidden', timeout: 10000 });
+      await visibleReminder.waitFor({ state: 'hidden', timeout: 10000 });
 
       return true;
     };
@@ -290,10 +328,16 @@ export default class CartPage extends BasePage {
       const reminderWasDismissed = await dismissCartReminder();
 
       if (!reminderWasDismissed) {
-        throw error;
+        const reminderCheckout = cartReminder
+          .getByText(/^Finalizar compra$/i)
+          .filter({ visible: true })
+          .last();
+        if (!(await reminderCheckout.isVisible().catch(() => false))) throw error;
+        await reminderCheckout.focus();
+        await reminderCheckout.press('Enter');
+      } else {
+        await this.continueButton.click();
       }
-
-      await this.continueButton.click();
     }
 
     const guestEmailInput = this.page.getByPlaceholder(/ingresa tu correo/i);

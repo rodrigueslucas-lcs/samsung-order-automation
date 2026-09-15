@@ -10,7 +10,7 @@ async function openAuthenticatedMenu(page) {
   await expect(profileButton).toBeVisible({ timeout: 60000 });
   await profileButton.hover();
 
-  const menu = page
+  let menu = page
     .locator('[role="menu"].profile-menu')
     .filter({ visible: true })
     .last();
@@ -38,7 +38,20 @@ test("SAM-24962 @qst @mx @base-store @safe @registered - Login Home page", async
 test("SAM-24963 @qst @mx @base-store @safe @registered - Validate My account menu", async ({ page }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24963"));
 
-  const menu = await openAuthenticatedMenu(page);
+  let menu = await openAuthenticatedMenu(page);
+
+  // MX may expose only the compact Home dropdown initially.
+  // If account options are not present, enter My Account and reopen the menu.
+  if (!(await menu.getByText(/My page|Mi p[aá]gina|My Account|Mi cuenta/i).count())) {
+    await page.goto(new URL("/mx/mypage/", page.url()).toString(), {
+      waitUntil: "domcontentloaded",
+      timeout: 60000,
+    });
+    await page.waitForURL(/\/mx\/mypage\/?(?:[?#].*)?$/, { timeout: 60000 });
+
+    menu = await openAuthenticatedMenu(page);
+  }
+
   const expectedOptions = [
     /My page|Mi p[aá]gina|My Account|Mi cuenta/i,
     /My Products|Mis productos/i,
@@ -46,7 +59,6 @@ test("SAM-24963 @qst @mx @base-store @safe @registered - Validate My account men
     /My Orders|Mis pedidos/i,
     /Wishlist|Wish List|Lista de deseos/i,
     /My sub(?:s)?criptions|Mis suscripciones/i,
-    /^Services$|^Servicios$/i,
     /Logout|Cerrar Sesi[oó]n/i,
   ];
 

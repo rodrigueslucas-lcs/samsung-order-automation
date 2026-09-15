@@ -15,7 +15,7 @@ export function getBackOfficeUrl(explicitUrl) {
   if (explicitUrl) return explicitUrl;
   if (process.env.BACKOFFICE_URL) return process.env.BACKOFFICE_URL;
 
-  const environment = (process.env.BACKOFFICE_ENV || "s2").toLowerCase();
+  const environment = (process.env.BACKOFFICE_ENV || "s1").toLowerCase();
   const url = BACKOFFICE_URLS[environment];
   if (!url) {
     throw new Error(

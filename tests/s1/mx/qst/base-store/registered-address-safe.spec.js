@@ -5,16 +5,21 @@ import { reachMxRegisteredDelivery } from "../../dst/base-store/mxFlows";
 
 const { recordBusinessEvidence } = evidenceContext;
 const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
+const saveAddressName = /Guardar detalles para compras futuras|Guardar.*(direcci[oó]n|env[ií]o|Mi cuenta)|Save.*address/i;
 
 test.describe.configure({ timeout: 420000 });
 
-async function openNewAddressMode(page) {
-  const newAddress = page
-    .getByRole("radio", { name: /Nueva direcci[oó]n|New address/i })
+async function selectAddressMode(page, name) {
+  const radio = page
+    .getByRole("radio", { name })
     .filter({ visible: true });
-  if (await newAddress.count()) {
-    await newAddress.first().check();
-  }
+  await radio.first().waitFor({ state: "visible", timeout: 60000 });
+  await radio.first().locator("xpath=ancestor::mat-radio-button[1]").click();
+  await expect(radio.first()).toBeChecked({ timeout: 30000 });
+}
+
+async function openNewAddressMode(page) {
+  await selectAddressMode(page, /Nueva direcci[oó]n|New address/i);
 }
 
 test("SAM-24992 @qst @mx @base-store @safe @registered - Select saved address", async ({ page, mxConfig }, testInfo) => {
@@ -24,12 +29,16 @@ test("SAM-24992 @qst @mx @base-store @safe @registered - Select saved address", 
   const savedAddress = page
     .getByRole("radio", { name: /Direcci[oó]n guardada|Saved address/i })
     .filter({ visible: true });
+  const savedAddressAvailable = await savedAddress.first()
+    .waitFor({ state: "visible", timeout: 60000 })
+    .then(() => true)
+    .catch(() => false);
   test.skip(
-    !(await savedAddress.isVisible().catch(() => false)),
+    !savedAddressAvailable,
     "No saved address is available in the authenticated MX S1 account; safe TC does not create persistent profile data."
   );
 
-  await savedAddress.check();
+  await selectAddressMode(page, /Direcci[oó]n guardada|Saved address/i);
   const checked = page.getByRole("radio", { checked: true }).filter({ visible: true });
   await expect(checked.first()).toBeVisible({ timeout: 30000 });
   await checkout.validateCheckoutSummary(mxConfig.sku);
@@ -56,7 +65,7 @@ test("MX QST registered Save-address discovery @qst @mx @base-store @safe @regis
   expect(address.selectedColonia).toBeTruthy();
 
   const saveAddress = page
-    .getByRole("checkbox", { name: /Guardar.*(direcci[oó]n|env[ií]o|Mi cuenta)|Save.*address/i })
+    .getByRole("checkbox", { name: saveAddressName })
     .filter({ visible: true });
   await expect(
     saveAddress.first(),
@@ -90,7 +99,7 @@ test("SAM-24994 @qst @mx @base-store @safe @registered - Checkout accepts a new 
   expect(address.selectedColonia).toBeTruthy();
 
   const saveAddress = page
-    .getByRole("checkbox", { name: /Guardar.*(direcci[oó]n|env[ií]o|Mi cuenta)|Save.*address/i })
+    .getByRole("checkbox", { name: saveAddressName })
     .filter({ visible: true });
   if (await saveAddress.count()) await expect(saveAddress.first()).not.toBeChecked();
 
@@ -112,14 +121,19 @@ test("SAM-25000 @qst @mx @base-store @safe @registered - Switch saved and new ad
     .getByRole("radio", { name: /Nueva direcci[oó]n|New address/i })
     .filter({ visible: true });
 
+  const [savedAvailable, freshAvailable] = await Promise.all([
+    saved.first().waitFor({ state: "visible", timeout: 60000 }).then(() => true).catch(() => false),
+    fresh.first().waitFor({ state: "visible", timeout: 60000 }).then(() => true).catch(() => false),
+  ]);
+
   test.skip(
-    !(await saved.isVisible().catch(() => false)) || !(await fresh.isVisible().catch(() => false)),
+    !savedAvailable || !freshAvailable,
     "Both saved-address and new-address modes are required to prove switching without creating persistent data."
   );
 
-  await saved.check();
+  await selectAddressMode(page, /Direcci[oó]n guardada|Saved address/i);
   await expect(saved).toBeChecked();
-  await fresh.check();
+  await selectAddressMode(page, /Nueva direcci[oó]n|New address/i);
   await expect(fresh).toBeChecked();
   await expect(saved).not.toBeChecked();
 
