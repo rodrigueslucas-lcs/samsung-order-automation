@@ -1,77 +1,104 @@
 # Samsung SMB Automation - Jenkins Setup
 
-This document describes the infrastructure prerequisites for the repository `Jenkinsfile`.
+## Current CI scope
 
-## Goal
-
-The first CI milestone is the official MX S1 Base Store P1/QST campaign. The repository validates the official 30-TC inventory before execution, runs Playwright with one worker and no retries for the campaign runner, and archives runtime evidence.
+The repository `Jenkinsfile` is ready for the official MX S1 Base Store P1/QST campaign. It validates the official 30-TC inventory before execution, uses one Playwright worker and zero retries in the campaign runner, supports Windows and Unix agents, can run headless, injects runtime secrets from Jenkins Credentials, and archives runtime evidence.
 
 ## Jenkins agent prerequisites
 
 - Git access to this repository.
-- Node.js compatible with the project (Node 24.x is the project baseline).
-- npm.
-- Google Chrome available to the Jenkins agent because the Playwright project currently uses `channel: chrome`.
-- Network/VPN access to the Samsung S1 endpoints used by MX tests.
-- Permission to write the Jenkins workspace and `test-results/`.
+- Node.js 24.x (project baseline) and npm.
+- Google Chrome available to the agent (`playwright.config.js` uses `channel: chrome`).
+- Network/VPN access from the agent to Samsung S1 MX and other endpoints used by the selected tests (including BackOffice/Mailinator/payment provider when applicable).
+- Workspace write permission.
 
-Do not install Allure yet. First prove the base pipeline and Playwright artifacts on the real Jenkins agent.
+A Linux agent is preferred if Samsung provides one, but the Jenkinsfile supports Windows agents as well.
 
-## Jenkins job
+## Required Jenkins credentials
 
-Create a Pipeline (or Multibranch Pipeline) pointing at this repository and use `Jenkinsfile` from SCM.
+Create exactly these three Jenkins credentials as **Secret file** credentials. The IDs are part of the pipeline contract:
 
-Recommended first run parameters:
+| Credential ID | Source file | Purpose |
+| --- | --- | --- |
+| `samsung-mx-s1-auth-state` | `playwright/.auth/mx-s1-user.json` | Playwright/Samsung authenticated storage state |
+| `samsung-mx-s1-session-storage` | `playwright/.auth/mx-s1-session-storage.json` | MX S1 sessionStorage exported with the auth state |
+| `samsung-mx-test-card` | `playwright/.auth/mx-test-card.json` | Approved MX payment test data |
 
-- `RUN_MX_QST=true`
-- `RUN_DESTRUCTIVE=false` for infrastructure validation only.
-- Enable `RUN_DESTRUCTIVE=true` only after authentication and local test-card injection are configured on an authorized S1 agent.
+Generate/refresh the first two files locally through the existing approved authentication flow. Do not edit cookies manually and do not bypass MFA/CAPTCHA. Upload the resulting files to Jenkins Credentials.
 
-The full official MX QST runner includes payment/order scenarios, so the Jenkinsfile deliberately refuses to run the complete 30-TC campaign unless `RUN_DESTRUCTIVE=true`.
+The pipeline copies all three secret files into the gitignored `playwright/.auth/` directory only for the build and deletes that directory in `post { always { ... } }` before artifacts are archived.
 
-## Authentication
+If a Samsung Account session expires, refresh the approved local state and replace the two auth secret files in Jenkins. Credentials are not printed or committed.
 
-Samsung Account authentication must not be committed to Git. The local flow currently writes Playwright auth state under `playwright/.auth/`, which is gitignored.
+## Create the Jenkins job
 
-For unattended Jenkins execution we still need to choose and validate one of these approaches on the real Samsung Jenkins agent:
+Recommended: create a **Pipeline** or **Multibranch Pipeline** from SCM.
 
-1. A Jenkins-managed secret file containing a valid pre-generated Playwright storage state, copied into the expected ignored path for the build; or
-2. Jenkins-managed username/password material plus a CI-compatible authentication bootstrap, if Samsung Account/MFA policy permits it.
+Repository: `rodrigueslucas-lcs/samsung-order-automation`
 
-Do not attempt to bypass MFA/CAPTCHA. If the account requires interactive MFA every run, the pipeline must use an approved reusable session mechanism or remain manually bootstrapped.
+Script path: `Jenkinsfile`
 
-## MX test card
+For the current development cycle, point the job at `agent/mx-qst-p1-finish`. After the work is merged, point it at the team's permanent integration/default branch.
 
-The MX payment test data must remain outside Git. Local development loads the ignored test-card file under `playwright/.auth/`.
+The Jenkins Git credential used for checkout is separate from the three runtime Secret files above.
 
-For Jenkins, store the equivalent test-card JSON as a Jenkins **Secret file** and materialize it only inside the workspace for the build. Never echo its contents to the console and never archive `playwright/.auth/`.
+## Pipeline parameters
+
+- `RUN_MX_QST=true`: run the official MX QST campaign.
+- `RUN_DESTRUCTIVE=true`: required for the complete official 30-TC campaign because it includes authorized payment/order scenarios.
+- `HEADLESS=true`: recommended for Jenkins service agents.
+- `ENABLE_VIDEO=false`: keep disabled until FFmpeg/video is proven on the real agent.
+
+For a first infrastructure-only build, set `RUN_MX_QST=false`. Checkout, Node/npm/Git/Chrome diagnostics, `npm ci`, the official SMB gate and the exact MX 30/30 list still execute without creating an order.
+
+For the first real QST build, enable both `RUN_MX_QST=true` and `RUN_DESTRUCTIVE=true` only on the authorized S1 agent after the three Secret file credentials exist.
+
+## Authentication behavior in CI
+
+Local execution remains unchanged: `npm run qst:mx:base-store` performs the existing manual authentication/bootstrap flow unless explicitly told otherwise.
+
+Jenkins sets `MX_QST_USE_EXISTING_AUTH=1`. In that mode the runner requires the pre-provisioned auth state and session storage instead of opening the interactive login bootstrap. Missing auth material fails closed before the campaign starts.
+
+Jenkins also sets `MX_QST_HEADLESS=1` when `HEADLESS=true`. This removes `--headed` from the Playwright invocation but does not weaken any functional assertion.
 
 ## Artifacts
 
-The MX runner writes campaign artifacts under `test-results/jenkins/mx-qst` when invoked by Jenkins. Jenkins archives `test-results/**/*` and `playwright-report/**/*`.
+Jenkins sets `MX_QST_ARTIFACT_DIR=test-results/jenkins/mx-qst` and archives `test-results/**/*` plus `playwright-report/**/*` after the secret directory has been removed.
 
-Current Playwright behavior:
+Current Playwright evidence behavior:
 
-- screenshots: enabled;
-- trace: retained on failure;
-- video: disabled unless `PW_VIDEO=1` because managed Windows environments previously produced FFmpeg `spawn EPERM` failures.
+- screenshots: on;
+- trace: retain on failure;
+- video: opt-in with `ENABLE_VIDEO=true` / `PW_VIDEO=1`.
 
-Validate video support on the Jenkins agent before enabling it globally. A Linux agent is preferable if available because Playwright/FFmpeg automation is generally easier to operate there.
+Video remains opt-in because a managed Windows environment previously produced FFmpeg `spawn EPERM` during teardown. Enable it only after a small Jenkins-agent proof run.
 
-## Next milestones
+## First-run checklist
 
-After the first Jenkins build is proven on the Samsung infrastructure:
+1. Confirm the Jenkins agent can reach Samsung S1 while on the required corporate network/VPN.
+2. Confirm Node 24.x, npm, Git and Chrome in `Agent Diagnostics`.
+3. Add the three Secret file credentials using the exact IDs above.
+4. Run once with `RUN_MX_QST=false` and confirm both official gates pass.
+5. Run the authorized QST with `RUN_MX_QST=true`, `RUN_DESTRUCTIVE=true`, `HEADLESS=true`, `ENABLE_VIDEO=false`.
+6. Confirm the console reports `Official MX Base P1 selection: 30/30 tests.`
+7. Review archived JSON, screenshots and failure traces.
+8. Do not blindly rerun a failed destructive TC after a possible payment/order submit; inspect the order/evidence first.
 
-1. Wire Jenkins Credentials for auth state and MX test-card data.
-2. Validate screenshot/trace/video artifacts from the Jenkins agent.
-3. Generate and publish the Samsung Executive/Control Center report from the same build data.
-4. Add Allure as the technical drill-down report without replacing the executive report.
-5. Parameterize QST/DST, market (MX/PE/CO/CL), Base Store/EPP, and safe/destructive execution.
-6. Add schedules only after the corresponding authentication strategy is reliable.
+## Security and safety rules
 
-## Security rules
+- Never commit passwords, storage-state cookies, session storage, payment test data, or Jenkins secret files.
+- Never archive `playwright/.auth/`.
+- Payment/order campaign: one worker, zero retries.
+- `RUN_DESTRUCTIVE` authorizes the official QST payment/order family only; it does not authorize profile writes or cronjobs.
+- MFA/CAPTCHA is never bypassed.
+- If a runtime result has no Playwright result status, the runner reports `NOT_RUN`; it must never infer PASS from missing execution evidence.
 
-- No passwords, card test data, storage-state cookies, or secret files in Git.
-- No `playwright/.auth/` directory in Jenkins artifacts.
-- Payment/order execution: one worker, zero retries, no blind rerun after a possible submit.
-- Cron/profile-write destructive families keep their independent guards; enabling the QST payment campaign does not authorize them.
+## Next CI layer after first Jenkins proof
+
+After one real Jenkins build proves agent/network/auth compatibility:
+
+1. Validate screenshot/trace/video artifact UX on Jenkins.
+2. Generate the Samsung Executive/Control Center report from the same build runtime JSON/artifacts.
+3. Add Allure as technical drill-down while retaining the executive report for management/release reporting.
+4. Parameterize market (MX/PE/CO/CL), QST/DST and Base Store/EPP only as those official runners become execution-ready.
+5. Add schedules only after authentication/session refresh behavior is operationally reliable.
