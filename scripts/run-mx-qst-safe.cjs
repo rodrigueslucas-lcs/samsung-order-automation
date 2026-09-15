@@ -60,7 +60,7 @@ console.log(`[mx-qst] Official MX Base P1 selection: ${officialP1Titles.length}/
 if (listOnly) {
   const listed = spawnSync(process.execPath, [
     playwrightCli, "test", "tests/s1/mx/qst/base-store",
-    "--project=chromium", "--grep", p1Pattern, "--list",
+    "--project=chromium", "--grep", p1Pattern, "--list", "--reporter=list",
   ], { stdio: "inherit" });
   process.exit(listed.status ?? 1);
 }
@@ -97,6 +97,17 @@ const qstExecutionEnv = {
   PLAYWRIGHT_HTML_OUTPUT_DIR: path.resolve("playwright-report"),
   SMB_EVIDENCE_DIR: path.join(artifactDir, "evidence"),
 };
+
+// Only a real execution owns these official build artifacts. Removing stale
+// output here prevents a cancelled build from publishing a previous/list report.
+for (const target of [
+  path.resolve("playwright-report"),
+  reportFile,
+  runtimeSummaryFile,
+  path.join(artifactDir, "evidence"),
+  path.join(artifactDir, "executive"),
+]) fs.rmSync(target, { recursive: true, force: true });
+
 const playwrightArgs = [
   playwrightCli, "test", "tests/s1/mx/qst/base-store",
   "--project=chromium", "--workers=1", "--retries=0",
