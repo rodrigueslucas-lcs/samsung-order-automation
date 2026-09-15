@@ -16,6 +16,7 @@ function buildMxQstRuntimeSummary(report, {
   officialIds, root = process.cwd(), market = "MX", store = "BASE_STORE",
   suite = "P1/QST", environment = "S1/STG",
   buildNumber = process.env.BUILD_NUMBER || null,
+  buildUrl = process.env.BUILD_URL || null,
   gitCommit = process.env.GIT_COMMIT || null,
   timestamp = report?.stats?.startTime || new Date().toISOString(),
   titles = {},
@@ -69,7 +70,7 @@ function buildMxQstRuntimeSummary(report, {
     duration: tests.reduce((sum, entry) => sum + entry.duration, 0),
   };
   if (summary.passed + summary.failed + summary.blocked + summary.notRun !== summary.official) throw new Error("MX QST runtime summary does not reconcile with official scope.");
-  return sanitize({ schemaVersion: 1, buildNumber, gitCommit, timestamp, market, store, suite, environment, summary, tests });
+  return sanitize({ schemaVersion: 1, buildNumber, buildUrl, gitCommit, timestamp, market, store, suite, environment, summary, tests });
 }
 
 function writeRuntimeSummary(filePath, summary) {
