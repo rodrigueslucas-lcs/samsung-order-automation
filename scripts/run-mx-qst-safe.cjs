@@ -6,6 +6,7 @@ const preqa2Ledger = require("../test-mapping/preqa2-validation.json");
 const { writeMxS1RuntimeResults } = require("../utils/mxS1RuntimeLedger");
 const { testTitles } = require("../utils/qstS1Implementation");
 
+const listOnly = process.argv.includes("--list");
 const artifactDir = path.resolve(process.env.MX_QST_ARTIFACT_DIR || "test-results");
 const reportFile = path.join(artifactDir, "mx-qst-safe-results.json");
 fs.mkdirSync(path.dirname(reportFile), { recursive: true });
@@ -46,6 +47,15 @@ if (MX_BASE_P1_IDS.length !== 30 || officialP1Titles.length !== 30 || invalidP1I
 }
 
 const destructiveTitles = officialP1Titles.filter((title) => /@destructive\b/i.test(title));
+console.log(`[mx-qst] Official MX Base P1 selection: ${officialP1Titles.length}/30 tests.`);
+
+if (listOnly) {
+  const listed = spawnSync(process.execPath, [
+    playwrightCli, "test", "tests/s1/mx/qst/base-store",
+    "--project=chromium", "--grep", p1Pattern, "--list",
+  ], { stdio: "inherit" });
+  process.exit(listed.status ?? 1);
+}
 
 const login = spawnSync(process.execPath, [path.resolve("scripts/auth-login-mx.cjs")], {
   env: { ...process.env, MX_AUTH_MANUAL: "1" },
@@ -56,7 +66,6 @@ if (login.status !== 0 || !hasAuthState()) {
   process.exit(login.status || 1);
 }
 
-console.log(`[mx-qst] Official MX Base P1 selection: ${officialP1Titles.length}/30 tests.`);
 const result = spawnSync(process.execPath, [
   playwrightCli, "test", "tests/s1/mx/qst/base-store",
   "--project=chromium", "--headed", "--workers=1", "--retries=0",
