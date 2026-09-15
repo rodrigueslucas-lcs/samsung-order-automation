@@ -2,8 +2,18 @@ import { expect } from "@playwright/test";
 import CartPage from "../../../../../pages/CartPage";
 import ProductPage from "../../../../../pages/ProductPage";
 import cartPresentation from "../../../../../flows/smb/cartPresentation";
+import mxStagingGuard from "../../../../../utils/mxStagingGuard";
 
 const { validateCartItemPresentation, validateStickyControl } = cartPresentation;
+const { assertMxStagingPage } = mxStagingGuard;
+
+async function bootstrapMx(page, config) {
+  await page.goto(config.bootstrapUrl.toString(), { waitUntil: "domcontentloaded" });
+  // The cookie endpoint may render its success copy or an empty response. Its
+  // contract is completed by explicitly returning to, and validating, MX S1.
+  await page.goto(config.baseUrl.toString(), { waitUntil: "domcontentloaded" });
+  await assertMxStagingPage(page, "MX QST flow bootstrap");
+}
 
 export function mxQstCart(page, config) {
   return new CartPage(page, {
@@ -18,8 +28,7 @@ export function mxQstCart(page, config) {
 }
 
 export async function openMxQstPdp(page, config) {
-  await page.goto(config.bootstrapUrl.toString(), { waitUntil: "domcontentloaded" });
-  await expect(page.getByText(/You can access pages now/i)).toBeVisible({ timeout: 60000 });
+  await bootstrapMx(page, config);
   await page.goto(config.pdpUrl.toString(), { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(new RegExp(`/mx/p/${config.sku}`, "i"));
   await expect(page.getByText(config.sku, { exact: true }).first()).toBeVisible({ timeout: 60000 });
@@ -27,8 +36,7 @@ export async function openMxQstPdp(page, config) {
 
 export async function prepareMxQstCart(page, config) {
   const cart = mxQstCart(page, config);
-  await page.goto(config.bootstrapUrl.toString(), { waitUntil: "domcontentloaded" });
-  await expect(page.getByText(/You can access pages now/i)).toBeVisible({ timeout: 60000 });
+  await bootstrapMx(page, config);
   await cart.clearMxCartAndConfirmEmpty();
   await openMxQstPdp(page, config);
 

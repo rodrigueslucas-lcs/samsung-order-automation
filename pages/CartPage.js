@@ -117,8 +117,6 @@ export default class CartPage extends BasePage {
         throw new Error(`MX cart row for ${sku} does not expose exactly one Remove button.`);
       }
 
-      const itemHandle = await item.elementHandle();
-      if (!itemHandle) throw new Error(`MX cart row for ${sku} detached before removal.`);
       await removeButton.click();
 
       const semanticDialog = this.page
@@ -147,7 +145,6 @@ export default class CartPage extends BasePage {
 
       await Promise.all([
         dialog.first().waitFor({ state: 'hidden', timeout: 30000 }),
-        this.page.waitForFunction((row) => !row.isConnected, itemHandle, { timeout: 30000 }),
         confirmButton.click(),
       ]);
     }

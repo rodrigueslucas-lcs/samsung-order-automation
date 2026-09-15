@@ -2,7 +2,7 @@ import { expect } from "@playwright/test";
 import BasePage from "./BasePage";
 
 const KNOWN_SUBJECTS = [/\u00a1Recibimos tu pedido!/i, /\u00a1Pago confirmado!/i];
-const OTP_SUBJECT = /Contrase\u00f1a \u00danica de Samsung \(OTP\)/i;
+const OTP_SUBJECT = /Contrase\u00f1a \u00danica de Samsung \(OTP\)|Samsung C[oó]digo de Verificaci[oó]n/i;
 const EXPECTED_SENDER = /Customer Services Team|customerservice@shopmail\.samsung\.com/i;
 
 export default class MailinatorPage extends BasePage {
@@ -43,9 +43,33 @@ export default class MailinatorPage extends BasePage {
 
   async snapshotMessageIds() {
     const rows = await this.inboxRows();
-    return rows.evaluateAll((elements) =>
-      elements.map((row) => row.id).filter(Boolean)
+    const ids = await rows.evaluateAll((elements) =>
+      elements.map((row) => row.id || row.querySelector("a[href*='msgid=']")?.getAttribute("href")).filter(Boolean)
     );
+    const otpCount = await rows.filter({ hasText: OTP_SUBJECT }).count();
+    return [...ids, `__otp_count__:${otpCount}`];
+  }
+
+  async snapshotOtpCodes() {
+    const codes = [];
+    await this.refreshInbox();
+    const count = await (await this.inboxRows()).filter({ hasText: OTP_SUBJECT }).count();
+
+    for (let index = 0; index < count; index++) {
+      const rows = (await this.inboxRows()).filter({ hasText: OTP_SUBJECT });
+      await rows.nth(index).click();
+      await this.page.getByText("Public Message", { exact: true })
+        .waitFor({ state: "visible", timeout: 30000 });
+      const message = await this.readOpenMessage();
+      try {
+        codes.push(this.extractOtp(message.bodyText));
+      } catch {
+        // Ignore malformed historical messages; they cannot identify the new OTP.
+      }
+      await this.refreshInbox();
+    }
+
+    return [...new Set(codes)];
   }
 
   async refreshInbox() {
@@ -56,7 +80,9 @@ export default class MailinatorPage extends BasePage {
     await this.inboxField.waitFor({ state: "visible", timeout: 30000 });
     await this.inboxField.fill(this.inbox);
     await this.goButton.click();
-    await this.page.waitForTimeout(1000);
+    await this.page.getByRole("heading", { name: "Public Messages" })
+      .waitFor({ state: "visible", timeout: 30000 });
+    await expect(this.inboxField).toHaveValue(this.inbox);
   }
 
   async openCandidate(subjectPattern) {
@@ -91,21 +117,32 @@ export default class MailinatorPage extends BasePage {
 
   async waitForOtpEmail({
     baselineMessageIds = [],
+    baselineOtpCodes = [],
     timeoutMs = Number(process.env.MAILINATOR_EMAIL_TIMEOUT_MS || 600000),
     intervalMs = Number(process.env.MAILINATOR_POLL_INTERVAL_MS || 15000),
   } = {}) {
     const startedAt = Date.now();
     const baseline = new Set(baselineMessageIds);
+    const priorOtpCodes = new Set(baselineOtpCodes);
+    const baselineOtpCount = Number(
+      baselineMessageIds.find((value) => value.startsWith("__otp_count__:"))?.split(":")[1] || 0
+    );
     let observed = [];
 
     while (Date.now() - startedAt < timeoutMs) {
       observed = await this.snapshotInbox();
       const rows = await this.inboxRows();
       const otpRows = rows.filter({ hasText: OTP_SUBJECT });
-      for (let index = 0; index < await otpRows.count(); index++) {
+      const otpCount = await otpRows.count();
+      const candidateCount = baselineOtpCodes.length > 0
+        ? otpCount
+        : Math.max(0, otpCount - baselineOtpCount);
+      for (let index = 0; index < candidateCount; index++) {
         const row = otpRows.nth(index);
-        const messageId = await row.getAttribute("id");
-        if (!messageId || baseline.has(messageId)) continue;
+        const messageId = (await row.getAttribute("id")) ||
+          (await row.locator("a[href*='msgid=']").first().getAttribute("href")) ||
+          `otp-row-${index}-of-${otpCount}`;
+        if (baseline.has(messageId)) continue;
 
         await row.click();
         await this.page.getByText("Public Message", { exact: true })
@@ -119,6 +156,10 @@ export default class MailinatorPage extends BasePage {
         }
 
         const otp = this.extractOtp(message.bodyText);
+        if (priorOtpCodes.has(otp)) {
+          await this.refreshInbox();
+          continue;
+        }
         await this.screenshot("tc13-mailinator-otp-email");
         return {
           otp,
@@ -130,7 +171,7 @@ export default class MailinatorPage extends BasePage {
         };
       }
 
-      await this.page.waitForTimeout(intervalMs);
+      await this.page.waitForTimeout(Math.min(intervalMs, Math.max(0, timeoutMs - (Date.now() - startedAt))));
       await this.refreshInbox();
     }
 

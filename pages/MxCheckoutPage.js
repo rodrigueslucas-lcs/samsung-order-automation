@@ -120,7 +120,14 @@ export default class MxCheckoutPage extends BasePage {
     await this.page.getByRole("textbox", { name: "line1" }).fill(exteriorNumber);
 
     const noInvoice = this.page.getByRole("radio", { name: "No", exact: true });
-    await noInvoice.check({ force: true });
+    const noInvoiceId = await noInvoice.getAttribute("id");
+    if (!noInvoiceId) throw new Error("MX invoice option No has no associated input id.");
+    const noInvoiceLabel = this.page.locator(`label[for="${noInvoiceId}"]`);
+    await noInvoiceLabel.waitFor({ state: "visible", timeout: 30000 });
+    await noInvoiceLabel.click();
+    if (!(await noInvoice.isChecked())) {
+      throw new Error("MX invoice option No was not selected by the checkout model.");
+    }
 
     const result = {
       lookupStatus: response.status(),

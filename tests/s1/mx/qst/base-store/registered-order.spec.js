@@ -2,12 +2,14 @@ import MarketPaymentPage from "../../../../../pages/MarketPaymentPage";
 import destructiveGuards from "../../../../../utils/destructiveGuards";
 import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
+import mxTestCard from "../../../../../utils/mxTestCard.js";
 import { test, expect } from "../../dst/base-store/mx.auth.fixture";
 import { reachMxRegisteredPayment } from "../../dst/base-store/mxFlows";
 
 const { requirePaymentSubmitOptIn } = destructiveGuards;
 const { recordBusinessEvidence } = evidenceContext;
 const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
+const { getMxTestCard } = mxTestCard;
 test.describe.configure({ retries: 0 });
 
 test.skip(process.env.ALLOW_PAYMENT_SUBMIT !== "1", "Registered order submit is destructive and requires ALLOW_PAYMENT_SUBMIT=1.");
@@ -26,13 +28,7 @@ test("SAM-25002 @destructive @qst @mx @base-store @registered - Complete card pa
   const config = { ...mxConfig, sku, pdpUrl: new URL(`/mx/p/${sku}`, mxConfig.baseUrl.origin) };
   await reachMxRegisteredPayment(page, config);
   const payment = new MarketPaymentPage(page, { market: "MX" });
-  const card = {
-    number: required("MX_TEST_CARD_NUMBER"),
-    holderName: required("MX_TEST_CARD_HOLDER"),
-    expiry: required("MX_TEST_CARD_EXPIRY"),
-    cvv: required("MX_TEST_CARD_CVV"),
-    document: required("MX_TEST_CARD_DOCUMENT"),
-  };
+  const card = getMxTestCard();
   await payment.selectCreditCard();
   await payment.fillCardData(card);
   await payment.validateCreditCardReady(card);

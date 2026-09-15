@@ -14,8 +14,7 @@ export default class GuestOrderTrackingPage extends BasePage {
     this.orderNumber = this.form.locator('input[type="text"]').first();
     this.email = this.form.locator('input[type="email"]');
     this.verificationCode = this.form.getByRole("textbox", {
-      name: "Código de verificación",
-      exact: true,
+      name: /Código de Verificación/i,
     });
     this.sendCodeButton = this.form.getByRole("button", {
       name: "Enviar código",
@@ -134,9 +133,15 @@ export default class GuestOrderTrackingPage extends BasePage {
       );
     }
 
-    await this.page
-      .getByText(/Hemos enviado el c\u00f3digo de verificaci\u00f3n.*correo electr\u00f3nico/i)
-      .waitFor({ state: "visible", timeout: 30000 });
+    // MX currently confirms an accepted OTP request by switching the form to
+    // its active verification state (code input + resend countdown). The old
+    // transient toast is not consistently rendered.
+    await this.verificationCode.waitFor({ state: "visible", timeout: 30000 });
+    const resendButton = this.form.getByRole("button", { name: /Reenviar c[oó]digo/i });
+    await resendButton.waitFor({ state: "visible", timeout: 30000 });
+    if (!(await resendButton.isDisabled())) {
+      throw new Error("OTP request returned success but the resend countdown was not active.");
+    }
 
     return {
       method: response.request().method(),
@@ -174,7 +179,7 @@ export default class GuestOrderTrackingPage extends BasePage {
       .or(card.getByRole("button", { name: /Ver detalles/i })).first();
     await details.waitFor({ state: "visible", timeout: 30000 });
 
-    const statusPattern = /Recibido|Pagado|En proceso|Preparando env[i\u00ed]o|En camino|Entregado|Processing|Shipping/i;
+    const statusPattern = /Pedido Registrado|Recibido|Pagado|En proceso|Preparando env[i\u00ed]o|En camino|Entregado|Processing|Shipping/i;
     const status = card.getByText(statusPattern).first();
     await status.waitFor({ state: "visible", timeout: 30000 });
     const statusText = (await status.innerText()).trim();

@@ -2,13 +2,161 @@
   "environment": "S1/STG",
   "market": "MX",
   "results": {
-    "SAM-24971": { "status": "PASS", "evidence": "Preserved validated S1/STG runtime result from the legacy campaign." },
-    "SAM-24972": { "status": "PASS", "evidence": "Preserved validated S1/STG runtime result from the legacy campaign." },
-    "SAM-24981": { "status": "PASS", "evidence": "Preserved validated S1/STG runtime result from the legacy campaign." },
-    "SAM-24982": { "status": "PASS", "evidence": "Preserved validated S1/STG runtime result from the legacy campaign." },
-    "SAM-24988": { "status": "PASS", "evidence": "Preserved validated S1/STG runtime result from the legacy campaign." },
-    "SAM-24989": { "status": "PASS", "evidence": "Preserved validated S1/STG runtime result from the legacy campaign." },
-    "SAM-25011": { "status": "PASS", "evidence": "Preserved validated S1/STG runtime result from the legacy campaign." },
-    "SAM-25016": { "status": "PASS", "evidence": "Preserved validated S1/STG runtime result from the legacy campaign." }
+    "SAM-24971": {
+      "status": "PASS",
+      "evidence": "Official MX P1 QST runner completed: SAM-24971 @qst @mx @base-store @safe - Cart page UI",
+      "blocker": null,
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-24972": {
+      "status": "PASS",
+      "evidence": "Official MX P1 QST runner completed: SAM-24972 @qst @mx @base-store @safe - Increase decrease and delete cart quantity",
+      "blocker": null,
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-24981": {
+      "status": "PASS",
+      "evidence": "Official MX P1 QST runner completed: SAM-24981 @qst @mx @base-store @safe - Add Samsung Care+",
+      "blocker": null,
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-24982": {
+      "status": "PASS",
+      "evidence": "Official MX P1 QST runner completed: SAM-24982 @qst @mx @base-store @safe - Trade-up interaction preserves controlled cart",
+      "blocker": null,
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-24988": {
+      "status": "PASS",
+      "evidence": "Official MX P1 QST runner completed: SAM-24988 @qst @mx @base-store @safe - Checkout button on cart page",
+      "blocker": null,
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-24989": {
+      "status": "FAIL",
+      "evidence": null,
+      "blocker": "MX S1 functional assertion failed: SAM-24989 @qst @mx @base-store @safe - Order Summary on checkout page",
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-25011": {
+      "status": "PASS",
+      "evidence": "Official MX P1 QST runner completed: SAM-25011 @qst @mx @base-store @backoffice @safe - BackOffice order and product basic advanced search",
+      "blocker": null,
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-25016": {
+      "status": "PASS",
+      "evidence": "Official MX P1 QST runner completed: SAM-25016 @qst @mx @base-store @safe @mobile - Mobile Sticky checkout",
+      "blocker": null,
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-24999": {
+      "status": "PASS",
+      "evidence": "Official MX P1 QST runner completed: SAM-24999 @qst @mx @base-store @safe - Invalid address is rejected",
+      "blocker": null,
+      "validatedAt": "2026-09-15T18:00:15.876Z"
+    },
+    "SAM-25001": {
+      "status": "PASS",
+      "evidence": "Official MX P1 QST runner completed: SAM-25001 @qst @mx @base-store @safe - Back to Top returns the cart to the top",
+      "blocker": null,
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-24969": {
+      "status": "BLOCKED",
+      "evidence": null,
+      "blocker": "{\"zephyrId\":\"SAM-24969\",\"market\":\"MX\",\"store\":\"BS\",\"suite\":\"QST\",\"feature\":\"Product\",\"environment\":\"S1\",\"coverage\":\"partial\",\"officialTitle\":\"Add product from BC Page\"} | MX_QST_BC_URL is required so the official BC/category origin is explicit instead of guessed.",
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-24986": {
+      "status": "BLOCKED",
+      "evidence": null,
+      "blocker": "{\"zephyrId\":\"SAM-24986\",\"market\":\"MX\",\"store\":\"BS\",\"suite\":\"QST\",\"feature\":\"Cart\",\"environment\":\"S1\",\"coverage\":\"missing\",\"officialTitle\":\"Cart value on logout\"} | A dedicated second MX account auth state is required to prove cross-account cart isolation.",
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-24985": {
+      "status": "BLOCKED",
+      "evidence": null,
+      "blocker": "{\"zephyrId\":\"SAM-24985\",\"market\":\"MX\",\"store\":\"BS\",\"suite\":\"QST\",\"feature\":\"Cart\",\"environment\":\"S1\",\"coverage\":\"missing\",\"officialTitle\":\"Add Extended Warranty on Cart\"} | Extended Warranty is not offered for the configured MX QST SKU; use a source-approved eligible SKU before asserting add behavior.",
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-25004": {
+      "status": "PASS",
+      "evidence": "Official MX P1 QST runner completed: SAM-25004 @qst @mx @base-store @safe - PayPal payment mode is available and selectable",
+      "blocker": null,
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-25005": {
+      "status": "PASS",
+      "evidence": "Official MX P1 QST runner completed: SAM-25005 @qst @mx @base-store @safe - Pay in Cash payment mode is available and selectable",
+      "blocker": null,
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-25006": {
+      "status": "BLOCKED",
+      "evidence": null,
+      "blocker": "{\"zephyrId\":\"SAM-25006\",\"market\":\"MX\",\"store\":\"BS\",\"suite\":\"QST\",\"feature\":\"Payment\",\"environment\":\"S1\",\"coverage\":\"missing\",\"officialTitle\":\"Rewards\"} | Rewards is not offered for the current MX S1 guest checkout context; do not fabricate payment availability.",
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-24992": {
+      "status": "PASS",
+      "evidence": "Official MX P1 QST runner completed: SAM-24992 @qst @mx @base-store @safe @registered - Select saved address",
+      "blocker": null,
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-24994": {
+      "status": "PASS",
+      "evidence": "Official MX P1 QST runner completed: SAM-24994 @qst @mx @base-store @safe @registered - Checkout accepts a new unsaved address",
+      "blocker": null,
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-25000": {
+      "status": "FAIL",
+      "evidence": null,
+      "blocker": "MX S1 functional assertion failed: SAM-25000 @qst @mx @base-store @safe @registered - Switch saved and new address modes",
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-24975": {
+      "status": "PASS",
+      "evidence": "Official MX P1 QST runner completed: SAM-24975 @qst @mx @base-store @safe - Rewards text on cart checkout and payment",
+      "blocker": null,
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-25010": {
+      "status": "PASS",
+      "evidence": "Official MX P1 QST runner completed: SAM-25010 @destructive @qst @mx @base-store - Track Order with email and Order ID",
+      "blocker": null,
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-24990": {
+      "status": "PASS",
+      "evidence": "Official MX P1 QST runner completed: SAM-24990 @qst @mx @base-store @safe - Fill mandatory customer details",
+      "blocker": null,
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-24995": {
+      "status": "PASS",
+      "evidence": "Official MX P1 QST runner completed: SAM-24995 @qst @mx @base-store @safe - Guest user cannot save address",
+      "blocker": null,
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-24991": {
+      "status": "BLOCKED",
+      "evidence": null,
+      "blocker": "Profile address persistence is destructive and requires ALLOW_PROFILE_WRITE=1. | MX_ADDRESS_API_URL is required so QA-marked address persistence can be read back and cleaned up safely.",
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-24993": {
+      "status": "PASS",
+      "evidence": "Official MX P1 QST runner completed: SAM-24993 @qst @mx @base-store @safe @registered - Save shipping and billing address option is available",
+      "blocker": null,
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    },
+    "SAM-25002": {
+      "status": "FAIL",
+      "evidence": null,
+      "blocker": "MX S1 functional assertion failed: SAM-25002 @destructive @qst @mx @base-store @registered - Complete card payment with registered user",
+      "validatedAt": "2026-09-15T18:00:15.877Z"
+    }
   }
 }

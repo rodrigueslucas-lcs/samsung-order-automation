@@ -70,6 +70,18 @@ export async function reachMxRegisteredDelivery(page, config) {
 
 export async function reachMxRegisteredPayment(page, config) {
   const { checkout } = await reachMxRegisteredDelivery(page, config);
+  const newAddress = page
+    .getByRole("radio", { name: /Nueva direcci[oó]n|New address/i })
+    .filter({ visible: true })
+    .first();
+  const newAddressAvailable = await newAddress
+    .waitFor({ state: "visible", timeout: 60000 })
+    .then(() => true)
+    .catch(() => false);
+  if (newAddressAvailable) {
+    await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
+    await expect(newAddress).toBeChecked({ timeout: 30000 });
+  }
   const address = await checkout.fillDelivery(
     { postalCode: "01000", street: "Avenida Revolucion", exteriorNumber: "1000" },
     { registered: true }
