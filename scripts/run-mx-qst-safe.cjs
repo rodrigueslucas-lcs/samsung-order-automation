@@ -24,7 +24,10 @@ const MX_BASE_P1_IDS = Object.freeze([
   "SAM-25005", "SAM-25006", "SAM-25010", "SAM-25011", "SAM-25016",
 ]);
 const p1Set = new Set(MX_BASE_P1_IDS);
-const p1Pattern = `^(?:${MX_BASE_P1_IDS.join("|")})\\b`;
+// Playwright --grep matches the full title path (file/describe/test), so the
+// SAM ID is not guaranteed to be at character zero. Keep the word boundary to
+// avoid partial ID matches while allowing the title path prefix.
+const p1Pattern = `(?:${MX_BASE_P1_IDS.join("|")})\\b`;
 
 const allTitles = fs.readdirSync(qstRoot)
   .filter((name) => name.endsWith(".spec.js"))
