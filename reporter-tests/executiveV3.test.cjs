@@ -165,7 +165,22 @@ test('executive v3 renders trend matrix audit and 144-TC drilldown', () => {
   assert.match(html, /Official TC Drilldown/);
   assert.match(html, /144 TCs/);
   assert.match(html, /SAM-24968/);
-  assert.match(html, /No fake execution metrics/);
+  assert.match(html, /No real execution artifact was supplied/);
+});
+
+test('executive v3 renders current Playwright runtime independently from the ledger', () => {
+  const execution = {
+    buildNumber: '42', gitCommit: 'abc123', timestamp: '2026-09-15T12:00:00.000Z',
+    market: 'MX', store: 'BASE_STORE', suite: 'P1/QST',
+    summary: { official: 30, executed: 23, passed: 13, failed: 10, blocked: 7, notRun: 0, passRate: 56.52, duration: 90000 },
+    tests: [{ samId: 'SAM-25001', title: 'Back to Top', status: 'PASS', duration: 1000 }],
+  };
+  const html = render(buildDashboardModel({ ledger: ledger(), execution }));
+  assert.match(html, /Latest Real Execution/);
+  assert.match(html, /Build: 42/);
+  assert.match(html, /Commit: abc123/);
+  assert.match(html, /SAM-25001/);
+  assert.match(html, /56\.5%/);
 });
 
 test('executive v3 remains useful with no execution evidence', () => {

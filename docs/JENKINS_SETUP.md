@@ -102,3 +102,26 @@ After one real Jenkins build proves agent/network/auth compatibility:
 3. Add Allure as technical drill-down while retaining the executive report for management/release reporting.
 4. Parameterize market (MX/PE/CO/CL), QST/DST and Base Store/EPP only as those official runners become execution-ready.
 5. Add schedules only after authentication/session refresh behavior is operationally reliable.
+# Jenkins HTML and runtime reporting
+
+Install the Jenkins **HTML Publisher** plugin before running this pipeline. The
+pipeline publishes two navigable build actions:
+
+- `Playwright MX QST` from `playwright-report/index.html`;
+- `MX QST Executive Dashboard` from
+  `test-results/jenkins/mx-qst/executive/index.html`.
+
+The same directories remain archived as ordinary artifacts. Opening an archived
+HTML file directly may show source text because artifact serving is not an HTML
+report host; use the HTML Publisher links on the build page. No global Jenkins
+CSP relaxation is required by this repository change.
+
+The machine-readable current-build result is written to
+`test-results/jenkins/mx-qst/runtime-summary.json`. It is derived from the real
+Playwright JSON result and reconciles the 30 official MX Base Store P1 cases as
+`PASS`, `FAIL`, `SKIPPED-BLOCKED`, or `NOT_RUN`. Static mapping and coverage
+remain separate sources for requirements and implementation completeness.
+
+`playwright/.auth/` is temporary Jenkins Secret File material. It is removed in
+`post { always { ... } }` before artifact publication and is never included by
+the archive patterns.

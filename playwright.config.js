@@ -12,9 +12,14 @@ export default defineConfig({
 
   workers: 1,
 
+  captureGitInfo: { commit: false, diff: false },
+
   reporter: [
-    ['html', { open: 'always' }],
+    ['html', { open: 'never', outputFolder: process.env.PLAYWRIGHT_HTML_OUTPUT_DIR || 'playwright-report' }],
     ['list'],
+    ...(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE
+      ? [['json', { outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT_FILE }]]
+      : []),
     ['./reporters/evidence/SmbEvidenceReporter.js', {
       outputDir: process.env.SMB_EVIDENCE_DIR || 'test-results/evidence'
     }]

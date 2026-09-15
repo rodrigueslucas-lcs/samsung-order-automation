@@ -120,6 +120,22 @@ pipeline {
         }
       }
       archiveArtifacts artifacts: 'test-results/**/*, playwright-report/**/*', allowEmptyArchive: true, fingerprint: true
+      publishHTML(target: [
+        allowMissing: true,
+        alwaysLinkToLastBuild: true,
+        keepAll: true,
+        reportDir: 'playwright-report',
+        reportFiles: 'index.html',
+        reportName: 'Playwright MX QST'
+      ])
+      publishHTML(target: [
+        allowMissing: true,
+        alwaysLinkToLastBuild: true,
+        keepAll: true,
+        reportDir: 'test-results/jenkins/mx-qst/executive',
+        reportFiles: 'index.html',
+        reportName: 'MX QST Executive Dashboard'
+      ])
     }
     success {
       echo 'Samsung SMB automation build completed successfully.'

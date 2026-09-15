@@ -61,6 +61,7 @@
     "reporting:evidence:test": "node --test reporter-tests/evidence.test.cjs && playwright test --config=reporter-tests/playwright.evidence.config.cjs",
     "reporting:executive": "node reporters/executive/generateExecutiveReport.cjs",
     "reporting:executive:test": "node --test reporter-tests/executive.test.cjs",
+    "reporting:mx-runtime:test": "node --test reporter-tests/mxQstRuntimeSummary.test.cjs reporter-tests/executiveV3.test.cjs",
     "reporting:preqa2": "node reporters/preqa2/generatePreqa2Report.cjs",
     "reporting:preqa2:status": "node reporters/preqa2/generatePreqa2Status.cjs",
     "reporting:preqa2:test": "node --test reporter-tests/preqa2Executive.test.cjs reporter-tests/preqa2Status.test.cjs",

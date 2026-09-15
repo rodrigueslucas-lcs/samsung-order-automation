@@ -5,12 +5,14 @@ const { hasAuthState } = require("../utils/mxAuthState");
 const preqa2Ledger = require("../test-mapping/preqa2-validation.json");
 const { writeMxS1RuntimeResults } = require("../utils/mxS1RuntimeLedger");
 const { testTitles } = require("../utils/qstS1Implementation");
+const { buildMxQstRuntimeSummary, writeRuntimeSummary } = require("../utils/mxQstRuntimeSummary.cjs");
 
 const listOnly = process.argv.includes("--list");
 const useExistingAuth = process.env.MX_QST_USE_EXISTING_AUTH === "1";
 const headless = process.env.MX_QST_HEADLESS === "1";
 const artifactDir = path.resolve(process.env.MX_QST_ARTIFACT_DIR || "test-results");
 const reportFile = path.join(artifactDir, "mx-qst-safe-results.json");
+const runtimeSummaryFile = path.join(artifactDir, "runtime-summary.json");
 fs.mkdirSync(path.dirname(reportFile), { recursive: true });
 const playwrightCli = path.resolve("node_modules/@playwright/test/cli.js");
 const qstRoot = path.resolve("tests/s1/mx/qst/base-store");
@@ -38,6 +40,7 @@ const officialP1Titles = allTitles.filter((title) => {
   const id = title.match(/SAM-\d+/)?.[0];
   return id && p1Set.has(id);
 });
+const officialTitlesById = Object.fromEntries(officialP1Titles.map((title) => [title.match(/SAM-\d+/)?.[0], title]));
 const p1TitleCounts = new Map(MX_BASE_P1_IDS.map((id) => [id, 0]));
 for (const title of officialP1Titles) {
   const id = title.match(/SAM-\d+/)?.[0];
@@ -86,13 +89,18 @@ if (useExistingAuth) {
 const qstExecutionEnv = {
   ...process.env,
   ALLOW_PAYMENT_SUBMIT: "1",
+  TEST_ENV: "S1/STG",
+  TEST_MARKET: "MX",
+  TEST_STORE: "BASE_STORE",
+  TEST_SUITE: "P1/QST",
   PLAYWRIGHT_JSON_OUTPUT_FILE: reportFile,
+  PLAYWRIGHT_HTML_OUTPUT_DIR: path.resolve("playwright-report"),
   SMB_EVIDENCE_DIR: path.join(artifactDir, "evidence"),
 };
 const playwrightArgs = [
   playwrightCli, "test", "tests/s1/mx/qst/base-store",
   "--project=chromium", "--workers=1", "--retries=0",
-  "--grep", p1Pattern, "--reporter=list,json", "--output", path.join(artifactDir, "playwright"),
+  "--grep", p1Pattern, "--output", path.join(artifactDir, "playwright"),
 ];
 if (!headless) playwrightArgs.splice(4, 0, "--headed");
 
@@ -103,26 +111,13 @@ const result = spawnSync(process.execPath, playwrightArgs, {
 
 if (fs.existsSync(reportFile)) {
   const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
-  const outcomes = new Map();
-  const blockedPattern = /SystemParking|maintenance|auth(?:enticated)? state|credentials? (?:are|is) required|EPERM|environment prerequisite/i;
-  const visit = (suite) => {
-    for (const spec of suite.specs || []) {
-      const ids = [...new Set(spec.title.match(/SAM-\d+/g) || [])].filter((id) => p1Set.has(id));
-      const tests = spec.tests || [];
-      const results = tests.flatMap((test) => test.results || []);
-      const statuses = results.map(({ status }) => status);
-      const reason = [
-        ...tests.flatMap((test) => test.annotations || []).map(({ description }) => description),
-        ...results.flatMap((entry) => entry.errors || []).map(({ message }) => message),
-      ].filter(Boolean).join(" | ");
-      const failed = statuses.some((value) => ["failed", "timedOut", "interrupted"].includes(value));
-      const blocked = statuses.length && statuses.every((value) => value === "skipped") || failed && blockedPattern.test(reason);
-      const status = !statuses.length ? "NOT_RUN" : blocked ? "SKIPPED-BLOCKED" : failed ? "FAIL" : "PASS";
-      for (const id of ids) outcomes.set(id, { status, reason, title: spec.title });
-    }
-    for (const child of suite.suites || []) visit(child);
-  };
-  for (const suite of report.suites || []) visit(suite);
+  const runtimeSummary = buildMxQstRuntimeSummary(report, { officialIds: MX_BASE_P1_IDS, titles: officialTitlesById });
+  writeRuntimeSummary(runtimeSummaryFile, runtimeSummary);
+  const outcomes = new Map(runtimeSummary.tests.map((entry) => [entry.samId, {
+    status: entry.status,
+    reason: entry.blockedReason || entry.error || "",
+    title: entry.title || entry.samId,
+  }]));
   console.log("\nMX QST OFFICIAL P1 TC SUMMARY");
   for (const [id, outcome] of [...outcomes].sort()) {
     console.log(`${id}: ${outcome.status}${outcome.status === "SKIPPED-BLOCKED" && outcome.reason ? ` - ${outcome.reason.split("\n")[0]}` : ""}`);
@@ -150,6 +145,15 @@ if (fs.existsSync(reportFile)) {
     writeMxS1RuntimeResults(stagingUpdates);
     console.log(`S1 runtime ledger reconciled: ${stagingUpdates.map(({ id }) => id).join(", ")}`);
   }
+
+  const executive = spawnSync(process.execPath, [
+    path.resolve("reporters/executive-v3/generateExecutiveV3.cjs"),
+    path.resolve("test-mapping/preqa2-validation.json"),
+    path.join(artifactDir, "executive", "index.html"),
+    path.join(artifactDir, "executive", "history.json"),
+    runtimeSummaryFile,
+  ], { stdio: "inherit" });
+  if (executive.status !== 0) console.error("[mx-qst] Executive report generation failed; Playwright result is preserved.");
 }
 
 process.exitCode = result.status ?? 1;

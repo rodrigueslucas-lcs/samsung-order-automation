@@ -246,7 +246,10 @@ function buildDashboardModel({ ledger = null, execution = null, history = [] } =
     .sort((a, b) => String(b.validatedAt).localeCompare(String(a.validatedAt)))
     .slice(0, 8);
   const audit = buildConsistencyAudit(ledger);
-  const releaseHealth = !audit.ok ? 'DATA CHECK' : totals.fail > 0 ? 'ATTENTION' : totals.blocked > 0 ? 'WATCH' : totals.executed > 0 ? 'HEALTHY' : 'NO EXECUTION';
+  const runtime = execution?.summary;
+  const releaseHealth = !audit.ok ? 'DATA CHECK'
+    : runtime ? (runtime.failed > 0 ? 'ATTENTION' : runtime.blocked > 0 ? 'WATCH' : runtime.executed > 0 ? 'HEALTHY' : 'NO EXECUTION')
+    : totals.fail > 0 ? 'ATTENTION' : totals.blocked > 0 ? 'WATCH' : totals.executed > 0 ? 'HEALTHY' : 'NO EXECUTION';
 
   return {
     generatedAt: new Date().toISOString(),
