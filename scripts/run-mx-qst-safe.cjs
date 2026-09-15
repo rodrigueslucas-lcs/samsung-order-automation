@@ -7,6 +7,8 @@ const { writeMxS1RuntimeResults } = require("../utils/mxS1RuntimeLedger");
 const { testTitles } = require("../utils/qstS1Implementation");
 
 const listOnly = process.argv.includes("--list");
+const useExistingAuth = process.env.MX_QST_USE_EXISTING_AUTH === "1";
+const headless = process.env.MX_QST_HEADLESS === "1";
 const artifactDir = path.resolve(process.env.MX_QST_ARTIFACT_DIR || "test-results");
 const reportFile = path.join(artifactDir, "mx-qst-safe-results.json");
 fs.mkdirSync(path.dirname(reportFile), { recursive: true });
@@ -60,13 +62,21 @@ if (listOnly) {
   process.exit(listed.status ?? 1);
 }
 
-const login = spawnSync(process.execPath, [path.resolve("scripts/auth-login-mx.cjs")], {
-  env: { ...process.env, MX_AUTH_MANUAL: "1" },
-  stdio: "inherit",
-});
-if (login.status !== 0 || !hasAuthState()) {
-  console.error("[mx-qst] MX manual authentication/bootstrap failed; QST execution was not started.");
-  process.exit(login.status || 1);
+if (useExistingAuth) {
+  if (!hasAuthState()) {
+    console.error("[mx-qst] Pre-provisioned MX auth state/session storage is missing; QST execution was not started.");
+    process.exit(2);
+  }
+  console.log("[mx-qst] Using pre-provisioned MX authentication state (CI mode).");
+} else {
+  const login = spawnSync(process.execPath, [path.resolve("scripts/auth-login-mx.cjs")], {
+    env: { ...process.env, MX_AUTH_MANUAL: "1" },
+    stdio: "inherit",
+  });
+  if (login.status !== 0 || !hasAuthState()) {
+    console.error("[mx-qst] MX manual authentication/bootstrap failed; QST execution was not started.");
+    process.exit(login.status || 1);
+  }
 }
 
 // Starting the official MX QST runner is the execution-level authorization for
@@ -79,12 +89,14 @@ const qstExecutionEnv = {
   PLAYWRIGHT_JSON_OUTPUT_FILE: reportFile,
   SMB_EVIDENCE_DIR: path.join(artifactDir, "evidence"),
 };
-
-const result = spawnSync(process.execPath, [
+const playwrightArgs = [
   playwrightCli, "test", "tests/s1/mx/qst/base-store",
-  "--project=chromium", "--headed", "--workers=1", "--retries=0",
+  "--project=chromium", "--workers=1", "--retries=0",
   "--grep", p1Pattern, "--reporter=list,json", "--output", path.join(artifactDir, "playwright"),
-], {
+];
+if (!headless) playwrightArgs.splice(4, 0, "--headed");
+
+const result = spawnSync(process.execPath, playwrightArgs, {
   env: qstExecutionEnv,
   stdio: "inherit",
 });
@@ -105,7 +117,7 @@ if (fs.existsSync(reportFile)) {
       ].filter(Boolean).join(" | ");
       const failed = statuses.some((value) => ["failed", "timedOut", "interrupted"].includes(value));
       const blocked = statuses.length && statuses.every((value) => value === "skipped") || failed && blockedPattern.test(reason);
-      const status = blocked ? "SKIPPED-BLOCKED" : failed ? "FAIL" : "PASS";
+      const status = !statuses.length ? "NOT_RUN" : blocked ? "SKIPPED-BLOCKED" : failed ? "FAIL" : "PASS";
       for (const id of ids) outcomes.set(id, { status, reason, title: spec.title });
     }
     for (const child of suite.suites || []) visit(child);
@@ -116,8 +128,8 @@ if (fs.existsSync(reportFile)) {
     console.log(`${id}: ${outcome.status}${outcome.status === "SKIPPED-BLOCKED" && outcome.reason ? ` - ${outcome.reason.split("\n")[0]}` : ""}`);
   }
   const values = [...outcomes.values()];
-  console.log(`Totals: official=30 reported=${values.length} executed=${values.filter(({ status }) => status !== "SKIPPED-BLOCKED").length} passed=${values.filter(({ status }) => status === "PASS").length} failed=${values.filter(({ status }) => status === "FAIL").length} skipped=${values.filter(({ status }) => status === "SKIPPED-BLOCKED").length}`);
-  for (const status of ["PASS", "FAIL", "SKIPPED-BLOCKED"]) {
+  console.log(`Totals: official=30 reported=${values.length} executed=${values.filter(({ status }) => !["SKIPPED-BLOCKED", "NOT_RUN"].includes(status)).length} passed=${values.filter(({ status }) => status === "PASS").length} failed=${values.filter(({ status }) => status === "FAIL").length} skipped=${values.filter(({ status }) => status === "SKIPPED-BLOCKED").length} notRun=${values.filter(({ status }) => status === "NOT_RUN").length}`);
+  for (const status of ["PASS", "FAIL", "SKIPPED-BLOCKED", "NOT_RUN"]) {
     const ids = [...outcomes].filter(([, outcome]) => outcome.status === status).map(([id]) => id);
     console.log(`${status}: ${ids.join(", ") || "none"}`);
   }
@@ -127,7 +139,7 @@ if (fs.existsSync(reportFile)) {
   console.log(`Failing SAM IDs: ${failing.join(", ") || "none"}`);
 
   const stagingUpdates = [...outcomes]
-    .filter(([id]) => preqa2Ledger.markets.MX.results[id]?.status === "NOT_APPLICABLE")
+    .filter(([id, outcome]) => outcome.status !== "NOT_RUN" && preqa2Ledger.markets.MX.results[id]?.status === "NOT_APPLICABLE")
     .map(([id, outcome]) => ({
       id,
       status: outcome.status === "SKIPPED-BLOCKED" ? "BLOCKED" : outcome.status,
