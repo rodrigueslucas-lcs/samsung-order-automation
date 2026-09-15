@@ -28,7 +28,7 @@
     "qst:epp": "node scripts/qst-run.cjs normal epp",
     "qst:list": "playwright test tests/s2/pe/qst --project=chromium --list",
     "qst:mx:base-store": "node scripts/run-mx-qst-safe.cjs",
-    "qst:mx:list": "playwright test tests/s1/mx/qst/base-store --project=chromium --list",
+    "qst:mx:list": "node scripts/run-mx-qst-safe.cjs --list",
     "qst:pe:base-store": "playwright test tests/s1/pe/qst/base-store --project=chromium --workers=1 --grep-invert @destructive",
     "qst:pe:list": "playwright test tests/s1/pe/qst/base-store --project=chromium --list",
     "qst:pe:progress": "node scripts/print-pe-qst-progress.cjs",
