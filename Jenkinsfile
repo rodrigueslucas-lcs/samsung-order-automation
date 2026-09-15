@@ -13,11 +13,13 @@ pipeline {
     booleanParam(name: 'RUN_MX_QST', defaultValue: true, description: 'Run official MX S1 Base Store P1/QST suite')
     booleanParam(name: 'RUN_DESTRUCTIVE', defaultValue: false, description: 'Allow payment/order scenarios. Enable only on an authorized S1 agent.')
     booleanParam(name: 'ENABLE_VIDEO', defaultValue: false, description: 'Enable Playwright video only after FFmpeg is proven on this Jenkins agent.')
+    booleanParam(name: 'HEADLESS', defaultValue: true, description: 'Run Playwright headless. Recommended for Jenkins service agents.')
   }
 
   environment {
     CI = '1'
     MX_QST_ARTIFACT_DIR = 'test-results/jenkins/mx-qst'
+    MX_QST_USE_EXISTING_AUTH = '1'
   }
 
   stages {
@@ -44,11 +46,8 @@ pipeline {
     stage('Install') {
       steps {
         script {
-          if (isUnix()) {
-            sh 'npm ci'
-          } else {
-            bat '@npm ci'
-          }
+          if (isUnix()) sh 'npm ci'
+          else bat '@npm ci'
         }
       }
     }
@@ -76,32 +75,35 @@ pipeline {
           if (!params.RUN_DESTRUCTIVE) {
             error('Official MX QST contains authorized payment/order P1 scenarios. RUN_DESTRUCTIVE must be enabled for the full 30-TC campaign.')
           }
-
           env.PW_VIDEO = params.ENABLE_VIDEO ? '1' : '0'
+          env.MX_QST_HEADLESS = params.HEADLESS ? '1' : '0'
+        }
 
-          // Authentication and MX test-card material remain outside Git.
-          // Once Jenkins credential IDs are approved, this stage will materialize
-          // secret files into the gitignored playwright/.auth directory for the
-          // duration of the workspace only. Until then, fail closed if prerequisites
-          // are absent rather than weakening/skipping official TCs.
-          if (isUnix()) {
-            sh '''
-              test -f playwright/.auth/mx-s1-user.json || { echo "Missing MX auth state in playwright/.auth"; exit 2; }
-              test -f playwright/.auth/mx-test-card.json || { echo "Missing MX test-card secret file in playwright/.auth"; exit 2; }
-              npm run qst:mx:base-store
-            '''
-          } else {
-            bat '''@echo off
-              if not exist playwright\\.auth\\mx-s1-user.json (
-                echo Missing MX auth state in playwright/.auth
-                exit /b 2
-              )
-              if not exist playwright\\.auth\\mx-test-card.json (
-                echo Missing MX test-card secret file in playwright/.auth
-                exit /b 2
-              )
-              call npm run qst:mx:base-store
-            '''
+        withCredentials([
+          file(credentialsId: 'samsung-mx-s1-auth-state', variable: 'MX_AUTH_STATE_SECRET'),
+          file(credentialsId: 'samsung-mx-s1-session-storage', variable: 'MX_SESSION_STORAGE_SECRET'),
+          file(credentialsId: 'samsung-mx-test-card', variable: 'MX_TEST_CARD_SECRET')
+        ]) {
+          script {
+            if (isUnix()) {
+              sh '''
+                set -eu
+                mkdir -p playwright/.auth
+                cp "$MX_AUTH_STATE_SECRET" playwright/.auth/mx-s1-user.json
+                cp "$MX_SESSION_STORAGE_SECRET" playwright/.auth/mx-s1-session-storage.json
+                cp "$MX_TEST_CARD_SECRET" playwright/.auth/mx-test-card.json
+                chmod 600 playwright/.auth/mx-s1-user.json playwright/.auth/mx-s1-session-storage.json playwright/.auth/mx-test-card.json || true
+                npm run qst:mx:base-store
+              '''
+            } else {
+              bat '''@echo off
+                if not exist playwright\\.auth mkdir playwright\\.auth
+                copy /Y "%MX_AUTH_STATE_SECRET%" "playwright\\.auth\\mx-s1-user.json" >nul || exit /b 2
+                copy /Y "%MX_SESSION_STORAGE_SECRET%" "playwright\\.auth\\mx-s1-session-storage.json" >nul || exit /b 2
+                copy /Y "%MX_TEST_CARD_SECRET%" "playwright\\.auth\\mx-test-card.json" >nul || exit /b 2
+                call npm run qst:mx:base-store
+              '''
+            }
           }
         }
       }
@@ -110,6 +112,13 @@ pipeline {
 
   post {
     always {
+      script {
+        if (isUnix()) {
+          sh 'rm -rf playwright/.auth || true'
+        } else {
+          bat '@if exist playwright\\.auth rmdir /S /Q playwright\\.auth'
+        }
+      }
       archiveArtifacts artifacts: 'test-results/**/*, playwright-report/**/*', allowEmptyArchive: true, fingerprint: true
     }
     success {
