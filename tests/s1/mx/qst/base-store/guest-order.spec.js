@@ -1,8 +1,11 @@
+import fs from "node:fs";
+import path from "node:path";
 import destructiveGuards from "../../../../../utils/destructiveGuards";
 import { test, expect } from "./mxQst.fixture";
 import { reachMxGuestPayment } from "../../dst/base-store/mxFlows";
 
 const { requirePaymentSubmitOptIn } = destructiveGuards;
+const guestOrderRuntimeFile = path.resolve("test-results/mx-qst/latest-guest-order.json");
 test.describe.configure({ retries: 0 });
 
 test.skip(
@@ -14,7 +17,8 @@ test("MX QST 13 + QST 14 @destructive @qst @mx @base-store - Guest SPEI order an
   test.setTimeout(600000);
   requirePaymentSubmitOptIn();
   const inbox = `mx-qst-${Date.now()}`;
-  const { checkout } = await reachMxGuestPayment(page, mxConfig, `${inbox}@mailinator.com`);
+  const email = `${inbox}@mailinator.com`;
+  const { checkout } = await reachMxGuestPayment(page, mxConfig, email);
   await checkout.selectPaymentMode(/^SPEI/i);
 
   let responseOrderCode = null;
@@ -42,5 +46,16 @@ test("MX QST 13 + QST 14 @destructive @qst @mx @base-store - Guest SPEI order an
     throw new Error("MX QST Guest SPEI submit produced no observable order code; do not retry.");
   }
   await expect(target.getByText(/confirmaci[oó]n|pedido recibido|gracias por tu compra/i).filter({ visible: true }).first()).toBeVisible({ timeout: 60000 });
+
+  fs.mkdirSync(path.dirname(guestOrderRuntimeFile), { recursive: true });
+  fs.writeFileSync(guestOrderRuntimeFile, JSON.stringify({
+    orderNumber: orderCode,
+    email,
+    inbox,
+    market: "mx",
+    createdAt: new Date().toISOString(),
+  }, null, 2));
+
   console.log("MX_QST_GUEST_ORDER", JSON.stringify({ orderCode, paymentMode: "SPEI", inbox }));
+  console.log(`[mx-qst] Guest tracking runtime saved to ${guestOrderRuntimeFile}`);
 });
