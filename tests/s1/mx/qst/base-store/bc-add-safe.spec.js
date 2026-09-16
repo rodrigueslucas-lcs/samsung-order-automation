@@ -53,16 +53,11 @@ async function getAuthenticatedPreQaPage() {
   }
 
   const context = contexts[0];
-  let page = context.pages().find((candidate) => {
-    try {
-      return new URL(candidate.url()).hostname === "p6-pre-qa2.samsung.com" &&
-        !candidate.url().includes("/apps/samsung/login/");
-    } catch {
-      return false;
-    }
-  });
 
-  if (!page) page = await context.newPage();
+  // Always create a dedicated tab inside the already-authenticated CDP context.
+  // Reusing an arbitrary existing tab can bind the TC to an S1/stage page and
+  // makes the observed browser state confusing even though the context is valid.
+  const page = await context.newPage();
   return { cdpBrowser, page };
 }
 
@@ -71,9 +66,6 @@ test.describe.configure({ timeout: 420000 });
 test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({}, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24969"));
 
-  // PreQA requires the legitimate WMC/AD-SSO-authenticated Chrome created by
-  // preqa2:bootstrap. Reuse that browser context through local CDP instead of
-  // creating a clean Playwright context that would be redirected to login.
   const { cdpBrowser, page } = await getAuthenticatedPreQaPage();
 
   try {
@@ -142,8 +134,7 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
       addedFromPdp: true,
     });
   } finally {
-    // Disconnect Playwright from the user-visible Chrome without closing the
-    // authenticated Chrome/profile that preqa2:bootstrap owns.
+    await page.close().catch(() => {});
     await cdpBrowser.close().catch(() => {});
   }
 });
