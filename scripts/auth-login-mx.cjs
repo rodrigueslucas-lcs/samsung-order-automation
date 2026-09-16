@@ -158,6 +158,15 @@ async function waitForStorefrontOrVerification(page) {
   }
 }
 
+async function hasVisibleCaptchaChallenge(page) {
+  return page.evaluate(() => [...document.querySelectorAll("iframe")].some((frame) => {
+    const title = frame.title || "";
+    const bounds = frame.getBoundingClientRect();
+    return /reCAPTCHA/i.test(title) && /desafio|challenge|expira|expires/i.test(title) &&
+      bounds.width > 0 && bounds.height > 0;
+  }));
+}
+
 function writeJsonSecurely(destination, value) {
   const temporary = `${destination}.tmp`;
   fs.writeFileSync(temporary, JSON.stringify(value, null, 2), { mode: 0o600 });
@@ -197,23 +206,35 @@ async function loginMxSamsungAccount() {
   const browser = await connectDedicatedChrome();
   const context = browser.contexts()[0];
   if (!context) throw new Error("Dedicated MX Chrome did not expose a browser context.");
-  let page = await context.newPage();
+  const existingAccountPage = context.pages().find((candidate) => {
+    try { return new URL(candidate.url()).hostname === ACCOUNT_HOSTNAME; }
+    catch { return false; }
+  });
+  let page = existingAccountPage || await context.newPage();
+  let authenticated = false;
   page.setDefaultTimeout(120000);
 
   try {
-    console.log("[auth:login:mx] opening MX S1 storefront in dedicated Chrome");
-    await openMxHome(page);
-    console.log("[auth:login:mx] MX S1 My Profile is visible");
-    let { menu } = await waitForProfileMenu(page);
-    console.log("[auth:login:mx] MX profile menu is stable");
-    const logout = menu.getByText(/^Cerrar Sesi[oó]n$/i);
-    const login = menu.locator('a[data-an-la="login"]').filter({ visible: true });
-    const menuText = await menu.innerText();
-    const menuState = /Cerrar Sesi[oó]n/i.test(menuText) ? "authenticated" : "signed-out";
+    let menu;
+    let menuState = "signed-out";
+    let login;
+    if (existingAccountPage) {
+      console.log("[auth:login:mx] resuming the existing Samsung Account tab in dedicated Chrome");
+    } else {
+      console.log("[auth:login:mx] opening MX S1 storefront in dedicated Chrome");
+      await openMxHome(page);
+      console.log("[auth:login:mx] MX S1 My Profile is visible");
+      ({ menu } = await waitForProfileMenu(page));
+      console.log("[auth:login:mx] MX profile menu is stable");
+      login = menu.locator('a[data-an-la="login"]').filter({ visible: true });
+      menuState = /Cerrar Sesi[oó]n/i.test(await menu.innerText()) ? "authenticated" : "signed-out";
+    }
     if (menuState === "signed-out") {
-      console.log("[auth:login:mx] opening Samsung Account sign-in");
-      await login.click();
-      await page.waitForURL((url) => url.hostname === ACCOUNT_HOSTNAME, { timeout: 60000 });
+      if (!existingAccountPage) {
+        console.log("[auth:login:mx] opening Samsung Account sign-in");
+        await login.click();
+        await page.waitForURL((url) => url.hostname === ACCOUNT_HOSTNAME, { timeout: 60000 });
+      }
       assertAllowedHost(page, [ACCOUNT_HOSTNAME], "Samsung Account login");
 
       if (manualLogin) {
@@ -228,15 +249,34 @@ async function loginMxSamsungAccount() {
         page = returnedPage;
       } else {
 
-        const emailInput = page.getByRole("textbox", { name: /Direcci[oó]n de correo/i }).first();
-        await emailInput.click();
-        await emailInput.pressSequentially(email, { delay: 35 });
-        await emailInput.press("Tab");
-        await page.getByRole("button", { name: /^Siguiente$/i }).click();
-        console.log("[auth:login:mx] Samsung Account email step completed");
-
+        const emailInput = page.locator('input#account');
         const passwordInput = page.locator('input[type="password"]').first();
-        await passwordInput.waitFor({ state: "visible", timeout: 60000 });
+        let emailStepComplete = false;
+        if (!(await hasVisibleCaptchaChallenge(page))) await emailInput.fill(email);
+        for (let attempt = 1; attempt <= 2 && !(await hasVisibleCaptchaChallenge(page)); attempt += 1) {
+          const nextButton = page.getByRole("button", { name: /^Siguiente$/i });
+          if (!(await nextButton.isEnabled())) break;
+          const challengeVisible = await hasVisibleCaptchaChallenge(page);
+          if (challengeVisible) break;
+          await nextButton.click({ timeout: 10000 });
+          emailStepComplete = await passwordInput
+            .waitFor({ state: "visible", timeout: 15000 })
+            .then(() => true)
+            .catch(() => false);
+          if (emailStepComplete) break;
+          if (!(await emailInput.isVisible().catch(() => false))) break;
+        }
+        if (!emailStepComplete) {
+          const challengeVisible = await hasVisibleCaptchaChallenge(page);
+          if (challengeVisible) {
+            console.log("[auth:login:mx] CAPTCHA is visible in the dedicated Chrome. Complete it manually and click Siguiente; automation will resume at the password step.");
+            await passwordInput.waitFor({ state: "visible", timeout: interactiveTimeout });
+            emailStepComplete = true;
+          } else {
+            throw new Error("Samsung Account did not advance from the email step to a password field; inspect the visible account page before retrying login.");
+          }
+        }
+        console.log("[auth:login:mx] Samsung Account password step is visible");
         await passwordInput.click();
         await passwordInput.pressSequentially(password, { delay: 35 });
         await passwordInput.press("Tab");
@@ -255,8 +295,11 @@ async function loginMxSamsungAccount() {
     console.log("[auth:login:mx] authenticated MX profile menu validated");
     await exportAuthenticatedState(context, page);
     console.log("[auth:login:mx] ignored MX auth state exported successfully");
+    authenticated = true;
   } finally {
-    await page.close().catch(() => {});
+    // Keep the exact dedicated Chrome tab available for manual inspection if
+    // Samsung changes the sign-in step or requires a human action.
+    if (authenticated) await page.close().catch(() => {});
     await browser.close().catch(() => {});
   }
 }

@@ -70,7 +70,9 @@ export default class BackOfficePage extends BasePage {
     const directPerspective = this.page
       .getByText("Administration Cockpit", { exact: true })
       .first();
-    const loginOutcome = await Promise.race([
+    // A timed-out loser must not reject the whole login while another
+    // legitimate outcome is still loading (ZK often redirects via custom-login).
+    const loginOutcome = await Promise.any([
       proceedButton
         .waitFor({ state: "visible", timeout: 60000 })
         .then(() => "authority"),
@@ -80,7 +82,11 @@ export default class BackOfficePage extends BasePage {
       this.page
         .waitForURL(/login\.zul\?login_error=1/, { timeout: 60000 })
         .then(() => "rejected"),
-    ]);
+    ]).catch(() => {
+      throw new Error(
+        `BackOffice login did not reach an authenticated perspective or authority selector; current URL: ${this.page.url()}`
+      );
+    });
     if (loginOutcome === "rejected") {
       throw new Error(
         `BackOffice rejected the runtime credentials (login_error=1): ${this.url}`

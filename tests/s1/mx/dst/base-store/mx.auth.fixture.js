@@ -8,6 +8,8 @@ const {
   AUTH_STATE_PATH,
   applyAuthSessionStorage,
   hasAuthState,
+  refreshAuthenticatedState,
+  validateCurrentPageAuthenticated,
   validateAuthenticatedSession,
 } = mxAuthState;
 const { assertMxStagingPage } = mxStagingGuard;
@@ -27,6 +29,7 @@ test.beforeEach(async ({ context, page }, testInfo) => {
   await applyAuthSessionStorage(context);
   await validateAuthenticatedSession(page);
   await assertMxStagingPage(page, "MX authenticated fixture");
+  await refreshAuthenticatedState(context, page);
   await page.mouse.move(20, 500);
   await page.keyboard.press("Escape");
   await page
@@ -36,11 +39,22 @@ test.beforeEach(async ({ context, page }, testInfo) => {
     .waitFor({ state: "hidden", timeout: 30000 });
 });
 
-test.afterEach(async ({ page }) => {
+test.afterEach(async ({ context, page, mxConfig }, testInfo) => {
   if (!hasAuthState() || page.url() === "about:blank") return;
   const currentUrl = page.url();
   if (/^chrome-error:\/\/chromewebdata\//i.test(currentUrl)) return;
   await assertMxStagingPage(page, "MX authenticated final environment guard");
+  if (testInfo.status === "passed") {
+    // Preserve a legitimately rotated session for the next isolated context.
+    // Never replace the saved state with a signed-out checkout page.
+    try {
+      await page.goto(mxConfig.baseUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
+      await validateCurrentPageAuthenticated(page);
+      await refreshAuthenticatedState(context, page);
+    } catch {
+      console.warn("[mx-auth] Session could not be revalidated after the test; preserving the last authenticated state.");
+    }
+  }
 });
 
 export { expect };

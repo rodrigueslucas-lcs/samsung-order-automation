@@ -28,7 +28,9 @@ export async function reachMxGuestDelivery(page, config, email) {
   await page.goto(config.bootstrapUrl.toString(), { waitUntil: "domcontentloaded" });
   await expect(page.getByText(/You can access pages now/i)).toBeVisible({ timeout: 60000 });
   const product = configuredProduct(page, config);
-  await product.addConfiguredPdpToCart();
+  // Do not leave the PDP until the cart POST completes. Navigating to /cart
+  // immediately after the click can abort the request and render an empty cart.
+  await product.addConfiguredPdpToCart({ waitForCartMutation: true });
   const cart = configuredCart(page, config);
   await cart.proceedToCheckout();
   const checkout = new MxCheckoutPage(page);

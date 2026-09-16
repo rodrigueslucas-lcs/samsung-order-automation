@@ -56,6 +56,48 @@ function createAuthState({
     );
   }
 
+  async function refreshAuthenticatedState(context, page) {
+    // Call only after validating the authenticated storefront UI. A new
+    // Playwright context must receive the latest rotated Samsung cookies.
+    requireAuthState();
+    if (new URL(page.url()).hostname !== hostname) {
+      throw new Error(`Cannot refresh ${label} auth state from another host.`);
+    }
+    const state = await context.storageState({ indexedDB: true });
+    const filteredState = {
+      cookies: state.cookies.filter((cookie) => {
+        const domain = cookie.domain.replace(/^\./, "");
+        return domain === hostname || cookie.domain === ".samsung.com";
+      }),
+      origins: state.origins.filter(({ origin }) => new URL(origin).hostname === hostname),
+    };
+    if (!filteredState.cookies.some((cookie) => cookie.domain.replace(/^\./, "") === hostname)) {
+      throw new Error(`Cannot refresh ${label} auth state without storefront cookies.`);
+    }
+    const sessionStorage = await page.evaluate(() =>
+      Object.fromEntries(
+        Array.from({ length: window.sessionStorage.length }, (_, index) => {
+          const key = window.sessionStorage.key(index);
+          return [key, window.sessionStorage.getItem(key)];
+        }).filter(([key]) => key !== null)
+      )
+    );
+    for (const [destination, value] of [
+      [AUTH_STATE_PATH, filteredState],
+      [AUTH_SESSION_STORAGE_PATH, sessionStorage],
+    ]) {
+      const temporary = `${destination}.tmp`;
+      fs.writeFileSync(temporary, JSON.stringify(value, null, 2), { mode: 0o600 });
+      fs.chmodSync(temporary, 0o600);
+      try {
+        fs.renameSync(temporary, destination);
+      } catch (error) {
+        fs.rmSync(temporary, { force: true });
+        throw new Error(`Could not refresh ${label} auth state safely: ${error.message}`);
+      }
+    }
+  }
+
   async function gotoWithNetworkRetry(page, url, options = {}) {
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
@@ -152,6 +194,7 @@ function createAuthState({
     AUTH_STATE_PATH,
     AUTH_SESSION_STORAGE_PATH,
     applyAuthSessionStorage,
+    refreshAuthenticatedState,
     hasAuthState,
     requireAuthState,
     validateCurrentPageAuthenticated,

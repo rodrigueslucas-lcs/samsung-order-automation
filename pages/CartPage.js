@@ -349,9 +349,14 @@ export default class CartPage extends BasePage {
     await this.continueButton.scrollIntoViewIfNeeded();
 
     await Promise.all([
-      this.page.waitForURL(/CHECKOUT_STEP_CONTACT_INFO/, { timeout: 60000 }),
+      this.page.waitForURL((url) =>
+        /CHECKOUT_STEP_CONTACT_INFO|\/guestlogin\/checkout/i.test(url.href),
+      { timeout: 60000 }),
       this.continueButton.click()
     ]);
+    if (/\/guestlogin\/checkout/i.test(this.page.url())) {
+      throw new Error('Registered MX checkout redirected to guest login; the Samsung Account session was not accepted. Refresh the authenticated state before rerunning registered cases.');
+    }
   }
 
 
