@@ -1,3 +1,4 @@
+import { chromium } from "@playwright/test";
 import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import { test, expect } from "./mxQst.fixture";
@@ -9,6 +10,7 @@ const PRE_QA_ORIGIN = "https://p6-pre-qa2.samsung.com";
 const PRE_QA_PLP = `${PRE_QA_ORIGIN}/mx/smartphones/all-smartphones/`;
 const PRE_QA_MODEL_CODE = "SM-S938BZBMLTM";
 const PRE_QA_PDP_PATH = "/mx/smartphones/galaxy-s25-ultra/buy/";
+const PRE_QA_CDP_URL = process.env.PREQA2_CDP_URL || "http://127.0.0.1:9223";
 
 async function dismissLocationBanner(page) {
   const continueButton = page.getByRole("button", { name: /Continuar/i }).filter({ visible: true });
@@ -42,21 +44,49 @@ async function readHeaderCartCount(page) {
   return 0;
 }
 
+async function getAuthenticatedPreQaPage() {
+  const cdpBrowser = await chromium.connectOverCDP(PRE_QA_CDP_URL);
+  const contexts = cdpBrowser.contexts();
+  if (!contexts.length) {
+    await cdpBrowser.close();
+    throw new Error(`No Chrome context found at ${PRE_QA_CDP_URL}. Keep the authenticated PreQA2 bootstrap Chrome open.`);
+  }
+
+  const context = contexts[0];
+  let page = context.pages().find((candidate) => {
+    try {
+      return new URL(candidate.url()).hostname === "p6-pre-qa2.samsung.com" &&
+        !candidate.url().includes("/apps/samsung/login/");
+    } catch {
+      return false;
+    }
+  });
+
+  if (!page) page = await context.newPage();
+  return { cdpBrowser, page };
+}
+
 test.describe.configure({ timeout: 420000 });
 
-test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({ browser }, testInfo) => {
+test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({}, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24969"));
 
-  // PreQA is intentionally isolated from the normal MX S1 page fixture. The
-  // storefront cart route is currently parked, but PLP/PDP and the add mutation
-  // remain usable, so the cart header count is the observable assertion.
-  const context = await browser.newContext();
-  const page = await context.newPage();
+  // PreQA requires the legitimate WMC/AD-SSO-authenticated Chrome created by
+  // preqa2:bootstrap. Reuse that browser context through local CDP instead of
+  // creating a clean Playwright context that would be redirected to login.
+  const { cdpBrowser, page } = await getAuthenticatedPreQaPage();
 
   try {
     await page.goto(PRE_QA_PLP, { waitUntil: "domcontentloaded", timeout: 60000 });
     await dismissLocationBanner(page);
-    await expect(page).toHaveURL(new RegExp("p6-pre-qa2\\.samsung\\.com/mx/smartphones/all-smartphones", "i"));
+
+    if (/\/apps\/samsung\/login\//i.test(page.url())) {
+      throw new Error(
+        `The Chrome attached at ${PRE_QA_CDP_URL} is not authenticated for PreQA2. Keep the WMC-authenticated preqa2:bootstrap Chrome open.`
+      );
+    }
+
+    await expect(page).toHaveURL(new RegExp("p6-pre-qa2\\.samsung\\.com/mx/smartphones/all-smartphones", "i"), { timeout: 30000 });
 
     const s25Card = page.getByText("Galaxy S25 Ultra", { exact: true }).filter({ visible: true }).first().locator(
       "xpath=ancestor::*[.//button[normalize-space()='Comprar']][1]"
@@ -105,12 +135,15 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
       plpPath: "/mx/smartphones/all-smartphones/",
       pdpPath: PRE_QA_PDP_PATH,
       modelCode: PRE_QA_MODEL_CODE,
+      cdpUrl: PRE_QA_CDP_URL,
       cartCountBefore,
       cartCountAfter,
       maintenanceObserved,
       addedFromPdp: true,
     });
   } finally {
-    await context.close();
+    // Disconnect Playwright from the user-visible Chrome without closing the
+    // authenticated Chrome/profile that preqa2:bootstrap owns.
+    await cdpBrowser.close().catch(() => {});
   }
 });
