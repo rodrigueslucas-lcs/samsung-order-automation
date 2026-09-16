@@ -7,7 +7,9 @@ const baseDir = path.join(root, "test-results", "reporter-tests", "allure-smoke"
 const resultsDir = path.join(baseDir, "allure-results");
 const reportDir = path.join(baseDir, "allure-report");
 const playwrightCli = require.resolve("@playwright/test/cli");
-const allureCli = path.join(root, "node_modules", "allure-commandline", "dist", "bin", "allure");
+const allureBin = process.platform === "win32"
+  ? path.join(root, "node_modules", ".bin", "allure.cmd")
+  : path.join(root, "node_modules", ".bin", "allure");
 
 fs.rmSync(baseDir, { recursive: true, force: true });
 fs.mkdirSync(baseDir, { recursive: true });
@@ -22,9 +24,12 @@ execFileSync(process.execPath, [playwrightCli, "test", "--config=reporter-tests/
 const resultFiles = fs.readdirSync(resultsDir).filter((name) => name.endsWith("-result.json"));
 if (resultFiles.length < 1) throw new Error("No Allure result JSON generated.");
 
-execFileSync(allureCli, ["generate", resultsDir, "--clean", "-o", reportDir], {
+if (!fs.existsSync(allureBin)) throw new Error(`Allure executable not found: ${allureBin}`);
+
+execFileSync(allureBin, ["generate", resultsDir, "--clean", "-o", reportDir], {
   cwd: root,
   stdio: "inherit",
+  shell: process.platform === "win32",
 });
 
 const indexPath = path.join(reportDir, "index.html");
