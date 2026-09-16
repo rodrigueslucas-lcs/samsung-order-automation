@@ -13,6 +13,8 @@ const headless = process.env.MX_QST_HEADLESS === "1";
 const artifactDir = path.resolve(process.env.MX_QST_ARTIFACT_DIR || "test-results");
 const reportFile = path.join(artifactDir, "mx-qst-safe-results.json");
 const runtimeSummaryFile = path.join(artifactDir, "runtime-summary.json");
+const allureResultsDir = path.join(artifactDir, "allure-results");
+const allureReportDir = path.join(artifactDir, "allure-report");
 fs.mkdirSync(path.dirname(reportFile), { recursive: true });
 const playwrightCli = path.resolve("node_modules/@playwright/test/cli.js");
 const qstRoot = path.resolve("tests/s1/mx/qst/base-store");
@@ -28,9 +30,6 @@ const MX_BASE_P1_IDS = Object.freeze([
   "SAM-25005", "SAM-25006", "SAM-25010", "SAM-25011", "SAM-25016",
 ]);
 const p1Set = new Set(MX_BASE_P1_IDS);
-// Playwright --grep matches the full title path (file/describe/test), so the
-// SAM ID is not guaranteed to be at character zero. Keep the word boundary to
-// avoid partial ID matches while allowing the title path prefix.
 const p1Pattern = `(?:${MX_BASE_P1_IDS.join("|")})\\b`;
 
 const allTitles = fs.readdirSync(qstRoot)
@@ -82,10 +81,6 @@ if (useExistingAuth) {
   }
 }
 
-// Starting the official MX QST runner is the execution-level authorization for
-// its payment/order P1 scenarios. Keep workers=1 and retries=0 so a submit is
-// never repeated blindly. Other destructive families (profile writes/cronjobs)
-// retain their own prerequisites and are not enabled here.
 const qstExecutionEnv = {
   ...process.env,
   ALLOW_PAYMENT_SUBMIT: "1",
@@ -96,6 +91,8 @@ const qstExecutionEnv = {
   PLAYWRIGHT_JSON_OUTPUT_FILE: reportFile,
   PLAYWRIGHT_HTML_OUTPUT_DIR: path.resolve("playwright-report"),
   SMB_EVIDENCE_DIR: path.join(artifactDir, "evidence"),
+  ENABLE_ALLURE: process.env.ENABLE_ALLURE || "0",
+  ALLURE_RESULTS_DIR: allureResultsDir,
 };
 
 // Only a real execution owns these official build artifacts. Removing stale
@@ -106,6 +103,8 @@ for (const target of [
   runtimeSummaryFile,
   path.join(artifactDir, "evidence"),
   path.join(artifactDir, "executive"),
+  allureResultsDir,
+  allureReportDir,
 ]) fs.rmSync(target, { recursive: true, force: true });
 
 const playwrightArgs = [
@@ -119,6 +118,22 @@ const result = spawnSync(process.execPath, playwrightArgs, {
   env: qstExecutionEnv,
   stdio: "inherit",
 });
+
+if (process.env.ENABLE_ALLURE === "1" && fs.existsSync(allureResultsDir)) {
+  const allureCli = process.platform === "win32"
+    ? path.resolve("node_modules/.bin/allure.cmd")
+    : path.resolve("node_modules/.bin/allure");
+  if (fs.existsSync(allureCli)) {
+    const allure = spawnSync(allureCli, ["generate", allureResultsDir, "--clean", "-o", allureReportDir], {
+      stdio: "inherit",
+      shell: process.platform === "win32",
+    });
+    if (allure.status !== 0) console.error("[mx-qst] Allure report generation failed; raw Allure results are preserved.");
+    else console.log(`[mx-qst] Allure report generated: ${allureReportDir}`);
+  } else {
+    console.error("[mx-qst] Allure CLI is not installed; raw Allure results are preserved.");
+  }
+}
 
 if (fs.existsSync(reportFile)) {
   const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
