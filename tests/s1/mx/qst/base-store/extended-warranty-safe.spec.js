@@ -45,15 +45,37 @@ test("SAM-24985 @qst @mx @base-store @safe - Extended Warranty on Cart", async (
   const termsSection = careSurface.getByText(/T[eé]rminos y condiciones de Samsung Care\+/i).first();
   await expect(termsSection).toBeVisible({ timeout: 30000 });
 
-  const consentInputs = careSurface.locator("input[type='checkbox'], input[type='radio']").filter({ visible: true });
-  const consentLabels = careSurface.locator("label").filter({ hasText: /He tomado nota|He le[ií]do|Entiendo que es una p[oó]liza|Declaro que tengo m[aá]s de 18 a[nñ]os/i });
+  // The consent copy contains legal links. Clicking the label text can open the
+  // Samsung Care+ legal page instead of selecting the control. Target only the
+  // four Material radio controls that belong to the terms section.
+  const consentTexts = [
+    /He tomado nota/i,
+    /He le[ií]do y estoy de acuerdo/i,
+    /Entiendo que es una p[oó]liza/i,
+    /Declaro que tengo m[aá]s de 18 a[nñ]os/i,
+  ];
 
-  const consentCount = await consentLabels.count();
-  expect(consentCount).toBeGreaterThanOrEqual(4);
-  for (let index = 0; index < consentCount; index += 1) {
-    const label = consentLabels.nth(index);
-    await label.scrollIntoViewIfNeeded();
-    await label.click();
+  for (const consentText of consentTexts) {
+    const consentRow = careSurface
+      .getByText(consentText)
+      .filter({ visible: true })
+      .first()
+      .locator("xpath=ancestor::*[.//input[@type='radio'] or .//input[@type='checkbox']][1]");
+    await expect(consentRow).toBeVisible({ timeout: 30000 });
+
+    const input = consentRow.locator("input[type='radio'], input[type='checkbox']").first();
+    await expect(input).toBeAttached({ timeout: 30000 });
+
+    if (!(await input.isChecked())) {
+      const touchTarget = consentRow.locator(".mat-mdc-radio-touch-target, .mat-mdc-checkbox-touch-target").first();
+      if (await touchTarget.count()) {
+        await touchTarget.click();
+      } else {
+        await input.check({ force: true });
+      }
+    }
+
+    await expect(input).toBeChecked({ timeout: 10000 });
   }
 
   const confirm = careSurface
