@@ -30,20 +30,30 @@ test("SAM-24985 @qst @mx @base-store @safe - Extended Warranty on Cart", async (
     .first();
   await expect(extendedWarrantyPlan).toBeVisible({ timeout: 30000 });
 
-  // The live Samsung Care+ UI uses a custom visual radio. Clicking the native
-  // input with force can change the DOM state without triggering the Angular
-  // selection handler, leaving "Agregar al carrito" disabled. Click the plan
-  // card/visual radio as a user would instead.
   const planCard = extendedWarrantyPlan.locator(
     "xpath=ancestor::*[.//input[@type='radio'] or .//*[@role='radio']][1]"
   );
   await expect(planCard).toBeVisible({ timeout: 30000 });
 
-  const visualRadio = planCard.getByRole("radio").filter({ visible: true }).first();
-  if (await visualRadio.count()) {
-    await visualRadio.click();
+  const planTouchTarget = planCard.locator(".mat-mdc-radio-touch-target").first();
+  if (await planTouchTarget.count()) {
+    await planTouchTarget.click();
   } else {
     await planCard.click();
+  }
+
+  const termsSection = careSurface.getByText(/T[eé]rminos y condiciones de Samsung Care\+/i).first();
+  await expect(termsSection).toBeVisible({ timeout: 30000 });
+
+  const consentInputs = careSurface.locator("input[type='checkbox'], input[type='radio']").filter({ visible: true });
+  const consentLabels = careSurface.locator("label").filter({ hasText: /He tomado nota|He le[ií]do|Entiendo que es una p[oó]liza|Declaro que tengo m[aá]s de 18 a[nñ]os/i });
+
+  const consentCount = await consentLabels.count();
+  expect(consentCount).toBeGreaterThanOrEqual(4);
+  for (let index = 0; index < consentCount; index += 1) {
+    const label = consentLabels.nth(index);
+    await label.scrollIntoViewIfNeeded();
+    await label.click();
   }
 
   const confirm = careSurface
@@ -69,6 +79,7 @@ test("SAM-24985 @qst @mx @base-store @safe - Extended Warranty on Cart", async (
     configuredSku: mxConfig.sku,
     service: "Samsung Care+",
     plan: "Garantía extendida",
+    acceptedCareTerms: true,
     totalBefore,
     totalAfter,
     priceChanged: true,
