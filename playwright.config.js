@@ -1,6 +1,8 @@
 // @ts-check
 import { defineConfig, devices } from '@playwright/test';
 
+const allureEnabled = process.env.ENABLE_ALLURE === '1';
+
 export default defineConfig({
   testDir: './tests',
 
@@ -19,6 +21,13 @@ export default defineConfig({
     ['list'],
     ...(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE
       ? [['json', { outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT_FILE }]]
+      : []),
+    ...(allureEnabled
+      ? [['allure-playwright', {
+          resultsDir: process.env.ALLURE_RESULTS_DIR || 'allure-results',
+          detail: true,
+          suiteTitle: false
+        }]]
       : []),
     ['./reporters/evidence/SmbEvidenceReporter.js', {
       outputDir: process.env.SMB_EVIDENCE_DIR || 'test-results/evidence'
