@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-15T23:42:22.751Z",
+  "build": { "number": "5", "commit": "b51369c445a92dc06a49f39ed5c176ba7c163c25" },
+  "campaign": { "market": "MX", "store": "BASE_STORE", "suite": "QST_P1" },
+  "summary": { "official": 30, "executed": 22, "passed": 14, "failed": 8, "blocked": 8, "notRun": 0, "durationMs": 2262000 },
+  "tests": [
+    {"id":"SAM-24962","status":"FAIL"},{"id":"SAM-24963","status":"FAIL"},{"id":"SAM-24964","status":"SKIPPED-BLOCKED","blocker":"Authoritative Samsung.com GNB comparison not implemented."},{"id":"SAM-24968","status":"SKIPPED-BLOCKED","blocker":"PLP/facet runtime not implemented."},{"id":"SAM-24969","status":"SKIPPED-BLOCKED","blocker":"MX_QST_BC_URL is required."},{"id":"SAM-24971","status":"PASS"},{"id":"SAM-24972","status":"PASS"},{"id":"SAM-24975","status":"PASS"},{"id":"SAM-24981","status":"PASS"},{"id":"SAM-24982","status":"PASS"},{"id":"SAM-24985","status":"SKIPPED-BLOCKED","blocker":"Configured SKU has no Extended Warranty."},{"id":"SAM-24986","status":"FAIL"},{"id":"SAM-24988","status":"PASS"},{"id":"SAM-24989","status":"PASS"},{"id":"SAM-24990","status":"PASS"},{"id":"SAM-24991","status":"SKIPPED-BLOCKED","blocker":"ALLOW_PROFILE_WRITE=1 and MX_ADDRESS_API_URL are required."},{"id":"SAM-24992","status":"FAIL"},{"id":"SAM-24993","status":"FAIL"},{"id":"SAM-24994","status":"FAIL"},{"id":"SAM-24995","status":"PASS"},{"id":"SAM-24999","status":"PASS"},{"id":"SAM-25000","status":"FAIL"},{"id":"SAM-25001","status":"PASS"},{"id":"SAM-25002","status":"FAIL"},{"id":"SAM-25004","status":"PASS"},{"id":"SAM-25005","status":"PASS"},{"id":"SAM-25006","status":"SKIPPED-BLOCKED","blocker":"Rewards unavailable in current guest checkout context."},{"id":"SAM-25010","status":"SKIPPED-BLOCKED","blocker":"Runtime timeout/external payment route blocker."},{"id":"SAM-25011","status":"SKIPPED-BLOCKED","blocker":"BackOffice password is missing in Jenkins."},{"id":"SAM-25016","status":"PASS"}
+  ]
+}
