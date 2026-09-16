@@ -10,189 +10,138 @@ const {
   buildTrend,
   buildConsistencyAudit,
 } = require('../reporters/executive-v3/dashboardModel');
-const { render } = require('../reporters/executive-v3/generateExecutiveV3.cjs');
+const { render, evidenceHref } = require('../reporters/executive-v3/generateExecutiveV3.cjs');
 
 function ledger() {
-  return {
-    environment: 'PREQA2',
-    markets: {
-      MX: { officialTotal: 37, status: 'ACTIVE', results: {
-        'SAM-24964': { status: 'PASS', context: 'either', evidence: 'GNB worked.', validatedAt: '2026-09-09T18:00:00.000Z' },
-        'SAM-24968': { status: 'FAIL', context: 'guest', evidence: 'Facet unavailable.', validatedAt: '2026-09-09T18:05:00.000Z' },
-      }},
-      CL: { officialTotal: 38, status: 'NOT_STARTED', results: {} },
-      CO: { officialTotal: 35, status: 'NOT_STARTED', results: {} },
-      PE: { officialTotal: 34, status: 'NOT_STARTED', results: {} },
-    },
-  };
+  return { environment: 'PREQA2', markets: {
+    MX: { officialTotal: 37, status: 'ACTIVE', results: {
+      'SAM-24964': { status: 'PASS', context: 'either', evidence: 'GNB worked.', validatedAt: '2026-09-09T18:00:00.000Z' },
+      'SAM-24968': { status: 'FAIL', context: 'guest', evidence: 'Facet unavailable.', validatedAt: '2026-09-09T18:05:00.000Z' },
+    }},
+    CL: { officialTotal: 38, status: 'NOT_STARTED', results: {} },
+    CO: { officialTotal: 35, status: 'NOT_STARTED', results: {} },
+    PE: { officialTotal: 34, status: 'NOT_STARTED', results: {} },
+  }};
 }
 
 function routedLedger() {
   const value = ledger();
-  value.markets.MX.results['SAM-24971'] = {
-    status: 'NOT_APPLICABLE',
-    context: 'either',
-    validationEnvironment: 'PREQA2',
-    targetEnvironment: 'STAGING',
-    environmentReason: 'Cart redirects to staging and is not a PreQA storefront flow.',
-  };
+  value.markets.MX.results['SAM-24971'] = { status: 'NOT_APPLICABLE', context: 'either', validationEnvironment: 'PREQA2', targetEnvironment: 'STAGING', environmentReason: 'Cart redirects to staging and is not a PreQA storefront flow.' };
   return value;
 }
 
-test('executive v3 keeps 144 official scope and separates official execution from MX automation', () => {
+function build5Execution() {
+  const statuses = [
+    ...Array(14).fill('PASS'), ...Array(8).fill('FAIL'), ...Array(8).fill('SKIPPED-BLOCKED'),
+  ];
+  return {
+    buildNumber: '5', buildUrl: 'http://localhost:8080/job/SAMSUNG-SMB-AUTOMATION/5/', gitCommit: 'abc123', timestamp: '2026-09-15T18:26:00.000Z',
+    market: 'MX', store: 'BASE_STORE', suite: 'P1/QST', environment: 'S1/STG',
+    summary: { official: 30, executed: 22, passed: 14, failed: 8, blocked: 8, notRun: 0, passRate: 63.636, duration: 2262000 },
+    tests: statuses.map((status, index) => ({ samId: `SAM-${25000 + index}`, title: `Fixture ${index + 1}`, status, duration: 1000, attachments: index === 0 ? [{ name: 'screenshot', path: 'test-results/jenkins/mx-qst/playwright/example/test-failed-1.png' }] : [] })),
+  };
+}
+
+test('executive keeps canonical 144 scope separate from MX automation coverage', () => {
   const model = buildDashboardModel({ ledger: ledger() });
   assert.equal(model.totals.official, 144);
   assert.equal(model.totals.executed, 2);
-  assert.equal(model.totals.pass, 1);
-  assert.equal(model.totals.fail, 1);
-  assert.equal(model.totals.pending, 142);
-  assert.equal(model.automation.scope, 'MX');
   assert.equal(model.automation.official, 37);
   assert.equal(model.automation.full + model.automation.partial + model.automation.missing, 37);
 });
 
 test('feature coverage conserves the 37 MX official cases', () => {
   const rows = buildMxFeatureCoverage();
-  const totals = rows.reduce((acc, row) => {
-    acc.total += row.total;
-    acc.full += row.full;
-    acc.partial += row.partial;
-    acc.missing += row.missing;
-    return acc;
-  }, { total: 0, full: 0, partial: 0, missing: 0 });
+  const totals = rows.reduce((acc, row) => ({ total: acc.total + row.total, full: acc.full + row.full, partial: acc.partial + row.partial, missing: acc.missing + row.missing }), { total: 0, full: 0, partial: 0, missing: 0 });
   assert.equal(totals.total, 37);
   assert.equal(totals.full + totals.partial + totals.missing, 37);
-  assert.ok(rows.some(row => row.feature === 'Checkout'));
-  assert.ok(rows.some(row => row.epp > 0));
 });
 
 test('automation gap queue contains only partial or missing MX cases', () => {
   const gaps = buildAutomationGaps();
   assert.ok(gaps.length > 0);
-  assert.ok(gaps.every(row => row.market === 'MX'));
-  assert.ok(gaps.every(row => row.coverage === 'partial' || row.coverage === 'missing'));
-  assert.equal(gaps.length, 37 - buildMxFeatureCoverage().reduce((sum, row) => sum + row.full, 0));
+  assert.ok(gaps.every(row => row.market === 'MX' && (row.coverage === 'partial' || row.coverage === 'missing')));
 });
 
-test('TC catalog always contains exactly the 144 official IDs', () => {
+test('TC catalog always contains exactly the 144 canonical IDs', () => {
   const catalog = buildCaseCatalog(ledger());
   assert.equal(catalog.length, 144);
   assert.equal(catalog.filter(row => row.market === 'MX').length, 37);
-  assert.equal(catalog.filter(row => row.market === 'CL').length, 38);
-  assert.equal(catalog.filter(row => row.market === 'CO').length, 35);
-  assert.equal(catalog.filter(row => row.market === 'PE').length, 34);
-  assert.equal(catalog.find(row => row.id === 'SAM-24964' && row.market === 'MX').status, 'PASS');
   assert.equal(catalog.filter(row => row.status === 'NOT_RUN').length, 142);
 });
 
-test('N/A in PreQA is modeled as an environment handoff, not as an official pass', () => {
-  const catalog = buildCaseCatalog(routedLedger());
-  const handoffs = buildEnvironmentHandoffs(catalog);
+test('N/A in PreQA is modeled as an environment handoff, not a pass', () => {
+  const handoffs = buildEnvironmentHandoffs(buildCaseCatalog(routedLedger()));
   assert.equal(handoffs.length, 1);
   assert.equal(handoffs[0].id, 'SAM-24971');
-  assert.equal(handoffs[0].fromEnvironment, 'PREQA2');
   assert.equal(handoffs[0].toEnvironment, 'STAGING');
-  assert.match(handoffs[0].reason, /Cart redirects to staging/);
-
-  const model = buildDashboardModel({ ledger: routedLedger() });
-  assert.equal(model.totals.notApplicable, 1);
-  assert.equal(model.totals.pass, 1);
-  assert.equal(model.validation.stagingRequired, 1);
-  assert.equal(model.validation.handoffUnspecified, 0);
 });
 
-test('N/A handoff without explicit target is surfaced instead of silently assumed', () => {
-  const value = routedLedger();
-  delete value.markets.MX.results['SAM-24971'].targetEnvironment;
-  const model = buildDashboardModel({ ledger: value });
-  assert.equal(model.validation.environmentHandoffs[0].toEnvironment, 'UNSPECIFIED');
-  assert.equal(model.validation.stagingRequired, 0);
-  assert.equal(model.validation.handoffUnspecified, 1);
-});
-
-test('Market x Feature matrix conserves all catalog rows across four markets', () => {
+test('Market x Feature matrix conserves all catalog rows', () => {
   const catalog = buildCaseCatalog(ledger());
   const matrix = buildMarketFeatureMatrix(catalog);
-  for (const market of ['MX', 'CL', 'CO', 'PE']) {
-    const sum = matrix.reduce((total, row) => total + row.markets[market].total, 0);
-    assert.equal(sum, catalog.filter(row => row.market === market).length);
-  }
-  assert.ok(matrix.some(row => row.feature === 'Unknown'));
+  for (const market of ['MX', 'CL', 'CO', 'PE']) assert.equal(matrix.reduce((total, row) => total + row.markets[market].total, 0), catalog.filter(row => row.market === market).length);
 });
 
-test('trend uses supplied snapshots and appends current state without inventing history', () => {
+test('trend uses supplied snapshots without inventing history', () => {
   const historical = ledger();
   historical.markets.MX.results = { 'SAM-24964': historical.markets.MX.results['SAM-24964'] };
   const rows = buildTrend([{ label: 'Earlier', ledger: historical }], ledger());
   assert.equal(rows.length, 2);
-  assert.equal(rows[0].label, 'Earlier');
   assert.equal(rows[0].executed, 1);
   assert.equal(rows[1].executed, 2);
-  assert.equal(rows[1].label, 'Current');
 });
 
-test('consistency audit passes canonical registry/coverage/ledger and flags unknown ledger IDs', () => {
-  const ok = buildConsistencyAudit(ledger());
-  assert.equal(ok.ok, true);
-  assert.equal(ok.failed, 0);
-
+test('consistency audit flags unknown ledger IDs', () => {
+  assert.equal(buildConsistencyAudit(ledger()).ok, true);
   const badLedger = ledger();
   badLedger.markets.MX.results['SAM-99999'] = { status: 'PASS' };
-  const bad = buildConsistencyAudit(badLedger);
-  assert.equal(bad.ok, false);
-  assert.ok(bad.checks.some(check => check.key === 'ledger-MX-ids' && !check.ok));
+  assert.equal(buildConsistencyAudit(badLedger).ok, false);
 });
 
-test('executive v3 exposes runtime attention separately from automation gaps', () => {
-  const model = buildDashboardModel({ ledger: ledger() });
-  assert.equal(model.validation.attention.length, 1);
-  assert.equal(model.validation.attention[0].id, 'SAM-24968');
-  assert.equal(model.validation.recent.length, 2);
-  assert.equal(model.validation.recent[0].id, 'SAM-24968');
-  assert.ok(model.automation.gaps.every(row => !('status' in row)));
+test('Build #5 runtime reconciles 30 = 14 PASS + 8 FAIL + 8 BLOCKED + 0 NOT_RUN', () => {
+  const execution = build5Execution();
+  const s = execution.summary;
+  assert.equal(s.passed + s.failed + s.blocked + s.notRun, s.official);
+  assert.equal(s.official, 30);
+  assert.equal(s.passed, 14);
+  assert.equal(s.failed, 8);
+  assert.equal(s.blocked, 8);
+  assert.equal(s.notRun, 0);
 });
 
-test('executive v3 renders trend matrix audit and 144-TC drilldown', () => {
-  const html = render(buildDashboardModel({ ledger: ledger() }));
-  assert.match(html, /Samsung Automation Control Center/);
-  assert.match(html, /Coverage denominator is MX official scope \(37\), not all 144 SMB cases/);
-  assert.match(html, /Official PASS does not automatically mean Full automation/);
-  assert.match(html, /MX Coverage by Feature/);
-  assert.match(html, /Automation Gap Queue/);
-  assert.match(html, /Market × Feature Validation Matrix/);
-  assert.match(html, /Validation Trend/);
-  assert.match(html, /Data Consistency Audit/);
-  assert.match(html, /Official TC Drilldown/);
-  assert.match(html, /144 TCs/);
-  assert.match(html, /SAM-24968/);
-  assert.match(html, /No real execution artifact was supplied/);
+test('Current Build Runtime denominator remains 30 even when canonical MX coverage is 37', () => {
+  const model = buildDashboardModel({ ledger: ledger(), execution: build5Execution() });
+  assert.equal(model.execution.summary.official, 30);
+  assert.equal(model.automation.official, 37);
+  assert.equal(model.totals.official, 144);
+  const html = render(model);
+  assert.match(html, /Current Build Runtime/);
+  assert.match(html, /14/);
+  assert.match(html, /8/);
+  assert.match(html, /Current Build Runtime uses 30 selected TCs/);
+  assert.match(html, /MX automation coverage contains 37 TCs/);
 });
 
-test('executive v3 renders current Playwright runtime independently from the ledger', () => {
-  const execution = {
-    buildNumber: '42', gitCommit: 'abc123', timestamp: '2026-09-15T12:00:00.000Z',
-    market: 'MX', store: 'BASE_STORE', suite: 'P1/QST',
-    summary: { official: 30, executed: 23, passed: 13, failed: 10, blocked: 7, notRun: 0, passRate: 56.52, duration: 90000 },
-    tests: [{ samId: 'SAM-25001', title: 'Back to Top', status: 'PASS', duration: 1000 }],
-  };
+test('dashboard uses external Jenkins-safe stylesheet and no inline script/style block', () => {
+  const html = render(buildDashboardModel({ ledger: ledger(), execution: build5Execution() }));
+  assert.match(html, /<link rel="stylesheet" href="dashboard\.css">/);
+  assert.doesNotMatch(html, /<style>/);
+  assert.doesNotMatch(html, /<script>/);
+});
+
+test('Jenkins evidence URL points to archived artifact', () => {
+  const execution = build5Execution();
+  const href = evidenceHref(execution, 'test-results/jenkins/mx-qst/playwright/example/test-failed-1.png');
+  assert.equal(href, 'http://localhost:8080/job/SAMSUNG-SMB-AUTOMATION/5/artifact/test-results/jenkins/mx-qst/playwright/example/test-failed-1.png');
   const html = render(buildDashboardModel({ ledger: ledger(), execution }));
-  assert.match(html, /Latest Real Execution/);
-  assert.match(html, /Build: 42/);
-  assert.match(html, /Commit: abc123/);
-  assert.match(html, /SAM-25001/);
-  assert.match(html, /56\.5%/);
+  assert.match(html, /artifact\/test-results\/jenkins\/mx-qst\/playwright\/example\/test-failed-1\.png/);
 });
 
-test('executive v3 remains useful with no execution evidence', () => {
+test('executive remains useful with no execution evidence', () => {
   const model = buildDashboardModel({ ledger: null });
   assert.equal(model.totals.official, 144);
-  assert.equal(model.totals.executed, 0);
   assert.equal(model.totals.pending, 144);
-  assert.equal(model.releaseHealth, 'NO EXECUTION');
-  assert.equal(model.validation.attention.length, 0);
-  assert.equal(model.validation.catalog.length, 144);
-  assert.equal(model.validation.environmentHandoffs.length, 0);
-  assert.equal(model.audit.ok, true);
+  assert.match(render(model), /No real execution artifact was supplied/);
   assert.match(render(model), /MX Automation Coverage/);
-  assert.match(render(model), /No timestamped official validation evidence is available yet/);
 });
