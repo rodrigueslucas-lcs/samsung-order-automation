@@ -1,10 +1,15 @@
 import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import { test, expect } from "./mxQst.fixture";
-import { prepareMxQstCart } from "./mxQstFlows";
+import { prepareMxQstCart, openMxService } from "./mxQstFlows";
 
 const { recordBusinessEvidence } = evidenceContext;
 const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
+
+function parseMxCurrency(text) {
+  const match = String(text || "").match(/\$\s*([\d,.]+)/);
+  return match ? Number(match[1].replace(/,/g, "")) : null;
+}
 
 test.describe.configure({ timeout: 420000 });
 
@@ -13,30 +18,54 @@ test("SAM-24985 @qst @mx @base-store @safe - Extended Warranty on Cart", async (
   const cart = await prepareMxQstCart(page, mxConfig);
   await cart.validateControlledSingleSku(mxConfig.sku);
 
-  const main = page.getByRole("main");
-  const warrantyText = main
-    .getByText(/Garant[ií]a Extendida|Extended Warranty/i)
-    .filter({ visible: true });
+  const totalHeading = page.getByRole("heading", { name: /Total con IVA/i });
+  await expect(totalHeading).toBeVisible({ timeout: 30000 });
+  const totalBefore = parseMxCurrency(await totalHeading.locator("..").innerText());
+  expect(totalBefore).not.toBeNull();
 
-  test.skip(
-    (await warrantyText.count()) === 0,
-    "Extended Warranty is not offered for the configured MX QST SKU; use a source-approved eligible SKU before asserting add behavior."
+  const careSurface = await openMxService(page, "Samsung Care\\+");
+  const extendedWarrantyPlan = careSurface
+    .getByText(/Garant[ií]a extendida/i)
+    .filter({ visible: true })
+    .first();
+  await expect(extendedWarrantyPlan).toBeVisible({ timeout: 30000 });
+
+  const planCard = extendedWarrantyPlan.locator(
+    "xpath=ancestor::*[.//input[@type='radio'] or @role='radio'][1]"
   );
+  const radio = planCard.locator("input[type='radio']").or(planCard.getByRole("radio")).first();
+  if (await radio.count()) {
+    await radio.check({ force: true });
+  } else {
+    await planCard.click();
+  }
 
-  const addAction = main
-    .getByRole("button", { name: /Agregar ahora.*(Garant[ií]a|Warranty)/i })
-    .or(main.getByText(/^Agregar ahora$/i).filter({ visible: true }))
+  const confirm = careSurface
+    .getByRole("button", { name: /Agregar|Añadir|Confirmar|Aplicar/i })
+    .filter({ visible: true })
+    .last();
+  if (await confirm.count()) {
+    await expect(confirm).toBeEnabled({ timeout: 30000 });
+    await confirm.click();
+  }
+
+  await expect(careSurface).toBeHidden({ timeout: 30000 }).catch(() => {});
+
+  const summaryWarranty = page
+    .getByText(/Samsung Care.*Garant[ií]a extendida|Garant[ií]a extendida/i)
     .filter({ visible: true });
-  await expect(addAction.first()).toBeVisible({ timeout: 30000 });
-  await addAction.first().click();
+  await expect(summaryWarranty.first()).toBeVisible({ timeout: 30000 });
 
-  await expect(
-    page.getByText(/Garant[ií]a Extendida|Extended Warranty/i).filter({ visible: true }).last()
-  ).toBeVisible({ timeout: 30000 });
+  const totalAfter = parseMxCurrency(await totalHeading.locator("..").innerText());
+  expect(totalAfter).not.toBeNull();
+  expect(totalAfter).toBeGreaterThan(totalBefore);
 
   recordBusinessEvidence(testInfo, {
     configuredSku: mxConfig.sku,
-    warrantySurfaceOpened: true,
-    note: "The test intentionally does not invent a plan/price selector before the live eligible-SKU UI is observed.",
+    service: "Samsung Care+",
+    plan: "Garantía extendida",
+    totalBefore,
+    totalAfter,
+    priceChanged: true,
   });
 });
