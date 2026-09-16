@@ -20,6 +20,7 @@ pipeline {
     CI = '1'
     MX_QST_ARTIFACT_DIR = 'test-results/jenkins/mx-qst'
     MX_QST_USE_EXISTING_AUTH = '1'
+    ENABLE_ALLURE = '1'
   }
 
   stages {
@@ -46,8 +47,13 @@ pipeline {
     stage('Install') {
       steps {
         script {
-          if (isUnix()) sh 'npm ci'
-          else bat '@npm ci'
+          if (isUnix()) {
+            sh 'npm ci'
+            sh 'npm run reporting:allure:install'
+          } else {
+            bat '@npm ci'
+            bat '@npm run reporting:allure:install'
+          }
         }
       }
     }
@@ -136,12 +142,20 @@ pipeline {
         reportFiles: 'index.html',
         reportName: 'MX QST Executive Dashboard'
       ])
+      publishHTML(target: [
+        allowMissing: true,
+        alwaysLinkToLastBuild: true,
+        keepAll: true,
+        reportDir: 'test-results/jenkins/mx-qst/allure-report',
+        reportFiles: 'index.html',
+        reportName: 'Allure MX QST'
+      ])
     }
     success {
       echo 'Samsung SMB automation build completed successfully.'
     }
     unsuccessful {
-      echo 'Samsung SMB automation build did not complete successfully. Review console output and archived Playwright evidence.'
+      echo 'Samsung SMB automation build did not complete successfully. Review console output and archived Playwright/Allure evidence.'
     }
   }
 }
