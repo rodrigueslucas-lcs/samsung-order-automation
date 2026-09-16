@@ -10,6 +10,7 @@ pipeline {
   }
 
   parameters {
+    booleanParam(name: 'RUN_ALLURE_SMOKE', defaultValue: false, description: 'Run isolated local Allure reporting smoke with Node 22; no Samsung URL/auth/order/payment.')
     booleanParam(name: 'RUN_MX_QST', defaultValue: true, description: 'Run official MX S1 Base Store P1/QST suite')
     booleanParam(name: 'RUN_DESTRUCTIVE', defaultValue: false, description: 'Allow payment/order scenarios. Enable only on an authorized S1 agent.')
     booleanParam(name: 'ENABLE_VIDEO', defaultValue: false, description: 'Enable Playwright video only after FFmpeg is proven on this Jenkins agent.')
@@ -58,7 +59,25 @@ pipeline {
       }
     }
 
+    stage('Allure Reporting Smoke') {
+      when {
+        expression { return params.RUN_ALLURE_SMOKE }
+      }
+      steps {
+        script {
+          if (isUnix()) {
+            sh 'npx -y node@22 scripts/run-allure-smoke.cjs'
+          } else {
+            bat '@call npx -y node@22 scripts/run-allure-smoke.cjs'
+          }
+        }
+      }
+    }
+
     stage('Official SMB Gate') {
+      when {
+        expression { return !params.RUN_ALLURE_SMOKE }
+      }
       steps {
         script {
           if (isUnix()) {
@@ -74,7 +93,7 @@ pipeline {
 
     stage('MX QST') {
       when {
-        expression { return params.RUN_MX_QST }
+        expression { return params.RUN_MX_QST && !params.RUN_ALLURE_SMOKE }
       }
       steps {
         script {
@@ -149,6 +168,14 @@ pipeline {
         reportDir: 'test-results/jenkins/mx-qst/allure-report',
         reportFiles: 'index.html',
         reportName: 'Allure MX QST'
+      ])
+      publishHTML(target: [
+        allowMissing: true,
+        alwaysLinkToLastBuild: true,
+        keepAll: true,
+        reportDir: 'test-results/reporter-tests/allure-smoke/allure-report',
+        reportFiles: 'index.html',
+        reportName: 'Allure Reporting Smoke'
       ])
     }
     success {
