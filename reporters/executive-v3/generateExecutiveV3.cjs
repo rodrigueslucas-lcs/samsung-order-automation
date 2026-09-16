@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { buildDashboardModel } = require('./dashboardModel');
 
-const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;' }[c]));
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 const pct = value => value == null ? 'N/A' : `${Number(value).toFixed(1)}%`;
 const readJson = file => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 const kpi = (label, value, hint='', tone='') => `<article class="kpi ${tone}"><small>${esc(label)}</small><b>${esc(value)}</b><span>${esc(hint)}</span></article>`;
@@ -18,17 +18,11 @@ function evidenceHref(execution, artifactPath) {
   const base = String(execution.buildUrl).replace(/\/?$/, '/');
   return `${base}artifact/${String(artifactPath).split('/').map(encodeURIComponent).join('/')}`;
 }
-
 function renderAttachments(execution, attachments = []) {
   const safe = attachments.filter(item => item?.path && !/(^|\/)playwright\/\.auth(\/|$)/i.test(item.path));
   if (!safe.length) return '—';
-  return safe.map(item => {
-    const href = evidenceHref(execution, item.path);
-    const label = esc(item.name || path.basename(item.path));
-    return href ? `<a href="${esc(href)}" target="_blank" rel="noopener">${label}</a>` : `<span>${label}</span>`;
-  }).join(' ');
+  return safe.map(item => { const href = evidenceHref(execution, item.path); const label = esc(item.name || path.basename(item.path)); return href ? `<a href="${esc(href)}" target="_blank" rel="noopener">${label}</a>` : `<span>${label}</span>`; }).join(' ');
 }
-
 function renderExecution(execution) {
   if (!execution?.summary || !Array.isArray(execution.tests)) return empty('No real execution artifact was supplied.');
   const s = execution.summary;
@@ -36,18 +30,9 @@ function renderExecution(execution) {
   const rows = execution.tests.map(test => `<tr><td><strong>${esc(test.samId)}</strong><small>${esc(test.title || '')}</small></td><td>${chip(test.status)}</td><td>${duration(test.duration)}</td><td class="evidence">${renderAttachments(execution, test.attachments)}</td><td class="evidence-text">${esc(test.blockedReason || test.error || '')}</td></tr>`).join('');
   return `<div class="runtime-meta"><span><strong>Build</strong> #${esc(execution.buildNumber || 'local')}</span><span><strong>Commit</strong> ${esc(execution.gitCommit || 'unavailable')}</span><span><strong>Timestamp</strong> ${esc(execution.timestamp || 'unavailable')}</span><span><strong>Scope</strong> ${esc(execution.market)} / ${esc(execution.store)} / ${esc(execution.suite)}</span><span><strong>Environment</strong> ${esc(execution.environment || 'unavailable')}</span><span><strong>Reconciliation</strong> ${reconciled ? 'OK' : 'CHECK'}</span></div><div class="grid runtime-kpis">${kpi('Official selected',s.official,'Current build only')}${kpi('Executed',s.executed,'PASS + FAIL')}${kpi('PASS',s.passed,pct(s.passRate),'good')}${kpi('FAIL',s.failed,'Current build failures',s.failed?'bad':'')}${kpi('Blocked',s.blocked,'Runtime prerequisites',s.blocked?'warn':'')}${kpi('Not run',s.notRun,`Duration ${duration(s.duration)}`)}</div><div class="table-wrap"><table><thead><tr><th>TC</th><th>Status</th><th>Duration</th><th>Evidence</th><th>Error / blocker</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
-
-function renderFeatureRows(features) {
-  return features.map(row => `<tr><td><strong>${esc(row.feature)}</strong><small>${row.baseStore} BS · ${row.epp} EPP</small></td><td>${row.total}</td><td>${row.full}</td><td>${row.partial}</td><td>${row.missing}</td><td>${pct(row.fullPercent)}</td></tr>`).join('');
-}
-function renderGaps(rows) {
-  const top = rows.slice(0, 12);
-  if (!top.length) return empty('No MX automation gaps.');
-  return top.map(row => `<tr><td><strong>${esc(row.id)}</strong><small>${esc(row.title || '')}</small></td><td>${esc(row.feature || '')}</td><td>${esc(row.store || '')}</td><td>${chip(row.coverage)}</td></tr>`).join('');
-}
-function renderMarketFeatureMatrix(rows) {
-  return rows.map(row => `<tr><td><strong>${esc(row.feature)}</strong></td>${['MX','CL','CO','PE'].map(m => { const v = row.markets[m]; return !v.total ? '<td class="muted-cell">—</td>' : `<td><b>${v.executed}/${v.total}</b><small>${v.pass} P · ${v.fail} F · ${v.blocked} B · ${v.pending} pending</small></td>`; }).join('')}</tr>`).join('');
-}
+function renderFeatureRows(features) { return features.map(row => `<tr><td><strong>${esc(row.feature)}</strong><small>${row.baseStore} BS · ${row.epp} EPP</small></td><td>${row.total}</td><td>${row.full}</td><td>${row.partial}</td><td>${row.missing}</td><td>${pct(row.fullPercent)}</td></tr>`).join(''); }
+function renderGaps(rows) { const top = rows.slice(0, 12); if (!top.length) return empty('No MX automation gaps.'); return top.map(row => `<tr><td><strong>${esc(row.id)}</strong><small>${esc(row.title || '')}</small></td><td>${esc(row.feature || '')}</td><td>${esc(row.store || '')}</td><td>${chip(row.coverage)}</td></tr>`).join(''); }
+function renderMarketFeatureMatrix(rows) { return rows.map(row => `<tr><td><strong>${esc(row.feature)}</strong></td>${['MX','CL','CO','PE'].map(m => { const v = row.markets[m]; return !v.total ? '<td class="muted-cell">—</td>' : `<td><b>${v.executed}/${v.total}</b><small>${v.pass} P · ${v.fail} F · ${v.blocked} B · ${v.pending} pending</small></td>`; }).join('')}</tr>`).join(''); }
 function renderAudit(audit) { return audit.checks.map(check => `<tr><td>${check.ok ? chip('PASS') : chip('FAIL')}</td><td><strong>${esc(check.key)}</strong></td><td>${esc(check.detail)}</td></tr>`).join(''); }
 function renderCatalog(rows) { return rows.map(row => `<tr><td><strong>${esc(row.id)}</strong><small>${esc(row.title)}</small></td><td>${esc(row.market)}</td><td>${esc(row.feature)}</td><td>${esc(row.store)}</td><td>${chip(row.status)}</td><td>${row.coverage ? chip(row.coverage) : '—'}</td><td>${esc(row.context)}</td><td class="evidence-text">${esc(row.blocker || row.evidence || row.runtimePath || '')}</td></tr>`).join(''); }
 
@@ -68,7 +53,6 @@ function render(model) {
 <section class="panel"><div class="panel-title"><div><h2>Official TC Drilldown</h2><p>Canonical ${model.validation.catalog.length}-TC inventory. This table is reference data, not Current Build Runtime.</p></div><span class="tag">${model.validation.catalog.length} TCs</span></div><div class="table-wrap"><table><thead><tr><th>TC</th><th>Market</th><th>Feature</th><th>Store</th><th>Ledger status</th><th>Coverage</th><th>Context</th><th>Evidence / blocker</th></tr></thead><tbody>${renderCatalog(model.validation.catalog)}</tbody></table></div></section>
 </main></body></html>`;
 }
-
 function main() {
   const root = path.resolve(__dirname, '../..');
   const ledgerPath = process.argv[2] ? path.resolve(process.argv[2]) : path.join(root, 'test-mapping/preqa2-validation.json');
@@ -83,6 +67,5 @@ function main() {
   fs.copyFileSync(path.join(__dirname, 'dashboard.css'), path.join(outputDir, 'dashboard.css'));
   console.log(`[executive-v3] ${output}`);
 }
-
 if (require.main === module) main();
 module.exports = { render, evidenceHref };
