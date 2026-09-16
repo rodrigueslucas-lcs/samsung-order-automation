@@ -15,7 +15,7 @@
     "auth:export:pe": "node scripts/auth-bootstrap-pe.cjs",
     "auth:verify:pe": "node scripts/auth-verify-pe.cjs",
     "dst:base-store": "playwright test tests/s2/pe/dst/base-store --project=chromium --workers=1 --grep-invert @destructive",
-    "dst:backoffice": "playwright test tests/s2/pe/dst/backoffice tests/s2/pe/dst/base-store tests/s2/pe/dst/epp --project=chromium --workers=1 --grep-invert \"@destructive|TC73|TC75\"",
+    "dst:backoffice": "playwright test tests/s2/pe/dst/backoffice --project=chromium --workers=1 --grep-invert \"@destructive|TC73|TC75\"",
     "dst:epp": "playwright test tests/s2/pe/dst/epp --project=chromium --workers=1 --grep-invert @destructive",
     "dst:mx:base-store": "playwright test tests/s1/mx/dst/base-store --project=chromium --workers=1 --grep-invert @destructive",
     "dst:mx:order": "playwright test tests/s1/mx/dst/base-store/order.spec.js --project=chromium --workers=1 --retries=0",
