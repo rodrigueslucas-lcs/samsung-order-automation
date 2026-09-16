@@ -30,26 +30,31 @@ test("SAM-24985 @qst @mx @base-store @safe - Extended Warranty on Cart", async (
     .first();
   await expect(extendedWarrantyPlan).toBeVisible({ timeout: 30000 });
 
+  // The live Samsung Care+ UI uses a custom visual radio. Clicking the native
+  // input with force can change the DOM state without triggering the Angular
+  // selection handler, leaving "Agregar al carrito" disabled. Click the plan
+  // card/visual radio as a user would instead.
   const planCard = extendedWarrantyPlan.locator(
-    "xpath=ancestor::*[.//input[@type='radio'] or @role='radio'][1]"
+    "xpath=ancestor::*[.//input[@type='radio'] or .//*[@role='radio']][1]"
   );
-  const radio = planCard.locator("input[type='radio']").or(planCard.getByRole("radio")).first();
-  if (await radio.count()) {
-    await radio.check({ force: true });
+  await expect(planCard).toBeVisible({ timeout: 30000 });
+
+  const visualRadio = planCard.getByRole("radio").filter({ visible: true }).first();
+  if (await visualRadio.count()) {
+    await visualRadio.click();
   } else {
     await planCard.click();
   }
 
   const confirm = careSurface
-    .getByRole("button", { name: /Agregar|Añadir|Confirmar|Aplicar/i })
+    .getByRole("button", { name: /Agregar al carrito|Añadir al carrito|Confirmar|Aplicar/i })
     .filter({ visible: true })
     .last();
-  if (await confirm.count()) {
-    await expect(confirm).toBeEnabled({ timeout: 30000 });
-    await confirm.click();
-  }
+  await expect(confirm).toBeVisible({ timeout: 30000 });
+  await expect(confirm).toBeEnabled({ timeout: 30000 });
+  await confirm.click();
 
-  await expect(careSurface).toBeHidden({ timeout: 30000 }).catch(() => {});
+  await expect(careSurface).toBeHidden({ timeout: 30000 });
 
   const summaryWarranty = page
     .getByText(/Samsung Care.*Garant[ií]a extendida|Garant[ií]a extendida/i)
