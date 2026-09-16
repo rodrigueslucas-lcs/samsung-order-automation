@@ -35,51 +35,38 @@ test("SAM-24985 @qst @mx @base-store @safe - Extended Warranty on Cart", async (
   );
   await expect(planCard).toBeVisible({ timeout: 30000 });
 
-  const planTouchTarget = planCard.locator(".mat-mdc-radio-touch-target").first();
-  if (await planTouchTarget.count()) {
-    await planTouchTarget.click();
-  } else {
-    await planCard.click();
-  }
+  const planInput = planCard.locator("input[type='radio']").first();
+  await expect(planInput).toBeAttached({ timeout: 30000 });
+  await planInput.check({ force: true });
+  await expect(planInput).toBeChecked({ timeout: 10000 });
 
   const termsSection = careSurface.getByText(/T[eé]rminos y condiciones de Samsung Care\+/i).first();
   await expect(termsSection).toBeVisible({ timeout: 30000 });
 
-  // The consent copy contains legal links. Clicking the label text can open the
-  // Samsung Care+ legal page instead of selecting the control. Target only the
-  // four Material radio controls that belong to the terms section.
-  const consentTexts = [
-    /He tomado nota/i,
-    /He le[ií]do y estoy de acuerdo/i,
-    /Entiendo que es una p[oó]liza/i,
-    /Declaro que tengo m[aá]s de 18 a[nñ]os/i,
-  ];
+  // After the plan is selected the modal exposes exactly four consent radio
+  // controls below the terms heading. Do not click labels/text because one row
+  // contains legal links. Check the native inputs directly so Angular receives
+  // the input/change events without navigating away from the modal.
+  const allRadios = careSurface.locator("input[type='radio']");
+  await expect.poll(() => allRadios.count(), {
+    timeout: 30000,
+    message: "Samsung Care+ should expose the selected plan plus four consent radios.",
+  }).toBeGreaterThanOrEqual(5);
 
-  for (const consentText of consentTexts) {
-    const consentRow = careSurface
-      .getByText(consentText)
-      .filter({ visible: true })
-      .first()
-      .locator("xpath=ancestor::*[.//input[@type='radio'] or .//input[@type='checkbox']][1]");
-    await expect(consentRow).toBeVisible({ timeout: 30000 });
+  const consentRadios = allRadios.filter({ visible: true });
+  const consentCount = await consentRadios.count();
+  expect(consentCount).toBeGreaterThanOrEqual(4);
 
-    const input = consentRow.locator("input[type='radio'], input[type='checkbox']").first();
-    await expect(input).toBeAttached({ timeout: 30000 });
-
-    if (!(await input.isChecked())) {
-      const touchTarget = consentRow.locator(".mat-mdc-radio-touch-target, .mat-mdc-checkbox-touch-target").first();
-      if (await touchTarget.count()) {
-        await touchTarget.click();
-      } else {
-        await input.check({ force: true });
-      }
-    }
-
-    await expect(input).toBeChecked({ timeout: 10000 });
+  // The four consent controls are the final four visible radios in the modal.
+  // Selecting by input avoids the Material touch-target/label interception.
+  for (let index = consentCount - 4; index < consentCount; index += 1) {
+    const radio = consentRadios.nth(index);
+    await radio.check({ force: true });
+    await expect(radio).toBeChecked({ timeout: 10000 });
   }
 
   const confirm = careSurface
-    .getByRole("button", { name: /Agregar al carrito|Añadir al carrito|Confirmar|Aplicar/i })
+    .getByRole("button", { name: /Agregar al carrito|Añadir al carrito/i })
     .filter({ visible: true })
     .last();
   await expect(confirm).toBeVisible({ timeout: 30000 });
