@@ -99,7 +99,7 @@ pipeline {
                 cp "$MX_SESSION_STORAGE_SECRET" playwright/.auth/mx-s1-session-storage.json
                 cp "$MX_TEST_CARD_SECRET" playwright/.auth/mx-test-card.json
                 chmod 600 playwright/.auth/mx-s1-user.json playwright/.auth/mx-s1-session-storage.json playwright/.auth/mx-test-card.json || true
-                npm run qst:mx:base-store
+                npx -y node@22 scripts/run-mx-qst-safe.cjs
               '''
             } else {
               bat '''@echo off
@@ -107,7 +107,7 @@ pipeline {
                 copy /Y "%MX_AUTH_STATE_SECRET%" "playwright\\.auth\\mx-s1-user.json" >nul || exit /b 2
                 copy /Y "%MX_SESSION_STORAGE_SECRET%" "playwright\\.auth\\mx-s1-session-storage.json" >nul || exit /b 2
                 copy /Y "%MX_TEST_CARD_SECRET%" "playwright\\.auth\\mx-test-card.json" >nul || exit /b 2
-                call npm run qst:mx:base-store
+                call npx -y node@22 scripts/run-mx-qst-safe.cjs
               '''
             }
           }
