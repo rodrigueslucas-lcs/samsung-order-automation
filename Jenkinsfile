@@ -26,9 +26,7 @@ pipeline {
 
   stages {
     stage('Checkout') {
-      steps {
-        checkout scm
-      }
+      steps { checkout scm }
     }
 
     stage('Agent Diagnostics') {
@@ -60,24 +58,17 @@ pipeline {
     }
 
     stage('Allure Reporting Smoke') {
-      when {
-        expression { return params.RUN_ALLURE_SMOKE }
-      }
+      when { expression { return params.RUN_ALLURE_SMOKE } }
       steps {
         script {
-          if (isUnix()) {
-            sh 'npx -y node@22 scripts/run-allure-smoke.cjs'
-          } else {
-            bat '@call npx -y node@22 scripts/run-allure-smoke.cjs'
-          }
+          if (isUnix()) sh 'npx -y node@22 scripts/run-allure-smoke.cjs'
+          else bat '@call npx -y node@22 scripts/run-allure-smoke.cjs'
         }
       }
     }
 
     stage('Official SMB Gate') {
-      when {
-        expression { return !params.RUN_ALLURE_SMOKE }
-      }
+      when { expression { return !params.RUN_ALLURE_SMOKE } }
       steps {
         script {
           if (isUnix()) {
@@ -92,9 +83,7 @@ pipeline {
     }
 
     stage('MX QST') {
-      when {
-        expression { return params.RUN_MX_QST && !params.RUN_ALLURE_SMOKE }
-      }
+      when { expression { return params.RUN_MX_QST && !params.RUN_ALLURE_SMOKE } }
       steps {
         script {
           if (!params.RUN_DESTRUCTIVE) {
@@ -138,6 +127,15 @@ pipeline {
   post {
     always {
       script {
+        // Rebuild the official Allure after runtime reconciliation so the report
+        // contains Samsung business metadata, official TC status and blocker categories.
+        if (!params.RUN_ALLURE_SMOKE) {
+          if (isUnix()) {
+            sh 'npx -y node@22 scripts/finalize-allure-mx-qst.cjs || true'
+          } else {
+            bat '@call npx -y node@22 scripts/finalize-allure-mx-qst.cjs || exit /b 0'
+          }
+        }
         if (isUnix()) {
           sh 'rm -rf playwright/.auth || true'
         } else {
@@ -167,7 +165,7 @@ pipeline {
         keepAll: true,
         reportDir: 'test-results/jenkins/mx-qst/allure-report',
         reportFiles: 'index.html',
-        reportName: 'Allure MX QST'
+        reportName: 'Samsung MX QST - Allure'
       ])
       publishHTML(target: [
         allowMissing: true,
@@ -178,11 +176,7 @@ pipeline {
         reportName: 'Allure Reporting Smoke'
       ])
     }
-    success {
-      echo 'Samsung SMB automation build completed successfully.'
-    }
-    unsuccessful {
-      echo 'Samsung SMB automation build did not complete successfully. Review console output and archived Playwright/Allure evidence.'
-    }
+    success { echo 'Samsung SMB automation build completed successfully.' }
+    unsuccessful { echo 'Samsung SMB automation build did not complete successfully. Review console output and archived Playwright/Allure evidence.' }
   }
 }
