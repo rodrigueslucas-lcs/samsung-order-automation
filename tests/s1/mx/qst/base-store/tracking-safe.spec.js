@@ -29,12 +29,14 @@ function readGuestOrderRuntime() {
 function preserveGuestOrderCandidate(orderNumber, email, inbox, confirmed = false) {
   if (!orderNumber) return;
   fs.mkdirSync(path.dirname(guestOrderRuntimeFile), { recursive: true });
-  const payload = JSON.stringify({ orderNumber, email, inbox, confirmed }, null, 2);
-
-  // On Windows the previous temp-file rename occasionally fails with EBUSY
-  // immediately after the order flow. This runtime file is only a local handoff
-  // record, so write it in place instead of failing a successfully-created order.
-  fs.writeFileSync(guestOrderRuntimeFile, payload, "utf8");
+  const temporary = `${guestOrderRuntimeFile}.tmp`;
+  fs.writeFileSync(temporary, JSON.stringify({ orderNumber, email, inbox, confirmed }, null, 2));
+  try {
+    fs.renameSync(temporary, guestOrderRuntimeFile);
+  } catch (error) {
+    fs.rmSync(temporary, { force: true });
+    throw new Error(`Could not persist MX guest order runtime safely: ${error.message}`);
+  }
 }
 
 async function createGuestOrderForTracking(page, mxConfig) {
@@ -75,6 +77,8 @@ async function createGuestOrderForTracking(page, mxConfig) {
     await spei.waitFor({ state: "visible", timeout: 60000 });
     await spei.click();
 
+    // Mercado Pago requires a separate review confirmation after choosing
+    // SPEI. Capture the causal MX code from its return URL, then confirm once.
     const review = target.getByRole("heading", { name: /^Revisa tu pago$/i });
     await review.waitFor({ state: "visible", timeout: 60000 });
     const reviewReturnHref = await target
@@ -117,6 +121,8 @@ async function createGuestOrderForTracking(page, mxConfig) {
 test("SAM-25010 @destructive @qst @mx @base-store - Track Order with email and Order ID", async ({ page, context, mxConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-25010"));
 
+  // Running SAM-25010 explicitly authorizes creation of at most one guest MX
+  // prerequisite order when runtime overrides were not supplied.
   let orderNumber = normalizeMxOrderCode(process.env.MX_QST_TRACKING_ORDER?.trim());
   let email = process.env.MX_QST_TRACKING_EMAIL?.trim().toLowerCase();
   let inbox = process.env.MAILINATOR_INBOX?.trim();
@@ -156,12 +162,13 @@ test("SAM-25010 @destructive @qst @mx @base-store - Track Order with email and O
   const mailinator = new MailinatorPage(mailPage, inbox);
   await mailinator.openInbox();
   const baselineMessageIds = await mailinator.snapshotMessageIds();
+  const baselineOtpCodes = await mailinator.snapshotOtpCodes();
 
   await page.bringToFront();
   const otpRequest = await trackingPage.requestVerificationCode(orderNumber, email);
 
   await mailPage.bringToFront();
-  const otpEmail = await mailinator.waitForOtpEmail({ baselineMessageIds });
+  const otpEmail = await mailinator.waitForOtpEmail({ baselineMessageIds, baselineOtpCodes });
 
   await page.bringToFront();
   await trackingPage.submitVerificationCode(otpEmail.otp, orderNumber);
