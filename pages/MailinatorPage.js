@@ -10,6 +10,7 @@ export default class MailinatorPage extends BasePage {
     super(page);
     this.inbox = inbox;
     this.url = "https://www.mailinator.com/v4/public/inboxes.jsp";
+    this.inboxUrl = null;
     this.inboxField = page.getByRole("textbox", { name: "inbox field" });
     this.goButton = page.getByRole("button", { name: "GO", exact: true });
   }
@@ -22,6 +23,9 @@ export default class MailinatorPage extends BasePage {
     await this.page.getByRole("heading", { name: "Public Messages" })
       .waitFor({ state: "visible", timeout: 30000 });
     await expect(this.inboxField).toHaveValue(this.inbox);
+    // Pin the exact inbox URL selected by Mailinator. Polling must reload this
+    // same inbox instead of submitting the public inbox form again.
+    this.inboxUrl = this.page.url();
   }
 
   async inboxRows() {
@@ -51,23 +55,22 @@ export default class MailinatorPage extends BasePage {
   }
 
   async snapshotOtpCodes() {
-    // Do not open historical OTP messages. SAM-25010 already snapshots the
-    // inbox message ids before requesting a new code; that is the freshness
-    // boundary we need. Opening old messages here caused unnecessary inbox
-    // navigation/refresh churn before the new OTP could be clicked.
+    // Freshness is defined by the inbox message ids captured before requesting
+    // the OTP. Historical OTP messages do not need to be opened.
     return [];
   }
 
   async refreshInbox() {
-    if (!(await this.inboxField.isVisible().catch(() => false))) {
-      const back = this.page.getByRole("link", { name: "Back to Inbox" });
-      if (await back.isVisible().catch(() => false)) await back.click();
+    if (!this.inboxUrl) {
+      throw new Error(`Mailinator inbox ${this.inbox} was not opened before polling.`);
     }
-    await this.inboxField.waitFor({ state: "visible", timeout: 30000 });
-    await this.inboxField.fill(this.inbox);
-    await this.goButton.click();
+
+    // Never submit the public inbox form during polling. Reload the exact URL
+    // captured by openInbox so Mailinator cannot switch to another public inbox.
+    await this.page.goto(this.inboxUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
     await this.page.getByRole("heading", { name: "Public Messages" })
       .waitFor({ state: "visible", timeout: 30000 });
+    await this.inboxField.waitFor({ state: "visible", timeout: 30000 });
     await expect(this.inboxField).toHaveValue(this.inbox);
   }
 
