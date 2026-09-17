@@ -29,14 +29,12 @@ function readGuestOrderRuntime() {
 function preserveGuestOrderCandidate(orderNumber, email, inbox, confirmed = false) {
   if (!orderNumber) return;
   fs.mkdirSync(path.dirname(guestOrderRuntimeFile), { recursive: true });
-  const temporary = `${guestOrderRuntimeFile}.tmp`;
-  fs.writeFileSync(temporary, JSON.stringify({ orderNumber, email, inbox, confirmed }, null, 2));
-  try {
-    fs.renameSync(temporary, guestOrderRuntimeFile);
-  } catch (error) {
-    fs.rmSync(temporary, { force: true });
-    throw new Error(`Could not persist MX guest order runtime safely: ${error.message}`);
-  }
+  const payload = JSON.stringify({ orderNumber, email, inbox, confirmed }, null, 2);
+
+  // On Windows the previous temp-file rename occasionally fails with EBUSY
+  // immediately after the order flow. This runtime file is only a local handoff
+  // record, so write it in place instead of failing a successfully-created order.
+  fs.writeFileSync(guestOrderRuntimeFile, payload, "utf8");
 }
 
 async function createGuestOrderForTracking(page, mxConfig) {
@@ -157,8 +155,6 @@ test("SAM-25010 @destructive @qst @mx @base-store - Track Order with email and O
   const mailPage = await context.newPage();
   const mailinator = new MailinatorPage(mailPage, inbox);
   await mailinator.openInbox();
-  // Freshness is proven by Mailinator's message id. Do not open historical OTP
-  // messages here; that was the source of the slow inbox churn.
   const baselineMessageIds = await mailinator.snapshotMessageIds();
 
   await page.bringToFront();
