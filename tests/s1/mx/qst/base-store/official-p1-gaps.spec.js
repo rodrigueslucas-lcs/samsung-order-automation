@@ -78,7 +78,55 @@ test("SAM-24964 @qst @mx @base-store @safe - Store GNB matches Samsung.com", asy
 
 test("SAM-24968 @qst @mx @base-store @safe - PLP facets are displayed and filterable", async ({}, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24968"));
-  test.skip(true, "Official P1 is selected, but the MX S1 PLP/facet runtime flow is not implemented yet; do not fabricate facet coverage.");
+
+  const { cdpBrowser, page } = await getAuthenticatedPreQaPage();
+  try {
+    await page.goto(`${PRE_QA_ORIGIN}/mx/smartphones/all-smartphones/`, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await dismissLocationBanner(page);
+
+    if (/\/apps\/samsung\/login\//i.test(page.url())) {
+      throw new Error(`The Chrome attached at ${PRE_QA_CDP_URL} is not authenticated for PreQA2.`);
+    }
+
+    const resultCount = page.getByText(/\d+\s*Resultado/i).first();
+    await expect(resultCount, "The Smartphones PLP must finish loading before validating facets.")
+      .toBeVisible({ timeout: 90000 });
+    const initialResultText = (await resultCount.textContent())?.trim() || "";
+
+    // Use the facet proven on the MX PreQA PLP. Jira SAM-24968 requires that a
+    // displayed facet can be selected and that the PLP reflects the selection.
+    const availableOnlineFacet = page.getByText(/Disponible Online/i, { exact: true }).filter({ visible: true });
+    await expect(availableOnlineFacet.first(), "The PLP must display the Disponible Online facet.")
+      .toBeVisible({ timeout: 60000 });
+
+    const initialMatches = await availableOnlineFacet.count();
+    await availableOnlineFacet.first().click();
+
+    // The selected facet is rendered as an applied chip/selection on this PLP.
+    // Requiring a second visible occurrence avoids reporting PASS from merely
+    // finding the original facet control without proving that it was applied.
+    await expect.poll(async () => await page.getByText(/Disponible Online/i, { exact: true }).filter({ visible: true }).count(), {
+      message: "Selecting Disponible Online must create a visible applied-filter state.",
+      timeout: 60000,
+    }).toBeGreaterThan(initialMatches);
+
+    await expect(resultCount).toBeVisible({ timeout: 30000 });
+    const filteredResultText = (await resultCount.textContent())?.trim() || "";
+
+    recordBusinessEvidence(testInfo, {
+      source: "PreQA Smartphones PLP",
+      cdpUrl: PRE_QA_CDP_URL,
+      plpPath: "/mx/smartphones/all-smartphones/",
+      facet: "Disponible Online",
+      facetDisplayed: true,
+      facetApplied: true,
+      initialResultText,
+      filteredResultText,
+    });
+  } finally {
+    await page.close().catch(() => {});
+    await cdpBrowser.close().catch(() => {});
+  }
 });
 
 test("SAM-24990 @qst @mx @base-store @safe - Fill mandatory customer details", async ({ page, mxConfig }, testInfo) => {
