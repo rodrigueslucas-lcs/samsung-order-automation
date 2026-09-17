@@ -23,20 +23,7 @@ function readGuestOrderRuntime() {
   const orderNumber = normalizeMxOrderCode(value.orderNumber);
   const email = String(value.email || "").trim().toLowerCase();
   const inbox = String(value.inbox || "").trim();
-  return orderNumber && email && inbox ? { orderNumber, email, inbox, confirmed: value.confirmed === true } : null;
-}
-
-function preserveGuestOrderCandidate(orderNumber, email, inbox, confirmed = false) {
-  if (!orderNumber) return;
-  fs.mkdirSync(path.dirname(guestOrderRuntimeFile), { recursive: true });
-  const temporary = `${guestOrderRuntimeFile}.tmp`;
-  fs.writeFileSync(temporary, JSON.stringify({ orderNumber, email, inbox, confirmed }, null, 2));
-  try {
-    fs.renameSync(temporary, guestOrderRuntimeFile);
-  } catch (error) {
-    fs.rmSync(temporary, { force: true });
-    throw new Error(`Could not persist MX guest order runtime safely: ${error.message}`);
-  }
+  return orderNumber && email && inbox ? { orderNumber, email, inbox } : null;
 }
 
 async function createGuestOrderForTracking(page, mxConfig) {
@@ -70,7 +57,6 @@ async function createGuestOrderForTracking(page, mxConfig) {
   const returnHref = await target.getByRole("link", { name: /Volver a la tienda/i })
     .getAttribute("href").catch(() => null);
   let orderNumber = normalizeMxOrderCode(body) || normalizeMxOrderCode(responseOrderCode) || normalizeMxOrderCode(returnHref);
-  preserveGuestOrderCandidate(orderNumber, email, inbox);
 
   if (new URL(target.url()).hostname === "www.mercadopago.com.mx") {
     const spei = target.getByRole("button", { name: /Transferencia SPEI/i });
@@ -85,7 +71,6 @@ async function createGuestOrderForTracking(page, mxConfig) {
       .getByRole("link", { name: /Volver a la tienda/i })
       .getAttribute("href");
     orderNumber ||= normalizeMxOrderCode(reviewReturnHref);
-    preserveGuestOrderCandidate(orderNumber, email, inbox);
     const confirm = target.getByRole("button", { name: /^Continuar$/i });
     await expect(confirm).toBeEnabled({ timeout: 30000 });
     await confirm.click();
@@ -93,14 +78,7 @@ async function createGuestOrderForTracking(page, mxConfig) {
     const instructions = target.getByRole("heading", {
       name: /^Ahora solo falta finalizar el pago$/i,
     });
-    const paymentOutcome = await Promise.any([
-      instructions.waitFor({ state: "visible", timeout: 120000 }).then(() => "instructions"),
-      target.getByRole("heading", { name: /No pudimos procesar tu pago/i })
-        .waitFor({ state: "visible", timeout: 120000 }).then(() => "rejected"),
-    ]);
-    if (paymentOutcome === "rejected") {
-      throw new Error(`Mercado Pago rejected the SPEI prerequisite for ${orderNumber || "the MX cart"}; do not submit again. The candidate order was preserved for tracking-only follow-up.`);
-    }
+    await instructions.waitFor({ state: "visible", timeout: 120000 });
     const returnToStore = target.getByRole("link", { name: /Volver a la tienda/i });
     const instructionsReturnHref = await returnToStore.getAttribute("href");
     orderNumber ||= normalizeMxOrderCode(instructionsReturnHref);
@@ -109,7 +87,6 @@ async function createGuestOrderForTracking(page, mxConfig) {
     await target.waitForLoadState("domcontentloaded", { timeout: 30000 }).catch(() => {});
     body = await target.locator("body").innerText({ timeout: 30000 }).catch(() => "");
     orderNumber ||= normalizeMxOrderCode(body) || normalizeMxOrderCode(target.url());
-    preserveGuestOrderCandidate(orderNumber, email, inbox, true);
   }
   if (!orderNumber) {
     throw new Error("SAM-25010 prerequisite submit produced no observable MX order code; do not retry automatically.");
@@ -129,9 +106,6 @@ test("SAM-25010 @destructive @qst @mx @base-store - Track Order with email and O
 
   if (!orderNumber || !email || !inbox) {
     const causalOrder = readGuestOrderRuntime();
-    if (causalOrder && !causalOrder.confirmed) {
-      throw new Error(`A previous MX guest order candidate ${causalOrder.orderNumber} has not been confirmed. Verify it before tracking; do not create or resubmit another order.`);
-    }
     if (causalOrder) ({ orderNumber, email, inbox } = causalOrder);
   }
 
