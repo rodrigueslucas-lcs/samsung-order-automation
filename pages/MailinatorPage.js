@@ -51,25 +51,11 @@ export default class MailinatorPage extends BasePage {
   }
 
   async snapshotOtpCodes() {
-    const codes = [];
-    await this.refreshInbox();
-    const count = await (await this.inboxRows()).filter({ hasText: OTP_SUBJECT }).count();
-
-    for (let index = 0; index < count; index++) {
-      const rows = (await this.inboxRows()).filter({ hasText: OTP_SUBJECT });
-      await rows.nth(index).click();
-      await this.page.getByText("Public Message", { exact: true })
-        .waitFor({ state: "visible", timeout: 30000 });
-      const message = await this.readOpenMessage();
-      try {
-        codes.push(this.extractOtp(message.bodyText));
-      } catch {
-        // Ignore malformed historical messages; they cannot identify the new OTP.
-      }
-      await this.refreshInbox();
-    }
-
-    return [...new Set(codes)];
+    // Do not open historical OTP messages. SAM-25010 already snapshots the
+    // inbox message ids before requesting a new code; that is the freshness
+    // boundary we need. Opening old messages here caused unnecessary inbox
+    // navigation/refresh churn before the new OTP could be clicked.
+    return [];
   }
 
   async refreshInbox() {
@@ -122,8 +108,6 @@ export default class MailinatorPage extends BasePage {
     intervalMs = Number(process.env.MAILINATOR_POLL_INTERVAL_MS || 3000),
   } = {}) {
     const startedAt = Date.now();
-    // Message href/msgid is the primary freshness signal. Ignore the synthetic
-    // OTP-count marker that snapshotMessageIds keeps only as a legacy fallback.
     const baseline = new Set(baselineMessageIds.filter((value) => !value.startsWith("__otp_count__:")));
     const priorOtpCodes = new Set(baselineOtpCodes);
     const baselineOtpCount = Number(
@@ -143,15 +127,11 @@ export default class MailinatorPage extends BasePage {
         const messageId = (await row.getAttribute("id")) ||
           (await row.locator("a[href*='msgid=']").first().getAttribute("href"));
 
-        // A real msgid/href not present in the pre-OTP snapshot is immediately
-        // actionable. Do not reopen historical OTP rows on every refresh.
         if (messageId) {
           if (!baseline.has(messageId)) candidates.push({ row, messageId });
           continue;
         }
 
-        // Fallback for a Mailinator markup variant with no id/href: only inspect
-        // rows beyond the baseline OTP count, never the whole historical inbox.
         if (index < Math.max(0, otpCount - baselineOtpCount)) {
           candidates.push({ row, messageId: `otp-row-${index}-of-${otpCount}` });
         }
