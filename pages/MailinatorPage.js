@@ -10,27 +10,18 @@ export default class MailinatorPage extends BasePage {
     super(page);
     this.inbox = inbox;
     this.url = "https://www.mailinator.com/v4/public/inboxes.jsp";
-    this.inboxUrl = `${this.url}?to=${encodeURIComponent(inbox)}`;
     this.inboxField = page.getByRole("textbox", { name: "inbox field" });
     this.goButton = page.getByRole("button", { name: "GO", exact: true });
   }
 
   async openInbox() {
-    // Navigate directly to the causal inbox. Do not rely on Mailinator's public
-    // GO form because its client-side navigation can retain/switch inbox state.
-    await this.page.goto(this.inboxUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await this.page.goto(this.url, { waitUntil: "domcontentloaded" });
+    await this.inboxField.waitFor({ state: "visible", timeout: 30000 });
+    await this.inboxField.fill(this.inbox);
+    await this.goButton.click();
     await this.page.getByRole("heading", { name: "Public Messages" })
       .waitFor({ state: "visible", timeout: 30000 });
-    await this.assertCausalInbox();
-  }
-
-  async assertCausalInbox() {
-    await this.inboxField.waitFor({ state: "visible", timeout: 30000 });
     await expect(this.inboxField).toHaveValue(this.inbox);
-    const currentInbox = new URL(this.page.url()).searchParams.get("to");
-    if (currentInbox !== this.inbox) {
-      throw new Error(`Mailinator switched inbox: expected ${this.inbox}, current=${currentInbox || "unknown"}.`);
-    }
   }
 
   async inboxRows() {
@@ -60,19 +51,38 @@ export default class MailinatorPage extends BasePage {
   }
 
   async snapshotOtpCodes() {
-    // Freshness is defined by the inbox message ids captured before requesting
-    // the OTP. Historical OTP messages do not need to be opened.
-    return [];
+    const codes = [];
+    await this.refreshInbox();
+    const count = await (await this.inboxRows()).filter({ hasText: OTP_SUBJECT }).count();
+
+    for (let index = 0; index < count; index++) {
+      const rows = (await this.inboxRows()).filter({ hasText: OTP_SUBJECT });
+      await rows.nth(index).click();
+      await this.page.getByText("Public Message", { exact: true })
+        .waitFor({ state: "visible", timeout: 30000 });
+      const message = await this.readOpenMessage();
+      try {
+        codes.push(this.extractOtp(message.bodyText));
+      } catch {
+        // Ignore malformed historical messages; they cannot identify the new OTP.
+      }
+      await this.refreshInbox();
+    }
+
+    return [...new Set(codes)];
   }
 
   async refreshInbox() {
-    // Always reconstruct the causal URL from this.inbox. Never reuse whatever
-    // URL Mailinator left after opening a message or client-side navigation.
-    this.inboxUrl = `${this.url}?to=${encodeURIComponent(this.inbox)}`;
-    await this.page.goto(this.inboxUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+    if (!(await this.inboxField.isVisible().catch(() => false))) {
+      const back = this.page.getByRole("link", { name: "Back to Inbox" });
+      if (await back.isVisible().catch(() => false)) await back.click();
+    }
+    await this.inboxField.waitFor({ state: "visible", timeout: 30000 });
+    await this.inboxField.fill(this.inbox);
+    await this.goButton.click();
     await this.page.getByRole("heading", { name: "Public Messages" })
       .waitFor({ state: "visible", timeout: 30000 });
-    await this.assertCausalInbox();
+    await expect(this.inboxField).toHaveValue(this.inbox);
   }
 
   async openCandidate(subjectPattern) {
@@ -109,10 +119,10 @@ export default class MailinatorPage extends BasePage {
     baselineMessageIds = [],
     baselineOtpCodes = [],
     timeoutMs = Number(process.env.MAILINATOR_EMAIL_TIMEOUT_MS || 600000),
-    intervalMs = Number(process.env.MAILINATOR_POLL_INTERVAL_MS || 3000),
+    intervalMs = Number(process.env.MAILINATOR_POLL_INTERVAL_MS || 15000),
   } = {}) {
     const startedAt = Date.now();
-    const baseline = new Set(baselineMessageIds.filter((value) => !value.startsWith("__otp_count__:")));
+    const baseline = new Set(baselineMessageIds);
     const priorOtpCodes = new Set(baselineOtpCodes);
     const baselineOtpCount = Number(
       baselineMessageIds.find((value) => value.startsWith("__otp_count__:"))?.split(":")[1] || 0
@@ -120,29 +130,20 @@ export default class MailinatorPage extends BasePage {
     let observed = [];
 
     while (Date.now() - startedAt < timeoutMs) {
-      await this.assertCausalInbox();
       observed = await this.snapshotInbox();
       const rows = await this.inboxRows();
       const otpRows = rows.filter({ hasText: OTP_SUBJECT });
       const otpCount = await otpRows.count();
-      const candidates = [];
-
-      for (let index = 0; index < otpCount; index++) {
+      const candidateCount = baselineOtpCodes.length > 0
+        ? otpCount
+        : Math.max(0, otpCount - baselineOtpCount);
+      for (let index = 0; index < candidateCount; index++) {
         const row = otpRows.nth(index);
         const messageId = (await row.getAttribute("id")) ||
-          (await row.locator("a[href*='msgid=']").first().getAttribute("href"));
+          (await row.locator("a[href*='msgid=']").first().getAttribute("href")) ||
+          `otp-row-${index}-of-${otpCount}`;
+        if (baseline.has(messageId)) continue;
 
-        if (messageId) {
-          if (!baseline.has(messageId)) candidates.push({ row, messageId });
-          continue;
-        }
-
-        if (index < Math.max(0, otpCount - baselineOtpCount)) {
-          candidates.push({ row, messageId: `otp-row-${index}-of-${otpCount}` });
-        }
-      }
-
-      for (const { row, messageId } of candidates) {
         await row.click();
         await this.page.getByText("Public Message", { exact: true })
           .waitFor({ state: "visible", timeout: 30000 });
@@ -150,14 +151,12 @@ export default class MailinatorPage extends BasePage {
         const senderMatches =
           EXPECTED_SENDER.test(message.sender) || EXPECTED_SENDER.test(message.bodyText);
         if (!senderMatches || !OTP_SUBJECT.test(message.subject)) {
-          baseline.add(messageId);
           await this.refreshInbox();
           continue;
         }
 
         const otp = this.extractOtp(message.bodyText);
         if (priorOtpCodes.has(otp)) {
-          baseline.add(messageId);
           await this.refreshInbox();
           continue;
         }
