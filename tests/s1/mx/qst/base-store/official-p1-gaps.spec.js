@@ -47,7 +47,10 @@ test("SAM-24964 @qst @mx @base-store @safe - Store GNB matches Samsung.com", asy
     const gnb = page.locator("nav, [role='navigation'], [class*='gnb']").filter({ visible: true }).first();
     await expect(gnb, "Samsung global navigation must be displayed on the Base Store home page.").toBeVisible({ timeout: 60000 });
 
-    const smartphonesLink = page.locator("a[href*='/mx/smartphones/all-smartphones']")
+    const mobilesMenu = gnb.locator("a.nv00-gnb-v4__l0-menu-link[href='/mx/smartphones/all-smartphones/']");
+    await expect(mobilesMenu, "The GNB must display the Móviles category.").toBeVisible();
+    await mobilesMenu.click();
+    const smartphonesLink = gnb.locator("a.nv00-gnb-v4__l1-menu-link[href='/mx/smartphones/all-smartphones/']")
       .filter({ visible: true }).first();
     await expect(smartphonesLink, "The GNB must expose navigation to the Smartphones BC/PLP page.").toBeVisible({ timeout: 60000 });
     const gnbHref = await smartphonesLink.getAttribute("href");
@@ -55,7 +58,7 @@ test("SAM-24964 @qst @mx @base-store @safe - Store GNB matches Samsung.com", asy
 
     await page.waitForURL((url) =>
       url.hostname === "p6-pre-qa2.samsung.com" && url.pathname.includes("/mx/smartphones/all-smartphones"),
-      { timeout: 60000 }
+      { timeout: 60000, waitUntil: "domcontentloaded" }
     );
     await dismissLocationBanner(page);
     await expect(page.getByText(/\d+\s*Resultado/i).first(), "The BC/PLP reached through the GNB must render its catalog.")
@@ -92,32 +95,32 @@ test("SAM-24968 @qst @mx @base-store @safe - PLP facets are displayed and filter
     await expect(resultCount, "The Smartphones PLP must finish loading before validating facets.")
       .toBeVisible({ timeout: 90000 });
     const initialResultText = (await resultCount.textContent())?.trim() || "";
+    const initialCount = Number(initialResultText.match(/\d+/)?.[0]);
+    expect(initialCount, "The unfiltered PLP must show a numeric result count.").toBeGreaterThan(0);
 
     // Use the facet proven on the MX PreQA PLP. Jira SAM-24968 requires that a
     // displayed facet can be selected and that the PLP reflects the selection.
-    const availableOnlineFacet = page.getByText(/Disponible Online/i, { exact: true }).filter({ visible: true });
-    await expect(availableOnlineFacet.first(), "The PLP must display the Disponible Online facet.")
-      .toBeVisible({ timeout: 60000 });
+    const productRange = page.getByRole("button", { name: "Gama de productos" });
+    await expect(productRange, "The PLP must display its product-range facet.").toBeVisible({ timeout: 60000 });
+    await productRange.click();
+    const galaxyZ = page.locator("input.checkbox-v3__input[data-reg-name='galaxy-z']");
+    await expect(page.locator("label[for='checkbox-series01i05']"), "Galaxy Z must be an available product-range option.").toBeVisible();
+    await page.locator("label[for='checkbox-series01i05']").click();
 
-    const initialMatches = await availableOnlineFacet.count();
-    await availableOnlineFacet.first().click();
-
-    // The selected facet is rendered as an applied chip/selection on this PLP.
-    // Requiring a second visible occurrence avoids reporting PASS from merely
-    // finding the original facet control without proving that it was applied.
-    await expect.poll(async () => await page.getByText(/Disponible Online/i, { exact: true }).filter({ visible: true }).count(), {
-      message: "Selecting Disponible Online must create a visible applied-filter state.",
+    await expect(page).toHaveURL(/\/mx\/smartphones\/all-smartphones\/\?[^#]*galaxy-z/i, { timeout: 60000 });
+    await expect(galaxyZ, "The chosen facet must remain selected.").toBeChecked();
+    await expect.poll(async () => Number(((await resultCount.textContent()) || "").match(/\d+/)?.[0]), {
+      message: "Selecting Galaxy Z must reduce the PLP result count.",
       timeout: 60000,
-    }).toBeGreaterThan(initialMatches);
+    }).toBeLessThan(initialCount);
 
-    await expect(resultCount).toBeVisible({ timeout: 30000 });
     const filteredResultText = (await resultCount.textContent())?.trim() || "";
 
     recordBusinessEvidence(testInfo, {
       source: "PreQA Smartphones PLP",
       cdpUrl: PRE_QA_CDP_URL,
       plpPath: "/mx/smartphones/all-smartphones/",
-      facet: "Disponible Online",
+      facet: "Galaxy Z",
       facetDisplayed: true,
       facetApplied: true,
       initialResultText,
