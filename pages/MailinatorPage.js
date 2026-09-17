@@ -10,22 +10,27 @@ export default class MailinatorPage extends BasePage {
     super(page);
     this.inbox = inbox;
     this.url = "https://www.mailinator.com/v4/public/inboxes.jsp";
-    this.inboxUrl = null;
+    this.inboxUrl = `${this.url}?to=${encodeURIComponent(inbox)}`;
     this.inboxField = page.getByRole("textbox", { name: "inbox field" });
     this.goButton = page.getByRole("button", { name: "GO", exact: true });
   }
 
   async openInbox() {
-    await this.page.goto(this.url, { waitUntil: "domcontentloaded" });
-    await this.inboxField.waitFor({ state: "visible", timeout: 30000 });
-    await this.inboxField.fill(this.inbox);
-    await this.goButton.click();
+    // Navigate directly to the causal inbox. Do not rely on Mailinator's public
+    // GO form because its client-side navigation can retain/switch inbox state.
+    await this.page.goto(this.inboxUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
     await this.page.getByRole("heading", { name: "Public Messages" })
       .waitFor({ state: "visible", timeout: 30000 });
+    await this.assertCausalInbox();
+  }
+
+  async assertCausalInbox() {
+    await this.inboxField.waitFor({ state: "visible", timeout: 30000 });
     await expect(this.inboxField).toHaveValue(this.inbox);
-    // Pin the exact inbox URL selected by Mailinator. Polling must reload this
-    // same inbox instead of submitting the public inbox form again.
-    this.inboxUrl = this.page.url();
+    const currentInbox = new URL(this.page.url()).searchParams.get("to");
+    if (currentInbox !== this.inbox) {
+      throw new Error(`Mailinator switched inbox: expected ${this.inbox}, current=${currentInbox || "unknown"}.`);
+    }
   }
 
   async inboxRows() {
@@ -61,17 +66,13 @@ export default class MailinatorPage extends BasePage {
   }
 
   async refreshInbox() {
-    if (!this.inboxUrl) {
-      throw new Error(`Mailinator inbox ${this.inbox} was not opened before polling.`);
-    }
-
-    // Never submit the public inbox form during polling. Reload the exact URL
-    // captured by openInbox so Mailinator cannot switch to another public inbox.
+    // Always reconstruct the causal URL from this.inbox. Never reuse whatever
+    // URL Mailinator left after opening a message or client-side navigation.
+    this.inboxUrl = `${this.url}?to=${encodeURIComponent(this.inbox)}`;
     await this.page.goto(this.inboxUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
     await this.page.getByRole("heading", { name: "Public Messages" })
       .waitFor({ state: "visible", timeout: 30000 });
-    await this.inboxField.waitFor({ state: "visible", timeout: 30000 });
-    await expect(this.inboxField).toHaveValue(this.inbox);
+    await this.assertCausalInbox();
   }
 
   async openCandidate(subjectPattern) {
@@ -119,6 +120,7 @@ export default class MailinatorPage extends BasePage {
     let observed = [];
 
     while (Date.now() - startedAt < timeoutMs) {
+      await this.assertCausalInbox();
       observed = await this.snapshotInbox();
       const rows = await this.inboxRows();
       const otpRows = rows.filter({ hasText: OTP_SUBJECT });
