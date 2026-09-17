@@ -119,10 +119,12 @@ export default class MailinatorPage extends BasePage {
     baselineMessageIds = [],
     baselineOtpCodes = [],
     timeoutMs = Number(process.env.MAILINATOR_EMAIL_TIMEOUT_MS || 600000),
-    intervalMs = Number(process.env.MAILINATOR_POLL_INTERVAL_MS || 15000),
+    intervalMs = Number(process.env.MAILINATOR_POLL_INTERVAL_MS || 3000),
   } = {}) {
     const startedAt = Date.now();
-    const baseline = new Set(baselineMessageIds);
+    // Message href/msgid is the primary freshness signal. Ignore the synthetic
+    // OTP-count marker that snapshotMessageIds keeps only as a legacy fallback.
+    const baseline = new Set(baselineMessageIds.filter((value) => !value.startsWith("__otp_count__:")));
     const priorOtpCodes = new Set(baselineOtpCodes);
     const baselineOtpCount = Number(
       baselineMessageIds.find((value) => value.startsWith("__otp_count__:"))?.split(":")[1] || 0
@@ -134,16 +136,28 @@ export default class MailinatorPage extends BasePage {
       const rows = await this.inboxRows();
       const otpRows = rows.filter({ hasText: OTP_SUBJECT });
       const otpCount = await otpRows.count();
-      const candidateCount = baselineOtpCodes.length > 0
-        ? otpCount
-        : Math.max(0, otpCount - baselineOtpCount);
-      for (let index = 0; index < candidateCount; index++) {
+      const candidates = [];
+
+      for (let index = 0; index < otpCount; index++) {
         const row = otpRows.nth(index);
         const messageId = (await row.getAttribute("id")) ||
-          (await row.locator("a[href*='msgid=']").first().getAttribute("href")) ||
-          `otp-row-${index}-of-${otpCount}`;
-        if (baseline.has(messageId)) continue;
+          (await row.locator("a[href*='msgid=']").first().getAttribute("href"));
 
+        // A real msgid/href not present in the pre-OTP snapshot is immediately
+        // actionable. Do not reopen historical OTP rows on every refresh.
+        if (messageId) {
+          if (!baseline.has(messageId)) candidates.push({ row, messageId });
+          continue;
+        }
+
+        // Fallback for a Mailinator markup variant with no id/href: only inspect
+        // rows beyond the baseline OTP count, never the whole historical inbox.
+        if (index < Math.max(0, otpCount - baselineOtpCount)) {
+          candidates.push({ row, messageId: `otp-row-${index}-of-${otpCount}` });
+        }
+      }
+
+      for (const { row, messageId } of candidates) {
         await row.click();
         await this.page.getByText("Public Message", { exact: true })
           .waitFor({ state: "visible", timeout: 30000 });
@@ -151,12 +165,14 @@ export default class MailinatorPage extends BasePage {
         const senderMatches =
           EXPECTED_SENDER.test(message.sender) || EXPECTED_SENDER.test(message.bodyText);
         if (!senderMatches || !OTP_SUBJECT.test(message.subject)) {
+          baseline.add(messageId);
           await this.refreshInbox();
           continue;
         }
 
         const otp = this.extractOtp(message.bodyText);
         if (priorOtpCodes.has(otp)) {
+          baseline.add(messageId);
           await this.refreshInbox();
           continue;
         }
