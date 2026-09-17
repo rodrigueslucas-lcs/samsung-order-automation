@@ -83,6 +83,10 @@ if (useExistingAuth) {
 
 const qstExecutionEnv = {
   ...process.env,
+  // SAM-24969 uses the already authenticated PreQA2 Chrome through CDP. Keep
+  // this overridable for CI/alternate agents, but make the proven local port
+  // part of the official runner so normal QST does not require a manual prefix.
+  PREQA2_CDP_URL: process.env.PREQA2_CDP_URL || "http://127.0.0.1:9223",
   ALLOW_PAYMENT_SUBMIT: "1",
   TEST_ENV: "S1/STG",
   TEST_MARKET: "MX",
@@ -94,6 +98,7 @@ const qstExecutionEnv = {
   ENABLE_ALLURE: process.env.ENABLE_ALLURE || "0",
   ALLURE_RESULTS_DIR: allureResultsDir,
 };
+console.log(`[mx-qst] PreQA2 CDP endpoint for SAM-24969: ${qstExecutionEnv.PREQA2_CDP_URL}`);
 
 // Only a real execution owns these official build artifacts. Removing stale
 // output here prevents a cancelled build from publishing a previous/list report.
