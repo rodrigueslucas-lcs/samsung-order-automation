@@ -20,28 +20,13 @@ async function dismissLocationBanner(page) {
 }
 
 async function readHeaderCartCount(page) {
-  const header = page.locator("header").first();
-  const cartControl = header
-    .getByRole("link", { name: /carrito|cart/i })
-    .or(header.getByRole("button", { name: /carrito|cart/i }))
-    .first();
-
-  if (await cartControl.count()) {
-    const text = await cartControl.innerText().catch(() => "");
-    const aria = await cartControl.getAttribute("aria-label").catch(() => "");
-    const match = `${text} ${aria}`.match(/\b(\d+)\b/);
-    if (match) return Number(match[1]);
-  }
-
-  const badge = header
-    .locator("[class*='cart'] [class*='badge'], [class*='cart'] [class*='count'], [class*='Cart'] [class*='badge'], [class*='Cart'] [class*='count']")
-    .filter({ visible: true });
-  for (let index = 0; index < await badge.count(); index += 1) {
-    const value = (await badge.nth(index).innerText().catch(() => "")).trim();
-    if (/^\d+$/.test(value)) return Number(value);
-  }
-
-  return 0;
+  // The global navigation is not inside the page's first <header>.
+  const cartControl = page.getByRole("link", { name: /Carrito de compras/i })
+    .filter({ visible: true }).first();
+  if (!(await cartControl.isVisible().catch(() => false))) return null;
+  const badge = cartControl.locator(".gnb-cart-count").first();
+  const value = (await badge.innerText().catch(() => "")).match(/(\d+)\s*$/)?.[1];
+  return value ? Number(value) : 0;
 }
 
 async function getAuthenticatedPreQaPage() {
@@ -80,11 +65,18 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
 
     await expect(page).toHaveURL(new RegExp("p6-pre-qa2\\.samsung\\.com/mx/smartphones/all-smartphones", "i"), { timeout: 30000 });
 
-    const s25Card = page.getByText("Galaxy S25 Ultra", { exact: true }).filter({ visible: true }).first().locator(
-      "xpath=ancestor::*[.//button[normalize-space()='Comprar']][1]"
-    );
-    await expect(s25Card).toBeVisible({ timeout: 60000 });
-    await s25Card.getByRole("button", { name: /^Comprar$/i }).click();
+    // The product grid loads asynchronously after the PLP shell. Scroll to it
+    // and wait for the result count, then target the actual product card by
+    // model code; editorial/FAQ mentions of the model are not catalog cards.
+    await page.getByText("Filtros", { exact: true }).first().scrollIntoViewIfNeeded();
+    await expect(page.getByText(/\d+\s*Resultado/i).first()).toBeVisible({ timeout: 90000 });
+    const s25Card = page.locator("[role='listitem'].pd21-product-card__item")
+      .filter({ has: page.locator(`a.pd21-product-card__name[data-modelcode='${PRE_QA_MODEL_CODE}']`) })
+      .first();
+    await expect(s25Card, "The PreQA BC catalog must render the configured Galaxy S25 Ultra product card.")
+      .toBeVisible({ timeout: 60000 });
+    await s25Card.scrollIntoViewIfNeeded();
+    await s25Card.getByRole("link", { name: /^Comprar:Galaxy S25 Ultra$/i }).click();
 
     await page.waitForURL((url) =>
       url.hostname === "p6-pre-qa2.samsung.com" && url.pathname.includes(PRE_QA_PDP_PATH),
@@ -94,34 +86,32 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
     await expect(page.getByText("Galaxy S25 Ultra", { exact: true }).filter({ visible: true }).first()).toBeVisible({ timeout: 60000 });
 
     const cartCountBefore = await readHeaderCartCount(page);
+    expect(cartCountBefore).not.toBeNull();
     const addToCart = page
       .getByRole("button", { name: /Añadir al carrito|Agregar al carrito|Add to cart|Add to bag/i })
       .filter({ visible: true })
       .first();
     await expect(addToCart).toBeVisible({ timeout: 60000 });
+    const addResponsePromise = page.waitForResponse((response) =>
+      response.request().method() === "POST" &&
+      new URL(response.url()).pathname.endsWith("/addToCart/multi/"),
+    { timeout: 60000 });
+    const countResponsePromise = page.waitForResponse((response) =>
+      response.request().method() === "GET" &&
+      new URL(response.url()).pathname.endsWith("/minicart/totalProducts"),
+    { timeout: 60000 });
     await addToCart.click();
-
-    await page.waitForURL((url) =>
-      /SystemParking\.html/i.test(url.pathname) || url.hostname === "p6-pre-qa2.samsung.com",
-      { timeout: 60000 }
-    ).catch(() => {});
-
-    const maintenanceObserved = /SystemParking\.html/i.test(new URL(page.url()).pathname);
-    if (maintenanceObserved) {
-      await page.goBack({ waitUntil: "domcontentloaded", timeout: 60000 });
-      await page.waitForURL((url) =>
-        url.hostname === "p6-pre-qa2.samsung.com" && url.pathname.includes(PRE_QA_PDP_PATH),
-        { timeout: 60000 }
-      );
-      await dismissLocationBanner(page);
-    }
-
-    await expect.poll(() => readHeaderCartCount(page), {
-      timeout: 60000,
-      message: "PreQA Add to Cart should increase the header cart count even when /cart is parked for maintenance.",
-    }).toBeGreaterThan(cartCountBefore);
-
-    const cartCountAfter = await readHeaderCartCount(page);
+    const [addResponse, countResponse] = await Promise.all([addResponsePromise, countResponsePromise]);
+    expect(addResponse.ok(), "The PreQA Add to Cart request must succeed.").toBe(true);
+    expect(countResponse.ok(), "The minicart count request must succeed.").toBe(true);
+    // CDP discards the original response body when the Add to Cart callback
+    // immediately navigates to stg2/cart. Re-read the same count endpoint.
+    const countSnapshot = await page.request.get(countResponse.url());
+    expect(countSnapshot.ok(), "The post-add minicart count must be readable.").toBe(true);
+    const countBody = await countSnapshot.text();
+    const cartCountAfter = Number(countBody.match(/<Integer>(\d+)<\/Integer>/i)?.[1]);
+    expect(Number.isFinite(cartCountAfter), "The minicart must return a numeric product count.").toBe(true);
+    expect(cartCountAfter).toBeGreaterThan(cartCountBefore);
     recordBusinessEvidence(testInfo, {
       source: "PreQA PLP -> PDP",
       plpPath: "/mx/smartphones/all-smartphones/",
@@ -130,7 +120,7 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
       cdpUrl: PRE_QA_CDP_URL,
       cartCountBefore,
       cartCountAfter,
-      maintenanceObserved,
+      addToCartStatus: addResponse.status(),
       addedFromPdp: true,
     });
   } finally {

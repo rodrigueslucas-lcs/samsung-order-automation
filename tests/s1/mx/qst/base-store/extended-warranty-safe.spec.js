@@ -50,10 +50,8 @@ test("SAM-24985 @qst @mx @base-store @safe - Extended Warranty on Cart", async (
   const termsSection = careSurface.getByText(/T[eé]rminos y condiciones de Samsung Care\+/i).first();
   await expect(termsSection).toBeVisible({ timeout: 30000 });
 
-  // These are the four consent rows shown under the Samsung Care+ terms.
-  // Target each row by its own copy so plan radios above the terms cannot be
-  // mistaken for consent controls. Click the Material touch target/label;
-  // never click the legal links contained in the second row.
+  // The four legal consents are checkboxes, distinct from the plan radios.
+  // Use their accessible names so the legal links are not clicked.
   const consentCopies = [
     /He tomado nota de las condiciones generales del seguro/i,
     /He le[ií]do y estoy de acuerdo los T[eé]rminos y Condiciones/i,
@@ -62,23 +60,10 @@ test("SAM-24985 @qst @mx @base-store @safe - Extended Warranty on Cart", async (
   ];
 
   for (const copy of consentCopies) {
-    const row = careSurface
-      .locator("mat-radio-button")
-      .filter({ hasText: copy })
-      .filter({ visible: true })
-      .first();
-    await expect(row).toBeVisible({ timeout: 30000 });
-
-    const input = row.locator("input[type='radio']");
-    await expect(input).toBeAttached({ timeout: 10000 });
-
-    const touchTarget = row.locator(".mat-mdc-radio-touch-target");
-    if (await touchTarget.count()) {
-      await touchTarget.click();
-    } else {
-      await row.locator("label").click();
-    }
-    await expect(input).toBeChecked({ timeout: 10000 });
+    const consent = careSurface.getByRole("checkbox", { name: copy }).first();
+    await expect(consent).toBeVisible({ timeout: 30000 });
+    await consent.check();
+    await expect(consent).toBeChecked({ timeout: 10000 });
   }
 
   const confirm = careSurface
