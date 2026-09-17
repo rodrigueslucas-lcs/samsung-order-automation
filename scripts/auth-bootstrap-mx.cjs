@@ -35,7 +35,7 @@ function assertMxHost(page, step) {
 function readDevToolsPort() {
   if (!fs.existsSync(devToolsActivePortFile)) {
     throw new Error(
-      "the dedicated S1 MX Chrome is not available; run npm run auth:open-profile:mx"
+      "the dedicated S1 MX Chrome is not available; run npm run auth:login:mx"
     );
   }
   const [portText] = fs.readFileSync(devToolsActivePortFile, "utf8").split("\n");
@@ -44,6 +44,37 @@ function readDevToolsPort() {
     throw new Error("the dedicated S1 MX Chrome debugging endpoint is invalid");
   }
   return port;
+}
+
+async function profileButtonVisible(page, timeout = 3000) {
+  if (page.isClosed()) return false;
+  try {
+    if (new URL(page.url()).hostname !== HOSTNAME) return false;
+  } catch {
+    return false;
+  }
+  return page
+    .getByRole("button", { name: "My Profile", exact: true })
+    .waitFor({ state: "visible", timeout })
+    .then(() => true)
+    .catch(() => false);
+}
+
+async function findLiveMxStorefront(context) {
+  const candidates = context.pages().filter((page) => {
+    if (page.isClosed()) return false;
+    try {
+      const url = new URL(page.url());
+      return url.hostname === HOSTNAME && /^\/mx\/?(?:[?#]|$)/i.test(`${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      return false;
+    }
+  });
+
+  for (const page of candidates.reverse()) {
+    if (await profileButtonVisible(page, 5000)) return page;
+  }
+  return null;
 }
 
 async function openAuthenticatedProfileMenu(page) {
@@ -74,6 +105,26 @@ async function openAuthenticatedProfileMenu(page) {
   reportStep("authenticated profile menu is open and Cerrar sesión is visible");
 }
 
+async function openMxStorefrontForExport(context) {
+  const livePage = await findLiveMxStorefront(context);
+  if (livePage) {
+    reportStep("reusing the live S1 MX storefront already open in dedicated Chrome");
+    await livePage.bringToFront();
+    return livePage;
+  }
+
+  const page = await context.newPage();
+  reportStep("no rendered MX tab found; opening S1 MX cookie setup");
+  await page.goto(setupUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+  assertMxHost(page, "cookie setup");
+  await page.getByText(/You can access pages now/i).waitFor({ state: "visible", timeout: 60000 });
+
+  reportStep("opening S1 MX storefront");
+  await page.goto(homeUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+  assertMxHost(page, "storefront navigation");
+  return page;
+}
+
 function writeJsonAtomically(tempFile, destination, value) {
   fs.writeFileSync(tempFile, JSON.stringify(value, null, 2), { mode: 0o600 });
   fs.chmodSync(tempFile, 0o600);
@@ -86,17 +137,10 @@ async function exportMxAuthentication() {
   const browser = await chromium.connectOverCDP(`http://127.0.0.1:${readDevToolsPort()}`);
   const context = browser.contexts()[0];
   if (!context) throw new Error("the dedicated S1 MX Chrome did not expose its browser context");
-  const page = await context.newPage();
+  let page;
 
   try {
-    reportStep("opening S1 MX cookie setup");
-    await page.goto(setupUrl, { waitUntil: "domcontentloaded" });
-    assertMxHost(page, "cookie setup");
-    await page.getByText(/You can access pages now/i).waitFor({ state: "visible", timeout: 60000 });
-
-    reportStep("opening S1 MX storefront");
-    await page.goto(homeUrl, { waitUntil: "domcontentloaded" });
-    assertMxHost(page, "storefront navigation");
+    page = await openMxStorefrontForExport(context);
     await openAuthenticatedProfileMenu(page);
 
     reportStep("collecting filtered S1 MX storage state");
