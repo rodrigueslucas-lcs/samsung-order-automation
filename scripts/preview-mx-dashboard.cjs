@@ -38,7 +38,7 @@ if (!fs.existsSync(output)) {
 }
 
 const html = fs.readFileSync(output, 'utf8');
-const expected = ['Official selected</small><b>30</b>', 'Executed</small><b>22</b>', 'PASS</small><b>14</b>', 'FAIL</small><b>8</b>', 'Blocked</small><b>8</b>', 'Not run</small><b>0</b>'];
+const expected = ['Official selected</small><b>30</b>', 'Executed</small><b>22</b>', 'PASS</small><b>14</b>', 'FAIL</small><b>8</b>', 'Blocked</small><b>8</b>', '<b>0</b> NOT RUN'];
 const missing = expected.filter(token => !html.includes(token));
 if (missing.length) {
   console.error(`[reporting:mx:preview] Generated dashboard failed runtime smoke check: ${missing.join(', ')}`);
@@ -48,3 +48,4 @@ if (missing.length) {
 console.log(`[reporting:mx:preview] Build #5 fixture copied to ${path.relative(root, runtime)}`);
 console.log(`[reporting:mx:preview] Dashboard generated: ${path.relative(root, output)}`);
 console.log('[reporting:mx:preview] Runtime verified: 30 official | 22 executed | 14 PASS | 8 FAIL | 8 BLOCKED | 0 NOT_RUN');
+console.log(`[reporting:mx:preview] Open in browser: file:///${output.replace(/\\\\/g, '/')}`);
