@@ -50,7 +50,7 @@ const args = [
   "--project=chromium", "--workers=1", "--retries=0",
   "--grep", pattern,
   "--grep-invert", "@registered|@destructive",
-  "--output", path.resolve(process.env.MX_FAST_ARTIFACT_DIR || "test-results/mx-fast/playwright"),
+  "--output", path.resolve(process.env.MX_FAST_ARTIFACT_DIR || "test-results/jenkins/mx-fast", "playwright"),
 ];
 if (listOnly) {
   args.push("--list", "--reporter=list");
@@ -58,6 +58,7 @@ if (listOnly) {
   args.splice(4, 0, "--headed");
 }
 
+const fastArtifactDir = path.resolve(process.env.MX_FAST_ARTIFACT_DIR || "test-results/jenkins/mx-fast");
 const env = {
   ...process.env,
   TEST_ENV: "S1/STG",
@@ -65,7 +66,9 @@ const env = {
   TEST_STORE: "BASE_STORE",
   TEST_SUITE: "FAST/GUEST",
   ENABLE_ALLURE: process.env.ENABLE_ALLURE || "0",
-  ALLURE_RESULTS_DIR: path.resolve(process.env.MX_FAST_ARTIFACT_DIR || "test-results/mx-fast", "allure-results"),
+  PLAYWRIGHT_HTML_OUTPUT_DIR: path.join(fastArtifactDir, "playwright-report"),
+  SMB_EVIDENCE_DIR: path.join(fastArtifactDir, "evidence"),
+  ALLURE_RESULTS_DIR: path.join(fastArtifactDir, "allure-results"),
 };
 
 const result = spawnSync(process.execPath, args, { env, stdio: "inherit" });
