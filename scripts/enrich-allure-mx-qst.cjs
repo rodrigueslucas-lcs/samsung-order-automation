@@ -11,6 +11,8 @@ const runtime = fs.existsSync(runtimeFile)
 const byId = new Map((runtime.tests || []).map((test) => [test.samId, test]));
 const JIRA_BASE_URL = "https://jira.secext.samsung.net/browse/";
 const jiraUrl = samId => `${JIRA_BASE_URL}${samId}`;
+const campaign = process.env.TEST_SUITE === "FAST/GUEST" ? "FAST / GUEST-SAFE" : "P1 / QST";
+const campaignLabel = process.env.TEST_SUITE === "FAST/GUEST" ? "MX Fast Guest · Safe" : "MX Official P1/QST";
 
 function upsertLabel(labels, name, value) {
   const next = (labels || []).filter((label) => label.name !== name);
@@ -124,7 +126,7 @@ function buildDescription(samId, feature, runtimeTest, reason) {
     "",
     `**Jira:** [Open ${samId}](${jiraUrl(samId)})`,
     `**Official runtime:** ${status}`,
-    `**Campaign:** MX · S1 · Base Store · P1/QST`,
+    `**Campaign:** MX · S1 · Base Store · ${campaign}`,
     `**Store:** Base Store`,
     `**Environment:** S1 / STG`,
     runtimeTest?.duration != null ? `**Duration:** ${(Number(runtimeTest.duration) / 1000).toFixed(1)}s` : null,
@@ -201,7 +203,7 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-r
     Market: "MX",
     Environment: "S1 / STG",
     Store: "Base Store",
-    Suite: "P1 / QST",
+    Suite: campaign,
     "Official TC": samId,
     Feature: feature,
   };
@@ -221,7 +223,7 @@ const environment = [
   "Market=MX",
   "Environment=S1/STG",
   "Store=Base Store",
-  "Suite=P1/QST",
+  `Suite=${campaign}`,
   "Official_SMB_Scope=362",
   "Official_P1_QST=144",
   "Official_P2_DST=218",
@@ -243,7 +245,7 @@ if (process.env.BUILD_URL) {
   fs.writeFileSync(path.join(resultsDir, "executor.json"), JSON.stringify({
     name: "Samsung SMB · Jenkins",
     type: "jenkins",
-    buildName: `Samsung SMB MX QST #${process.env.BUILD_NUMBER || ""}`,
+    buildName: `Samsung SMB · ${campaignLabel} · #${process.env.BUILD_NUMBER || ""}`,
     buildUrl: process.env.BUILD_URL,
     reportUrl: `${process.env.BUILD_URL}Samsung_20MX_20QST_20-_20Allure/`,
   }, null, 2));
