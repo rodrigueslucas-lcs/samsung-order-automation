@@ -20,10 +20,10 @@ const samLink = samId => `<a class="sam-link" href="${jiraHref(samId)}" target="
 const OFFICIAL = {
   total: 362, p1: 144, p2: 218,
   markets: {
-    MX: { total: 92, p1: 38, base: 56, epp: 36 },
-    PE: { total: 92, p1: 34, base: 55, epp: 37 },
-    CL: { total: 89, p1: 38, base: 53, epp: 36 },
-    CO: { total: 89, p1: 34, base: 54, epp: 35 },
+    MX: { total: 92, p1: 38, p2: 54, base: 56, baseP1: 30, baseP2: 26, epp: 36, eppP1: 8, eppP2: 28 },
+    PE: { total: 92, p1: 34, p2: 58, base: 55, baseP1: 28, baseP2: 27, epp: 37, eppP1: 6, eppP2: 31 },
+    CL: { total: 89, p1: 38, p2: 51, base: 53, baseP1: 31, baseP2: 22, epp: 36, eppP1: 7, eppP2: 29 },
+    CO: { total: 89, p1: 34, p2: 55, base: 54, baseP1: 28, baseP2: 26, epp: 35, eppP1: 6, eppP2: 29 },
   },
 };
 
@@ -83,10 +83,17 @@ function renderExecution(execution) {
   const s = execution.summary;
   const reconciled = s.passed + s.failed + s.blocked + s.notRun === s.official;
   const rows = execution.tests.map(test => `<tr><td>${samLink(test.samId)}<small>${esc(test.title || '')}</small></td><td>${chip(test.status)}</td><td>${esc(blockerCategory(test))}</td><td>${duration(test.duration)}</td><td class="evidence">${renderAttachments(execution, test.attachments)}</td><td class="evidence-text" title="${esc(test.blockedReason || test.error || '')}">${esc(String(test.blockedReason || test.error || '').split('\n')[0])}</td></tr>`).join('');
-  return `${executionMeta(execution,reconciled)}<div class="grid runtime-kpis">${kpi('Official selected',s.official,'Current build only')}${kpi('Executed',s.executed,'PASS + FAIL')}${kpi('PASS',s.passed,pct(s.passRate),'good')}${kpi('FAIL',s.failed,'Current build failures',s.failed?'bad':'')}${kpi('Blocked',s.blocked,'Known prerequisites',s.blocked?'warn':'')}${kpi('Duration',duration(s.duration),'Total runtime')}</div>${resultBar(s)}<div class="table-wrap execution-table"><table><thead><tr><th>Test case</th><th>Status</th><th>Category</th><th>Duration</th><th>Evidence</th><th>Reason</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  const ev = evidenceStats(execution);
+  return `${executionMeta(execution,reconciled)}<div class="evidence-summary"><div><span class="section-kicker">EXECUTION EVIDENCE</span><strong>${ev.withEvidence} / ${s.official} TCs with evidence</strong><small>${ev.totalFiles} browser artifacts available in this runtime summary</small></div><div class="evidence-key"><span>▣ Screenshot</span><span>▶ Video</span><span>⌁ Trace</span><span>≡ Error Context</span></div></div><div class="grid runtime-kpis">${kpi('Official selected',s.official,'Current build only')}${kpi('Executed',s.executed,'PASS + FAIL')}${kpi('PASS',s.passed,pct(s.passRate),'good')}${kpi('FAIL',s.failed,'Current build failures',s.failed?'bad':'')}${kpi('Blocked',s.blocked,'Known prerequisites',s.blocked?'warn':'')}${kpi('Duration',duration(s.duration),'Total runtime')}</div>${resultBar(s)}<div class="table-wrap execution-table"><table><thead><tr><th>Test case</th><th>Status</th><th>Category</th><th>Duration</th><th>Evidence</th><th>Reason</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function renderOfficialMarkets() {
-  return Object.entries(OFFICIAL.markets).map(([market,m]) => `<article class="market-card"><div class="market-head"><strong>${market}</strong><span>${m.total} DST scenarios</span></div><div class="market-number">${m.p1} <small>P1 / QST</small></div><div class="market-stats"><span><b>${m.base}</b> Base Store</span><span><b>${m.epp}</b> EPP</span></div><footer>Current official priority template</footer></article>`).join('');
+  return Object.entries(OFFICIAL.markets).map(([market,m]) => `<article class="market-card"><div class="market-head"><strong>${market}</strong><span>${m.total} total / DST</span></div><div class="market-number">${m.p1} <small>P1 / QST total</small></div><div class="priority-split"><span><b>${m.p1}</b> P1</span><span><b>${m.p2}</b> P2</span></div><div class="store-breakdown"><div><strong>Base Store</strong><b>${m.base}</b><small>${m.baseP1} P1 · ${m.baseP2} P2</small>${market === 'MX' ? '<em>30 = current official runner</em>' : ''}</div><div><strong>EPP</strong><b>${m.epp}</b><small>${m.eppP1} P1 · ${m.eppP2} P2</small></div></div><footer>P1 runs in QST + DST · P2 runs in DST only</footer></article>`).join('');
+}
+function evidenceStats(execution) {
+  const tests = Array.isArray(execution?.tests) ? execution.tests : [];
+  const withEvidence = tests.filter(test => Array.isArray(test.attachments) && test.attachments.some(item => item?.path && !/(^|\\/)playwright\\/\\.auth(\\/|$)/i.test(item.path))).length;
+  const totalFiles = tests.reduce((sum,test) => sum + ((test.attachments || []).filter(item => item?.path && !/(^|\\/)playwright\\/\\.auth(\\/|$)/i.test(item.path)).length), 0);
+  return { withEvidence, totalFiles };
 }
 function renderFeatureRows(features) { return features.map(row => `<tr><td><strong>${esc(row.feature)}</strong><small>${row.baseStore} BS · ${row.epp} EPP</small></td><td>${row.total}</td><td>${row.full}</td><td>${row.partial}</td><td>${row.missing}</td><td>${pct(row.fullPercent)}</td></tr>`).join(''); }
 function renderGaps(rows) { const top = rows.slice(0, 12); if (!top.length) return empty('No MX automation gaps.'); return top.map(row => `<tr><td>${samLink(row.id)}<small>${esc(row.title || '')}</small></td><td>${esc(row.feature || '')}</td><td>${esc(row.store || '')}</td><td>${chip(row.coverage)}</td></tr>`).join(''); }
@@ -103,7 +110,7 @@ function render(model) {
   const runtime = execution?.summary || null;
   const health = runtime ? (runtime.failed ? 'ATTENTION' : runtime.blocked ? 'WATCH' : runtime.executed ? 'HEALTHY' : 'NO EXECUTION') : model.releaseHealth;
   const headline = runtime ? `${esc(execution.market || 'MX')} · ${esc(execution.environment || 'S1/STG')} · ${esc(execution.store || 'BASE_STORE')} · ${esc(execution.suite || 'P1/QST')} · Build #${esc(execution.buildNumber || 'local')}` : 'Samsung LATAM · SMB Commerce · Playwright';
-  const scopeReference = `<div class="official-kpis">${kpi('Official SMB',OFFICIAL.total,'DST scenarios')}${kpi('P1 / QST',OFFICIAL.p1,'Included in QST + DST')}${kpi('P2',OFFICIAL.p2,'DST only')}${kpi('Markets',4,'MX · PE · CL · CO')}</div><div class="grid markets">${renderOfficialMarkets()}</div><div class="scope-note">Current priority templates are the official source of truth. The preserved 144-ID Zephyr campaign is historical evidence and is shown only in the legacy drilldown below.</div>`;
+  const scopeReference = `<div class="scope-explainer"><strong>Do not mix these denominators:</strong><span><b>144 P1</b> = complete LATAM QST scope</span><span><b>362 P1+P2</b> = complete LATAM DST scope</span><span><b>30 MX Base Store P1</b> = current automated runner shown in this build</span></div><div class="official-kpis">${kpi('Official SMB',OFFICIAL.total,'P1 + P2 / DST')}${kpi('P1 / QST',OFFICIAL.p1,'All markets + Base Store + EPP')}${kpi('P2 / DST only',OFFICIAL.p2,'All markets + Base Store + EPP')}${kpi('Current Runner',30,'MX · Base Store · P1/QST')}</div><div class="grid markets">${renderOfficialMarkets()}</div><div class="scope-note">Values come from the current market priority templates. The preserved 144-ID Zephyr campaign below is historical evidence and is not the same denominator as the current 144 P1/QST scope.</div>`;
   const heroCards = runtime ? `
     ${kpi('Official Tests',runtime.official,'Selected campaign')}
     ${kpi('Passed',runtime.passed,pct(successRate(runtime)),'good')}
