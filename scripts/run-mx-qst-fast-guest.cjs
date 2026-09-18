@@ -9,13 +9,13 @@ const root = path.resolve("tests/s1/mx/qst/base-store");
 const playwrightCli = path.resolve("node_modules/@playwright/test/cli.js");
 
 // Fast, non-destructive MX Base Store campaign.
-// These are the official P1 cases that do not require the registered storefront
-// session and have already produced PASS results in the official campaign.
+// These are official P1 cases that do not require the registered storefront
+// session and are intended for quick validation while S1 registered auth is blocked.
 // Keep this suite separate from the official 30-case denominator.
 const MX_FAST_GUEST_IDS = Object.freeze([
   "SAM-24971", "SAM-24972", "SAM-24975", "SAM-24981", "SAM-24982",
   "SAM-24988", "SAM-24989", "SAM-24990", "SAM-24995", "SAM-24999",
-  "SAM-25001", "SAM-25002", "SAM-25004", "SAM-25005", "SAM-25016",
+  "SAM-25001", "SAM-25004", "SAM-25005", "SAM-25016",
 ]);
 
 const idSet = new Set(MX_FAST_GUEST_IDS);
