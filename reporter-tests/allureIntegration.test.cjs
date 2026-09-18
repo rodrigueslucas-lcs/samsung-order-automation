@@ -28,7 +28,7 @@ test('Jenkins enables, archives and publishes Allure beside existing reports', (
   assert.match(jenkins, /ENABLE_ALLURE = '1'/);
   assert.match(jenkins, /npm run reporting:allure:install/);
   assert.match(jenkins, /reportDir: 'test-results\/jenkins\/mx-qst\/allure-report'/);
-  assert.match(jenkins, /reportName: 'Allure MX QST'/);
+  assert.match(jenkins, /reportName: 'Samsung MX QST - Allure'/);
   assert.match(jenkins, /archiveArtifacts artifacts: 'test-results\/\*\*\/\*, playwright-report\/\*\*\/\*'/);
   assert.match(jenkins, /reportName: 'Playwright MX QST'/);
   assert.match(jenkins, /reportName: 'MX QST Executive Dashboard'/);
