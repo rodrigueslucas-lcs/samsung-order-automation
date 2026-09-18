@@ -25,7 +25,7 @@ export default defineConfig({
     ...(allureEnabled
       ? [['allure-playwright', {
           resultsDir: process.env.ALLURE_RESULTS_DIR || 'allure-results',
-          detail: true,
+          detail: false,
           suiteTitle: false
         }]]
       : []),
