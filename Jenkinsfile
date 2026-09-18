@@ -142,7 +142,7 @@ pipeline {
       when { expression { return params.TEST_SUITE == 'official-p1' } }
       steps {
         script {
-          if (!params.EXECUTION_MODE == 'authorized-destructive') {
+          if (params.EXECUTION_MODE != 'authorized-destructive') {
             error('Official MX QST contains authorized payment/order P1 scenarios. Select EXECUTION_MODE=authorized-destructive for the full 30-TC campaign.')
           }
           env.PW_VIDEO = params.EVIDENCE_MODE == 'screenshots-trace-video' ? '1' : '0'
@@ -202,60 +202,54 @@ pipeline {
         }
       }
       archiveArtifacts artifacts: 'test-results/**/*, playwright-report/**/*', allowEmptyArchive: true, fingerprint: true
-      publishHTML(target: [
-        allowMissing: true,
-        alwaysLinkToLastBuild: true,
-        keepAll: true,
-        reportDir: 'playwright-report',
-        reportFiles: 'index.html',
-        reportName: 'Playwright MX QST'
-      ])
-      publishHTML(target: [
-        allowMissing: true,
-        alwaysLinkToLastBuild: true,
-        keepAll: true,
-        reportDir: 'test-results/jenkins/mx-fast/playwright-report',
-        reportFiles: 'index.html',
-        reportName: 'Samsung MX Fast - Playwright'
-      ])
-      publishHTML(target: [
-        allowMissing: true,
-        alwaysLinkToLastBuild: true,
-        keepAll: true,
-        reportDir: 'test-results/jenkins/mx-fast/allure-report',
-        reportFiles: 'index.html',
-        reportName: 'Samsung MX Fast - Allure'
-      ])
-      publishHTML(target: [
-        allowMissing: true,
-        alwaysLinkToLastBuild: true,
-        keepAll: true,
-        reportDir: 'test-results/jenkins/mx-qst/executive',
-        reportFiles: 'index.html',
-        reportName: 'MX QST Executive Dashboard'
-      ])
-      publishHTML(target: [
-        allowMissing: true,
-        alwaysLinkToLastBuild: true,
-        keepAll: true,
-        reportDir: 'test-results/jenkins/mx-qst/allure-report',
-        reportFiles: 'index.html',
-        reportName: 'Samsung MX QST - Allure'
-      ])
       script {
-        def nativeAllurePath = params.TEST_SUITE == 'fast-guest' ? 'test-results/jenkins/mx-fast/allure-results' : 'test-results/jenkins/mx-qst/allure-results'
-        if (params.TEST_SUITE != 'allure-smoke' && fileExists(nativeAllurePath)) {
-          allure includeProperties: false, results: [[path: nativeAllurePath]]
+        if (params.TEST_SUITE == 'fast-guest') {
+          publishHTML(target: [
+            allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
+            reportDir: 'test-results/jenkins/mx-fast/executive',
+            reportFiles: 'index.html',
+            reportName: 'Samsung MX Fast - Executive Dashboard'
+          ])
+          publishHTML(target: [
+            allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
+            reportDir: 'test-results/jenkins/mx-fast/playwright-report',
+            reportFiles: 'index.html',
+            reportName: 'Samsung MX Fast - Playwright'
+          ])
+          publishHTML(target: [
+            allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
+            reportDir: 'test-results/jenkins/mx-fast/allure-report',
+            reportFiles: 'index.html',
+            reportName: 'Samsung MX Fast - Allure'
+          ])
+        } else if (params.TEST_SUITE == 'official-p1') {
+          publishHTML(target: [
+            allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
+            reportDir: 'test-results/jenkins/mx-qst/executive',
+            reportFiles: 'index.html',
+            reportName: 'MX QST Executive Dashboard'
+          ])
+          publishHTML(target: [
+            allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
+            reportDir: 'playwright-report',
+            reportFiles: 'index.html',
+            reportName: 'Playwright MX QST'
+          ])
+          publishHTML(target: [
+            allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
+            reportDir: 'test-results/jenkins/mx-qst/allure-report',
+            reportFiles: 'index.html',
+            reportName: 'Samsung MX QST - Allure'
+          ])
+        } else if (params.TEST_SUITE == 'allure-smoke') {
+          publishHTML(target: [
+            allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
+            reportDir: 'test-results/reporter-tests/allure-smoke/allure-report',
+            reportFiles: 'index.html',
+            reportName: 'Allure Reporting Smoke'
+          ])
         }
       }
-      publishHTML(target: [
-        allowMissing: true,
-        alwaysLinkToLastBuild: true,
-        keepAll: true,
-        reportDir: 'test-results/reporter-tests/allure-smoke/allure-report',
-        reportFiles: 'index.html',
-        reportName: 'Allure Reporting Smoke'
-      ])
     }
     success { echo 'Samsung SMB automation build completed successfully.' }
     unsuccessful { echo 'Samsung SMB automation build did not complete successfully. Review console output and archived Playwright/Allure evidence.' }
