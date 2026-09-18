@@ -25,6 +25,21 @@ pipeline {
   }
 
   stages {
+    stage('Build Identity') {
+      steps {
+        script {
+          def suiteLabel = [
+            'fast-guest': 'FAST',
+            'official-p1': 'P1',
+            'backoffice-safe': 'BACKOFFICE',
+            'allure-smoke': 'ALLURE'
+          ][params.TEST_SUITE] ?: params.TEST_SUITE.toUpperCase()
+          currentBuild.displayName = "#${env.BUILD_NUMBER} · ${params.ENVIRONMENT} · ${suiteLabel}"
+          currentBuild.description = "Samsung SMB · MX · ${params.ENVIRONMENT} · ${params.TEST_SUITE} · ${params.EXECUTION_MODE}"
+        }
+      }
+    }
+
     stage('Checkout') {
       steps { checkout scm }
     }
