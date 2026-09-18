@@ -121,6 +121,7 @@ pipeline {
           env.MX_QST_HEADLESS = params.BROWSER_MODE == 'headless' ? '1' : '0'
           env.ENABLE_ALLURE = '1'
           env.MX_FAST_ARTIFACT_DIR = 'test-results/jenkins/mx-fast'
+          env.MX_QST_ARTIFACT_DIR = 'test-results/jenkins/mx-fast'
           env.TEST_SUITE = 'FAST/GUEST'
           if (isUnix()) sh 'npx -y node@22 scripts/run-mx-qst-fast-guest.cjs'
           else bat '@call npx -y node@22 scripts/run-mx-qst-fast-guest.cjs'
