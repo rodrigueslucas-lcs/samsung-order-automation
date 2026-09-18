@@ -15,12 +15,69 @@ function upsertLabel(labels, name, value) {
   if (value) next.push({ name, value });
   return next;
 }
-
+function pushUniqueLabel(labels, name, value) {
+  if (value && !labels.some((label) => label.name === name && label.value === value)) labels.push({ name, value });
+  return labels;
+}
 function classifyBlocker(text = "") {
-  if (/auth|session|login|logged|account|credential/i.test(text)) return "AUTH";
-  if (/sku|product|eligible|data|address|order|email/i.test(text)) return "TEST_DATA";
-  if (/environment|staging|s1|backend|server|maintenance|timeout|unavailable|endpoint|cdp/i.test(text)) return "ENVIRONMENT";
-  return "PREREQUISITE";
+  if (/auth|session|login|logged|account|credential/i.test(text)) return "Authentication / session";
+  if (/sku|product|eligible|data|address|order|email/i.test(text)) return "Test data / prerequisite";
+  if (/environment|staging|s1|backend|server|maintenance|timeout|unavailable|endpoint|cdp|network/i.test(text)) return "Environment / backend";
+  return "Prerequisite";
+}
+function inferFeature(result, runtimeTest) {
+  const value = `${runtimeTest?.title || ""} ${result.name || ""} ${result.fullName || ""}`.toLowerCase();
+  const rules = [
+    ["Order & Tracking", /track|tracking|order|pedido|confirmation|confirmaci/],
+    ["Payment", /payment|pago|mercado|card|tarjeta/],
+    ["Checkout", /checkout|delivery|shipping|address|direcci/],
+    ["Cart & Promotions", /cart|carrito|coupon|cup[oó]n|promo/],
+    ["Product & Catalog", /pdp|plp|product|producto|facet|filter|gnb|catalog|bc-add/],
+    ["Account & Profile", /login|account|profile|registered|registro|address book/],
+    ["Search & Navigation", /search|busca|navigation|home|banner/],
+  ];
+  return rules.find(([, pattern]) => pattern.test(value))?.[0] || "Storefront";
+}
+function inferOwner(result) {
+  return result.labels?.find((label) => label.name === "owner")?.value || "Samsung SMB QA";
+}
+function prettyStatus(status) {
+  return status === "SKIPPED-BLOCKED" || status === "BLOCKED" ? "BLOCKED" : status || "Playwright result";
+}
+function buildDescription(samId, feature, runtimeTest, reason) {
+  const status = prettyStatus(runtimeTest?.status);
+  return [
+    `### ${samId} · ${feature}`,
+    "",
+    `**Official runtime:** ${status}`,
+    `**Campaign:** MX · S1 · Base Store · P1/QST`,
+    `**Store:** Base Store`,
+    `**Environment:** S1 / STG`,
+    runtimeTest?.duration != null ? `**Duration:** ${(Number(runtimeTest.duration) / 1000).toFixed(1)}s` : null,
+    status === "BLOCKED" ? `**Blocker category:** ${classifyBlocker(reason)}` : null,
+    reason ? `**Reason:** ${String(reason).split("\n")[0]}` : null,
+    "",
+    "_Playwright steps and attachments below are the technical execution evidence._",
+  ].filter(Boolean).join("  \n");
+}
+function copyRuntimeAttachments(result, runtimeTest) {
+  if (!runtimeTest?.attachments?.length) return;
+  result.attachments ||= [];
+  const existingSources = new Set(result.attachments.map((item) => item.source));
+  for (const attachment of runtimeTest.attachments) {
+    if (!attachment?.path || !fs.existsSync(attachment.path)) continue;
+    const ext = path.extname(attachment.path);
+    const source = `runtime-${runtimeTest.samId}-${result.attachments.length + 1}${ext}`;
+    const destination = path.join(resultsDir, source);
+    fs.copyFileSync(attachment.path, destination);
+    if (!existingSources.has(source)) {
+      result.attachments.push({
+        name: attachment.name || path.basename(attachment.path),
+        source,
+        type: attachment.contentType || (ext === ".png" ? "image/png" : ext === ".webm" ? "video/webm" : ext === ".zip" ? "application/zip" : "application/octet-stream"),
+      });
+    }
+  }
 }
 
 for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-result.json"))) {
@@ -32,68 +89,86 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-r
 
   const runtimeTest = byId.get(samId);
   const tags = searchable.match(/@[\w-]+/g) || [];
+  const feature = inferFeature(result, runtimeTest);
   const cleanTitle = (runtimeTest?.title || result.name || samId)
     .replace(/\s+@(qst|mx|base-store|safe|registered|guest|destructive)\b/gi, "")
-    .trim();
+    .trim()
+    .replace(new RegExp(`^${samId}\\s*[-–:]?\\s*`, "i"), "");
 
-  result.name = cleanTitle.startsWith(samId) ? cleanTitle : `${samId} - ${cleanTitle}`;
+  result.name = `${samId} · ${cleanTitle || feature}`;
   result.labels = upsertLabel(result.labels, "parentSuite", "Samsung SMB Automation");
   result.labels = upsertLabel(result.labels, "suite", "MX · S1 · Base Store");
-  result.labels = upsertLabel(result.labels, "subSuite", "P1 / QST");
+  result.labels = upsertLabel(result.labels, "subSuite", `P1 / QST · ${feature}`);
   result.labels = upsertLabel(result.labels, "epic", "Samsung SMB Commerce");
-  result.labels = upsertLabel(result.labels, "feature", "MX Base Store");
+  result.labels = upsertLabel(result.labels, "feature", feature);
+  result.labels = upsertLabel(result.labels, "story", cleanTitle || samId);
   result.labels = upsertLabel(result.labels, "severity", "critical");
+  result.labels = upsertLabel(result.labels, "owner", inferOwner(result));
   result.labels = upsertLabel(result.labels, "testCaseId", samId);
-  for (const tag of tags) result.labels.push({ name: "tag", value: tag.slice(1) });
-
-  if (runtimeTest?.status) result.labels.push({ name: "tag", value: `runtime:${runtimeTest.status}` });
-  const reason = runtimeTest?.blockedReason || runtimeTest?.error || "";
-  if (runtimeTest?.status === "SKIPPED-BLOCKED") {
-    result.labels.push({ name: "tag", value: "BLOCKED" });
-    result.labels.push({ name: "tag", value: `blocker:${classifyBlocker(reason)}` });
-    result.description = [
-      `**Official runtime:** BLOCKED`,
-      `**Blocker:** ${classifyBlocker(reason)}`,
-      reason ? `**Reason:** ${String(reason).split("\n")[0]}` : null,
-      `**Campaign:** MX · S1 · Base Store · P1/QST`,
-    ].filter(Boolean).join("  \n");
-  } else {
-    result.description = [
-      `**Official runtime:** ${runtimeTest?.status || "Playwright result"}`,
-      `**Campaign:** MX · S1 · Base Store · P1/QST`,
-      `**Test case:** ${samId}`,
-    ].join("  \n");
+  result.labels = upsertLabel(result.labels, "layer", "e2e");
+  result.labels = upsertLabel(result.labels, "host", "Samsung SMB");
+  for (const tag of ["MX", "S1", "Base Store", "P1", "QST", ...tags.map((tag) => tag.slice(1))]) {
+    pushUniqueLabel(result.labels, "tag", tag);
   }
 
+  const reason = runtimeTest?.blockedReason || runtimeTest?.error || "";
+  if (runtimeTest?.status) pushUniqueLabel(result.labels, "tag", `runtime:${prettyStatus(runtimeTest.status)}`);
+  if (prettyStatus(runtimeTest?.status) === "BLOCKED") {
+    pushUniqueLabel(result.labels, "tag", "BLOCKED");
+    pushUniqueLabel(result.labels, "tag", `blocker:${classifyBlocker(reason)}`);
+  }
+  result.description = buildDescription(samId, feature, runtimeTest, reason);
+
+  result.parameters ||= [];
+  const params = {
+    Market: "MX",
+    Environment: "S1 / STG",
+    Store: "Base Store",
+    Suite: "P1 / QST",
+    "Official TC": samId,
+    Feature: feature,
+  };
+  for (const [name, value] of Object.entries(params)) {
+    result.parameters = result.parameters.filter((item) => item.name !== name);
+    result.parameters.push({ name, value });
+  }
+
+  copyRuntimeAttachments(result, runtimeTest);
   fs.writeFileSync(file, JSON.stringify(result, null, 2));
 }
 
 const environment = [
   "Project=Samsung SMB Automation",
+  "Platform=SAP Commerce / Hybris",
+  "Framework=Playwright",
   "Market=MX",
   "Environment=S1/STG",
   "Store=Base Store",
   "Suite=P1/QST",
+  "Official_SMB_Scope=362",
+  "Official_P1_QST=144",
+  "Official_P2_DST=218",
+  "MX_BaseStore_P1_Selected=30",
   `Branch=${process.env.BRANCH_NAME || process.env.GIT_BRANCH || "local"}`,
   `Build=${process.env.BUILD_NUMBER || "local"}`,
 ].join("\n") + "\n";
 fs.writeFileSync(path.join(resultsDir, "environment.properties"), environment);
 
 fs.writeFileSync(path.join(resultsDir, "categories.json"), JSON.stringify([
-  { name: "Authentication / session", matchedStatuses: ["failed", "broken"], messageRegex: ".*(auth|session|login|logged|credential).*" },
-  { name: "Environment / backend", matchedStatuses: ["failed", "broken"], messageRegex: ".*(environment|backend|server|maintenance|unavailable|endpoint|timeout).*" },
-  { name: "Test data / prerequisite", matchedStatuses: ["failed", "broken"], messageRegex: ".*(sku|eligible|test data|address|order|prerequisite).*" },
-  { name: "Functional assertion", matchedStatuses: ["failed"] },
+  { name: "Authentication / session", matchedStatuses: ["failed", "broken"], messageRegex: ".*(auth|session|login|logged|credential|account).*" },
+  { name: "Environment / backend", matchedStatuses: ["failed", "broken"], messageRegex: ".*(environment|backend|server|maintenance|unavailable|endpoint|timeout|network).*" },
+  { name: "Test data / prerequisite", matchedStatuses: ["failed", "broken"], messageRegex: ".*(sku|eligible|test data|address|order|prerequisite|product).*" },
+  { name: "Functional assertion", matchedStatuses: ["failed"], messageRegex: ".*(expect|assert|expected|received).*" },
+  { name: "Automation / selector", matchedStatuses: ["failed", "broken"], messageRegex: ".*(locator|selector|strict mode|element|click|fill).*" },
 ], null, 2));
 
 if (process.env.BUILD_URL) {
   fs.writeFileSync(path.join(resultsDir, "executor.json"), JSON.stringify({
-    name: "Jenkins",
+    name: "Samsung SMB · Jenkins",
     type: "jenkins",
     buildName: `Samsung SMB MX QST #${process.env.BUILD_NUMBER || ""}`,
     buildUrl: process.env.BUILD_URL,
-    reportUrl: `${process.env.BUILD_URL}Allure_20MX_20QST/`,
+    reportUrl: `${process.env.BUILD_URL}Samsung_20MX_20QST_20-_20Allure/`,
   }, null, 2));
 }
-
-console.log(`[allure] Enriched MX QST results with Samsung business metadata: ${resultsDir}`);
+console.log(`[allure] Enriched Samsung report: business hierarchy, parameters, categories and runtime evidence -> ${resultsDir}`);
