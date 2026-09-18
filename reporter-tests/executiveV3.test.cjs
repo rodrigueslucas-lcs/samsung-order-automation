@@ -116,11 +116,11 @@ test('Current Build Runtime denominator remains 30 even when canonical MX covera
   assert.equal(model.automation.official, 37);
   assert.equal(model.totals.official, 144);
   const html = render(model);
-  assert.match(html, /Current Build Runtime/);
+  assert.match(html, /CURRENT BUILD/);
   assert.match(html, /14/);
   assert.match(html, /8/);
   assert.match(html, /Current Build Runtime uses 30 selected TCs/);
-  assert.match(html, /MX automation coverage contains 37 TCs/);
+  assert.match(html, /LEGACY 37-ID MAP/);
 });
 
 test('dashboard uses external Jenkins-safe stylesheet and no inline script/style block', () => {
