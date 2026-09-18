@@ -14,6 +14,8 @@ const empty = text => `<div class="empty">${esc(text)}</div>`;
 const kpi = (label, value, hint='', tone='') => `<article class="kpi ${tone}"><small>${esc(label)}</small><b>${esc(value)}</b><span>${esc(hint)}</span></article>`;
 const bar = value => `<div class="bar"><progress max="100" value="${Math.max(0, Math.min(100, Number(value || 0)))}"></progress></div>`;
 const successRate = summary => summary?.executed ? (Number(summary.passed || 0) / Number(summary.executed) * 100) : 0;
+const jiraHref = samId => `https://jira.secext.samsung.net/browse/${encodeURIComponent(String(samId || ''))}`;
+const samLink = samId => `<a class="sam-link" href="${jiraHref(samId)}" target="_blank" rel="noopener">${esc(samId)}</a>`;
 
 const OFFICIAL = {
   total: 362, p1: 144, p2: 218,
@@ -74,23 +76,23 @@ function renderAttention(execution) {
   if (!Array.isArray(execution?.tests)) return empty('No current runtime supplied.');
   const rows = execution.tests.filter(test => test.status === 'FAIL' || test.status === 'SKIPPED-BLOCKED' || test.status === 'BLOCKED');
   if (!rows.length) return '<div class="success-callout">No failures or blockers in the current build.</div>';
-  return `<div class="attention-list">${rows.map(test => `<article><div><strong>${esc(test.samId)}</strong><span>${esc(test.title || '')}</span></div>${chip(test.status)}<span class="category">${esc(blockerCategory(test))}</span><p>${esc(String(test.blockedReason || test.error || '').split('\n')[0])}</p><div class="evidence">${renderAttachments(execution, test.attachments)}</div></article>`).join('')}</div>`;
+  return `<div class="attention-list">${rows.map(test => `<article><div>${samLink(test.samId)}<span>${esc(test.title || '')}</span></div>${chip(test.status)}<span class="category">${esc(blockerCategory(test))}</span><p>${esc(String(test.blockedReason || test.error || '').split('\n')[0])}</p><div class="evidence">${renderAttachments(execution, test.attachments)}</div></article>`).join('')}</div>`;
 }
 function renderExecution(execution) {
   if (!execution?.summary || !Array.isArray(execution.tests)) return empty('No real execution artifact was supplied.');
   const s = execution.summary;
   const reconciled = s.passed + s.failed + s.blocked + s.notRun === s.official;
-  const rows = execution.tests.map(test => `<tr><td><strong>${esc(test.samId)}</strong><small>${esc(test.title || '')}</small></td><td>${chip(test.status)}</td><td>${esc(blockerCategory(test))}</td><td>${duration(test.duration)}</td><td class="evidence">${renderAttachments(execution, test.attachments)}</td><td class="evidence-text" title="${esc(test.blockedReason || test.error || '')}">${esc(String(test.blockedReason || test.error || '').split('\n')[0])}</td></tr>`).join('');
+  const rows = execution.tests.map(test => `<tr><td>${samLink(test.samId)}<small>${esc(test.title || '')}</small></td><td>${chip(test.status)}</td><td>${esc(blockerCategory(test))}</td><td>${duration(test.duration)}</td><td class="evidence">${renderAttachments(execution, test.attachments)}</td><td class="evidence-text" title="${esc(test.blockedReason || test.error || '')}">${esc(String(test.blockedReason || test.error || '').split('\n')[0])}</td></tr>`).join('');
   return `${executionMeta(execution,reconciled)}<div class="grid runtime-kpis">${kpi('Official selected',s.official,'Current build only')}${kpi('Executed',s.executed,'PASS + FAIL')}${kpi('PASS',s.passed,pct(s.passRate),'good')}${kpi('FAIL',s.failed,'Current build failures',s.failed?'bad':'')}${kpi('Blocked',s.blocked,'Known prerequisites',s.blocked?'warn':'')}${kpi('Duration',duration(s.duration),'Total runtime')}</div>${resultBar(s)}<div class="table-wrap execution-table"><table><thead><tr><th>Test case</th><th>Status</th><th>Category</th><th>Duration</th><th>Evidence</th><th>Reason</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function renderOfficialMarkets() {
   return Object.entries(OFFICIAL.markets).map(([market,m]) => `<article class="market-card"><div class="market-head"><strong>${market}</strong><span>${m.total} DST scenarios</span></div><div class="market-number">${m.p1} <small>P1 / QST</small></div><div class="market-stats"><span><b>${m.base}</b> Base Store</span><span><b>${m.epp}</b> EPP</span></div><footer>Current official priority template</footer></article>`).join('');
 }
 function renderFeatureRows(features) { return features.map(row => `<tr><td><strong>${esc(row.feature)}</strong><small>${row.baseStore} BS · ${row.epp} EPP</small></td><td>${row.total}</td><td>${row.full}</td><td>${row.partial}</td><td>${row.missing}</td><td>${pct(row.fullPercent)}</td></tr>`).join(''); }
-function renderGaps(rows) { const top = rows.slice(0, 12); if (!top.length) return empty('No MX automation gaps.'); return top.map(row => `<tr><td><strong>${esc(row.id)}</strong><small>${esc(row.title || '')}</small></td><td>${esc(row.feature || '')}</td><td>${esc(row.store || '')}</td><td>${chip(row.coverage)}</td></tr>`).join(''); }
+function renderGaps(rows) { const top = rows.slice(0, 12); if (!top.length) return empty('No MX automation gaps.'); return top.map(row => `<tr><td>${samLink(row.id)}<small>${esc(row.title || '')}</small></td><td>${esc(row.feature || '')}</td><td>${esc(row.store || '')}</td><td>${chip(row.coverage)}</td></tr>`).join(''); }
 function renderMarketFeatureMatrix(rows) { return rows.map(row => `<tr><td><strong>${esc(row.feature)}</strong></td>${['MX','CL','CO','PE'].map(m => { const v = row.markets[m]; return !v.total ? '<td class="muted-cell">—</td>' : `<td><b>${v.executed}/${v.total}</b><small>${v.pass} P · ${v.fail} F · ${v.blocked} B · ${v.pending} pending</small></td>`; }).join('')}</tr>`).join(''); }
 function renderAudit(audit) { return audit.checks.map(check => `<tr><td>${check.ok ? chip('PASS') : chip('FAIL')}</td><td><strong>${esc(check.key)}</strong></td><td>${esc(check.detail)}</td></tr>`).join(''); }
-function renderCatalog(rows) { return rows.map(row => `<tr><td><strong>${esc(row.id)}</strong><small>${esc(row.title)}</small></td><td>${esc(row.market)}</td><td>${esc(row.feature)}</td><td>${esc(row.store)}</td><td>${chip(row.status)}</td><td>${row.coverage ? chip(row.coverage) : '—'}</td><td>${esc(row.context)}</td><td class="evidence-text">${esc(row.blocker || row.evidence || row.runtimePath || '')}</td></tr>`).join(''); }
+function renderCatalog(rows) { return rows.map(row => `<tr><td>${samLink(row.id)}<small>${esc(row.title)}</small></td><td>${esc(row.market)}</td><td>${esc(row.feature)}</td><td>${esc(row.store)}</td><td>${chip(row.status)}</td><td>${row.coverage ? chip(row.coverage) : '—'}</td><td>${esc(row.context)}</td><td class="evidence-text">${esc(row.blocker || row.evidence || row.runtimePath || '')}</td></tr>`).join(''); }
 function detail(title, subtitle, badge, content, open=false) {
   return `<details class="panel disclosure" ${open?'open':''}><summary><div><h2>${esc(title)}</h2><p>${esc(subtitle)}</p></div><span class="tag">${esc(badge)}</span></summary><div class="detail-body">${content}</div></details>`;
 }
