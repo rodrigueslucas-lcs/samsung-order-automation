@@ -63,7 +63,7 @@
     "reporting:executive:test": "node --test reporter-tests/executive.test.cjs",
     "reporting:mx-runtime:test": "node --test reporter-tests/mxQstRuntimeSummary.test.cjs reporter-tests/executiveV3.test.cjs reporter-tests/listIsolation.test.cjs reporter-tests/allureIntegration.test.cjs",
     "reporting:mx:preview": "node scripts/preview-mx-dashboard.cjs",
-    "reporting:allure:install": "npm install --no-save --package-lock=false allure-playwright@3.11.1 allure-commandline@2.43.0",
+    "reporting:allure:install": "npm install --no-save --package-lock=false --ignore-scripts allure-playwright@3.11.1 allure-commandline@2.43.0",
     "reporting:allure:smoke": "node scripts/run-allure-smoke.cjs",
     "reporting:preqa2": "node reporters/preqa2/generatePreqa2Report.cjs",
     "reporting:preqa2:status": "node reporters/preqa2/generatePreqa2Status.cjs",
