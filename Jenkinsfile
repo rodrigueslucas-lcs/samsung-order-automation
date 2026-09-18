@@ -10,9 +10,9 @@ pipeline {
   }
 
   parameters {
-    booleanParam(name: 'RUN_ALLURE_SMOKE', defaultValue: false, description: 'Run isolated local Allure reporting smoke with Node 22; no Samsung URL/auth/order/payment.')
-    booleanParam(name: 'RUN_MX_QST', defaultValue: true, description: 'Run official MX S1 Base Store P1/QST suite')
-    booleanParam(name: 'RUN_DESTRUCTIVE', defaultValue: false, description: 'Allow payment/order scenarios. Enable only on an authorized S1 agent.')
+    choice(name: 'TEST_SUITE', choices: ['fast-guest', 'official-p1', 'allure-smoke'], description: 'Suite: fast-guest = quick safe MX validation; official-p1 = complete 30-TC MX Base Store P1/QST; allure-smoke = reporting validation only.')
+    booleanParam(name: 'RUN_DESTRUCTIVE', defaultValue: false, description: 'Official P1 only: allow authorized payment/order scenarios. Not used by fast-guest.')
+
     booleanParam(name: 'ENABLE_VIDEO', defaultValue: false, description: 'Enable Playwright video only after FFmpeg is proven on this Jenkins agent.')
     booleanParam(name: 'HEADLESS', defaultValue: true, description: 'Run Playwright headless. Recommended for Jenkins service agents.')
   }
@@ -58,7 +58,7 @@ pipeline {
     }
 
     stage('Allure Reporting Smoke') {
-      when { expression { return params.RUN_ALLURE_SMOKE } }
+      when { expression { return params.TEST_SUITE == 'allure-smoke' } }
       steps {
         script {
           if (isUnix()) sh 'npx -y node@22 scripts/run-allure-smoke.cjs'
@@ -68,7 +68,7 @@ pipeline {
     }
 
     stage('Official SMB Gate') {
-      when { expression { return !params.RUN_ALLURE_SMOKE } }
+      when { expression { return params.TEST_SUITE != 'allure-smoke' } }
       steps {
         script {
           if (isUnix()) {
@@ -82,8 +82,21 @@ pipeline {
       }
     }
 
-    stage('MX QST') {
-      when { expression { return params.RUN_MX_QST && !params.RUN_ALLURE_SMOKE } }
+    stage('MX Fast Guest · Safe') {
+      when { expression { return params.TEST_SUITE == 'fast-guest' } }
+      steps {
+        script {
+          env.PW_VIDEO = params.ENABLE_VIDEO ? '1' : '0'
+          env.MX_QST_HEADLESS = params.HEADLESS ? '1' : '0'
+          env.ENABLE_ALLURE = '1'
+          if (isUnix()) sh 'npx -y node@22 scripts/run-mx-qst-fast-guest.cjs'
+          else bat '@call npx -y node@22 scripts/run-mx-qst-fast-guest.cjs'
+        }
+      }
+    }
+
+    stage('MX Official P1 · 30 TCs') {
+      when { expression { return params.TEST_SUITE == 'official-p1' } }
       steps {
         script {
           if (!params.RUN_DESTRUCTIVE) {
@@ -129,7 +142,7 @@ pipeline {
       script {
         // Rebuild the official Allure after runtime reconciliation so the report
         // contains Samsung business metadata, official TC status and blocker categories.
-        if (!params.RUN_ALLURE_SMOKE) {
+        if (params.TEST_SUITE != 'allure-smoke' && params.TEST_SUITE != 'fast-guest') {
           if (isUnix()) {
             sh 'npx -y node@22 scripts/finalize-allure-mx-qst.cjs || true'
           } else {
