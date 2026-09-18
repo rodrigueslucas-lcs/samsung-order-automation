@@ -4,10 +4,13 @@ import evidenceContext from "../../../../../reporters/evidence/evidenceContext.j
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import GuestOrderTrackingPage from "../../../../../pages/GuestOrderTrackingPage";
 import MailinatorPage from "../../../../../pages/MailinatorPage";
+import destructiveGuards from "../../../../../utils/destructiveGuards";
+import { reachMxGuestPayment } from "../../dst/base-store/mxFlows";
 import { test, expect } from "./mxQst.fixture";
 
 const { recordBusinessEvidence } = evidenceContext;
 const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
+const { requirePaymentSubmitOptIn } = destructiveGuards;
 
 test.describe.configure({ timeout: 1200000, retries: 0 });
 const guestOrderRuntimeFile = path.resolve("test-results/mx-qst/latest-guest-order.json");
@@ -45,12 +48,53 @@ function readGuestOrderRuntime() {
   }
 }
 
+async function createFreshGuestOrder(page, mxConfig) {
+  requirePaymentSubmitOptIn();
+  const inbox = `mx-qst-${Date.now()}`;
+  const email = `${inbox}@mailinator.com`;
+  const { checkout } = await reachMxGuestPayment(page, mxConfig, email);
+  await checkout.selectPaymentMode(/^SPEI/i);
+
+  let responseOrderCode = null;
+  page.on("response", (response) => {
+    if (!/order|payment|checkout|transaction/i.test(response.url())) return;
+    response.text().then((body) => {
+      responseOrderCode ||= normalizeMxOrderCode(body);
+    }).catch(() => {});
+  });
+
+  const action = page.getByRole("button", { name: /^Continuar a Mercado Pago$/i });
+  await expect(action).toBeEnabled({ timeout: 30000 });
+  const initialUrl = page.url();
+  const popupPromise = page.context().waitForEvent("page", { timeout: 120000 }).catch(() => null);
+  await action.click(); // Submit exactly once; never retry an uncertain order creation.
+  const outcome = await Promise.race([
+    page.waitForURL((url) => url.href !== initialUrl, { timeout: 120000 }).then(() => page),
+    popupPromise,
+  ]);
+  const target = outcome || page;
+  await target.waitForLoadState("domcontentloaded", { timeout: 30000 }).catch(() => {});
+  const body = await target.locator("body").innerText({ timeout: 30000 }).catch(() => "");
+  const orderNumber = normalizeMxOrderCode(body) || responseOrderCode;
+  if (!orderNumber) throw new Error("Guest order submit produced no observable order code; do not retry.");
+  await expect(target.getByText(/confirmaci[oó]n|pedido recibido|gracias por tu compra/i).filter({ visible: true }).first())
+    .toBeVisible({ timeout: 60000 });
+  return { orderNumber, email, inbox };
+}
+
 test("SAM-25010 @destructive @qst @mx @base-store - Track Order with email and Order ID", async ({ page, context, mxConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-25010"));
 
-  let orderNumber = normalizeMxOrderCode(process.env.MX_QST_TRACKING_ORDER?.trim());
-  let email = process.env.MX_QST_TRACKING_EMAIL?.trim().toLowerCase();
-  let inbox = process.env.MAILINATOR_INBOX?.trim();
+  let orderNumber;
+  let email;
+  let inbox;
+  if (process.env.MX_QST_TRACKING_CREATE_ORDER === "1") {
+    ({ orderNumber, email, inbox } = await createFreshGuestOrder(page, mxConfig));
+  } else {
+    orderNumber = normalizeMxOrderCode(process.env.MX_QST_TRACKING_ORDER?.trim());
+    email = process.env.MX_QST_TRACKING_EMAIL?.trim().toLowerCase();
+    inbox = process.env.MAILINATOR_INBOX?.trim();
+  }
 
   if (!orderNumber || !email || !inbox) {
     const causalOrder = readGuestOrderRuntime();
@@ -89,9 +133,9 @@ test("SAM-25010 @destructive @qst @mx @base-store - Track Order with email and O
   const otpRequest = await trackingPage.requestVerificationCode(orderNumber, email);
 
   await mailPage.bringToFront();
-  // The reused guest inbox may already contain the still-valid OTP. The
-  // storefront's verification step remains the authority on its validity.
-  const otpEmail = await mailinator.waitForOtpEmail({ baselineMessageIds, allowExistingOtp: true });
+  // A previously delivered code can be invalidated by this new request.
+  // Only consume the message arriving after it, never the first old inbox row.
+  const otpEmail = await mailinator.waitForOtpEmail({ baselineMessageIds });
 
   await page.bringToFront();
   await trackingPage.submitVerificationCode(otpEmail.otp, orderNumber);

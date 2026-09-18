@@ -118,9 +118,8 @@ export default class MailinatorPage extends BasePage {
   async waitForOtpEmail({
     baselineMessageIds = [],
     baselineOtpCodes = [],
-    allowExistingOtp = false,
     timeoutMs = Number(process.env.MAILINATOR_EMAIL_TIMEOUT_MS || 600000),
-    intervalMs = Number(process.env.MAILINATOR_POLL_INTERVAL_MS || 15000),
+    intervalMs = Number(process.env.MAILINATOR_POLL_INTERVAL_MS || 3000),
   } = {}) {
     const startedAt = Date.now();
     const baseline = new Set(baselineMessageIds);
@@ -135,7 +134,7 @@ export default class MailinatorPage extends BasePage {
       const rows = await this.inboxRows();
       const otpRows = rows.filter({ hasText: OTP_SUBJECT });
       const otpCount = await otpRows.count();
-      const candidateCount = allowExistingOtp || baselineOtpCodes.length > 0
+      const candidateCount = baselineOtpCodes.length > 0
         ? otpCount
         : Math.max(0, otpCount - baselineOtpCount);
       for (let index = 0; index < candidateCount; index++) {
@@ -145,7 +144,7 @@ export default class MailinatorPage extends BasePage {
         const messageId = await row.evaluate((element) =>
           element.id || element.querySelector("a[href*='msgid=']")?.getAttribute("href") || null
         ) || `otp-row-${index}-of-${otpCount}`;
-        if (!allowExistingOtp && baseline.has(messageId)) continue;
+        if (baseline.has(messageId)) continue;
 
         await row.click();
         await this.page.getByText("Public Message", { exact: true })

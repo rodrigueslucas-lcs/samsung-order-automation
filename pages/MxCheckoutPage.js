@@ -15,6 +15,14 @@ export default class MxCheckoutPage extends BasePage {
     });
     await guest.click();
     await this.page.waitForURL(/CHECKOUT_STEP_CONTACT_INFO/, { timeout: 60000 });
+    // The guest email entered on the previous step is not always carried into
+    // Contact Info. This field is required before Delivery can open.
+    const contactEmail = this.page.getByRole("textbox", { name: "email", exact: true });
+    await contactEmail.waitFor({ state: "visible", timeout: 30000 });
+    await contactEmail.fill(email);
+    if (await contactEmail.inputValue() !== email) {
+      throw new Error("MX guest contact email was not retained.");
+    }
   }
 
   async fillContact({ firstName, lastName, phone }) {
@@ -88,7 +96,19 @@ export default class MxCheckoutPage extends BasePage {
 
   async fillDelivery({ postalCode, street, exteriorNumber }, { registered = false } = {}) {
     const postal = this.page.getByRole("textbox", { name: /postal|c[oó]digo postal/i });
-    await postal.waitFor({ state: "visible", timeout: 60000 });
+    const rendered = await postal.waitFor({ state: "visible", timeout: 20000 })
+      .then(() => true).catch(() => false);
+    if (!rendered) {
+      // S1 occasionally leaves Delivery as an endless skeleton after its
+      // dynamic form errors. One reload is safe here: no order was submitted.
+      if (!/CHECKOUT_STEP_DELIVERY/.test(this.page.url())) {
+        throw new Error("MX Delivery form did not render and checkout left the Delivery step.");
+      }
+      await this.page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+      await postal.waitFor({ state: "visible", timeout: 60000 }).catch(() => {
+        throw new Error("MX Delivery form remained an unrendered skeleton after one reload; check S1 dynamic-form errors.");
+      });
+    }
     const addressResponse = this.page.waitForResponse(
       (response) =>
         response.url().includes("getAddressForWardPostCode") &&
