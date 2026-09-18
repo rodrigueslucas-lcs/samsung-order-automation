@@ -29,6 +29,8 @@
     "qst:list": "playwright test tests/s2/pe/qst --project=chromium --list --reporter=list",
     "qst:mx:base-store": "node scripts/run-mx-qst-safe.cjs",
     "qst:mx:list": "node scripts/run-mx-qst-safe.cjs --list",
+    "qst:mx:fast": "node scripts/run-mx-qst-fast-guest.cjs",
+    "qst:mx:fast:list": "node scripts/run-mx-qst-fast-guest.cjs --list",
     "qst:pe:base-store": "playwright test tests/s1/pe/qst/base-store --project=chromium --workers=1 --grep-invert @destructive",
     "qst:pe:list": "playwright test tests/s1/pe/qst/base-store --project=chromium --list --reporter=list",
     "qst:pe:progress": "node scripts/print-pe-qst-progress.cjs",
