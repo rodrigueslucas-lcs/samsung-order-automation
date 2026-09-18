@@ -10,11 +10,11 @@ pipeline {
   }
 
   parameters {
-    choice(name: 'TEST_SUITE', choices: ['fast-guest', 'official-p1', 'allure-smoke'], description: 'Suite: fast-guest = quick safe MX validation; official-p1 = complete 30-TC MX Base Store P1/QST; allure-smoke = reporting validation only.')
-    booleanParam(name: 'RUN_DESTRUCTIVE', defaultValue: false, description: 'Official P1 only: allow authorized payment/order scenarios. Not used by fast-guest.')
-
-    booleanParam(name: 'ENABLE_VIDEO', defaultValue: false, description: 'Enable Playwright video only after FFmpeg is proven on this Jenkins agent.')
-    booleanParam(name: 'HEADLESS', defaultValue: true, description: 'Run Playwright headless. Recommended for Jenkins service agents.')
+    choice(name: 'ENVIRONMENT', choices: ['S1', 'S2'], description: 'Target environment. MX automated QST is currently validated on S1; S2 is available for the existing PE suites.')
+    choice(name: 'TEST_SUITE', choices: ['fast-guest', 'official-p1', 'backoffice-safe', 'allure-smoke'], description: 'Execution profile. fast-guest is the recommended quick feedback suite.')
+    choice(name: 'EXECUTION_MODE', choices: ['safe', 'authorized-destructive'], description: 'Safety mode. Destructive payment/order execution is accepted only by official-p1.')
+    choice(name: 'BROWSER_MODE', choices: ['headless', 'headed'], description: 'Browser mode. Headless is recommended on Jenkins.')
+    choice(name: 'EVIDENCE_MODE', choices: ['screenshots-trace', 'screenshots-trace-video'], description: 'Evidence capture. Video requires FFmpeg on the Jenkins agent.')
   }
 
   environment {
@@ -67,6 +67,20 @@ pipeline {
       }
     }
 
+    stage('Validate Selection') {
+      when { expression { return params.TEST_SUITE != 'allure-smoke' } }
+      steps {
+        script {
+          if (['fast-guest', 'official-p1'].contains(params.TEST_SUITE) && params.ENVIRONMENT != 'S1') {
+            error('MX fast-guest and official-p1 are currently validated for S1 only. Select ENVIRONMENT=S1.')
+          }
+          if (params.TEST_SUITE == 'backoffice-safe' && params.ENVIRONMENT != 'S1') {
+            error('Current SMB BackOffice QST path is configured for S1. Select ENVIRONMENT=S1.')
+          }
+        }
+      }
+    }
+
     stage('Official SMB Gate') {
       when { expression { return params.TEST_SUITE != 'allure-smoke' } }
       steps {
@@ -86,8 +100,8 @@ pipeline {
       when { expression { return params.TEST_SUITE == 'fast-guest' } }
       steps {
         script {
-          env.PW_VIDEO = params.ENABLE_VIDEO ? '1' : '0'
-          env.MX_QST_HEADLESS = params.HEADLESS ? '1' : '0'
+          env.PW_VIDEO = params.EVIDENCE_MODE == 'screenshots-trace-video' ? '1' : '0'
+          env.MX_QST_HEADLESS = params.BROWSER_MODE == 'headless' ? '1' : '0'
           env.ENABLE_ALLURE = '1'
           env.MX_FAST_ARTIFACT_DIR = 'test-results/jenkins/mx-fast'
           env.TEST_SUITE = 'FAST/GUEST'
@@ -97,15 +111,27 @@ pipeline {
       }
     }
 
+    stage('SMB BackOffice · Safe') {
+      when { expression { return params.TEST_SUITE == 'backoffice-safe' } }
+      steps {
+        script {
+          env.PW_VIDEO = params.EVIDENCE_MODE == 'screenshots-trace-video' ? '1' : '0'
+          env.MX_QST_HEADLESS = params.BROWSER_MODE == 'headless' ? '1' : '0'
+          if (isUnix()) sh 'npm run qst:smb:backoffice -- --grep-invert @destructive'
+          else bat '@npm run qst:smb:backoffice -- --grep-invert @destructive'
+        }
+      }
+    }
+
     stage('MX Official P1 · 30 TCs') {
       when { expression { return params.TEST_SUITE == 'official-p1' } }
       steps {
         script {
-          if (!params.RUN_DESTRUCTIVE) {
-            error('Official MX QST contains authorized payment/order P1 scenarios. RUN_DESTRUCTIVE must be enabled for the full 30-TC campaign.')
+          if (!params.EXECUTION_MODE == 'authorized-destructive') {
+            error('Official MX QST contains authorized payment/order P1 scenarios. Select EXECUTION_MODE=authorized-destructive for the full 30-TC campaign.')
           }
-          env.PW_VIDEO = params.ENABLE_VIDEO ? '1' : '0'
-          env.MX_QST_HEADLESS = params.HEADLESS ? '1' : '0'
+          env.PW_VIDEO = params.EVIDENCE_MODE == 'screenshots-trace-video' ? '1' : '0'
+          env.MX_QST_HEADLESS = params.BROWSER_MODE == 'headless' ? '1' : '0'
         }
 
         withCredentials([
