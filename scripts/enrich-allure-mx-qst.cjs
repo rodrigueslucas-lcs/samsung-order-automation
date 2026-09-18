@@ -9,6 +9,8 @@ const runtime = fs.existsSync(runtimeFile)
   ? JSON.parse(fs.readFileSync(runtimeFile, "utf8"))
   : { tests: [] };
 const byId = new Map((runtime.tests || []).map((test) => [test.samId, test]));
+const JIRA_BASE_URL = "https://jira.secext.samsung.net/browse/";
+const jiraUrl = samId => `${JIRA_BASE_URL}${samId}`;
 
 function upsertLabel(labels, name, value) {
   const next = (labels || []).filter((label) => label.name !== name);
@@ -47,8 +49,9 @@ function prettyStatus(status) {
 function buildDescription(samId, feature, runtimeTest, reason) {
   const status = prettyStatus(runtimeTest?.status);
   return [
-    `### ${samId} · ${feature}`,
+    `### [${samId}](${jiraUrl(samId)}) · ${feature}`,
     "",
+    `**Jira:** [Open ${samId}](${jiraUrl(samId)})`,
     `**Official runtime:** ${status}`,
     `**Campaign:** MX · S1 · Base Store · P1/QST`,
     `**Store:** Base Store`,
@@ -105,6 +108,8 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-r
   result.labels = upsertLabel(result.labels, "severity", "critical");
   result.labels = upsertLabel(result.labels, "owner", inferOwner(result));
   result.labels = upsertLabel(result.labels, "testCaseId", samId);
+  result.links = (result.links || []).filter((link) => link.name !== samId && link.type !== "tms");
+  result.links.push({ name: samId, url: jiraUrl(samId), type: "tms" });
   result.labels = upsertLabel(result.labels, "layer", "e2e");
   result.labels = upsertLabel(result.labels, "host", "Samsung SMB");
   for (const tag of ["MX", "S1", "Base Store", "P1", "QST", ...tags.map((tag) => tag.slice(1))]) {
