@@ -165,7 +165,7 @@ pipeline {
         keepAll: true,
         reportDir: 'test-results/jenkins/mx-qst/allure-report',
         reportFiles: 'index.html',
-        reportName: 'Allure MX QST'
+        reportName: 'Samsung MX QST - Allure'
       ])
       publishHTML(target: [
         allowMissing: true,
