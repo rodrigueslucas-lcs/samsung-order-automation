@@ -91,8 +91,9 @@ function renderOfficialMarkets() {
 }
 function evidenceStats(execution) {
   const tests = Array.isArray(execution?.tests) ? execution.tests : [];
-  const withEvidence = tests.filter(test => Array.isArray(test.attachments) && test.attachments.some(item => item?.path && !/(^|\\/)playwright\\/\\.auth(\\/|$)/i.test(item.path))).length;
-  const totalFiles = tests.reduce((sum,test) => sum + ((test.attachments || []).filter(item => item?.path && !/(^|\\/)playwright\\/\\.auth(\\/|$)/i.test(item.path)).length), 0);
+  const hasSafePath = item => item?.path && !/(^|\/)playwright\/\.auth(\/|$)/i.test(item.path);
+  const withEvidence = tests.filter(test => Array.isArray(test.attachments) && test.attachments.some(hasSafePath)).length;
+  const totalFiles = tests.reduce((sum,test) => sum + ((test.attachments || []).filter(hasSafePath).length), 0);
   return { withEvidence, totalFiles };
 }
 function renderFeatureRows(features) { return features.map(row => `<tr><td><strong>${esc(row.feature)}</strong><small>${row.baseStore} BS · ${row.epp} EPP</small></td><td>${row.total}</td><td>${row.full}</td><td>${row.partial}</td><td>${row.missing}</td><td>${pct(row.fullPercent)}</td></tr>`).join(''); }
