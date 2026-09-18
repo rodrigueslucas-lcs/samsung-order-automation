@@ -100,15 +100,18 @@ function businessJourney(feature, title = "") {
   return ["Prepare test context", "Open Samsung storefront", "Exercise the business scenario", "Validate the expected result"];
 }
 function syntheticBusinessSteps(feature, title, result) {
-  // Keep real Playwright/test.step output untouched. These high-level reporting
-  // steps are added only when the test did not emit explicit business steps.
-  const hasExplicitStep = (result.steps || []).some((step) => step.name && !/^before hooks|after hooks$/i.test(step.name));
-  if (hasExplicitStep) return;
+  // Allure is a business execution report. Low-level adapter operations such as
+  // locator/request/expect/navigation belong in Playwright Trace, not the main tree.
+  const technical = /^(before hooks?|after hooks?|navigate|expect\b|wait for|waitfor|locator\b|request\b|page\.|browser\.|context\.|api\b|fixture\b)/i;
+  const explicitBusinessSteps = (result.steps || []).filter((step) => {
+    const name = String(step?.name || "").trim();
+    return name && !technical.test(name);
+  });
   const start = Number(result.start || Date.now());
   const stop = Number(result.stop || start);
   const names = businessJourney(feature, title);
   const slice = Math.max(1, Math.floor(Math.max(1, stop - start) / names.length));
-  result.steps = names.map((name, index) => ({
+  const curated = names.map((name, index) => ({
     name,
     status: result.status === "passed" ? "passed" : (index === names.length - 1 ? result.status : "passed"),
     stage: "finished",
@@ -118,6 +121,7 @@ function syntheticBusinessSteps(feature, title, result) {
     attachments: [],
     parameters: [],
   }));
+  result.steps = explicitBusinessSteps.length ? explicitBusinessSteps : curated;
 }
 function buildDescription(samId, feature, runtimeTest, reason) {
   const status = prettyStatus(runtimeTest?.status);
@@ -137,22 +141,39 @@ function buildDescription(samId, feature, runtimeTest, reason) {
   ].filter(Boolean).join("  \n");
 }
 function copyRuntimeAttachments(result, runtimeTest) {
-  if (!runtimeTest?.attachments?.length) return;
   result.attachments ||= [];
-  const existingSources = new Set(result.attachments.map((item) => item.source));
+  const normalizeName = (attachment) => {
+    const type = String(attachment?.type || attachment?.contentType || "");
+    const name = String(attachment?.name || "");
+    const source = String(attachment?.source || attachment?.path || "");
+    if (/screenshot/i.test(name) || /^image\//i.test(type) || /\.png$/i.test(source)) return "Screenshot · Final state";
+    if (/trace/i.test(name) || /\.zip$/i.test(source)) return "Playwright Trace";
+    if (/video/i.test(name) || /^video\//i.test(type) || /\.webm$/i.test(source)) return "Video · Execution";
+    if (/stdout|stderr|log/i.test(name)) return "Execution log";
+    return name || "Evidence";
+  };
+  const seen = new Set();
+  result.attachments = result.attachments.filter((attachment) => {
+    const key = String(attachment?.source || "") || `${normalizeName(attachment)}|${attachment?.type || ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    attachment.name = normalizeName(attachment);
+    return true;
+  });
+  if (!runtimeTest?.attachments?.length) return;
   for (const attachment of runtimeTest.attachments) {
     if (!attachment?.path || !fs.existsSync(attachment.path)) continue;
     const ext = path.extname(attachment.path);
+    // Avoid copying a Playwright artifact already represented by the adapter.
+    const semanticKey = `${normalizeName(attachment)}|${attachment.contentType || ext}`;
+    if ([...result.attachments].some((item) => `${normalizeName(item)}|${item.type || path.extname(item.source || "")}` === semanticKey)) continue;
     const source = `runtime-${runtimeTest.samId}-${result.attachments.length + 1}${ext}`;
-    const destination = path.join(resultsDir, source);
-    fs.copyFileSync(attachment.path, destination);
-    if (!existingSources.has(source)) {
-      result.attachments.push({
-        name: attachment.name || path.basename(attachment.path),
-        source,
-        type: attachment.contentType || (ext === ".png" ? "image/png" : ext === ".webm" ? "video/webm" : ext === ".zip" ? "application/zip" : "application/octet-stream"),
-      });
-    }
+    fs.copyFileSync(attachment.path, path.join(resultsDir, source));
+    result.attachments.push({
+      name: normalizeName(attachment),
+      source,
+      type: attachment.contentType || (ext === ".png" ? "image/png" : ext === ".webm" ? "video/webm" : ext === ".zip" ? "application/zip" : "application/octet-stream"),
+    });
   }
 }
 
