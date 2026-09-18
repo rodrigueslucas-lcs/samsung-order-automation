@@ -89,7 +89,9 @@ test("SAM-25010 @destructive @qst @mx @base-store - Track Order with email and O
   const otpRequest = await trackingPage.requestVerificationCode(orderNumber, email);
 
   await mailPage.bringToFront();
-  const otpEmail = await mailinator.waitForOtpEmail({ baselineMessageIds });
+  // The reused guest inbox may already contain the still-valid OTP. The
+  // storefront's verification step remains the authority on its validity.
+  const otpEmail = await mailinator.waitForOtpEmail({ baselineMessageIds, allowExistingOtp: true });
 
   await page.bringToFront();
   await trackingPage.submitVerificationCode(otpEmail.otp, orderNumber);

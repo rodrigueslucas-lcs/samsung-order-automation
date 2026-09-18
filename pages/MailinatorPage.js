@@ -118,6 +118,7 @@ export default class MailinatorPage extends BasePage {
   async waitForOtpEmail({
     baselineMessageIds = [],
     baselineOtpCodes = [],
+    allowExistingOtp = false,
     timeoutMs = Number(process.env.MAILINATOR_EMAIL_TIMEOUT_MS || 600000),
     intervalMs = Number(process.env.MAILINATOR_POLL_INTERVAL_MS || 15000),
   } = {}) {
@@ -134,15 +135,17 @@ export default class MailinatorPage extends BasePage {
       const rows = await this.inboxRows();
       const otpRows = rows.filter({ hasText: OTP_SUBJECT });
       const otpCount = await otpRows.count();
-      const candidateCount = baselineOtpCodes.length > 0
+      const candidateCount = allowExistingOtp || baselineOtpCodes.length > 0
         ? otpCount
         : Math.max(0, otpCount - baselineOtpCount);
       for (let index = 0; index < candidateCount; index++) {
         const row = otpRows.nth(index);
-        const messageId = (await row.getAttribute("id")) ||
-          (await row.locator("a[href*='msgid=']").first().getAttribute("href")) ||
-          `otp-row-${index}-of-${otpCount}`;
-        if (baseline.has(messageId)) continue;
+        // Mailinator often renders the message row without an <a href="...msgid=...">.
+        // Locator.getAttribute() waits 30s for that absent link on every poll.
+        const messageId = await row.evaluate((element) =>
+          element.id || element.querySelector("a[href*='msgid=']")?.getAttribute("href") || null
+        ) || `otp-row-${index}-of-${otpCount}`;
+        if (!allowExistingOtp && baseline.has(messageId)) continue;
 
         await row.click();
         await this.page.getByText("Public Message", { exact: true })
