@@ -26,6 +26,7 @@ function pushUniqueLabel(labels, name, value) {
 function classifyBlocker(text = "") {
   if (/auth|session|login|logged|account|credential/i.test(text)) return "Authentication / session";
   if (/sku|product|eligible|data|address|order|email/i.test(text)) return "Test data / prerequisite";
+  if (/executable doesn.t exist|browser.*executable|ms-playwright|ffmpeg|spawn (eperm|enoent)|playwright.*install/i.test(text)) return "Infrastructure / Playwright";
   if (/environment|staging|s1|backend|server|maintenance|timeout|unavailable|endpoint|cdp|network/i.test(text)) return "Environment / backend";
   return "Prerequisite";
 }
@@ -255,6 +256,7 @@ const environment = [
 fs.writeFileSync(path.join(resultsDir, "environment.properties"), environment);
 
 fs.writeFileSync(path.join(resultsDir, "categories.json"), JSON.stringify([
+  { name: "Infrastructure / Playwright", matchedStatuses: ["failed", "broken"], messageRegex: ".*(executable doesn.t exist|browser.*executable|ms-playwright|ffmpeg|spawn (EPERM|ENOENT)|playwright.*install).*" },
   { name: "Authentication / session", matchedStatuses: ["failed", "broken"], messageRegex: ".*(auth|session|login|logged|credential|account).*" },
   { name: "Environment / backend", matchedStatuses: ["failed", "broken"], messageRegex: ".*(environment|backend|server|maintenance|unavailable|endpoint|timeout|network).*" },
   { name: "Test data / prerequisite", matchedStatuses: ["failed", "broken"], messageRegex: ".*(sku|eligible|test data|address|order|prerequisite|product).*" },
@@ -268,7 +270,7 @@ if (process.env.BUILD_URL) {
     type: "jenkins",
     buildName: `Samsung SMB · ${campaignLabel} · #${process.env.BUILD_NUMBER || ""}`,
     buildUrl: process.env.BUILD_URL,
-    reportUrl: `${process.env.BUILD_URL}Samsung_20MX_20QST_20-_20Allure/`,
+    reportUrl: `${process.env.BUILD_URL}${encodeURIComponent(process.env.ALLURE_REPORT_NAME || (process.env.TEST_SUITE === "FAST/GUEST" ? "Samsung MX Fast - Allure" : "Samsung MX QST - Allure")).replace(/%20/g, "_20")}/`,
   }, null, 2));
 }
 console.log(`[allure] Enriched Samsung report: business hierarchy, parameters, categories and runtime evidence -> ${resultsDir}`);
