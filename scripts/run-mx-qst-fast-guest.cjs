@@ -2,11 +2,18 @@ const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const { testTitles } = require("../utils/qstS1Implementation");
+const { buildMxQstRuntimeSummary, writeRuntimeSummary } = require("../utils/mxQstRuntimeSummary.cjs");
 
 const listOnly = process.argv.includes("--list");
 const headless = process.env.MX_QST_HEADLESS === "1";
 const root = path.resolve("tests/s1/mx/qst/base-store");
 const playwrightCli = path.resolve("node_modules/@playwright/test/cli.js");
+const fastArtifactDir = path.resolve(process.env.MX_FAST_ARTIFACT_DIR || "test-results/jenkins/mx-fast");
+const reportFile = path.join(fastArtifactDir, "mx-fast-results.json");
+const runtimeSummaryFile = path.join(fastArtifactDir, "runtime-summary.json");
+const allureResultsDir = path.join(fastArtifactDir, "allure-results");
+const allureReportDir = path.join(fastArtifactDir, "allure-report");
+const executiveDir = path.join(fastArtifactDir, "executive");
 
 // Fast, non-destructive MX Base Store campaign.
 // These are official P1 cases that do not require the registered storefront
@@ -58,7 +65,12 @@ if (listOnly) {
   args.splice(4, 0, "--headed");
 }
 
-const fastArtifactDir = path.resolve(process.env.MX_FAST_ARTIFACT_DIR || "test-results/jenkins/mx-fast");
+if (!listOnly) {
+  for (const target of [reportFile, runtimeSummaryFile, allureResultsDir, allureReportDir, executiveDir, path.join(fastArtifactDir, "playwright-report"), path.join(fastArtifactDir, "playwright"), path.join(fastArtifactDir, "evidence")]) {
+    fs.rmSync(target, { recursive: true, force: true });
+  }
+}
+
 const env = {
   ...process.env,
   TEST_ENV: "S1/STG",
@@ -68,8 +80,27 @@ const env = {
   ENABLE_ALLURE: process.env.ENABLE_ALLURE || "0",
   PLAYWRIGHT_HTML_OUTPUT_DIR: path.join(fastArtifactDir, "playwright-report"),
   SMB_EVIDENCE_DIR: path.join(fastArtifactDir, "evidence"),
-  ALLURE_RESULTS_DIR: path.join(fastArtifactDir, "allure-results"),
+  ALLURE_RESULTS_DIR: allureResultsDir,
+  PLAYWRIGHT_JSON_OUTPUT_FILE: reportFile,
 };
 
 const result = spawnSync(process.execPath, args, { env, stdio: "inherit" });
+
+if (!listOnly && fs.existsSync(reportFile)) {
+  const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
+  const titles = Object.fromEntries(selected.map((title) => [title.match(/SAM-\d+/)?.[0], title]));
+  const runtimeSummary = buildMxQstRuntimeSummary(report, { officialIds: MX_FAST_GUEST_IDS, titles });
+  writeRuntimeSummary(runtimeSummaryFile, runtimeSummary);
+
+  const executive = spawnSync(process.execPath, [
+    path.resolve("reporters/executive-v3/generateExecutiveV3.cjs"),
+    path.resolve("test-mapping/preqa2-validation.json"),
+    path.join(executiveDir, "index.html"),
+    path.join(executiveDir, "history.json"),
+    runtimeSummaryFile,
+  ], { stdio: "inherit", env });
+
+  if (executive.status !== 0) console.error("[mx-fast] Executive dashboard generation failed.");
+}
+
 process.exit(result.status ?? 1);
