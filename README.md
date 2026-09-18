@@ -1,259 +1,143 @@
 # Samsung LATAM SMB QA Automation
 
-Playwright automation and QA campaign tooling for Samsung LATAM SMB eCommerce on SAP Commerce.
+Playwright-based QA automation and governance for Samsung LATAM SMB eCommerce on SAP Commerce/Hybris.
 
-The repository models the official Zephyr SMB scope across **Mexico, Chile, Colombia and Peru** and separates four concepts that must not be mixed:
+The project is designed as a **regional QA automation platform**, not a collection of isolated scripts. It combines official Samsung scope, safe Playwright execution, runtime reconciliation, evidence, Jenkins CI, an executive dashboard and Allure investigation across **Mexico, Peru, Chile and Colombia**.
 
-1. **Historical execution scope** — the preserved 144-case Zephyr campaign.
-2. **Environment applicability** — which non-Production environment can legitimately execute the official flow.
-3. **Official runtime validation** — PASS/FAIL/BLOCKED/NOT_APPLICABLE/NOT_RUN from runtime evidence in the applicable environment.
-4. **Automation implementation coverage** — Full/Partial/Missing or reuse classifications, depending on the market.
+## Current official scope
 
-Production is read-only. State-changing automation is restricted to explicitly authorized non-Production targets and guarded at runtime.
+The current source of truth is the Samsung priority-template model imported from `docs/smb_priority_templates/`. Priority and store context are independent: **P1 runs in QST + DST; P2 runs in DST only**.
 
-## Official SMB scope
+| Market | Base Store | EPP | P1 / QST | P2 | DST total |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| MX | 56 (30 P1 / 26 P2) | 36 (8 / 28) | 38 | 54 | 92 |
+| PE | 55 (28 / 27) | 37 (6 / 31) | 34 | 58 | 92 |
+| CL | 53 (31 / 22) | 36 (7 / 29) | 38 | 51 | 89 |
+| CO | 54 (28 / 26) | 35 (6 / 29) | 34 | 55 | 89 |
+| **SMB** | **218** | **144** | **144** | **218** | **362** |
 
-`test-mapping/smb-qst.json` is the preserved 2026-09-02 execution campaign, not the current P1/P2 source of truth. The current official model imports the four authoritative Markdown templates in `docs/smb_priority_templates/` through `test-mapping/official-smb-inventory.json`. It contains 362 source rows: 144 P1/QST and 218 P2; all 362 belong to DST. See `docs/OFFICIAL_SMB_PRIORITY_MODEL.md`.
+The older `test-mapping/smb-qst.json` is a preserved **144-ID Zephyr execution campaign from 2026-09-02**. It remains useful for traceability and historical evidence, but it is **not** the current P1/P2 denominator. Its total happens to equal the current P1 total; the two models must not be conflated.
 
-| Market | Historical campaign IDs |
-|---|---:|
-| MX | 37 |
-| CL | 38 |
-| CO | 35 |
-| PE | 34 |
-| **Total** | **144** |
+For the active MX S1 Base Store campaign, the official safe runner currently selects **30 Base Store P1 TCs**. MX has **38 P1 rows overall** when its 8 EPP P1 rows are included.
 
-CL and CO are **not future markets** in the business architecture. They are already part of the official 144-case Zephyr scope. What remains incomplete for those markets is case-level executable automation/configuration where official metadata and runtime behavior have not yet been verified.
+See [Official SMB Priority Model](docs/OFFICIAL_SMB_PRIORITY_MODEL.md).
 
-See [Current Architecture](docs/CURRENT_ARCHITECTURE.md) and [Environment Validation Policy](docs/ENVIRONMENT_VALIDATION_POLICY.md).
+## What the framework provides
 
-## Runtime source of truth: correct environment + official Expected Result
+- **Playwright 1.60 / Node.js** automation with Page Objects and reusable business flows.
+- **Official-scope governance** with P1/P2, QST/DST and Base Store/EPP kept independent.
+- **Runtime reconciliation** so Playwright output is translated into official PASS / FAIL / BLOCKED / NOT_RUN without treating implementation coverage as execution.
+- **Evidence capture** for screenshots, traces, videos and business evidence.
+- **Jenkins CI** with guarded destructive execution, secret-file injection and archived reports.
+- **Executive Dashboard** for presentation, release health, scope and evidence.
+- **Allure** for technical drilldown, failure categories and TC-level investigation.
+- **Environment safety** that blocks Production writes and prevents blind retries after payment/order submission.
 
-The official Zephyr Expected Result is the acceptance criterion. The correct validation environment depends on the flow.
+## Reporting model
 
-PreQA2 is authoritative for scenarios that are actually supported there. The live MX campaign proved a split in which Home, supported Samsung Account/My Account, PLP, PDP and GNB can be validated in PreQA2, while Cart and downstream flows redirect into Staging and must be validated there.
+The reporting stack deliberately separates four questions:
 
-Therefore:
+1. **What is the current official scope?** — 362 DST rows: 144 P1/QST + 218 P2.
+2. **What ran in this build?** — the runtime summary for the selected campaign, e.g. the 30 MX S1 Base Store P1 TCs.
+3. **What is implemented?** — automation coverage/mapping, independent from PASS/FAIL.
+4. **What happened technically?** — evidence, trace, screenshot, video, error and blocker classification.
 
-- a valid PreQA2 PASS remains valid for a PreQA2-supported official flow;
-- a Cart/Checkout/Orders/Payment case that is not supported in PreQA2 is `NOT_APPLICABLE` to the PreQA2 leg, not automatically BLOCKED;
-- that N/A classification creates a Staging validation obligation rather than closing the official TC;
-- the final official runtime result is established in the applicable non-Production environment;
-- Production is never used as an alternative validation target.
+### Executive Dashboard
 
-The current PreQA2 runtime ledger is:
+The Executive Dashboard is the official entry point for demos and build review:
 
-```text
-test-mapping/preqa2-validation.json
-```
+`test-results/jenkins/mx-qst/executive/index.html`
 
-Core rules:
+Its first view is intentionally compact: build/environment/scope, execution KPIs, result distribution and items requiring attention. Detailed coverage, regional matrix, data audit and historical inventory are collapsible so the report remains useful without becoming visually overwhelming.
 
-- Official PASS does **not** automatically mean Full automation.
-- Automation is promoted only when implementation exists and is actually proven.
-- Registered official cases require a real Samsung Account registered context where encoded.
-- Guest and EPP requirements are tracked separately.
-- PreQA2 and Staging navigation are environment/market guarded; Production redirects must not be followed.
-- `NOT_APPLICABLE in PreQA2` must not be misreported as `officially complete` when Staging still owns the flow.
+Evidence links are designed for browser-first investigation:
 
-Useful PreQA2 campaign commands after integration:
+- **Screenshot** opens the image artifact.
+- **Video** opens the video artifact.
+- **Open Trace** launches Playwright Trace Viewer with the archived trace URL.
+- **Error Context** opens the supporting artifact.
+
+The Jenkins artifact must remain reachable by the browser for Trace Viewer to load it; Jenkins authentication/CORS/network policy can still restrict remote Trace Viewer access.
+
+### Allure
+
+Allure complements the Executive Dashboard rather than replacing it. It is the technical investigation view with Samsung business hierarchy, SAM IDs, runtime status, blocker categories, environment/build metadata and attachments.
+
+Jenkins publishes:
+
+- `MX QST Executive Dashboard`
+- `Samsung MX QST - Allure`
+- `Playwright MX QST`
+- optional `Allure Reporting Smoke`
+
+## MX S1 Base Store runner
+
+The official MX Base Store command is:
 
 ```bash
-npm run preqa2:gate
-npm run preqa2:plan
-npm run preqa2:closure
-npm run preqa2:reconcile
-npm run preqa2:promotions
-npm run reporting:preqa2
-npm run reporting:preqa2:status
+npm run qst:mx:base-store
 ```
 
-## Current MX environment routing
+Discovery only:
 
-Based on live runtime evidence:
-
-| Flow family | Current validation environment |
-|---|---|
-| Home / supported Samsung Account / My Account | PreQA2 |
-| PLP / PDP / GNB | PreQA2 |
-| Cart / Checkout | Staging |
-| Orders / My Orders | Staging |
-| Payment / order creation | Authorized Staging only |
-| Mobile cart / checkout | Staging |
-| BackOffice / fulfillment | Applicable Staging environment |
-| EPP | Legitimate market-specific EPP context required |
-
-This is the current verified MX routing. CL/CO/PE routing must be learned from their official TCs and real environment behavior rather than copied blindly.
-
-## Market implementation reality
-
-### Mexico
-
-MX is currently the deepest market in the official QST automation model. `test-mapping/mx-qst-coverage.json` maps all **37 official MX cases** to Full/Partial/Missing coverage and case metadata.
-
-The live campaign classifies the same 37 IDs by environment applicability and runtime result independently from coverage state.
-
-### Peru
-
-PE contributes **34 official cases** to the same SMB baseline. Existing implementation/reuse analysis is represented in `test-mapping/pe-qst-reuse-plan.json` and the country-scoped Playwright implementation.
-
-A reuse candidate is not automatically an official PASS and is not automatically Full automation. It becomes authoritative only after the corresponding official TC is verified and executed in the correct environment/context.
-
-### Chile and Colombia
-
-CL contributes **38** official cases and CO contributes **35**.
-
-The architecture already includes them in:
-
-- the official registry;
-- campaign planning;
-- ledger/reporting models;
-- closure/status reporting;
-- executive reporting;
-- shared-family candidate analysis where verified.
-
-The repository intentionally does **not** fabricate detailed titles, selectors, test data, store classification or country-specific specs for unverified CL/CO cases. Those entries may remain `Unknown` until the official TC and runtime behavior are inspected.
-
-This is why the business architecture is broader than the current `tests/` and `config/markets/` directory trees.
-
-## Architecture at a glance
-
-```text
-Current official priority scope
-  test-mapping/official-smb-inventory.json  P1/P2 Base Store + EPP model
-
-Historical execution campaign
-  test-mapping/smb-qst.json                 preserved 144-case baseline
-
-Market metadata / automation mapping
-  test-mapping/mx-qst-coverage.json         MX 37-case Full/Partial/Missing model
-  test-mapping/pe-qst-reuse-plan.json       PE reuse/implementation plan
-  shared-family metadata                    verified cross-market candidates
-
-Environment validation
-  PreQA2                                     storefront flows where supported
-  Staging                                    cart/checkout/orders/payment/backoffice where applicable
-  environment handoff                       N/A-in-PreQA -> Staging validation obligation
-
-PreQA2 control plane
-  utils/preqa2ExecutionRequirements.js
-  utils/preqa2CampaignPlan.js
-  utils/preqa2RuntimeGuard.js
-  utils/preqa2Validation.js
-  utils/preqa2ValidationLedger.js
-  utils/preqa2ResultRecorder.js
-  utils/preqa2LedgerMerge.js
-  utils/preqa2ClosureGate.js
-  utils/preqa2PromotionPlan.js
-  scripts/preqa2-*.cjs
-
-Executable automation
-  tests/<environment>/<country>/<suite>/<area>/
-  pages/
-  utils/
-
-Reporting
-  reporters/preqa2/
-  reporters/executive-v3/
+```bash
+npm run qst:mx:list
 ```
 
-## Why you may not see `cl/` and `co/` folders yet
+The runner uses one worker and zero retries for the controlled campaign. Payment/order scenarios are guarded and must only run in an explicitly authorized non-Production environment.
 
-The current executable tree is strongest in MX and PE. That is expected.
+The current registered-user S1 flow depends on a valid Samsung Account storefront session. Authentication/backend instability is classified as an environment/authentication blocker; it must not be disguised as an automation PASS or silently bypassed.
 
-The filesystem convention is:
+## Authentication
 
-```text
-tests/<environment>/<country>/<suite>/<area>/
+MX storefront authentication artifacts are local/runtime-only under `playwright/.auth/` and must never be committed. The current operator workflow for refreshing the MX login is:
+
+```bash
+npm run auth:login:mx
 ```
 
-Country directories are created only when there is enough verified official metadata, configuration and runtime evidence to support a real executable implementation. We do not create empty or fake `cl/` and `co/` folders just to make the tree look symmetric.
+MFA, CAPTCHA and other human-only challenges remain manual. Credentials, cookies, tokens and storage state must never be logged or committed.
 
-So today:
+## Safety rules
 
-- **Business scope:** MX + CL + CO + PE.
-- **Campaign/control plane:** MX + CL + CO + PE.
-- **Executable test tree:** currently deepest for MX and PE.
-- **CL/CO execution code:** added case by case as official behavior is verified.
+Production is **read-only**. Never submit Production orders/payments, execute Production CronJobs/cancellations, modify Production customer/profile data or follow an environment redirect into Production to complete a test.
 
-## Authentication model
-
-There are two distinct authentication concerns in the PreQA2 campaign:
-
-- **WMC / PreQA2 access** establishes the storefront validation session.
-- **Samsung Account authentication** is additionally required for registered-user official TCs such as My Account and registered flows.
-
-A valid existing Samsung Account session should be reused when possible. Manual intervention is appropriate only when an actual human-only authentication step appears, such as MFA, CAPTCHA or phone approval.
-
-Credentials, cookies, tokens, storage state and dedicated browser profiles are runtime-only and must never be committed.
-
-## EPP
-
-EPP is a separate store context, not a synonym for Base Store coverage.
-
-An EPP official TC requires legitimate EPP access/configuration for the corresponding market. Base Store evidence may demonstrate reusable implementation, but it cannot by itself prove an official EPP TC.
-
-Production redirects from an EPP or My Account journey must be blocked and recorded as environment behavior rather than followed.
-
-## Destructive-action safety
-
-Production is strictly read-only.
-
-Never:
-
-- submit a Production payment/order;
-- run a Production CronJob or cancellation;
-- alter Production customer/profile/address/order data;
-- leave a non-Production validation environment for Production to complete a test.
-
-Payment/order submit requires explicit authorization and the runtime guard:
+State-changing non-Production actions remain explicitly guarded:
 
 ```text
 ALLOW_PAYMENT_SUBMIT=1
-```
-
-CronJob execution requires:
-
-```text
 ALLOW_CRONJOB_RUN=1
+ALLOW_PROFILE_WRITE=1
 ```
 
-Profile writes and other state-changing flows remain separately guarded. Destructive execution uses one worker and zero retries; ambiguous payment/order submits must never be blindly retried.
+Payment/order execution uses one worker and zero retries. An ambiguous submit must never be blindly retried.
 
-## Legacy DST / S1 / S2 / S3 assets
-
-The repository still contains substantial historical and operational DST/QST implementation under S1/S2/S3. Those assets remain useful and are now also relevant as execution targets for official flows that are not applicable in PreQA2.
-
-Do not compare old DST scenario totals directly with either the historical 144-ID campaign or the current 144-row P1/QST denominator; they represent different scopes. The current official DST denominator is 362 rows.
-
-## Reporting
-
-Operational PreQA2 reporting lives under:
+## Repository architecture
 
 ```text
-reporters/preqa2/
+docs/smb_priority_templates/              current Samsung P1/P2 source templates
+test-mapping/official-smb-inventory.json  current official inventory contract
+test-mapping/smb-qst.json                 preserved 144-ID historical campaign
+test-mapping/*-qst-*                      market mappings / reuse / runtime ledgers
+
+tests/<environment>/<market>/             executable Playwright automation
+pages/                                    Page Objects
+utils/                                    guards, auth, evidence and shared flows
+scripts/                                  runners, reconciliation and reporting
+
+reporters/executive-v3/                   executive presentation/reporting
+reporters/evidence/                       evidence model
+reporters/preqa2/                         PreQA2 campaign reporting
+reporter-tests/                           reporting integrity tests
+
+Jenkinsfile                               CI orchestration and report publication
 ```
 
-Executive V3 lives under:
+## Environments
 
-```text
-reporters/executive-v3/
-```
+Environment applicability is determined by the real business flow, not by forcing every TC into one host. In MX, storefront/catalog scenarios can be validated in PreQA2 where supported, while Cart/Checkout/Orders/Payment/BackOffice flows are routed to the applicable Staging environment.
 
-The reporting model must keep these dimensions separate:
-
-- Current official SMB template scope: **362** (144 P1/QST; 218 P2; 362 DST).
-- Historical execution campaign: **144 IDs** (MX 37, CL 38, CO 35, PE 34), retained separately.
-- Current official MX scope: **92** rows (38 P1/QST).
-- Current official CL scope: **89** rows (38 P1/QST).
-- Current official CO scope: **89** rows (34 P1/QST).
-- Current official PE scope: **92** rows (34 P1/QST).
-- CO official scope: **35**.
-- PE official scope: **34**.
-- PreQA2 applicability/result.
-- Staging-required handoff.
-- Final official runtime result in the applicable environment.
-- MX Full/Partial/Missing automation coverage: denominator **37**, not 144.
+A scenario that is not applicable in PreQA2 creates a Staging validation obligation; it does not become an automatic PASS. Production is never used as a fallback validation target.
 
 ## Local setup
 
@@ -262,37 +146,35 @@ npm ci
 npx playwright install
 ```
 
-Useful targeted commands:
+Useful validation/reporting commands:
 
 ```bash
-npx playwright test --list
+npm run qst:official:gate
 npm run qst:mx:list
-npm run qst:pe:list
+npm run reporting:mx-runtime:test
+npm run reporting:mx:preview
+npm run reporting:preqa2:test
 ```
 
-For the isolated Executive V3 branch:
+Allure tooling can be installed without changing the lockfile:
 
 ```bash
-node --test reporter-tests/executiveV3.test.cjs
-node reporters/executive-v3/generateExecutiveV3.cjs
+npm run reporting:allure:install
 ```
 
-## Integration rule
+## Presentation flow
 
-While a live browser/CDP campaign is running, remote architecture/reporting work may exist on a separate branch.
+For a team demo, the intended story is:
 
-Do not resolve `preqa2-validation.json` with a blanket `ours` or `theirs` merge. Preserve runtime evidence and environment-routing decisions first, reconcile the canonical ledger, then run the full gates, reporting tests and `git diff --check` locally before declaring the integration official.
+`Official Samsung scope → Jenkins execution → Executive Dashboard → evidence/trace → Allure drilldown → regional scalability`
+
+The dashboard is the executive entry point; Allure and Playwright remain the technical investigation layers. This keeps the presentation concise while preserving full engineering evidence underneath.
 
 ## Documentation
 
 - [Current SMB Architecture](docs/CURRENT_ARCHITECTURE.md)
-- [Environment Validation Policy](docs/ENVIRONMENT_VALIDATION_POLICY.md)
-- [PreQA2 Validation Campaign](docs/PREQA2_VALIDATION_CAMPAIGN.md)
-- [PreQA2 Parallel Integration](docs/PREQA2_PARALLEL_INTEGRATION.md)
 - [Official SMB Priority Model](docs/OFFICIAL_SMB_PRIORITY_MODEL.md)
-- [Executive Report V3](docs/EXECUTIVE_REPORT_V3.md)
-- [PE DST Coverage](docs/COVERAGE_MATRIX.md)
-- [MX S1 DST Base Store Coverage](docs/DST_MX_BASE_STORE_COVERAGE_MATRIX.md)
+- [Environment Validation Policy](docs/ENVIRONMENT_VALIDATION_POLICY.md)
 - [MX QST Coverage](docs/MX_QST_COVERAGE_MATRIX.md)
-- [PE QST Coverage](docs/QST_COVERAGE_MATRIX.md)
+- [Executive Report V3](docs/EXECUTIVE_REPORT_V3.md)
 - [Documentation index](docs/README.md)
