@@ -22,6 +22,7 @@ pipeline {
     MX_QST_ARTIFACT_DIR = 'test-results/jenkins/mx-qst'
     MX_QST_USE_EXISTING_AUTH = '1'
     ENABLE_ALLURE = '1'
+    PLAYWRIGHT_BROWSERS_PATH = '0'
   }
 
   stages {
@@ -67,6 +68,7 @@ pipeline {
           } else {
             bat '@npm ci'
             bat '@npm run reporting:allure:install'
+            bat '@call npx playwright install chromium'
           }
         }
       }
@@ -186,10 +188,12 @@ pipeline {
         // Rebuild the official Allure after runtime reconciliation so the report
         // contains Samsung business metadata, official TC status and blocker categories.
         if (params.TEST_SUITE == 'official-p1') {
+          env.ALLURE_REPORT_NAME = 'Samsung MX QST - Allure'
           if (isUnix()) sh 'npx -y node@22 scripts/finalize-allure-mx-qst.cjs || true'
           else bat '@call npx -y node@22 scripts/finalize-allure-mx-qst.cjs || exit /b 0'
         }
         if (params.TEST_SUITE == 'fast-guest') {
+          env.ALLURE_REPORT_NAME = 'Samsung MX Fast - Allure'
           env.MX_QST_ARTIFACT_DIR = 'test-results/jenkins/mx-fast'
           env.TEST_SUITE = 'FAST/GUEST'
           if (isUnix()) sh 'npx -y node@22 scripts/finalize-allure-mx-qst.cjs || true'
