@@ -89,6 +89,8 @@ pipeline {
           env.PW_VIDEO = params.ENABLE_VIDEO ? '1' : '0'
           env.MX_QST_HEADLESS = params.HEADLESS ? '1' : '0'
           env.ENABLE_ALLURE = '1'
+          env.MX_FAST_ARTIFACT_DIR = 'test-results/jenkins/mx-fast'
+          env.TEST_SUITE = 'FAST/GUEST'
           if (isUnix()) sh 'npx -y node@22 scripts/run-mx-qst-fast-guest.cjs'
           else bat '@call npx -y node@22 scripts/run-mx-qst-fast-guest.cjs'
         }
@@ -142,12 +144,15 @@ pipeline {
       script {
         // Rebuild the official Allure after runtime reconciliation so the report
         // contains Samsung business metadata, official TC status and blocker categories.
-        if (params.TEST_SUITE != 'allure-smoke' && params.TEST_SUITE != 'fast-guest') {
-          if (isUnix()) {
-            sh 'npx -y node@22 scripts/finalize-allure-mx-qst.cjs || true'
-          } else {
-            bat '@call npx -y node@22 scripts/finalize-allure-mx-qst.cjs || exit /b 0'
-          }
+        if (params.TEST_SUITE == 'official-p1') {
+          if (isUnix()) sh 'npx -y node@22 scripts/finalize-allure-mx-qst.cjs || true'
+          else bat '@call npx -y node@22 scripts/finalize-allure-mx-qst.cjs || exit /b 0'
+        }
+        if (params.TEST_SUITE == 'fast-guest') {
+          env.MX_QST_ARTIFACT_DIR = 'test-results/jenkins/mx-fast'
+          env.TEST_SUITE = 'FAST/GUEST'
+          if (isUnix()) sh 'npx -y node@22 scripts/finalize-allure-mx-qst.cjs || true'
+          else bat '@call npx -y node@22 scripts/finalize-allure-mx-qst.cjs || exit /b 0'
         }
         if (isUnix()) {
           sh 'rm -rf playwright/.auth || true'
@@ -168,6 +173,22 @@ pipeline {
         allowMissing: true,
         alwaysLinkToLastBuild: true,
         keepAll: true,
+        reportDir: 'test-results/jenkins/mx-fast/playwright-report',
+        reportFiles: 'index.html',
+        reportName: 'Samsung MX Fast - Playwright'
+      ])
+      publishHTML(target: [
+        allowMissing: true,
+        alwaysLinkToLastBuild: true,
+        keepAll: true,
+        reportDir: 'test-results/jenkins/mx-fast/allure-report',
+        reportFiles: 'index.html',
+        reportName: 'Samsung MX Fast - Allure'
+      ])
+      publishHTML(target: [
+        allowMissing: true,
+        alwaysLinkToLastBuild: true,
+        keepAll: true,
         reportDir: 'test-results/jenkins/mx-qst/executive',
         reportFiles: 'index.html',
         reportName: 'MX QST Executive Dashboard'
@@ -180,6 +201,12 @@ pipeline {
         reportFiles: 'index.html',
         reportName: 'Samsung MX QST - Allure'
       ])
+      script {
+        def nativeAllurePath = params.TEST_SUITE == 'fast-guest' ? 'test-results/jenkins/mx-fast/allure-results' : 'test-results/jenkins/mx-qst/allure-results'
+        if (params.TEST_SUITE != 'allure-smoke' && fileExists(nativeAllurePath)) {
+          allure includeProperties: false, results: [[path: nativeAllurePath]]
+        }
+      }
       publishHTML(target: [
         allowMissing: true,
         alwaysLinkToLastBuild: true,
