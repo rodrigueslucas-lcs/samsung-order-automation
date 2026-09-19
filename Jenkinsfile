@@ -194,11 +194,14 @@ pipeline {
           else bat '@call npx -y node@22 scripts/finalize-allure-mx-qst.cjs || exit /b 0'
         }
         if (params.TEST_SUITE == 'fast-guest') {
-          env.ALLURE_REPORT_NAME = 'Samsung MX Fast - Allure'
-          env.MX_QST_ARTIFACT_DIR = 'test-results/jenkins/mx-fast'
-          env.TEST_SUITE = 'FAST/GUEST'
-          if (isUnix()) sh 'npx -y node@22 scripts/finalize-allure-mx-qst.cjs || true'
-          else bat '@call npx -y node@22 scripts/finalize-allure-mx-qst.cjs || exit /b 0'
+          withEnv([
+            'ALLURE_REPORT_NAME=Samsung MX Fast - Allure',
+            'MX_QST_ARTIFACT_DIR=test-results/jenkins/mx-fast',
+            'TEST_SUITE=FAST/GUEST'
+          ]) {
+            if (isUnix()) sh 'npx -y node@22 scripts/finalize-allure-mx-qst.cjs || true'
+            else bat '@call npx -y node@22 scripts/finalize-allure-mx-qst.cjs || exit /b 0'
+          }
         }
         if (isUnix()) {
           sh 'rm -rf playwright/.auth || true'
