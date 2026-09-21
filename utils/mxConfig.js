@@ -30,7 +30,7 @@ function getMxConfig(environment = process.env) {
     "MX_BOOTSTRAP_URL",
     target
   );
-  const sku = environment.MX_SMOKE_SKU || "WD26DB8995BZAX";
+  const sku = environment.MX_QST_SKU || environment.MX_SMOKE_SKU || "SM-F741BLBKLTM";
   const pdpUrl = parseMxUrl(
     environment.MX_SMOKE_PDP_URL || `${baseUrl.origin}/mx/p/${sku}`,
     "MX_SMOKE_PDP_URL",
