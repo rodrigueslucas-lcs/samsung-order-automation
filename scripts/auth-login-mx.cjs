@@ -126,7 +126,7 @@ async function waitForProfileMenu(page) {
 async function openMxHome(page, context) {
   const renderedBeforeNavigation = await findRenderedMxPage(context, page);
   if (renderedBeforeNavigation) {
-    console.log("[auth:login:mx] reusing an already rendered MX ${ENV_NAME} storefront tab");
+    console.log(`[auth:login:mx] reusing an already rendered MX ${ENV_NAME} storefront tab`);
     return renderedBeforeNavigation;
   }
 
@@ -136,7 +136,7 @@ async function openMxHome(page, context) {
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     await page.goto(homeUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
-    assertAllowedHost(page, [HOSTNAME], "MX storefront`);
+    assertAllowedHost(page, [HOSTNAME], "MX storefront");
     if (await hasRenderedStorefront(page, 30000)) return page;
 
     const renderedSibling = await findRenderedMxPage(context);
@@ -146,7 +146,7 @@ async function openMxHome(page, context) {
     }
     if (attempt < 3) await page.waitForTimeout(3000);
   }
-  throw new Error(`MX ${ENV_NAME} storefront did not render My Profile after 3 navigation attempts and no rendered sibling tab was available.");
+  throw new Error(`MX ${ENV_NAME} storefront did not render My Profile after 3 navigation attempts and no rendered sibling tab was available.`);
 }
 
 async function waitForStorefrontOrVerification(page) {
@@ -154,7 +154,7 @@ async function waitForStorefrontOrVerification(page) {
     .getByText(/captcha|c[oó]digo de verificaci[oó]n|verifica tu identidad|autenticaci[oó]n de dos pasos|confirma que eres t[uú]/i)
     .filter({ visible: true }).first();
   const outcome = await Promise.race([
-    page.waitForURL((url) => url.hostname === HOSTNAME, { timeout: 180000 }).then(() => "storefront`),
+    page.waitForURL((url) => url.hostname === HOSTNAME, { timeout: 180000 }).then(() => "storefront"),
     verification.waitFor({ timeout: 180000 }).then(() => "verification"),
     page.waitForTimeout(180000).then(() => "timeout"),
   ]);
@@ -163,7 +163,7 @@ async function waitForStorefrontOrVerification(page) {
     await page.waitForURL((url) => url.hostname === HOSTNAME, { timeout: interactiveTimeout });
     return;
   }
-  if (outcome !== "storefront`) throw new Error("Samsung Account did not return to the MX ${ENV_NAME} storefront within the allowed time.");
+  if (outcome !== "storefront") throw new Error(`Samsung Account did not return to the MX ${ENV_NAME} storefront within the allowed time.`);
 }
 
 async function hasVisibleCaptchaChallenge(page) {
@@ -191,7 +191,7 @@ async function exportAuthenticatedState(context, page) {
     origins: fullState.origins.filter(({ origin }) => new URL(origin).hostname === HOSTNAME),
   };
   if (!mxState.cookies.some((cookie) => cookie.domain.replace(/^\./, "") === HOSTNAME)) {
-    throw new Error("No MX ${ENV_NAME} storefront cookies were available after login.");
+    throw new Error(`No MX ${ENV_NAME} storefront cookies were available after login.`);
   }
   const sessionStorage = await page.evaluate(() => Object.fromEntries(
     Array.from({ length: window.sessionStorage.length }, (_, index) => {
@@ -225,9 +225,9 @@ async function loginMxSamsungAccount() {
     if (existingAccountPage) {
       console.log("[auth:login:mx] resuming the existing Samsung Account tab in dedicated Chrome");
     } else {
-      console.log("[auth:login:mx] opening MX ${ENV_NAME} storefront in dedicated Chrome");
+      console.log(`[auth:login:mx] opening MX ${ENV_NAME} storefront in dedicated Chrome`);
       page = await openMxHome(page, context);
-      console.log("[auth:login:mx] MX ${ENV_NAME} My Profile is visible");
+      console.log(`[auth:login:mx] MX ${ENV_NAME} My Profile is visible`);
       ({ menu } = await waitForProfileMenu(page));
       console.log("[auth:login:mx] MX profile menu is stable");
       login = menu.locator('a[data-an-la="login"]').filter({ visible: true });
@@ -242,7 +242,7 @@ async function loginMxSamsungAccount() {
       assertAllowedHost(page, [ACCOUNT_HOSTNAME], "Samsung Account login");
 
       if (manualLogin) {
-        console.log("[auth:login:mx] Samsung Account login is ready in the visible Chrome. Complete login/CAPTCHA/MFA manually; automation will resume after the authenticated MX ${ENV_NAME} return.");
+        console.log(`[auth:login:mx] Samsung Account login is ready in the visible Chrome. Complete login/CAPTCHA/MFA manually; automation will resume after the authenticated MX ${ENV_NAME} return.`);
         const returnedPage = await Promise.race([
           page.waitForURL((url) => url.hostname === HOSTNAME, { timeout: interactiveTimeout }).then(() => page),
           context.waitForEvent("page", { timeout: interactiveTimeout }).then(async (candidate) => {
@@ -288,7 +288,7 @@ async function loginMxSamsungAccount() {
     page = await openMxHome(page, context);
     ({ menu } = await waitForProfileMenu(page));
     if (!/Cerrar Sesi[oó]n/i.test(await menu.innerText())) {
-      throw new Error(`MX ${ENV_NAME} returned from Samsung Account without an authenticated profile menu.");
+      throw new Error(`MX ${ENV_NAME} returned from Samsung Account without an authenticated profile menu.`);
     }
     console.log("[auth:login:mx] authenticated MX profile menu validated");
     await exportAuthenticatedState(context, page);
