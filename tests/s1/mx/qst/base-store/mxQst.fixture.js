@@ -8,7 +8,7 @@ const { assertMxStagingPage } = mxStagingGuard;
 export const test = base.extend({
   mxConfig: async ({}, use) => {
     const baseConfig = getMxConfig();
-    const sku = "SM-F741BLBKLTM";
+    const sku = process.env.MX_QST_SKU || baseConfig.sku;
     await use({
       ...baseConfig,
       sku,
