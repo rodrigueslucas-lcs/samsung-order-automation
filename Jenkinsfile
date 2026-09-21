@@ -133,6 +133,8 @@ pipeline {
       steps {
         script {
           env.PW_VIDEO = params.EVIDENCE_MODE == 'screenshots-trace-video' ? '1' : '0'
+          env.MX_QST_ENVIRONMENT = params.ENVIRONMENT
+          env.BACKOFFICE_ENV = params.ENVIRONMENT.toLowerCase()
           env.MX_QST_HEADLESS = params.BROWSER_MODE == 'headless' ? '1' : '0'
           if (isUnix()) sh 'npm run qst:smb:backoffice -- --grep-invert @destructive'
           else bat '@npm run qst:smb:backoffice -- --grep-invert @destructive'
@@ -148,6 +150,8 @@ pipeline {
             error('Official MX QST contains authorized payment/order P1 scenarios. Select EXECUTION_MODE=authorized-destructive for the full 30-TC campaign.')
           }
           env.PW_VIDEO = params.EVIDENCE_MODE == 'screenshots-trace-video' ? '1' : '0'
+          env.MX_QST_ENVIRONMENT = params.ENVIRONMENT
+          env.BACKOFFICE_ENV = params.ENVIRONMENT.toLowerCase()
           env.MX_QST_HEADLESS = params.BROWSER_MODE == 'headless' ? '1' : '0'
         }
 
