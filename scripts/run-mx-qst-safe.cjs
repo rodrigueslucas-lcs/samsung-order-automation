@@ -174,11 +174,13 @@ if (fs.existsSync(reportFile)) {
       id,
       status: outcome.status === "SKIPPED-BLOCKED" ? "BLOCKED" : outcome.status,
       evidence: outcome.status === "PASS" ? `Official MX P1 QST runner completed: ${outcome.title}` : null,
-      blocker: outcome.status === "SKIPPED-BLOCKED" ? outcome.reason.split("\n")[0] || "${targetEnvironment} prerequisite was not available." : outcome.status === "FAIL" ? `MX ${targetEnvironment} functional assertion failed: ${outcome.title}` : null,
+      blocker: outcome.status === "SKIPPED-BLOCKED" ? outcome.reason.split("\n")[0] || `${targetEnvironment} prerequisite was not available.` : outcome.status === "FAIL" ? `MX ${targetEnvironment} functional assertion failed: ${outcome.title}` : null,
     }));
-  if (stagingUpdates.length) {
+  if (targetEnvironment === "S1" && stagingUpdates.length) {
     writeMxS1RuntimeResults(stagingUpdates);
     console.log(`S1 runtime ledger reconciled: ${stagingUpdates.map(({ id }) => id).join(", ")}`);
+  } else if (targetEnvironment === "S2") {
+    console.log("S2 comparison run: S1 runtime ledger intentionally left unchanged.");
   }
 
   const executive = spawnSync(process.execPath, [
