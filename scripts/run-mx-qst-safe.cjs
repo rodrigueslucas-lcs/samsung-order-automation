@@ -146,7 +146,7 @@ if (process.env.ENABLE_ALLURE === "1" && fs.existsSync(allureResultsDir)) {
 
 if (fs.existsSync(reportFile)) {
   const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
-  const runtimeSummary = buildMxQstRuntimeSummary(report, { officialIds: MX_BASE_P1_IDS, titles: officialTitlesById });
+  const runtimeSummary = buildMxQstRuntimeSummary(report, { officialIds: MX_BASE_P1_IDS, titles: officialTitlesById, environment: environmentLabel, suite: "P1/QST" });
   writeRuntimeSummary(runtimeSummaryFile, runtimeSummary);
   const outcomes = new Map(runtimeSummary.tests.map((entry) => [entry.samId, {
     status: entry.status,
