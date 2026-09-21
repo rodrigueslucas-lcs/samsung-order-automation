@@ -10,7 +10,7 @@ pipeline {
   }
 
   parameters {
-    choice(name: 'ENVIRONMENT', choices: ['S1', 'S2'], description: 'Target environment. MX automated QST is currently validated on S1; S2 is available for the existing PE suites.')
+    choice(name: 'ENVIRONMENT', choices: ['S1', 'S2'], description: 'Target MX environment. S1 = stg storefront / S1 BackOffice; S2 = stg2 storefront / S2 BackOffice.')
     choice(name: 'TEST_SUITE', choices: ['fast-guest', 'official-p1', 'backoffice-safe', 'allure-smoke'], description: 'Execution profile. fast-guest is the recommended quick feedback suite.')
     choice(name: 'EXECUTION_MODE', choices: ['safe', 'authorized-destructive'], description: 'Safety mode. Destructive payment/order execution is accepted only by official-p1.')
     choice(name: 'BROWSER_MODE', choices: ['headless', 'headed'], description: 'Browser mode. Headless is recommended on Jenkins.')
@@ -88,11 +88,8 @@ pipeline {
       when { expression { return params.TEST_SUITE != 'allure-smoke' } }
       steps {
         script {
-          if (['fast-guest', 'official-p1'].contains(params.TEST_SUITE) && params.ENVIRONMENT != 'S1') {
-            error('MX fast-guest and official-p1 are currently validated for S1 only. Select ENVIRONMENT=S1.')
-          }
-          if (params.TEST_SUITE == 'backoffice-safe' && params.ENVIRONMENT != 'S1') {
-            error('Current SMB BackOffice QST path is configured for S1. Select ENVIRONMENT=S1.')
+          if (!['S1', 'S2'].contains(params.ENVIRONMENT)) {
+            error('Unsupported MX environment. Select S1 or S2.')
           }
         }
       }
@@ -118,6 +115,8 @@ pipeline {
       steps {
         script {
           env.PW_VIDEO = params.EVIDENCE_MODE == 'screenshots-trace-video' ? '1' : '0'
+          env.MX_QST_ENVIRONMENT = params.ENVIRONMENT
+          env.BACKOFFICE_ENV = params.ENVIRONMENT.toLowerCase()
           env.MX_QST_HEADLESS = params.BROWSER_MODE == 'headless' ? '1' : '0'
           env.ENABLE_ALLURE = '1'
           env.MX_FAST_ARTIFACT_DIR = 'test-results/jenkins/mx-fast'
@@ -152,9 +151,14 @@ pipeline {
           env.MX_QST_HEADLESS = params.BROWSER_MODE == 'headless' ? '1' : '0'
         }
 
+        script {
+          env.MX_AUTH_STATE_CREDENTIAL = params.ENVIRONMENT == 'S2' ? 'samsung-mx-s2-auth-state' : 'samsung-mx-s1-auth-state'
+          env.MX_SESSION_CREDENTIAL = params.ENVIRONMENT == 'S2' ? 'samsung-mx-s2-session-storage' : 'samsung-mx-s1-session-storage'
+          env.MX_AUTH_SUFFIX = params.ENVIRONMENT.toLowerCase()
+        }
         withCredentials([
-          file(credentialsId: 'samsung-mx-s1-auth-state', variable: 'MX_AUTH_STATE_SECRET'),
-          file(credentialsId: 'samsung-mx-s1-session-storage', variable: 'MX_SESSION_STORAGE_SECRET'),
+          file(credentialsId: env.MX_AUTH_STATE_CREDENTIAL, variable: 'MX_AUTH_STATE_SECRET'),
+          file(credentialsId: env.MX_SESSION_CREDENTIAL, variable: 'MX_SESSION_STORAGE_SECRET'),
           file(credentialsId: 'samsung-mx-test-card', variable: 'MX_TEST_CARD_SECRET')
         ]) {
           script {
@@ -162,17 +166,17 @@ pipeline {
               sh '''
                 set -eu
                 mkdir -p playwright/.auth
-                cp "$MX_AUTH_STATE_SECRET" playwright/.auth/mx-s1-user.json
-                cp "$MX_SESSION_STORAGE_SECRET" playwright/.auth/mx-s1-session-storage.json
+                cp "$MX_AUTH_STATE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-user.json
+                cp "$MX_SESSION_STORAGE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-session-storage.json
                 cp "$MX_TEST_CARD_SECRET" playwright/.auth/mx-test-card.json
-                chmod 600 playwright/.auth/mx-s1-user.json playwright/.auth/mx-s1-session-storage.json playwright/.auth/mx-test-card.json || true
+                chmod 600 playwright/.auth/mx-${MX_AUTH_SUFFIX}-user.json playwright/.auth/mx-${MX_AUTH_SUFFIX}-session-storage.json playwright/.auth/mx-test-card.json || true
                 npx -y node@22 scripts/run-mx-qst-safe.cjs
               '''
             } else {
               bat '''@echo off
                 if not exist playwright\\.auth mkdir playwright\\.auth
-                copy /Y "%MX_AUTH_STATE_SECRET%" "playwright\\.auth\\mx-s1-user.json" >nul || exit /b 2
-                copy /Y "%MX_SESSION_STORAGE_SECRET%" "playwright\\.auth\\mx-s1-session-storage.json" >nul || exit /b 2
+                copy /Y "%MX_AUTH_STATE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-user.json" >nul || exit /b 2
+                copy /Y "%MX_SESSION_STORAGE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-session-storage.json" >nul || exit /b 2
                 copy /Y "%MX_TEST_CARD_SECRET%" "playwright\\.auth\\mx-test-card.json" >nul || exit /b 2
                 call npx -y node@22 scripts/run-mx-qst-safe.cjs
               '''
@@ -189,13 +193,15 @@ pipeline {
         // Rebuild the official Allure after runtime reconciliation so the report
         // contains Samsung business metadata, official TC status and blocker categories.
         if (params.TEST_SUITE == 'official-p1') {
-          env.ALLURE_REPORT_NAME = 'Samsung MX QST - Allure'
+          env.ALLURE_REPORT_NAME = "Samsung MX ${params.ENVIRONMENT} QST - Allure"
+          env.MX_QST_ENVIRONMENT = params.ENVIRONMENT
           if (isUnix()) sh 'npx -y node@22 scripts/finalize-allure-mx-qst.cjs || true'
           else bat '@call npx -y node@22 scripts/finalize-allure-mx-qst.cjs || exit /b 0'
         }
         if (params.TEST_SUITE == 'fast-guest') {
           withEnv([
-            'ALLURE_REPORT_NAME=Samsung MX Fast - Allure',
+            "ALLURE_REPORT_NAME=Samsung MX ${params.ENVIRONMENT} Fast - Allure",
+            "MX_QST_ENVIRONMENT=${params.ENVIRONMENT}",
             'MX_QST_ARTIFACT_DIR=test-results/jenkins/mx-fast',
             'TEST_SUITE=FAST/GUEST'
           ]) {
