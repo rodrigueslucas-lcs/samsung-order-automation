@@ -1,5 +1,7 @@
 const { chromium } = require("@playwright/test");
 const fs = require("node:fs");
+const { resolveMxEnvironment } = require("../utils/mxConfig");
+const target = resolveMxEnvironment();
 const {
   AUTH_SESSION_STORAGE_PATH,
   applyAuthSessionStorage,
@@ -29,10 +31,10 @@ async function verifyMxAuthentication() {
     await applyAuthSessionStorage(context);
     const page = await context.newPage();
 
-    console.log("[auth:verify:mx] fresh S1 MX browser context created");
-    console.log("[auth:verify:mx] target: S1 | MX | stg.shop.samsung.com");
+    console.log(`[auth:verify:mx] fresh ${target.name} MX browser context created`);
+    console.log(`[auth:verify:mx] target: ${target.name} | MX | ${target.hostname}`);
     await validateAuthenticatedSession(page);
-    console.log("[auth:verify:mx] Cerrar sesión validated in a fresh S1 MX context");
+    console.log(`[auth:verify:mx] Cerrar sesión validated in a fresh ${target.name} MX context`);
     await context.storageState({ path: requireAuthState(), indexedDB: true });
     const sessionStorage = await page.evaluate(() =>
       Object.fromEntries(
