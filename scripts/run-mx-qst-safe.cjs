@@ -1,7 +1,7 @@
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
-const { hasAuthState } = require("../utils/mxAuthState");
+const { hasAuthState, hasVerifiedAuthState } = require("../utils/mxAuthState");
 const preqa2Ledger = require("../test-mapping/preqa2-validation.json");
 const { writeMxS1RuntimeResults } = require("../utils/mxS1RuntimeLedger");
 const { testTitles } = require("../utils/qstS1Implementation");
@@ -67,10 +67,16 @@ if (listOnly) {
   process.exit(listed.status ?? 1);
 }
 
-if (hasAuthState()) {
-  console.log(`[mx-qst] Reusing validated MX ${targetEnvironment} authentication state.`);
-} else if (useExistingAuth) {
-  console.error("[mx-qst] Pre-provisioned MX auth state/session storage is missing; QST execution was not started.");
+if (useExistingAuth) {
+  if (!hasAuthState()) {
+    console.error("[mx-qst] Pre-provisioned MX auth state/session storage is missing; QST execution was not started.");
+    process.exit(2);
+  }
+  console.log(`[mx-qst] Using pre-provisioned MX ${targetEnvironment} authentication state (CI mode).`);
+} else if (hasVerifiedAuthState()) {
+  console.log(`[mx-qst] Reusing verified MX ${targetEnvironment} authentication state; login bootstrap will not run again.`);
+} else if (hasAuthState()) {
+  console.error(`[mx-qst] MX ${targetEnvironment} auth files exist but are not verified for reuse. Run MX_QST_ENVIRONMENT=${targetEnvironment} npm run auth:verify:mx, then rerun QST.`);
   process.exit(2);
 } else {
   const login = spawnSync(process.execPath, [path.resolve("scripts/auth-login-mx.cjs")], {
@@ -81,6 +87,7 @@ if (hasAuthState()) {
     console.error("[mx-qst] MX manual authentication/bootstrap failed; QST execution was not started.");
     process.exit(login.status || 1);
   }
+  console.log(`[mx-qst] Fresh MX ${targetEnvironment} authentication state exported by the login bootstrap.`);
 }
 
 const qstExecutionEnv = {
