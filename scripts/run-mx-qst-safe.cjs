@@ -8,6 +8,9 @@ const { testTitles } = require("../utils/qstS1Implementation");
 const { buildMxQstRuntimeSummary, writeRuntimeSummary } = require("../utils/mxQstRuntimeSummary.cjs");
 
 const listOnly = process.argv.includes("--list");
+const targetEnvironment = String(process.env.MX_QST_ENVIRONMENT || "S1").toUpperCase();
+if (!["S1", "S2"].includes(targetEnvironment)) throw new Error(`Unsupported MX QST environment: ${targetEnvironment}.`);
+const environmentLabel = targetEnvironment === "S2" ? "S2/STG2" : "S1/STG";
 const useExistingAuth = process.env.MX_QST_USE_EXISTING_AUTH === "1";
 const headless = process.env.MX_QST_HEADLESS === "1";
 const artifactDir = path.resolve(process.env.MX_QST_ARTIFACT_DIR || "test-results");
@@ -54,7 +57,7 @@ if (MX_BASE_P1_IDS.length !== 30 || officialP1Titles.length !== 30 || invalidP1I
 }
 
 const destructiveTitles = officialP1Titles.filter((title) => /@destructive\b/i.test(title));
-console.log(`[mx-qst] Official MX Base P1 selection: ${officialP1Titles.length}/30 tests.`);
+console.log(`[mx-qst] Official MX ${targetEnvironment} Base P1 selection: ${officialP1Titles.length}/30 tests.`);
 
 if (listOnly) {
   const listed = spawnSync(process.execPath, [
@@ -88,7 +91,8 @@ const qstExecutionEnv = {
   // part of the official runner so normal QST does not require a manual prefix.
   PREQA2_CDP_URL: process.env.PREQA2_CDP_URL || "http://127.0.0.1:9223",
   ALLOW_PAYMENT_SUBMIT: "1",
-  TEST_ENV: "S1/STG",
+  TEST_ENV: environmentLabel,
+  MX_QST_ENVIRONMENT: targetEnvironment,
   TEST_MARKET: "MX",
   TEST_STORE: "BASE_STORE",
   TEST_SUITE: "P1/QST",
@@ -170,7 +174,7 @@ if (fs.existsSync(reportFile)) {
       id,
       status: outcome.status === "SKIPPED-BLOCKED" ? "BLOCKED" : outcome.status,
       evidence: outcome.status === "PASS" ? `Official MX P1 QST runner completed: ${outcome.title}` : null,
-      blocker: outcome.status === "SKIPPED-BLOCKED" ? outcome.reason.split("\n")[0] || "S1 prerequisite was not available." : outcome.status === "FAIL" ? `MX S1 functional assertion failed: ${outcome.title}` : null,
+      blocker: outcome.status === "SKIPPED-BLOCKED" ? outcome.reason.split("\n")[0] || "${targetEnvironment} prerequisite was not available." : outcome.status === "FAIL" ? `MX ${targetEnvironment} functional assertion failed: ${outcome.title}` : null,
     }));
   if (stagingUpdates.length) {
     writeMxS1RuntimeResults(stagingUpdates);
