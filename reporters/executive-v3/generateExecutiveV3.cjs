@@ -57,10 +57,13 @@ function renderAttachments(execution, attachments = []) {
 }
 function blockerCategory(test) {
   const text = `${test?.blockedReason || ''} ${test?.error || ''}`;
-  if (/auth|session|login|account|credential/i.test(text)) return 'Authentication';
-  if (/sku|product|eligible|test data|address|order|email/i.test(text)) return 'Test Data';
-  if (/environment|staging|s1|backend|server|maintenance|timeout|unavailable|endpoint|cdp|network/i.test(text)) return 'Environment';
-  return test?.status === 'FAIL' ? 'Functional / Automation' : 'Prerequisite';
+  if (/executable doesn.t exist|browser.*executable|ms-playwright|ffmpeg|spawn (eperm|enoent)|playwright.*install/i.test(text)) return 'Infrastructure / Playwright';
+  if (/auth|session|login|logged|account|credential/i.test(text)) return 'Authentication / Session';
+  if (/environment|staging|s1|backend|server|maintenance|unavailable|endpoint|cdp|network|unexpected URL.*\/cart|postal.*not found|delivery.*skeleton|timeout.*delivery/i.test(text)) return 'Environment / Backend';
+  if (/sku|product|eligible|test data|address|order|email/i.test(text)) return 'Test Data / Prerequisite';
+  if (/expect|assert|expected|received/i.test(text)) return 'Functional Assertion';
+  if (/locator|selector|strict mode|element|click|fill/i.test(text)) return 'Automation / Selector';
+  return test?.status === 'FAIL' ? 'Needs Triage' : 'Prerequisite';
 }
 function resultBar(s) {
   const total = Number(s.official || 0) || 1;
