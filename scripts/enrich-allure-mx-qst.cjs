@@ -12,6 +12,8 @@ const byId = new Map((runtime.tests || []).map((test) => [test.samId, test]));
 const JIRA_BASE_URL = "https://jira.secext.samsung.net/browse/";
 const jiraUrl = samId => `${JIRA_BASE_URL}${samId}`;
 const campaign = process.env.TEST_SUITE === "FAST/GUEST" ? "FAST / GUEST-SAFE" : "P1 / QST";
+const targetEnvironment = String(process.env.MX_QST_ENVIRONMENT || "S1").toUpperCase();
+const environmentLabel = targetEnvironment === "S2" ? "S2 / STG2" : "S1 / STG";
 const campaignLabel = process.env.TEST_SUITE === "FAST/GUEST" ? "MX Fast Guest · Safe" : "MX Official P1/QST";
 
 function upsertLabel(labels, name, value) {
@@ -143,9 +145,9 @@ function buildDescription(samId, feature, runtimeTest, reason) {
     "",
     `**Jira:** [Open ${samId}](${jiraUrl(samId)})`,
     `**Official runtime:** ${status}`,
-    `**Campaign:** MX · S1 · Base Store · ${campaign}`,
+    `**Campaign:** MX · ${targetEnvironment} · Base Store · ${campaign}`,
     `**Store:** Base Store`,
-    `**Environment:** S1 / STG`,
+    `**Environment:** ${environmentLabel}`,
     runtimeTest?.duration != null ? `**Duration:** ${(Number(runtimeTest.duration) / 1000).toFixed(1)}s` : null,
     status === "BLOCKED" ? `**Blocker category:** ${classifyBlocker(reason)}` : null,
     reason ? `**Reason:** ${String(reason).split("\n")[0]}` : null,
@@ -210,7 +212,7 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-r
 
   result.name = `${samId} · ${cleanTitle || feature}`;
   result.labels = upsertLabel(result.labels, "parentSuite", "Samsung SMB Automation");
-  result.labels = upsertLabel(result.labels, "suite", "MX · S1 · Base Store");
+  result.labels = upsertLabel(result.labels, "suite", `MX · ${targetEnvironment} · Base Store`);
   result.labels = upsertLabel(result.labels, "subSuite", `P1 / QST · ${feature}`);
   result.labels = upsertLabel(result.labels, "epic", "Samsung SMB Commerce");
   result.labels = upsertLabel(result.labels, "feature", feature);
@@ -222,7 +224,7 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-r
   result.links.push({ name: samId, url: jiraUrl(samId), type: "tms" });
   result.labels = upsertLabel(result.labels, "layer", "e2e");
   result.labels = upsertLabel(result.labels, "host", "Samsung SMB");
-  for (const tag of ["MX", "S1", "Base Store", "P1", "QST", ...tags.map((tag) => tag.slice(1))]) {
+  for (const tag of ["MX", targetEnvironment, "Base Store", "P1", "QST", ...tags.map((tag) => tag.slice(1))]) {
     pushUniqueLabel(result.labels, "tag", tag);
   }
 
@@ -238,7 +240,7 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-r
   result.parameters ||= [];
   const params = {
     Market: "MX",
-    Environment: "S1 / STG",
+    Environment: environmentLabel,
     Store: "Base Store",
     Suite: campaign,
     "Official TC": samId,
@@ -258,7 +260,7 @@ const environment = [
   "Platform=SAP Commerce / Hybris",
   "Framework=Playwright",
   "Market=MX",
-  "Environment=S1/STG",
+  `Environment=${targetEnvironment === "S2" ? "S2/STG2" : "S1/STG"}`,
   "Store=Base Store",
   `Suite=${campaign}`,
   "Official_SMB_Scope=362",
