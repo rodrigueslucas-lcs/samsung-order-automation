@@ -5,6 +5,7 @@ const target = resolveMxEnvironment();
 const {
   AUTH_SESSION_STORAGE_PATH,
   applyAuthSessionStorage,
+  markAuthStateVerified,
   requireAuthState,
   validateAuthenticatedSession,
 } = require("../utils/mxAuthState");
@@ -45,7 +46,8 @@ async function verifyMxAuthentication() {
       )
     );
     writeJsonSecurely(AUTH_SESSION_STORAGE_PATH, sessionStorage);
-    console.log("[auth:verify:mx] refreshed MX session state preserved for the test fixture");
+    markAuthStateVerified();
+    console.log("[auth:verify:mx] refreshed MX session state preserved and marked as verified for the target environment");
   } finally {
     await browser.close();
   }
