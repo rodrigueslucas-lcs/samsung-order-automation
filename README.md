@@ -18,7 +18,7 @@ The current source of truth is the Samsung priority-template model imported from
 
 The older `test-mapping/smb-qst.json` is a preserved **144-ID Zephyr execution campaign from 2026-09-02**. It remains useful for traceability and historical evidence, but it is **not** the current P1/P2 denominator. Its total happens to equal the current P1 total; the two models must not be conflated.
 
-For the active MX S1 Base Store campaign, the official safe runner currently selects **30 Base Store P1 TCs**. MX has **38 P1 rows overall** when its 8 EPP P1 rows are included.
+For the active MX Base Store campaign, the official runner selects **the same 30 Base Store P1 TCs on S1/STG or S2/STG2**. Environment selection changes configuration, not the TC inventory. MX has **38 P1 rows overall** when its 8 EPP P1 rows are included.
 
 See [Official SMB Priority Model](docs/OFFICIAL_SMB_PRIORITY_MODEL.md).
 
@@ -70,7 +70,7 @@ Jenkins publishes:
 - `Playwright MX QST`
 - optional `Allure Reporting Smoke`
 
-## MX S1 Base Store runner
+## MX S1 / S2 Base Store runner
 
 The official MX Base Store command is:
 
@@ -86,7 +86,7 @@ npm run qst:mx:list
 
 The runner uses one worker and zero retries for the controlled campaign. Payment/order scenarios are guarded and must only run in an explicitly authorized non-Production environment.
 
-The current registered-user S1 flow depends on a valid Samsung Account storefront session. Authentication/backend instability is classified as an environment/authentication blocker; it must not be disguised as an automation PASS or silently bypassed.
+Registered-user execution uses environment-specific storefront state (`mx-s1-*` or `mx-s2-*`). Authentication/backend instability is classified as an environment/authentication blocker; it must not be disguised as an automation PASS or silently bypassed.
 
 ## Authentication
 
@@ -135,7 +135,9 @@ Jenkinsfile                               CI orchestration and report publicatio
 
 ## Environments
 
-Environment applicability is determined by the real business flow, not by forcing every TC into one host. In MX, storefront/catalog scenarios can be validated in PreQA2 where supported, while Cart/Checkout/Orders/Payment/BackOffice flows are routed to the applicable Staging environment.
+MX QST supports environment-parity execution: **S1 uses `stg.shop.samsung.com` and S1 BackOffice; S2 uses `stg2.shop.samsung.com` and S2 BackOffice**. The same MX Base Store P1 inventory is reused across both environments so results can be compared TC-for-TC without duplicating specs. The repository already uses STG2/S2 for the established PE automation, including `tests/s2/pe/qst` and `tests/s2/pe/dst`.
+
+Environment applicability is determined by the real business flow, not by forcing every TC into one host. In MX, storefront/catalog scenarios can also be validated in PreQA2 where supported, while Cart/Checkout/Orders/Payment/BackOffice flows are routed to the selected Staging environment.
 
 A scenario that is not applicable in PreQA2 creates a Staging validation obligation; it does not become an automatic PASS. Production is never used as a fallback validation target.
 
