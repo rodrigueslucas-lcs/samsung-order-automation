@@ -5,6 +5,9 @@ const { testTitles } = require("../utils/qstS1Implementation");
 const { buildMxQstRuntimeSummary, writeRuntimeSummary } = require("../utils/mxQstRuntimeSummary.cjs");
 
 const listOnly = process.argv.includes("--list");
+const targetEnvironment = String(process.env.MX_QST_ENVIRONMENT || "S1").toUpperCase();
+if (!["S1", "S2"].includes(targetEnvironment)) throw new Error(`Unsupported MX QST environment: ${targetEnvironment}.`);
+const environmentLabel = targetEnvironment === "S2" ? "S2/STG2" : "S1/STG";
 const headless = process.env.MX_QST_HEADLESS === "1";
 const root = path.resolve("tests/s1/mx/qst/base-store");
 const playwrightCli = path.resolve("node_modules/@playwright/test/cli.js");
@@ -49,7 +52,7 @@ if (unsafe.length) {
   process.exit(1);
 }
 
-console.log(`[mx-fast] MX Base Store fast guest selection: ${selected.length} tests.`);
+console.log(`[mx-fast] MX ${targetEnvironment} Base Store fast guest selection: ${selected.length} tests.`);
 console.log(`[mx-fast] IDs: ${MX_FAST_GUEST_IDS.join(", ")}`);
 
 const args = [
@@ -73,7 +76,8 @@ if (!listOnly) {
 
 const env = {
   ...process.env,
-  TEST_ENV: "S1/STG",
+  TEST_ENV: environmentLabel,
+  MX_QST_ENVIRONMENT: targetEnvironment,
   TEST_MARKET: "MX",
   TEST_STORE: "BASE_STORE",
   TEST_SUITE: "FAST/GUEST",
