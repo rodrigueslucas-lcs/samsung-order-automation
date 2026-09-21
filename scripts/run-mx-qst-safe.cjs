@@ -67,12 +67,11 @@ if (listOnly) {
   process.exit(listed.status ?? 1);
 }
 
-if (useExistingAuth) {
-  if (!hasAuthState()) {
-    console.error("[mx-qst] Pre-provisioned MX auth state/session storage is missing; QST execution was not started.");
-    process.exit(2);
-  }
-  console.log("[mx-qst] Using pre-provisioned MX authentication state (CI mode).");
+if (hasAuthState()) {
+  console.log(`[mx-qst] Reusing validated MX ${targetEnvironment} authentication state.`);
+} else if (useExistingAuth) {
+  console.error("[mx-qst] Pre-provisioned MX auth state/session storage is missing; QST execution was not started.");
+  process.exit(2);
 } else {
   const login = spawnSync(process.execPath, [path.resolve("scripts/auth-login-mx.cjs")], {
     env: { ...process.env, MX_AUTH_MANUAL: "1" },
