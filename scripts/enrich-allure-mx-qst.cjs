@@ -33,9 +33,9 @@ function classifyBlocker(text = "") {
 function inferFeature(result, runtimeTest) {
   const value = `${runtimeTest?.title || ""} ${result.name || ""} ${result.fullName || ""}`.toLowerCase();
   const rules = [
-    ["Order & Tracking", /track|tracking|order|pedido|confirmation|confirmaci/],
-    ["Payment", /payment|pago|mercado|card|tarjeta/],
-    ["Checkout", /checkout|delivery|shipping|address|direcci/],
+    ["Order & Tracking", /track|tracking|order confirmation|pedido|confirmaci/],
+    ["Payment", /payment|pago|mercado|paypal|cash|card|tarjeta|rewards/],
+    ["Checkout", /checkout|order summary|delivery|shipping|address|direcci|customer details/],
     ["Cart & Promotions", /cart|carrito|coupon|cup[oó]n|promo/],
     ["Product & Catalog", /pdp|plp|product|producto|facet|filter|gnb|catalog|bc-add/],
     ["Account & Profile", /login|account|profile|registered|registro|address book/],
@@ -100,7 +100,7 @@ function businessJourney(feature, title = "") {
   ];
   return ["Prepare test context", "Open Samsung storefront", "Exercise the business scenario", "Validate the expected result"];
 }
-function syntheticBusinessSteps(feature, title, result) {
+function curateBusinessSteps(feature, title, result) {
   // Allure is a business execution report. Low-level adapter operations such as
   // locator/request/expect/navigation belong in Playwright Trace, not the main tree.
   const technical = /^(before hooks?|after hooks?|navigate|expect\b|wait for|waitfor|locator\b|request\b|page\.|browser\.|context\.|api\b|fixture\b)/i;
@@ -122,7 +122,19 @@ function syntheticBusinessSteps(feature, title, result) {
     attachments: [],
     parameters: [],
   }));
-  result.steps = explicitBusinessSteps.length ? explicitBusinessSteps : curated;
+  // Preserve real Playwright test.step() calls when present. For legacy tests
+  // without business steps, render a clearly-labelled journey outline instead
+  // of fabricated execution timings.
+  if (explicitBusinessSteps.length) {
+    result.steps = explicitBusinessSteps;
+    return;
+  }
+  result.steps = curated.map((step) => ({
+    ...step,
+    name: `Journey · ${step.name}`,
+    status: "skipped",
+    statusDetails: { message: "Business journey outline; add Playwright test.step() for measured execution timing." },
+  }));
 }
 function buildDescription(samId, feature, runtimeTest, reason) {
   const status = prettyStatus(runtimeTest?.status);
@@ -166,8 +178,11 @@ function copyRuntimeAttachments(result, runtimeTest) {
     if (!attachment?.path || !fs.existsSync(attachment.path)) continue;
     const ext = path.extname(attachment.path);
     // Avoid copying a Playwright artifact already represented by the adapter.
-    const semanticKey = `${normalizeName(attachment)}|${attachment.contentType || ext}`;
-    if ([...result.attachments].some((item) => `${normalizeName(item)}|${item.type || path.extname(item.source || "")}` === semanticKey)) continue;
+    const normalized = normalizeName(attachment);
+    // Adapter and runtime reporters often point at the same evidence using
+    // different filenames. Keep one item per evidence kind to avoid duplicate
+    // screenshot/video/trace rows in Allure.
+    if (result.attachments.some((item) => normalizeName(item) === normalized)) continue;
     const source = `runtime-${runtimeTest.samId}-${result.attachments.length + 1}${ext}`;
     fs.copyFileSync(attachment.path, path.join(resultsDir, source));
     result.attachments.push({
@@ -218,7 +233,7 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-r
     pushUniqueLabel(result.labels, "tag", `blocker:${classifyBlocker(reason)}`);
   }
   result.description = buildDescription(samId, feature, runtimeTest, reason);
-  syntheticBusinessSteps(feature, cleanTitle, result);
+  curateBusinessSteps(feature, cleanTitle, result);
 
   result.parameters ||= [];
   const params = {
@@ -258,7 +273,7 @@ fs.writeFileSync(path.join(resultsDir, "environment.properties"), environment);
 fs.writeFileSync(path.join(resultsDir, "categories.json"), JSON.stringify([
   { name: "Infrastructure / Playwright", matchedStatuses: ["failed", "broken"], messageRegex: ".*(executable doesn.t exist|browser.*executable|ms-playwright|ffmpeg|spawn (EPERM|ENOENT)|playwright.*install).*" },
   { name: "Authentication / session", matchedStatuses: ["failed", "broken"], messageRegex: ".*(auth|session|login|logged|credential|account).*" },
-  { name: "Environment / backend", matchedStatuses: ["failed", "broken"], messageRegex: ".*(environment|backend|server|maintenance|unavailable|endpoint|timeout|network).*" },
+  { name: "Environment / backend", matchedStatuses: ["failed", "broken"], messageRegex: ".*(environment|backend|server|maintenance|unavailable|endpoint|timeout|network|unexpected URL.*\/cart|postal.*not found|delivery.*skeleton).*" },
   { name: "Test data / prerequisite", matchedStatuses: ["failed", "broken"], messageRegex: ".*(sku|eligible|test data|address|order|prerequisite|product).*" },
   { name: "Functional assertion", matchedStatuses: ["failed"], messageRegex: ".*(expect|assert|expected|received).*" },
   { name: "Automation / selector", matchedStatuses: ["failed", "broken"], messageRegex: ".*(locator|selector|strict mode|element|click|fill).*" },
