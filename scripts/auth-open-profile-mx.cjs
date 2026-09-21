@@ -1,9 +1,13 @@
 const { spawn, spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
+const { resolveMxEnvironment } = require("../utils/mxConfig");
 
-const profileDir = path.resolve("playwright/profiles/s1-mx-qa");
-const setupUrl = "https://stg.shop.samsung.com/getcookie.html";
+const target = resolveMxEnvironment();
+const suffix = target.name.toLowerCase();
+
+const profileDir = path.resolve(`playwright/profiles/${suffix}-mx-qa`);
+const setupUrl = `https://${target.hostname}/getcookie.html`;
 
 fs.mkdirSync(profileDir, { recursive: true });
 
@@ -61,11 +65,11 @@ chrome.once("error", (error) => {
 
 chrome.once("spawn", () => {
   chrome.unref();
-  console.log("A maximized Chrome window was opened with the dedicated S1 MX QA profile.");
+  console.log(`A maximized Chrome window was opened with the dedicated ${target.name} MX QA profile.`);
   console.log("");
   console.log("Complete these steps manually:");
   console.log("1. Wait for: You can access pages now!");
-  console.log("2. Open https://stg.shop.samsung.com/mx/");
+  console.log(`2. Open https://${target.hostname}/mx/`);
   console.log("3. Maximize the browser if the OS did not maximize it automatically.");
   console.log("4. Use My Profile → Iniciar sesión.");
   console.log("5. Complete FedCM/CAPTCHA/MFA/SMS manually.");
