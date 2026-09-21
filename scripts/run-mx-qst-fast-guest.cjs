@@ -93,7 +93,7 @@ const result = spawnSync(process.execPath, args, { env, stdio: "inherit" });
 if (!listOnly && fs.existsSync(reportFile)) {
   const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
   const titles = Object.fromEntries(selected.map((title) => [title.match(/SAM-\d+/)?.[0], title]));
-  const runtimeSummary = buildMxQstRuntimeSummary(report, { officialIds: MX_FAST_GUEST_IDS, titles });
+  const runtimeSummary = buildMxQstRuntimeSummary(report, { officialIds: MX_FAST_GUEST_IDS, titles, environment: environmentLabel, suite: "FAST/GUEST" });
   writeRuntimeSummary(runtimeSummaryFile, runtimeSummary);
 
   const executive = spawnSync(process.execPath, [
