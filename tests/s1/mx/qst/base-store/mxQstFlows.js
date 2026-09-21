@@ -1,4 +1,4 @@
-import { expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import CartPage from "../../../../../pages/CartPage";
 import ProductPage from "../../../../../pages/ProductPage";
 import cartPresentation from "../../../../../flows/smb/cartPresentation";
@@ -8,11 +8,13 @@ const { validateCartItemPresentation, validateStickyControl } = cartPresentation
 const { assertMxStagingPage } = mxStagingGuard;
 
 async function bootstrapMx(page, config) {
-  await page.goto(config.bootstrapUrl.toString(), { waitUntil: "domcontentloaded" });
-  // The cookie endpoint may render its success copy or an empty response. Its
-  // contract is completed by explicitly returning to, and validating, MX S1.
-  await page.goto(config.baseUrl.toString(), { waitUntil: "domcontentloaded" });
-  await assertMxStagingPage(page, "MX QST flow bootstrap");
+  await test.step("Bootstrap MX S1 storefront session", async () => {
+    await page.goto(config.bootstrapUrl.toString(), { waitUntil: "domcontentloaded" });
+    // The cookie endpoint may render its success copy or an empty response. Its
+    // contract is completed by explicitly returning to, and validating, MX S1.
+    await page.goto(config.baseUrl.toString(), { waitUntil: "domcontentloaded" });
+    await assertMxStagingPage(page, "MX QST flow bootstrap");
+  });
 }
 
 export function mxQstCart(page, config) {
@@ -29,22 +31,28 @@ export function mxQstCart(page, config) {
 
 export async function openMxQstPdp(page, config) {
   await bootstrapMx(page, config);
-  await page.goto(config.pdpUrl.toString(), { waitUntil: "domcontentloaded" });
-  await expect(page).toHaveURL(new RegExp(`/mx/p/${config.sku}`, "i"));
-  await expect(page.getByText(config.sku, { exact: true }).first()).toBeVisible({ timeout: 60000 });
+  await test.step("Open controlled MX product detail page", async () => {
+    await page.goto(config.pdpUrl.toString(), { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(new RegExp(`/mx/p/${config.sku}`, "i"));
+    await expect(page.getByText(config.sku, { exact: true }).first()).toBeVisible({ timeout: 60000 });
+  });
 }
 
 export async function prepareMxQstCart(page, config) {
   const cart = mxQstCart(page, config);
   await bootstrapMx(page, config);
-  await cart.clearMxCartAndConfirmEmpty();
+  await test.step("Reset cart to a controlled state", async () => {
+    await cart.clearMxCartAndConfirmEmpty();
+  });
   await openMxQstPdp(page, config);
 
   const storage = page.getByRole("button", { name: "512GB", exact: true });
   await expect(storage).toBeVisible({ timeout: 30000 });
-  if (!/\bselected\b/.test((await storage.getAttribute("class")) || "")) {
-    await storage.click();
-  }
+  await test.step("Select the controlled product configuration", async () => {
+    if (!/\bselected\b/.test((await storage.getAttribute("class")) || "")) {
+      await storage.click();
+    }
+  });
 
   const product = new ProductPage(page, {
     setupUrl: config.bootstrapUrl.toString(),
@@ -52,8 +60,12 @@ export async function prepareMxQstCart(page, config) {
     pdpUrl: config.pdpUrl.toString(),
     cartUrl: config.cartUrl.toString(),
   });
-  await product.addConfiguredPdpToCart({ waitForCartMutation: true });
-  await cart.validateControlledSingleSku(config.sku);
+  await test.step("Add configured product to cart", async () => {
+    await product.addConfiguredPdpToCart({ waitForCartMutation: true });
+  });
+  await test.step("Validate controlled cart state", async () => {
+    await cart.validateControlledSingleSku(config.sku);
+  });
   return cart;
 }
 
@@ -87,6 +99,7 @@ function parseMxCurrency(text) {
 }
 
 export async function validateMxCheckoutSummaryPresentation(page) {
+  return test.step("Validate checkout order summary", async () => {
   const summaryHeading = page.getByRole("heading", {
     name: "Resumen de tu pedido",
     level: 2,
@@ -130,11 +143,13 @@ export async function validateMxCheckoutSummaryPresentation(page) {
     voucherVisible: (await page.getByText(/Voucher|Cup[oó]n/i).filter({ visible: true }).count()) > 0,
     promoVisible: (await page.getByText(/Promoci[oó]n|Promo/i).filter({ visible: true }).count()) > 0,
   };
+  });
 }
 
 export { validateStickyControl };
 
 export async function openMxService(page, name) {
+  return test.step(`Open ${name.replace(/\\\\/g, "")} service configuration`, async () => {
   const button = page.getByRole("button", {
     name: new RegExp(`Agregar ahora\\s*${name}`, "i"),
   });
@@ -148,4 +163,5 @@ export async function openMxService(page, name) {
     timeout: 30000,
   });
   return surface;
+  });
 }
