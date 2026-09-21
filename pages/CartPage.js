@@ -38,8 +38,9 @@ export default class CartPage extends BasePage {
 
   async loadMxCartState() {
     const cartUrl = new URL(this.cartUrl);
-    if (cartUrl.hostname !== 'stg.shop.samsung.com' || cartUrl.pathname !== '/mx/cart') {
-      throw new Error('MX cart control is restricted to https://stg.shop.samsung.com/mx/cart.');
+    const allowedMxStagingHosts = new Set(['stg.shop.samsung.com', 'stg2.shop.samsung.com']);
+    if (!allowedMxStagingHosts.has(cartUrl.hostname) || cartUrl.pathname !== '/mx/cart') {
+      throw new Error('MX cart control is restricted to the MX S1/S2 staging cart.');
     }
 
     const currentCartResponse = this.page.waitForResponse(
