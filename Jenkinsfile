@@ -226,38 +226,38 @@ pipeline {
             allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
             reportDir: 'test-results/jenkins/mx-fast/executive',
             reportFiles: 'index.html',
-            reportName: 'Samsung MX Fast - Executive Dashboard'
+            reportName: "Samsung MX ${params.ENVIRONMENT} Fast - Executive Dashboard"
           ])
           publishHTML(target: [
             allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
             reportDir: 'test-results/jenkins/mx-fast/playwright-report',
             reportFiles: 'index.html',
-            reportName: 'Samsung MX Fast - Playwright'
+            reportName: "Samsung MX ${params.ENVIRONMENT} Fast - Playwright"
           ])
           publishHTML(target: [
             allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
             reportDir: 'test-results/jenkins/mx-fast/allure-report',
             reportFiles: 'index.html',
-            reportName: 'Samsung MX Fast - Allure'
+            reportName: "Samsung MX ${params.ENVIRONMENT} Fast - Allure"
           ])
         } else if (params.TEST_SUITE == 'official-p1') {
           publishHTML(target: [
             allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
             reportDir: 'test-results/jenkins/mx-qst/executive',
             reportFiles: 'index.html',
-            reportName: 'MX QST Executive Dashboard'
+            reportName: "MX ${params.ENVIRONMENT} QST Executive Dashboard"
           ])
           publishHTML(target: [
             allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
             reportDir: 'playwright-report',
             reportFiles: 'index.html',
-            reportName: 'Playwright MX QST'
+            reportName: "Playwright MX ${params.ENVIRONMENT} QST"
           ])
           publishHTML(target: [
             allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
             reportDir: 'test-results/jenkins/mx-qst/allure-report',
             reportFiles: 'index.html',
-            reportName: 'Samsung MX QST - Allure'
+            reportName: "Samsung MX ${params.ENVIRONMENT} QST - Allure"
           ])
         } else if (params.TEST_SUITE == 'allure-smoke') {
           publishHTML(target: [
