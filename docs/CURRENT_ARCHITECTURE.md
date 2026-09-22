@@ -1,153 +1,186 @@
 # Current SMB QA Automation Architecture
 
-This document describes the repository after the Zephyr/QST architecture was normalized around the official SMB scope and the live multi-environment validation campaign.
+This document describes the current repository architecture after the Samsung SMB scope, MX S1/S2 execution, Jenkins reporting and executive presentation layers were reconciled.
 
 ## 1. Authoritative business scope
 
-The official SMB QST scope is the Zephyr baseline tracked in `test-mapping/smb-qst.json`.
+The current business source of truth is the Samsung priority-template model under `docs/smb_priority_templates/`, represented by the official inventory contract.
 
-| Market | Official TCs |
-|---|---:|
-| MX | 37 |
-| CL | 38 |
-| CO | 35 |
-| PE | 34 |
-| **Total** | **144** |
+| Market | Base Store | EPP | P1 / QST | P2 / DST only | DST total |
+|---|---:|---:|---:|---:|---:|
+| MX | 56 | 36 | 38 | 54 | 92 |
+| PE | 55 | 37 | 34 | 58 | 92 |
+| CL | 53 | 36 | 38 | 51 | 89 |
+| CO | 54 | 35 | 34 | 55 | 89 |
+| **SMB** | **218** | **144** | **144** | **218** | **362** |
 
-The 144-case registry is the business denominator. It must not be replaced by the number of Playwright specs, historical DST counts, or the number of currently automated MX cases.
+Priority and store are independent dimensions:
 
-## 2. Runtime validation source of truth
+- **P1 runs in QST + DST**.
+- **P2 runs in DST only**.
+- Base Store and EPP remain distinct store contexts.
 
-The official Zephyr Expected Result is the acceptance criterion. The correct runtime environment depends on the business flow.
+The preserved `test-mapping/smb-qst.json` file is a historical 144-ID Zephyr campaign. Its total must not be confused with the current 144 P1 total.
 
-PreQA2 is authoritative only for official scenarios that are actually supported there. The live MX campaign proved that storefront flows such as Home, PLP, PDP, GNB and supported Samsung Account/My Account areas can be validated in PreQA2, while Cart and downstream flows redirect into Staging and therefore must be validated there.
+## 2. Active MX execution model
 
-A TC that is not applicable to PreQA2 must not be forced through that environment and must not be called BLOCKED merely because PreQA2 does not host the required flow. It is classified as `NOT_APPLICABLE` for the PreQA2 campaign and handed off to the applicable Staging campaign. The final official runtime result is established in the correct environment.
+MX has **38 P1 rows overall**:
+
+- 30 Base Store P1;
+- 8 EPP P1.
+
+The active MX Base Store runner executes the same official **30 P1 TCs** on either:
+
+- S1 / `stg.shop.samsung.com`;
+- S2 / `stg2.shop.samsung.com`.
+
+Environment selection changes configuration and endpoints, not the selected Base Store P1 inventory.
+
+## 3. Runtime, coverage and history are separate
+
+The architecture deliberately separates:
+
+- **Runtime result**: PASS / FAIL / BLOCKED / NOT_RUN in a specific build/environment.
+- **Automation coverage**: Full / Partial / Missing implementation maturity.
+- **Historical campaign state**: preserved Zephyr/PreQA2 evidence and ledgers.
+- **Official scope**: current Samsung P1/P2 priority inventory.
+
+No reporting layer may infer PASS from coverage or from the absence of an execution result.
+
+## 4. Environment routing
+
+The real business flow decides the validation environment.
+
+PreQA2 may be used for supported storefront/catalog validation. Cart, Checkout, Orders, Payment and BackOffice flows are validated in the applicable Staging environment when PreQA2 does not host the complete journey.
+
+A PreQA2 `NOT_APPLICABLE` result creates a Staging validation obligation; it is not an automatic PASS.
+
+Production is never used as a fallback target.
 
 See [Environment Validation Policy](ENVIRONMENT_VALIDATION_POLICY.md).
 
-The canonical campaign ledger remains `test-mapping/preqa2-validation.json` for the PreQA2 leg after live evidence is safely integrated. Environment handoff metadata must be preserved so Staging execution can close the remaining official cases without rediscovery.
-
-Official validation state and automation implementation coverage are deliberately separate dimensions:
-
-- `PASS`, `FAIL`, `BLOCKED`, `NOT_APPLICABLE` and `NOT_RUN` describe runtime validation in a specific campaign/environment.
-- `Full`, `Partial` and `Missing` describe persisted automation coverage.
-- A PreQA2 `NOT_APPLICABLE` result does not mean the official TC is complete when the flow is still applicable in Staging.
-- Official PASS does not automatically promote automation coverage to Full.
-
-## 3. Current MX environment split
-
-The live campaign established the following current routing for MX:
-
-| Flow family | Current validation environment |
-|---|---|
-| Home / supported Samsung Account / My Account | PreQA2 |
-| PLP / PDP / GNB | PreQA2 |
-| Cart / Checkout | Staging |
-| Orders / My Orders | Staging |
-| Payment / order creation | Authorized Staging only |
-| Mobile cart / checkout | Staging |
-| BackOffice / fulfillment | Applicable Staging environment |
-| EPP | Legitimate market-specific EPP context required |
-
-This is an observed MX routing rule, not a fabricated universal rule for CL/CO/PE. Each market must be verified from official TCs and actual environment behavior.
-
-## 4. Country model
-
-### Mexico
-
-MX currently has the deepest case-level automation metadata through `test-mapping/mx-qst-coverage.json` and the active live campaign. It is the only market where Full/Partial/Missing automation coverage is currently treated as a complete 37-case denominator.
-
-### Peru
-
-PE is part of the same 144-case official campaign. Existing implementation and reuse analysis are represented by `test-mapping/pe-qst-reuse-plan.json` and the country-scoped Playwright implementation. Reuse classification is not the same thing as official PASS or Full automation.
-
-### Chile and Colombia
-
-CL and CO are not future countries in the business model. They are official markets in the 144-case Zephyr scope today.
-
-The repository intentionally does not invent detailed selectors, data, store classification or test titles where official TC metadata has not yet been verified. Shared-family candidates may exist, but case-level automation coverage is not claimed until the official TC is read and runtime evidence is produced.
-
-Therefore:
-
-- CL/CO are present in the official registry, campaign planning, ledger model, closure gates and executive reporting.
-- CL/CO may have `Unknown` feature/store metadata for cases that are not yet classified.
-- Absence of `tests/<env>/cl/...` or `tests/<env>/co/...` directories does not mean the markets are absent from the architecture; it means country-specific executable implementation has not yet been safely materialized.
-
-## 5. Architecture layers
+## 5. Executable architecture
 
 ```text
 Official business scope
-  test-mapping/smb-qst.json              144 official TCs (MX/CL/CO/PE)
+  docs/smb_priority_templates/              Samsung priority templates
+  test-mapping/official-smb-inventory.json  current official inventory contract
 
-Case metadata / implementation mapping
-  test-mapping/mx-qst-coverage.json      MX 37-case automation coverage
-  test-mapping/pe-qst-reuse-plan.json    PE implementation/reuse plan
-  shared-family metadata                 CL/CO/PE/MX reuse candidates where verified
+Historical / compatibility sources
+  test-mapping/smb-qst.json                 preserved 144-ID Zephyr campaign
+  test-mapping/preqa2-validation.json       PreQA2 validation ledger
+  test-mapping/*-qst-*                      market coverage/reuse/runtime metadata
 
-Environment validation control plane
-  PreQA2 campaign                         storefront/applicability validation where supported
-  Staging campaigns                       cart/checkout/orders/payment/backoffice where applicable
-  environment handoff                     N/A-in-PreQA -> applicable Staging obligation
-
-PreQA2 tooling
-  utils/preqa2ExecutionRequirements.js   registered / guest / EPP requirements
-  utils/preqa2CampaignPlan.js             market queue and prioritization
-  utils/preqa2RuntimeGuard.js             exact PreQA2 host/market guard
-  utils/preqa2Validation*.js              canonical PreQA2 ledger validation
-  utils/preqa2ClosureGate.js              PreQA2 campaign closure conditions
-  utils/preqa2PromotionPlan.js            validation vs automation promotion rules
-  scripts/preqa2-*.cjs                    plan, gate, record, merge, closure, reporting
-
-Executable Playwright implementation
+Executable Playwright
   tests/<environment>/<market>/<suite>/<area>/
   pages/
   utils/
 
-Reporting
-  reporters/preqa2/                       operational PreQA2 status
-  reporters/executive-v3/                 144-scope executive control center
+Authentication / guards
+  utils/mxAuthState*
+  tests/s1/mx/dst/base-store/mx.auth.fixture.js
+  utils/mxStagingGuard*
+  scripts/auth-login-mx.cjs
+
+Execution / reconciliation / reporting
+  scripts/
+  reporters/evidence/
+  reporters/executive-v3/
+  reporters/preqa2/
+  reporter-tests/
+
+CI
+  Jenkinsfile
 ```
 
-## 6. Filesystem convention
+## 6. Authentication model
 
-Executable tests converge on:
+WMC/PreQA2 authentication and Samsung Account authentication are separate concerns.
 
-```text
-tests/<environment>/<country>/<suite>/<area>/
-```
+MX registered-user execution uses environment-specific persisted auth state. Before a registered TC continues, the authenticated fixture proves that the session is still usable.
 
-Examples already represented in the repository include MX under S1 and PE under S2. New CL/CO executable directories should only be created when a verified official case has enough real configuration and runtime evidence to justify implementation.
+For recoverable setup failures such as an expired Samsung Account session, unusable auth state or expired setup cookie, the fixture can perform **one controlled renewal** using the approved MX login flow, load the refreshed browser state into the current Playwright context, validate authentication again and then continue.
 
-The architecture is wider than the current test-directory tree: the registry and campaign model cover all four markets, while executable code grows market by market and environment by environment.
+Policy:
 
-## 7. Authentication model
+- local auto-renew is enabled unless `MX_AUTH_AUTO_RENEW=0`;
+- CI/Jenkins auto-renew is disabled unless `MX_AUTH_AUTO_RENEW=1`;
+- MFA/CAPTCHA remains human verification and is never bypassed;
+- failed renewal remains a failure/blocker.
 
-WMC authentication and Samsung Account authentication are separate concerns.
+Credentials, cookies and storage state are runtime-only and must never be committed.
 
-PreQA2 bootstrap establishes WMC/PreQA2 access. Registered official TCs additionally require a valid Samsung Account session. The campaign should reuse authenticated state when valid and stop only for actual human-only authentication such as MFA/CAPTCHA/phone approval.
+## 7. Safety boundaries
 
-Registered/guest/EPP requirements are encoded per official TC where known. A registered PASS must not be recorded from a guest-only runtime context.
+Production is read-only.
 
-## 8. Safety boundaries
+Destructive non-Production actions remain explicitly guarded, including:
 
-Production is read-only. A PreQA2 or Staging validation must never escape into Production to continue a scenario.
+- payment/order submit;
+- customer/profile writes;
+- CronJob execution;
+- other state-changing operations.
 
-Payment/order submission, profile writes, CronJobs and other destructive actions remain separately guarded and require explicit authorization. Staging is the correct environment for some official flows, but that does not remove destructive-action controls.
+Payment/order execution must not use blind retries after an ambiguous submit. A backend/environment defect must not be hidden by weakening assertions simply to produce a green build.
 
-## 9. Reporting model
+## 8. Reporting architecture
 
-The executive report must keep these dimensions separate:
+The reporting stack has four layers.
 
-- Official SMB scope: 144 TCs.
-- Market official scope: MX 37, CL 38, CO 35, PE 34.
-- PreQA2 runtime result and applicability.
-- Staging-required handoff for flows not supported by PreQA2.
-- Final official runtime result in the applicable environment.
-- MX persisted automation coverage: denominator 37.
+### Executive Dashboard
 
-The Executive V3 report additionally exposes market/feature views, attention queues, automation gaps, TC drilldown, recent validation, trend snapshots and consistency auditing. It must not fabricate feature/store/environment execution data when no verified metadata exists.
+Outcome-first presentation view. Final order:
 
-## 10. Integration rule while live campaign is running
+1. Build Health
+2. Execution at a glance
+3. Needs Attention only when necessary
+4. Test Execution
+5. MX Automation Coverage
+6. Official SMB Scope
+7. Coverage by Feature + Gap Queue
+8. Technical Governance, collapsed by default
 
-Live browser/CDP campaign changes and remote architecture/reporting work may exist on separate branches. Do not resolve the canonical ledger with a blanket `ours` or `theirs` merge. Preserve live runtime evidence first, reconcile the ledger case by case or with merge utilities, preserve environment-routing decisions, then run the full gates and reporting tests locally before declaring the integration official.
+Technical Governance contains:
+
+- Regional Validation Matrix;
+- Data Integrity;
+- Historical TC Inventory.
+
+### Allure
+
+Technical TC-level investigation organized around Samsung business hierarchy, SAM/Jira IDs, runtime status, categories, steps and attachments.
+
+### Playwright report / Trace Viewer
+
+Low-level Playwright execution and trace investigation.
+
+### Jenkins
+
+Orchestration, coverage gates, environment selection, test execution, report finalization and publication. Pipeline Stage View exposes the operational sequence for presentation and troubleshooting.
+
+## 9. Evidence model
+
+Runtime evidence can include:
+
+- screenshots;
+- traces;
+- videos when enabled;
+- error context;
+- business metadata;
+- order/payment identifiers when safely recorded.
+
+Evidence and runtime status are reconciled from the actual execution. Historical mapping data must not overwrite current build evidence.
+
+## 10. Trace access from Jenkins
+
+Trace links may use `trace.playwright.dev` with an archived Jenkins trace URL.
+
+The browser must be able to reach the Jenkins artifact. Jenkins authentication/CORS and browser local-network policy can block that fetch even when the ZIP is valid.
+
+When Jenkins runs on localhost, Chromium-based browsers may require Local Network Access permission for the Trace Viewer origin.
+
+## 11. Integration discipline
+
+Do not resolve runtime-ledger conflicts with blanket `ours` or `theirs` choices. Preserve real execution evidence first, reconcile case state deliberately, then run the official gates/reporting validation before treating the integration as canonical.
+
+The final architecture is designed around one rule: **official scope, current runtime, implementation coverage and historical governance must remain independently auditable.**
