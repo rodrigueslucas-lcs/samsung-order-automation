@@ -1,46 +1,132 @@
-# MX S1 Quick Smoke Test — Base Store
+# MX QST — Current Coverage and Runner Model
 
-`Automated` requires a successful MX QST execution. `Implemented — not run` means a guarded QST wrapper exists but has not performed its destructive action. DST/manual evidence is reuse evidence, not a QST pass.
+This document describes the current MX QST execution model. It replaces the older 22-scenario S1-only progress snapshot that previously lived here.
 
-| ID | Scenario | Initial status | Evidence / dependency |
-|---|---|---|---|
-| QST 01 | Homepage | Partial | Headed S1 diagnostic validated the Samsung header and `Productos y Servicios` footer, but the rendered homepage had no hero or Top Seller section; it transitioned from benefit tiles to `Accenture Samsung Store Offers` and the footer. No permissive locator was added. |
-| QST 02 | Open PLP from navigation | Not implemented | Explicitly outside this batch. |
-| QST 03 | PLP details/facets/variant | Not implemented | Explicitly outside this batch. |
-| QST 04 | Navigate to PDP | Automated | Headed Chrome passed using the configured MX PDP flow. |
-| QST 05 | PDP variants other than color | Automated | Headed Chrome passed with `SM-F741BLBKLTM`; 256GB/512GB were validated separately from the color controls. |
-| QST 06 | Add to Cart | Automated | Headed Chrome passed in the same causal safe wrapper as QST 07/08. |
-| QST 07 | Cart displayed | Automated | Headed Chrome passed using `CartPage`. |
-| QST 08 | Order summary | Automated | Headed Chrome validated subtotal and total using `CartPage`. |
-| QST 09 | Add Trade-In | Partial | Headed Chrome opened the real Galaxy Canje journey and validated its device-selection UI; a complete valuation/application was not performed, so it is not promoted. |
-| QST 10 | Add Samsung Care+ | Automated | Headed Chrome selected the current Care+ option, accepted all displayed terms, added it, and found Care+ still associated in Cart. No checkout/order. |
-| QST 11 | Navigate to Checkout | Automated | Headed Chrome reached the guest boundary; no order. |
-| QST 12 | Enter address | Automated | Headed Chrome reused `reachMxGuestPayment`, validated postal lookup/colonia and reached Payment without submit. |
-| QST 13 | Guest order with available payment | Implemented — not run | Guarded Guest SPEI; `@destructive`; exactly one submit. |
-| QST 14 | Guest order confirmation | Implemented — not run | Same causal order as QST 13. |
-| QST 15 | Registered login | Blocked | The exported MX auth state did not render `My Profile` during the authenticated fixture validation; no account mutation occurred. |
-| QST 16 | Registered order, payment different from Guest | Implemented — not run | Guarded registered Amex / `mx-mercadoCC`; one submit. |
-| QST 17 | Confirmation email | Not implemented | Explicitly outside this batch. |
-| QST 18 | BackOffice login | Blocked | Two headed attempts reached the S1 URL but the gateway returned HTTP 403 before the login form; credentials were not submitted. |
-| QST 19 | See order status | Blocked | `MX260903-63905850` was configured, but the same pre-login S1 HTTP 403 prevented the read-only search. |
-| QST 20 | Run financial initial CronJob | Blocked | Explicitly excluded; no CronJob execution in this batch. |
-| QST 21 | Run warehouse transfer CronJob | Blocked | Explicitly excluded; no CronJob execution in this batch. |
-| QST 22 | Shipping Requested | Not implemented | Explicitly outside this batch. |
+## Official MX scope
 
-## Safety
+MX contains **92 official priority rows** across Base Store and EPP:
 
-- S1 MX only (`stg.shop.samsung.com`); Production is read-only and is never an execution target.
-- QST 13/14 and 16 require `ALLOW_PAYMENT_SUBMIT=1`, `--workers=1`, and `--retries=0`.
-- Each destructive wrapper performs one submit only and explicitly forbids blind retry when no order code is observable.
-- QST 18/19 are read-only; cancellation and CronJob execution are absent.
+| Store | P1 / QST | P2 / DST only | Total |
+|---|---:|---:|---:|
+| Base Store | 30 | 26 | 56 |
+| EPP | 8 | 28 | 36 |
+| **MX** | **38** | **54** | **92** |
 
-## Current totals
+For the active Base Store QST campaign, the official runner selects **30 P1 TCs**.
 
-| Status | Count |
-|---|---:|
-| Automated | 8 |
-| Partial | 2 |
-| Implemented — not run | 3 |
-| Blocked | 5 |
-| Not implemented | 4 |
-| **Total** | **22** |
+## S1 / S2 parity
+
+The same 30 Base Store P1 cases are used for:
+
+- **S1/STG** — `stg.shop.samsung.com`
+- **S2/STG2** — `stg2.shop.samsung.com`
+
+The environment changes configuration and endpoints, not the case inventory. Specs are not duplicated only to represent S1 versus S2.
+
+## Official MX Base Store P1 IDs
+
+```text
+24962, 24963, 24964, 24968, 24969, 24971, 24972, 24975,
+24981, 24982, 24985, 24986, 24988, 24989, 24990, 24991,
+24992, 24993, 24994, 24995, 24999, 25000, 25001, 25002,
+25004, 25005, 25006, 25010, 25011, 25016
+```
+
+The official gate and list command must reconcile to 30/30 before the complete Base Store P1 campaign is treated as valid.
+
+## FAST guest-safe subset
+
+The FAST guest-safe campaign is a non-destructive subset intended for quick environment/pipeline validation.
+
+Current guest-safe IDs:
+
+```text
+24971, 24972, 24975, 24981, 24982, 24988, 24989,
+24990, 24995, 24999, 25001, 25004, 25005, 25016
+```
+
+This subset does not replace the official 30-TC P1 campaign.
+
+## Runtime status versus coverage
+
+Three concepts must remain separate:
+
+- **Official scope** — the current Samsung priority inventory.
+- **Runtime result** — what actually happened in a specific S1/S2 build.
+- **Automation coverage** — Full / Partial / Missing implementation maturity retained by mapping/reporting layers.
+
+A prior PASS does not guarantee the next environment/build will PASS. A Partial/Full mapping does not create a runtime result.
+
+## Registered and destructive flows
+
+Registered-user execution requires valid environment-specific Samsung Account state.
+
+The MX authenticated fixture:
+
+1. loads the persisted state;
+2. validates that the current session is usable;
+3. for recoverable expiry, may perform one controlled renewal;
+4. reloads the refreshed state into the current Playwright context;
+5. proves authentication before continuing.
+
+CI auto-renew is opt-in with `MX_AUTH_AUTO_RENEW=1`. MFA/CAPTCHA is never bypassed.
+
+Payment/order scenarios require explicit non-Production authorization such as:
+
+```text
+ALLOW_PAYMENT_SUBMIT=1
+```
+
+They must use controlled execution and must not blindly retry after an ambiguous submit.
+
+## Environment defects
+
+Tests must not be weakened merely to make S1/S2 green.
+
+When automation reaches the intended business state and the environment/backend fails the expected behavior, preserve the failure and evidence as an environment/functional defect.
+
+Examples of current stabilization principles include:
+
+- use causal API/UI evidence rather than waiting on a navigation that can be replaced by a maintenance/system-check page;
+- explicitly prove registered address selection before continuing checkout;
+- preserve order/tracking failures when the environment cannot find a newly created order after successful verification;
+- distinguish authentication expiry from product/test-data/backend defects.
+
+## Commands
+
+Official Base Store campaign:
+
+```bash
+npm run qst:mx:base-store
+```
+
+List/discovery only:
+
+```bash
+npm run qst:mx:list
+```
+
+FAST guest-safe campaign:
+
+```bash
+npm run qst:mx:fast
+```
+
+FAST list only:
+
+```bash
+npm run qst:mx:fast:list
+```
+
+Set the environment using the runner/Jenkins configuration. For direct isolated Playwright diagnostics, `MX_QST_ENVIRONMENT=S1` or `S2` selects the target configuration.
+
+## Reporting
+
+MX execution feeds the final reporting stack:
+
+1. Executive Dashboard — build health and presentation.
+2. Allure — SAM/Jira-oriented technical evidence.
+3. Playwright report / Trace Viewer — low-level investigation.
+4. Jenkins Stage View — orchestration and report production.
+
+Historical regional ledgers and old campaign inventories are preserved for traceability but do not replace the current official priority model.
