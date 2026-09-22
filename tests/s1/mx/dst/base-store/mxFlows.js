@@ -81,7 +81,7 @@ export async function reachMxRegisteredPayment(page, config) {
     .then(() => true)
     .catch(() => false);
   if (newAddressAvailable) {
-    await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
+    await newAddress.check({ force: true });
     await expect(newAddress).toBeChecked({ timeout: 30000 });
   }
   const address = await checkout.fillDelivery(
