@@ -2,126 +2,263 @@
 
 ## Current CI scope
 
-The repository `Jenkinsfile` is ready for the official MX S1 Base Store P1/QST campaign. It validates the official 30-TC inventory before execution, uses one Playwright worker and zero retries in the campaign runner, supports Windows and Unix agents, can run headless, injects runtime secrets from Jenkins Credentials, and archives runtime evidence.
+The repository `Jenkinsfile` supports the official MX Base Store P1/QST campaign on **S1/STG or S2/STG2**.
+
+The pipeline validates the official inventory before execution, uses controlled Playwright workers/retries, supports Windows and Unix agents, can run headless, injects runtime secrets from Jenkins Credentials, archives evidence and publishes the Executive Dashboard, Allure and Playwright reports.
+
+The same official MX Base Store P1 inventory is reused across S1 and S2; environment selection changes configuration, not the TC list.
 
 ## Jenkins agent prerequisites
 
 - Git access to this repository.
-- Node.js 24.x (project baseline) and npm.
-- Google Chrome available to the agent (`playwright.config.js` uses `channel: chrome`).
-- Network/VPN access from the agent to Samsung S1 MX and other endpoints used by the selected tests (including BackOffice/Mailinator/payment provider when applicable).
+- Node.js 24.x project baseline and npm.
+- Google Chrome available to the agent (`playwright.config.js` uses the Chrome channel where configured).
+- Network/VPN access to the selected Samsung environment and every endpoint used by the selected tests, including BackOffice, Mailinator and approved payment providers when applicable.
 - Workspace write permission.
+- HTML Publisher plugin for published HTML reports.
+- Pipeline Stage View plugin for the Jenkins job stage matrix.
+- Allure Jenkins plugin if native Jenkins Allure publication is enabled.
 
-A Linux agent is preferred if Samsung provides one, but the Jenkinsfile supports Windows agents as well.
+A Linux agent is preferred if available, but the Jenkinsfile supports Windows agents as well.
 
-## Required Jenkins credentials
+## Runtime credentials and auth state
 
-Create exactly these three Jenkins credentials as **Secret file** credentials. The IDs are part of the pipeline contract:
+Authentication state and approved payment data are runtime-only. They must never be committed or archived.
 
-| Credential ID | Source file | Purpose |
-| --- | --- | --- |
-| `samsung-mx-s1-auth-state` | `playwright/.auth/mx-s1-user.json` | Playwright/Samsung authenticated storage state |
-| `samsung-mx-s1-session-storage` | `playwright/.auth/mx-s1-session-storage.json` | MX S1 sessionStorage exported with the auth state |
-| `samsung-mx-test-card` | `playwright/.auth/mx-test-card.json` | Approved MX payment test data |
+Use Jenkins **Secret file** credentials for the environment-specific auth material and approved payment test data expected by the job configuration. The pipeline copies secret files into the gitignored `playwright/.auth/` directory only for the build and removes that directory in `post { always { ... } }` before artifact publication.
 
-Generate/refresh the first two files locally through the existing approved authentication flow. Do not edit cookies manually and do not bypass MFA/CAPTCHA. Upload the resulting files to Jenkins Credentials.
+Generate or refresh MX auth state through the approved local flow:
 
-The pipeline copies all three secret files into the gitignored `playwright/.auth/` directory only for the build and deletes that directory in `post { always { ... } }` before artifacts are archived.
+```bash
+npm run auth:login:mx
+```
 
-If a Samsung Account session expires, refresh the approved local state and replace the two auth secret files in Jenkins. Credentials are not printed or committed.
+Do not manually edit cookies and do not bypass MFA/CAPTCHA.
 
-## Create the Jenkins job
+## Authentication behavior
 
-Recommended: create a **Pipeline** or **Multibranch Pipeline** from SCM.
+Registered-user tests validate the persisted MX session before continuing.
 
-Repository: `rodrigueslucas-lcs/samsung-order-automation`
+For a recoverable auth failure such as:
 
-Script path: `Jenkinsfile`
+- expired Samsung Account session;
+- unusable saved access/auth state;
+- expired setup cookie;
 
-For the current development cycle, point the job at `agent/mx-qst-p1-finish`. After the work is merged, point it at the team's permanent integration/default branch.
+the authenticated fixture can perform **one controlled renewal**, then reload the new cookies/local/session storage into the already-running Playwright context and prove authentication again before the TC continues.
 
-The Jenkins Git credential used for checkout is separate from the three runtime Secret files above.
+Auto-renew policy:
 
-## Pipeline parameters
+```text
+Local execution:
+  enabled by default
+  MX_AUTH_AUTO_RENEW=0 disables it
 
-- `RUN_MX_QST=true`: run the official MX QST campaign.
-- `RUN_DESTRUCTIVE=true`: required for the complete official 30-TC campaign because it includes authorized payment/order scenarios.
-- `HEADLESS=true`: recommended for Jenkins service agents.
-- `ENABLE_VIDEO=false`: keep disabled until FFmpeg/video is proven on the real agent.
+CI / Jenkins:
+  disabled by default
+  MX_AUTH_AUTO_RENEW=1 explicitly enables it
+```
 
-For a first infrastructure-only build, set `RUN_MX_QST=false`. Checkout, Node/npm/Git/Chrome diagnostics, `npm ci`, the official SMB gate and the exact MX 30/30 list still execute without creating an order.
+Enable CI auto-renew only on an agent where interactive Samsung Account verification can be completed safely. MFA/CAPTCHA remains a human verification step and is never bypassed.
 
-For the first real QST build, enable both `RUN_MX_QST=true` and `RUN_DESTRUCTIVE=true` only on the authorized S1 agent after the three Secret file credentials exist.
+If renewal cannot complete, the run remains failed/blocked. The pipeline must never manufacture PASS from an invalid session.
 
-## Authentication behavior in CI
+## Job configuration
 
-Local execution remains unchanged: `npm run qst:mx:base-store` performs the existing manual authentication/bootstrap flow unless explicitly told otherwise.
+Recommended job type: **Pipeline** or **Multibranch Pipeline** from SCM.
 
-Jenkins sets `MX_QST_USE_EXISTING_AUTH=1`. In that mode the runner requires the pre-provisioned auth state and session storage instead of opening the interactive login bootstrap. Missing auth material fails closed before the campaign starts.
+Repository:
 
-Jenkins also sets `MX_QST_HEADLESS=1` when `HEADLESS=true`. This removes `--headed` from the Playwright invocation but does not weaken any functional assertion.
+```text
+rodrigueslucas-lcs/samsung-order-automation
+```
 
-## Artifacts
+Script path:
 
-Jenkins sets `MX_QST_ARTIFACT_DIR=test-results/jenkins/mx-qst` and archives `test-results/**/*` plus `playwright-report/**/*` after the secret directory has been removed.
+```text
+Jenkinsfile
+```
 
-Current Playwright evidence behavior:
+For the current development cycle, use:
 
-- screenshots: on;
-- trace: retain on failure;
-- video: opt-in with `ENABLE_VIDEO=true` / `PW_VIDEO=1`.
+```text
+agent/mx-qst-p1-finish
+```
 
-Video remains opt-in because a managed Windows environment previously produced FFmpeg `spawn EPERM` during teardown. Enable it only after a small Jenkins-agent proof run.
+After integration, point the job to the team's permanent branch.
 
-## First-run checklist
+## Execution parameters
 
-1. Confirm the Jenkins agent can reach Samsung S1 while on the required corporate network/VPN.
-2. Confirm Node 24.x, npm, Git and Chrome in `Agent Diagnostics`.
-3. Add the three Secret file credentials using the exact IDs above.
-4. Run once with `RUN_MX_QST=false` and confirm both official gates pass.
-5. Run the authorized QST with `RUN_MX_QST=true`, `RUN_DESTRUCTIVE=true`, `HEADLESS=true`, `ENABLE_VIDEO=false`.
-6. Confirm the console reports `Official MX Base P1 selection: 30/30 tests.`
-7. Review archived JSON, screenshots and failure traces.
-8. Do not blindly rerun a failed destructive TC after a possible payment/order submit; inspect the order/evidence first.
+Use the Jenkins parameters exposed by the current `Jenkinsfile`. The important operational rules remain:
+
+- select the intended MX environment explicitly;
+- FAST/guest-safe execution must not require destructive authorization;
+- the full official P1 campaign includes registered/destructive payment/order scenarios and requires explicit authorization;
+- headless is recommended on Jenkins service agents;
+- payment/order execution must not use blind automatic retries;
+- video can remain opt-in until FFmpeg is proven stable on the real Jenkins agent.
+
+For destructive execution, the repository safety gates still apply, including environment guards and explicit action flags such as:
+
+```text
+ALLOW_PAYMENT_SUBMIT=1
+```
+
+Do not enable destructive execution against Production.
+
+## Pipeline stages
+
+The Jenkins pipeline is organized for both operational readability and presentation. The current flow includes stages for:
+
+1. Build Context
+2. Checkout
+3. Validate Request
+4. Agent Health
+5. Dependencies
+6. Official Coverage Gate
+7. Selected execution path, such as FAST Guest Safe / BackOffice Safe / Official P1
+8. Finalize Reports
+9. Quality Summary
+10. Declarative post actions / publication
+
+Pipeline Stage View exposes this progression directly on the Jenkins job page.
+
+## Official scope gate
+
+Before test execution, the pipeline validates the current Samsung official priority model and runner selection.
+
+For MX Base Store P1, the official runner must reconcile to **30 selected TCs** for either S1 or S2.
+
+Static coverage/mapping and runtime PASS/FAIL remain separate concepts.
+
+## Runtime and evidence
+
+The pipeline writes the current build result under the Jenkins test-results tree, including the machine-readable runtime summary used by the reports.
+
+Runtime reconciliation preserves official statuses such as:
+
+- `PASS`
+- `FAIL`
+- `SKIPPED-BLOCKED` / `BLOCKED`
+- `NOT_RUN`
+
+Missing execution evidence is never inferred as PASS.
+
+Playwright evidence can include:
+
+- screenshots;
+- retained failure traces;
+- video when enabled;
+- error/context artifacts;
+- business evidence metadata.
+
+Never archive `playwright/.auth/`.
+
+## Published reports
+
+The Jenkins reporting stack has three complementary layers:
+
+### Executive Dashboard
+
+Published from the Jenkins MX QST report output and intended as the first presentation/release view.
+
+The final dashboard flow is:
+
+1. Build Health
+2. Execution at a glance
+3. Needs Attention only when required
+4. Test Execution
+5. MX Automation Coverage
+6. Official SMB Scope
+7. Coverage by Feature + Gap Queue
+8. Technical Governance, collapsed by default
+
+`Technical Governance` contains:
+
+- Regional Validation Matrix
+- Data Integrity
+- Historical TC Inventory
+
+### Allure
+
+Technical drill-down for Samsung hierarchy, SAM/Jira IDs, business steps, runtime status, categories and attachments.
+
+### Playwright report / trace
+
+Deep technical investigation layer for Playwright execution details and trace analysis.
+
+## HTML Publisher and Resource Root
+
+Use Jenkins **HTML Publisher** links rather than opening archived HTML files as raw artifacts.
+
+JS-heavy reports such as Playwright HTML may require Jenkins **Resource Root URL** to be configured to a different origin from the main Jenkins URL. This allows Jenkins to serve report resources without globally weakening Content Security Policy.
+
+Do **not** disable Jenkins CSP globally just to make Playwright HTML render.
+
+## Playwright Trace Viewer from Jenkins
+
+The Executive Dashboard and Allure may link a trace to:
+
+```text
+https://trace.playwright.dev/?trace=<archived-jenkins-trace-url>
+```
+
+For this to work:
+
+- the archived trace URL must be reachable from the browser;
+- Jenkins authentication/CORS policy must permit access;
+- the browser must permit the public Trace Viewer origin to reach the Jenkins artifact origin.
+
+When Jenkins runs on `localhost`, Chromium-based browsers may block that cross-origin local fetch until **Local Network Access** is allowed for `trace.playwright.dev`.
+
+A Trace Viewer access error does not by itself mean the trace ZIP is corrupt.
+
+## Allure publication
+
+The repository already generates Allure results/reporting through project tooling. The Jenkins Allure plugin may additionally provide native build-history/report integration.
+
+If a pipeline reports that the `allure` DSL step is unavailable, verify that the installed Allure plugin is active in a **new clean build**. Do not assume a build resumed across a Jenkins restart proves the plugin configuration is invalid.
+
+The generated Allure HTML remains a valid fallback publication layer when native plugin publication is unavailable.
+
+## First-run / clean-build checklist
+
+1. Confirm the Jenkins agent can reach the selected Samsung environment on the required corporate network/VPN.
+2. Confirm Node, npm, Git and Chrome in Agent Health/Diagnostics.
+3. Confirm the required Secret file credentials exist for the selected environment.
+4. Run the official coverage/inventory gate.
+5. Run a non-destructive FAST build first when validating infrastructure/reporting.
+6. Confirm the selected test count matches the intended campaign.
+7. Confirm Executive Dashboard publication.
+8. Confirm Allure publication and TC attachments.
+9. Confirm Playwright HTML opens through HTML Publisher.
+10. Open one retained trace and validate browser/Jenkins network permissions.
+11. Only then run the authorized destructive/full campaign if required.
+12. After a possible payment/order submit, inspect evidence/order state before any manual rerun.
 
 ## Security and safety rules
 
-- Never commit passwords, storage-state cookies, session storage, payment test data, or Jenkins secret files.
+- Never commit passwords, cookies, tokens, session storage, payment test data or Jenkins secret files.
 - Never archive `playwright/.auth/`.
-- Payment/order campaign: one worker, zero retries.
-- `RUN_DESTRUCTIVE` authorizes the official QST payment/order family only; it does not authorize profile writes or cronjobs.
+- Production is read-only.
+- Payment/order scenarios use controlled execution and no blind retry after an ambiguous submit.
+- `ALLOW_PAYMENT_SUBMIT`, profile-write and cronjob flags authorize only their explicit non-Production action families.
 - MFA/CAPTCHA is never bypassed.
-- If a runtime result has no Playwright result status, the runner reports `NOT_RUN`; it must never infer PASS from missing execution evidence.
+- Auth renewal is attempted at most once per recoverable fixture setup failure.
+- A backend/environment defect remains a backend/environment defect; tests must not be weakened only to make the build green.
 
-## Next CI layer after first Jenkins proof
+## Presentation flow
 
-After one real Jenkins build proves agent/network/auth compatibility:
+Recommended demo sequence:
 
-1. Validate screenshot/trace/video artifact UX on Jenkins.
-2. Generate the Samsung Executive/Control Center report from the same build runtime JSON/artifacts.
-3. Add Allure as technical drill-down while retaining the executive report for management/release reporting.
-4. Parameterize market (MX/PE/CO/CL), QST/DST and Base Store/EPP only as those official runners become execution-ready.
-5. Add schedules only after authentication/session refresh behavior is operationally reliable.
-# Jenkins HTML and runtime reporting
+```text
+Executive Dashboard
+  → current build health
+  → TC evidence / SAM
+  → Allure technical drill-down
+  → Playwright trace when needed
+  → Jenkins Stage View / automation pipeline
+  → regional scalability and official scope
+```
 
-Install the Jenkins **HTML Publisher** plugin before running this pipeline. The
-pipeline publishes two navigable build actions:
-
-- `Playwright MX QST` from `playwright-report/index.html`;
-- `MX QST Executive Dashboard` from
-  `test-results/jenkins/mx-qst/executive/index.html`.
-
-The same directories remain archived as ordinary artifacts. Opening an archived
-HTML file directly may show source text because artifact serving is not an HTML
-report host; use the HTML Publisher links on the build page. No global Jenkins
-CSP relaxation is required by this repository change.
-
-The machine-readable current-build result is written to
-`test-results/jenkins/mx-qst/runtime-summary.json`. It is derived from the real
-Playwright JSON result and reconciles the 30 official MX Base Store P1 cases as
-`PASS`, `FAIL`, `SKIPPED-BLOCKED`, or `NOT_RUN`. Static mapping and coverage
-remain separate sources for requirements and implementation completeness.
-
-`playwright/.auth/` is temporary Jenkins Secret File material. It is removed in
-`post { always { ... } }` before artifact publication and is never included by
-the archive patterns.
+This keeps the presentation outcome-first while retaining full engineering evidence underneath.
