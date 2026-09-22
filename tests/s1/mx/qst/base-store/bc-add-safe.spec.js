@@ -29,6 +29,17 @@ async function readHeaderCartCount(page) {
   return value ? Number(value) : 0;
 }
 
+async function resolveObservedMinicartCountUrl(page) {
+  const observed = await page.evaluate(() => {
+    const resources = performance.getEntriesByType("resource")
+      .map((entry) => entry.name)
+      .filter((url) => /\/minicart\/totalProducts(?:[?#]|$)/i.test(url));
+    return resources.at(-1) || null;
+  });
+  if (observed) return observed;
+  return new URL("/mx/minicart/totalProducts", page.url()).toString();
+}
+
 async function getAuthenticatedPreQaPage() {
   const cdpBrowser = await chromium.connectOverCDP(PRE_QA_CDP_URL);
   const contexts = cdpBrowser.contexts();
@@ -87,6 +98,7 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
 
     const cartCountBefore = await readHeaderCartCount(page);
     expect(cartCountBefore).not.toBeNull();
+    const minicartCountUrl = await resolveObservedMinicartCountUrl(page);
     const addToCart = page
       .getByRole("button", { name: /Añadir al carrito|Agregar al carrito|Add to cart|Add to bag/i })
       .filter({ visible: true })
@@ -96,17 +108,14 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
       response.request().method() === "POST" &&
       new URL(response.url()).pathname.endsWith("/addToCart/multi/"),
     { timeout: 60000 });
-    const countResponsePromise = page.waitForResponse((response) =>
-      response.request().method() === "GET" &&
-      new URL(response.url()).pathname.endsWith("/minicart/totalProducts"),
-    { timeout: 60000 });
     await addToCart.click();
-    const [addResponse, countResponse] = await Promise.all([addResponsePromise, countResponsePromise]);
+    const addResponse = await addResponsePromise;
     expect(addResponse.ok(), "The PreQA Add to Cart request must succeed.").toBe(true);
-    expect(countResponse.ok(), "The minicart count request must succeed.").toBe(true);
-    // CDP discards the original response body when the Add to Cart callback
-    // immediately navigates to stg2/cart. Re-read the same count endpoint.
-    const countSnapshot = await page.request.get(countResponse.url());
+
+    // The Add to Cart callback can redirect to a maintenance/system-check cart
+    // before the storefront emits a second minicart request. Validate the cart
+    // mutation by querying the exact minicart endpoint observed on the PDP.
+    const countSnapshot = await page.request.get(minicartCountUrl);
     expect(countSnapshot.ok(), "The post-add minicart count must be readable.").toBe(true);
     const countBody = await countSnapshot.text();
     const cartCountAfter = Number(countBody.match(/<Integer>(\d+)<\/Integer>/i)?.[1]);
