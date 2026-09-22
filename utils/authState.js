@@ -40,11 +40,58 @@ function createAuthState({
     );
   }
 
-  async function applyAuthSessionStorage(context) {
+  function readPersistedAuthState() {
     requireAuthState();
-    const sessionStorage = JSON.parse(
-      fs.readFileSync(AUTH_SESSION_STORAGE_PATH, "utf8")
+    return {
+      browserState: JSON.parse(fs.readFileSync(AUTH_STATE_PATH, "utf8")),
+      sessionStorage: JSON.parse(fs.readFileSync(AUTH_SESSION_STORAGE_PATH, "utf8")),
+    };
+  }
+
+  async function installPersistedBrowserState(context, page = null) {
+    const { browserState, sessionStorage } = readPersistedAuthState();
+    const targetOrigin = `https://${hostname}`;
+    const targetLocalStorage = (browserState.origins || [])
+      .find(({ origin }) => origin === targetOrigin)?.localStorage || [];
+
+    if (Array.isArray(browserState.cookies) && browserState.cookies.length) {
+      await context.addCookies(browserState.cookies);
+    }
+
+    await context.addInitScript(
+      ({ targetHostname, sessionState, localState }) => {
+        if (window.location.hostname !== targetHostname) return;
+        for (const [key, value] of Object.entries(sessionState || {})) {
+          window.sessionStorage.setItem(key, value);
+        }
+        for (const item of localState || []) {
+          if (item?.name != null) window.localStorage.setItem(item.name, item.value ?? "");
+        }
+      },
+      { targetHostname: hostname, sessionState: sessionStorage, localState: targetLocalStorage }
     );
+
+    if (page) {
+      let currentHostname = "";
+      try { currentHostname = new URL(page.url()).hostname; } catch {}
+      if (currentHostname === hostname) {
+        await page.evaluate(
+          ({ sessionState, localState }) => {
+            for (const [key, value] of Object.entries(sessionState || {})) {
+              window.sessionStorage.setItem(key, value);
+            }
+            for (const item of localState || []) {
+              if (item?.name != null) window.localStorage.setItem(item.name, item.value ?? "");
+            }
+          },
+          { sessionState: sessionStorage, localState: targetLocalStorage }
+        );
+      }
+    }
+  }
+
+  async function applyAuthSessionStorage(context) {
+    const { sessionStorage } = readPersistedAuthState();
 
     await context.addInitScript(
       ({ targetHostname, state }) => {
@@ -191,6 +238,7 @@ function createAuthState({
     AUTH_STATE_PATH,
     AUTH_SESSION_STORAGE_PATH,
     applyAuthSessionStorage,
+    installPersistedBrowserState,
     refreshAuthenticatedState,
     hasAuthState,
     requireAuthState,
