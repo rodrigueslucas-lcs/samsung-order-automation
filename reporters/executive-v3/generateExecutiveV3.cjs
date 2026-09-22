@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { buildDashboardModel } = require('./dashboardModel');
 
-const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;' }[c]));
 const pct = value => value == null ? 'N/A' : `${Number(value).toFixed(1)}%`;
 const readJson = file => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
 const duration = ms => `${(Number(ms || 0) / 60000).toFixed(1)}m`;
@@ -12,7 +12,6 @@ const displayStatus = status => status === 'SKIPPED-BLOCKED' ? 'BLOCKED' : statu
 const chip = value => `<span class="chip ${statusClass(value)}">${esc(displayStatus(value))}</span>`;
 const empty = text => `<div class="empty">${esc(text)}</div>`;
 const kpi = (label, value, hint='', tone='') => `<article class="kpi ${tone}"><small>${esc(label)}</small><b>${esc(value)}</b><span>${esc(hint)}</span></article>`;
-const bar = value => `<div class="bar"><progress max="100" value="${Math.max(0, Math.min(100, Number(value || 0)))}"></progress></div>`;
 const successRate = summary => summary?.executed ? (Number(summary.passed || 0) / Number(summary.executed) * 100) : 0;
 const jiraHref = samId => `https://jira.secext.samsung.net/browse/${encodeURIComponent(String(samId || ''))}`;
 const samLink = samId => `<a class="sam-link" href="${jiraHref(samId)}" target="_blank" rel="noopener">${esc(samId)}</a>`;
@@ -35,6 +34,13 @@ function evidenceHref(execution, artifactPath) {
 function traceViewerHref(href) {
   return href ? `https://trace.playwright.dev/?trace=${encodeURIComponent(href)}` : null;
 }
+function publishedPlaywrightHref(execution) {
+  if (!execution?.buildUrl) return null;
+  const base = String(execution.buildUrl).replace(/\/?$/, '/');
+  const environment = /S2/i.test(String(execution.environment || '')) ? 'S2' : 'S1';
+  const suite = /FAST/i.test(String(execution.suite || '')) ? 'Fast' : 'P1';
+  return `${base}02_20_c2b7_20Samsung_20MX_20${environment}_20${suite}_20_c2b7_20Playwright/`;
+}
 function attachmentKind(item) {
   const value = `${item?.name || ''} ${item?.path || ''}`.toLowerCase();
   if (/trace\.zip|\btrace\b/.test(value)) return 'trace';
@@ -46,14 +52,33 @@ function attachmentKind(item) {
 function renderAttachments(execution, attachments = []) {
   const safe = attachments.filter(item => item?.path && !/(^|\/)playwright\/\.auth(\/|$)/i.test(item.path));
   if (!safe.length) return '<span class="no-evidence">—</span>';
-  const labels = { trace:'Open Trace', screenshot:'Screenshot', video:'Video', context:'Error Context', artifact:'Artifact' };
-  return safe.map(item => {
-    const href = evidenceHref(execution, item.path);
+  const seen = new Set();
+  const links = [];
+  for (const item of safe) {
     const kind = attachmentKind(item);
-    const target = kind === 'trace' ? traceViewerHref(href) : href;
-    const icon = { trace:'⌁', screenshot:'▣', video:'▶', context:'≡', artifact:'↗' }[kind];
-    return target ? `<a class="evidence-link ${kind}" href="${esc(target)}" target="_blank" rel="noopener" title="${esc(item.name || path.basename(item.path))}"><span>${icon}</span>${labels[kind]}</a>` : `<span>${esc(labels[kind])}</span>`;
-  }).join('');
+    // Jenkins commonly serves markdown context and trace ZIPs as downloads. The
+    // dashboard already renders the failure reason inline, so context files are
+    // intentionally not exposed as a misleading browser link.
+    if (kind === 'context') continue;
+    let target = evidenceHref(execution, item.path);
+    let label = 'Artifact';
+    let icon = '↗';
+    if (kind === 'trace') {
+      target = publishedPlaywrightHref(execution) || target;
+      label = target ? 'Open Playwright' : 'Trace';
+      icon = '⌁';
+    } else if (kind === 'screenshot') {
+      label = 'Screenshot'; icon = '▣';
+    } else if (kind === 'video') {
+      label = 'Video'; icon = '▶';
+    }
+    if (!target) continue;
+    const signature = `${kind}:${target}`;
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    links.push(`<a class="evidence-link ${kind}" href="${esc(target)}" target="_blank" rel="noopener" title="${esc(item.name || path.basename(item.path))}"><span>${icon}</span>${label}</a>`);
+  }
+  return links.join('') || '<span class="no-evidence">See reason</span>';
 }
 function blockerCategory(test) {
   const text = `${test?.blockedReason || ''} ${test?.error || ''}`;
@@ -87,10 +112,7 @@ function renderExecution(execution) {
   const reconciled = s.passed + s.failed + s.blocked + s.notRun === s.official;
   const rows = execution.tests.map(test => `<tr><td>${samLink(test.samId)}<small>${esc(test.title || '')}</small></td><td>${chip(test.status)}</td><td>${esc(blockerCategory(test))}</td><td>${duration(test.duration)}</td><td class="evidence">${renderAttachments(execution, test.attachments)}</td><td class="evidence-text" title="${esc(test.blockedReason || test.error || '')}">${esc(String(test.blockedReason || test.error || '').split('\n')[0])}</td></tr>`).join('');
   const ev = evidenceStats(execution);
-  return `${executionMeta(execution,reconciled)}<div class="evidence-summary"><div><span class="section-kicker">EXECUTION EVIDENCE</span><strong>${ev.withEvidence} / ${s.official} TCs with evidence</strong><small>${ev.totalFiles} browser artifacts available in this runtime summary</small></div><div class="evidence-key"><span>▣ Screenshot</span><span>▶ Video</span><span>⌁ Trace</span><span>≡ Error Context</span></div></div><div class="grid runtime-kpis">${kpi('Official selected',s.official,'Current build only')}${kpi('Executed',s.executed,'PASS + FAIL')}${kpi('PASS',s.passed,pct(s.passRate),'good')}${kpi('FAIL',s.failed,'Current build failures',s.failed?'bad':'')}${kpi('Blocked',s.blocked,'Known prerequisites',s.blocked?'warn':'')}${kpi('Duration',duration(s.duration),'Total runtime')}</div>${resultBar(s)}<div class="table-wrap execution-table"><table><thead><tr><th>Test case</th><th>Status</th><th>Category</th><th>Duration</th><th>Evidence</th><th>Reason</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-}
-function renderOfficialMarkets() {
-  return Object.entries(OFFICIAL.markets).map(([market,m]) => `<article class="market-card"><div class="market-head"><strong>${market}</strong><span>${m.total} total / DST</span></div><div class="market-number">${m.p1} <small>P1 / QST total</small></div><div class="priority-split"><span><b>${m.p1}</b> P1</span><span><b>${m.p2}</b> P2</span></div><div class="store-breakdown"><div><strong>Base Store</strong><b>${m.base}</b><small>${m.baseP1} P1 · ${m.baseP2} P2</small>${market === 'MX' ? '<em>30 = current official runner</em>' : ''}</div><div><strong>EPP</strong><b>${m.epp}</b><small>${m.eppP1} P1 · ${m.eppP2} P2</small></div></div><footer>P1 runs in QST + DST · P2 runs in DST only</footer></article>`).join('');
+  return `${executionMeta(execution,reconciled)}<div class="evidence-summary"><div><span class="section-kicker">EXECUTION EVIDENCE</span><strong>${ev.withEvidence} / ${s.official} TCs with evidence</strong><small>${ev.totalFiles} browser artifacts available in this runtime summary</small></div><div class="evidence-key"><span>▣ Screenshot</span><span>▶ Video</span><span>⌁ Playwright report / trace</span><span>Reason shown inline</span></div></div><div class="grid runtime-kpis">${kpi('Official selected',s.official,'Current build only')}${kpi('Executed',s.executed,'PASS + FAIL')}${kpi('PASS',s.passed,pct(s.passRate),'good')}${kpi('FAIL',s.failed,'Current build failures',s.failed?'bad':'')}${kpi('Blocked',s.blocked,'Known prerequisites',s.blocked?'warn':'')}${kpi('Duration',duration(s.duration),'Total runtime')}</div>${resultBar(s)}<div class="table-wrap execution-table"><table><thead><tr><th>Test case</th><th>Status</th><th>Category</th><th>Duration</th><th>Evidence</th><th>Reason</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function evidenceStats(execution) {
   const tests = Array.isArray(execution?.tests) ? execution.tests : [];
@@ -133,13 +155,13 @@ function render(model) {
     ${kpi('Suite',execution.suite || 'P1/QST',execution.store || 'Base Store')}
   ` : '';
   const governance = `
-    <div class="governance-summary"><div><span class="section-kicker">TECHNICAL GOVERNANCE</span><strong>3 supporting views</strong><small>Audit and historical traceability stay available without competing with current-build results.</small></div><div class="governance-stats"><span><b>${auditPassed}/${auditTotal}</b> audit checks</span><span><b>${catalog.length}</b> historical TCs</span><span><b>4</b> LATAM markets</span></div></div>
-    ${governanceItem('Regional Validation Matrix','Historical 144-ID execution ledger by market and feature.','LEGACY',`<div class="static-note">Current Build Runtime uses ${runtime ? `${runtime.official} selected TCs` : 'its own runtime denominator'}. This matrix is preserved historical context and does not replace the current priority model.</div><div class="table-wrap"><table><thead><tr><th>Feature</th><th>MX</th><th>CL</th><th>CO</th><th>PE</th></tr></thead><tbody>${renderMarketFeatureMatrix(model.validation.marketFeatureMatrix)}</tbody></table></div>`)}
-    ${governanceItem('Data Integrity','Registry, coverage and ledger consistency checks.',model.audit.ok ? 'ALL CHECKS PASS' : 'CHECK REQUIRED',`<div class="audit-summary ${model.audit.ok?'audit-ok':'audit-check'}"><strong>${auditPassed} of ${auditTotal} validation checks passed</strong><span>Registry totals · coverage ledger · canonical statuses · runtime IDs</span></div><div class="table-wrap"><table><thead><tr><th>Result</th><th>Check</th><th>Detail</th></tr></thead><tbody>${renderAudit(model.audit)}</tbody></table></div>`)}
-    ${governanceItem('Historical TC Inventory',`Preserved ${catalog.length}-ID Zephyr campaign for traceability.`,'ARCHIVE',`<div class="archive-summary"><strong>${catalog.length} TCs retained for audit and traceability</strong><span>This is reference data, not the current-build execution table.</span></div><div class="table-wrap historical-table"><table><thead><tr><th>TC</th><th>Market</th><th>Feature</th><th>Store</th><th>Ledger status</th><th>Coverage</th><th>Context</th><th>Evidence / blocker</th></tr></thead><tbody>${renderCatalog(catalog)}</tbody></table></div>`)}
+    <div class="governance-summary"><div><span class="section-kicker">TECHNICAL GOVERNANCE</span><strong>3 supporting views</strong><small>Historical evidence and consistency checks stay available without competing with current-build results.</small></div><div class="governance-stats"><span><b>${auditPassed}/${auditTotal}</b> audit checks</span><span><b>${catalog.length}</b> historical TCs</span><span><b>4</b> LATAM markets</span></div></div>
+    ${governanceItem('Historical Regional Validation Matrix','Preserved 144-ID ledger by market and feature.','HISTORICAL',`<div class="static-note">This is the preserved historical 144-ID campaign. It is not the current 362-row priority model and it does not replace the current-build runtime.</div><div class="table-wrap"><table><thead><tr><th>Feature</th><th>MX</th><th>CL</th><th>CO</th><th>PE</th></tr></thead><tbody>${renderMarketFeatureMatrix(model.validation.marketFeatureMatrix)}</tbody></table></div>`)}
+    ${governanceItem('Data Integrity','Automated consistency checks for reporting inputs.',model.audit.ok ? 'ALL CHECKS PASS' : 'CHECK REQUIRED',`<div class="audit-summary ${model.audit.ok?'audit-ok':'audit-check'}"><strong>${auditPassed} of ${auditTotal} validation checks passed</strong><span>Historical registry · current 30-TC runner coverage · canonical ledger statuses · known IDs</span></div><div class="table-wrap"><table><thead><tr><th>Result</th><th>Check</th><th>Detail</th></tr></thead><tbody>${renderAudit(model.audit)}</tbody></table></div>`)}
+    ${governanceItem('Historical TC Archive',`Preserved ${catalog.length}-ID Zephyr campaign for audit/traceability.`,'ARCHIVE',`<div class="archive-summary"><strong>${catalog.length} historical rows retained</strong><span>Reference only. Current execution is the Test Execution table above.</span></div><div class="table-wrap historical-table"><table><thead><tr><th>TC</th><th>Market</th><th>Feature</th><th>Store</th><th>Historical status</th><th>Coverage</th><th>Context</th><th>Evidence / blocker</th></tr></thead><tbody>${renderCatalog(catalog)}</tbody></table></div>`)}
   `;
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Samsung SMB QA Automation</title><link rel="stylesheet" href="dashboard.css"><style>
-body{background:#f6f8fb}.hero{background:linear-gradient(118deg,#071d3b 0%,#0b376d 64%,#0e4b8f 100%)}main{max-width:1480px}.panel,.overview{box-shadow:0 10px 28px rgba(18,43,75,.055);border-color:#e3e9f1}.presentation-final .tag{background:#eef4fb;color:#32516f}.market-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.market-strip span{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;border:1px solid #e5eaf1;border-radius:10px;background:#fafbfd;color:#66778c}.market-strip b{color:#16365b;font-size:14px}.scope-explainer.compact{margin-bottom:12px}.compact-kpis{grid-template-columns:repeat(4,1fr)}.governance-shell{border:1px solid #dbe4ef;background:#fff}.governance-shell>summary{padding:20px 22px}.governance-shell[open]>summary{border-bottom:1px solid #e6ebf2}.governance-shell>.detail-body{padding:0}.governance-summary{display:flex;justify-content:space-between;gap:24px;align-items:center;padding:18px 22px;background:#f8fafc}.governance-summary strong{display:block;font-size:18px;margin:3px 0}.governance-summary small{display:block;color:#6e7e91}.governance-stats{display:flex;gap:10px;flex-wrap:wrap}.governance-stats span{padding:8px 11px;background:#fff;border:1px solid #e0e6ee;border-radius:9px;color:#6a7889}.governance-stats b{color:#17395f}.governance-item{border-top:1px solid #e7ebf1;background:#fff}.governance-item>summary{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 22px;cursor:pointer;list-style:none}.governance-item>summary::-webkit-details-marker{display:none}.governance-item>summary div strong{display:block;color:#18395e;font-size:15px}.governance-item>summary div span{display:block;color:#758497;margin-top:3px;font-size:12px}.governance-badge{font-size:10px;font-weight:700;letter-spacing:.05em;color:#60758e;background:#f0f4f8;padding:5px 8px;border-radius:999px}.governance-body{padding:0 22px 22px}.audit-summary,.archive-summary{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:12px 14px;border-radius:10px;margin-bottom:12px;background:#f7f9fc;color:#68788d}.audit-ok strong{color:#087b52}.audit-check strong{color:#a75e00}.archive-summary strong{color:#284a6d}.historical-table{max-height:520px;overflow:auto}.attention-panel{border-left:4px solid #c43b4d}.coverage-row{gap:12px}.coverage-box{background:#fafbfd}.detail-body{padding-top:14px}.report-footer{opacity:.8}@media(max-width:900px){.market-strip,.compact-kpis{grid-template-columns:repeat(2,1fr)}.governance-summary{align-items:flex-start;flex-direction:column}}@media(max-width:600px){.market-strip,.compact-kpis{grid-template-columns:1fr}.governance-stats{display:grid;grid-template-columns:1fr;width:100%}}
+body{background:#f6f8fb}.hero{background:linear-gradient(118deg,#071d3b 0%,#0b376d 64%,#0e4b8f 100%)}main{max-width:1480px}.panel,.overview{box-shadow:0 10px 28px rgba(18,43,75,.055);border-color:#e3e9f1}.presentation-final .tag{background:#eef4fb;color:#32516f}.market-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.market-strip span{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;border:1px solid #e5eaf1;border-radius:10px;background:#fafbfd;color:#66778c}.market-strip b{color:#16365b;font-size:14px}.scope-explainer.compact{margin-bottom:12px}.compact-kpis{grid-template-columns:repeat(4,1fr)}.governance-shell{border:1px solid #dbe4ef;background:#fff}.governance-shell>summary{padding:20px 22px}.governance-shell[open]>summary{border-bottom:1px solid #e6ebf2}.governance-shell>.detail-body{padding:0}.governance-summary{display:flex;justify-content:space-between;gap:24px;align-items:center;padding:18px 22px;background:#f8fafc}.governance-summary strong{display:block;font-size:18px;margin:3px 0}.governance-summary small{display:block;color:#6e7e91}.governance-stats{display:flex;gap:10px;flex-wrap:wrap}.governance-stats span{padding:8px 11px;background:#fff;border:1px solid #e0e6ee;border-radius:9px;color:#6a7889}.governance-stats b{color:#17395f}.governance-item{border-top:1px solid #e7ebf1;background:#fff}.governance-item>summary{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 22px;cursor:pointer;list-style:none}.governance-item>summary::-webkit-details-marker{display:none}.governance-item>summary div strong{display:block;color:#18395e;font-size:15px}.governance-item>summary div span{display:block;color:#758497;margin-top:3px;font-size:12px}.governance-badge{font-size:10px;font-weight:700;letter-spacing:.05em;color:#60758e;background:#f0f4f8;padding:5px 8px;border-radius:999px}.governance-body{padding:0 22px 22px}.audit-summary,.archive-summary{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:12px 14px;border-radius:10px;margin-bottom:12px;background:#f7f9fc;color:#68788d}.audit-ok strong{color:#087b52}.audit-check strong{color:#a75e00}.archive-summary strong{color:#284a6d}.historical-table{max-height:480px;overflow:auto}.attention-panel{border-left:4px solid #c43b4d}.coverage-row{gap:12px}.coverage-box{background:#fafbfd}.detail-body{padding-top:14px}.report-footer{opacity:.8}.presentation-final .section-grid{grid-template-columns:1fr;gap:22px}.presentation-final .section-grid>.table-wrap,.presentation-final .section-grid>div{min-width:0}.presentation-final .section-grid table{width:100%}.presentation-final .evidence-link.trace{background:#eef4fb;color:#184c82}@media(max-width:900px){.market-strip,.compact-kpis{grid-template-columns:repeat(2,1fr)}.governance-summary{align-items:flex-start;flex-direction:column}}@media(max-width:600px){.market-strip,.compact-kpis{grid-template-columns:1fr}.governance-stats{display:grid;grid-template-columns:1fr;width:100%}}
 </style></head><body class="presentation-final"><header class="hero"><div class="hero-row"><div><div class="eyebrow">Samsung · Quality Engineering · SMB</div><h1>QA Execution Dashboard</h1><p>${headline}</p></div><div class="health ${health.toLowerCase().replace(/\s+/g,'-')}"><span class="eyebrow">Current build health</span><strong>${esc(health)}</strong></div></div><div class="meta"><span>Generated ${esc(model.generatedAt)}</span><span>Official SMB 362</span><span>P1/QST 144</span><span>P2/DST 218</span><span>Data audit ${model.audit.ok ? 'OK' : 'CHECK'}</span></div></header><main>
 <section class="overview">
   <div class="overview-head"><div><span class="section-kicker">CURRENT BUILD</span><h2>Execution at a glance</h2></div><span class="tag">REAL PLAYWRIGHT RUNTIME</span></div>
@@ -148,10 +170,10 @@ body{background:#f6f8fb}.hero{background:linear-gradient(118deg,#071d3b 0%,#0b37
 </section>
 ${attentionCount ? `<section class="panel attention-panel"><div class="panel-title"><div><h2>Needs Attention</h2><p>Failures and known blockers only.</p></div><span class="tag">${attentionCount} ITEMS</span></div>${renderAttention(execution)}</section>` : ''}
 ${detail('Test Execution','Current-build TCs with status, duration and browser evidence.','CURRENT BUILD',renderExecution(execution),true)}
-${detail('MX Automation Coverage','Implementation maturity for the preserved MX mapping; intentionally separate from runtime.','IMPLEMENTATION',`<div class="coverage-row"><div class="coverage-box"><small>FULL</small><b>${mx.full ?? 'N/A'}</b></div><div class="coverage-box"><small>PARTIAL</small><b>${mx.partial ?? 'N/A'}</b></div><div class="coverage-box"><small>MISSING</small><b>${mx.missing ?? 'N/A'}</b></div><div class="coverage-box"><small>FULL COVERAGE</small><b>${pct(mx.fullPercent)}</b></div></div><div class="scope-note">The preserved 37-ID mapping is an implementation ledger. It is not the current official MX P1 denominator (38) or the current Base Store runner selection (30).</div>`,true)}
+${detail('MX Base Store P1 Automation Coverage','Current implementation maturity for the official 30-TC MX Base Store P1 runner.','30-TC RUNNER',`<div class="coverage-row"><div class="coverage-box"><small>FULL</small><b>${mx.full ?? 'N/A'}</b></div><div class="coverage-box"><small>PARTIAL</small><b>${mx.partial ?? 'N/A'}</b></div><div class="coverage-box"><small>MISSING</small><b>${mx.missing ?? 'N/A'}</b></div><div class="coverage-box"><small>FULL COVERAGE</small><b>${pct(mx.fullPercent)}</b></div></div><div class="scope-note">This coverage is calculated only over the official 30 MX Base Store P1 IDs. Runtime PASS/FAIL remains a separate dimension.</div>`,true)}
 ${detail('Official SMB Scope','Compact reference for the current LATAM P1/P2 priority model.','362 SCENARIOS',scopeReference,true)}
-${detail('Coverage by Feature + Gap Queue','Where automation is mature and what remains to implement.','COVERAGE',`<div class="section-grid"><div><h3>MX Coverage by Feature</h3><div class="table-wrap"><table><thead><tr><th>Feature</th><th>Total</th><th>Full</th><th>Partial</th><th>Missing</th><th>Full %</th></tr></thead><tbody>${renderFeatureRows(mx.features)}</tbody></table></div></div><div><h3>Automation Gap Queue</h3><div class="table-wrap"><table><thead><tr><th>TC</th><th>Feature</th><th>Store</th><th>Coverage</th></tr></thead><tbody>${renderGaps(mx.gaps)}</tbody></table></div></div></div>`,true)}
-<details class="panel disclosure governance-shell"><summary><div><h2>Technical Governance</h2><p>Regional ledger, integrity audit and historical TC archive — available on demand.</p></div><span class="tag">3 SECTIONS · ${model.audit.ok?'AUDIT OK':'CHECK'}</span></summary><div class="detail-body">${governance}</div></details>
+${detail('Coverage by Feature + Gap Queue','Current 30-TC runner maturity and prioritized implementation gaps.','COVERAGE',`<div class="section-grid"><div><h3>MX Base Store P1 Coverage by Feature</h3><div class="table-wrap"><table><thead><tr><th>Feature</th><th>Total</th><th>Full</th><th>Partial</th><th>Missing</th><th>Full %</th></tr></thead><tbody>${renderFeatureRows(mx.features)}</tbody></table></div></div><div><h3>Automation Gap Queue</h3><div class="table-wrap"><table><thead><tr><th>TC</th><th>Feature</th><th>Store</th><th>Coverage</th></tr></thead><tbody>${renderGaps(mx.gaps)}</tbody></table></div></div></div>`,true)}
+<details class="panel disclosure governance-shell"><summary><div><h2>Technical Governance</h2><p>Historical ledger, integrity audit and archived TC inventory — available on demand.</p></div><span class="tag">3 SECTIONS · ${model.audit.ok?'AUDIT OK':'CHECK'}</span></summary><div class="detail-body">${governance}</div></details>
 <footer class="report-footer"><strong>Samsung SMB QA Automation</strong><span>Runtime · Evidence · Coverage · Governance</span></footer>
 </main></body></html>`;
 }
@@ -170,4 +192,4 @@ function main() {
   console.log(`[executive-v3] ${output}`);
 }
 if (require.main === module) main();
-module.exports = { render, evidenceHref, traceViewerHref, attachmentKind };
+module.exports = { render, evidenceHref, traceViewerHref, publishedPlaywrightHref, attachmentKind };
