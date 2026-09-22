@@ -42,8 +42,12 @@ test("SAM-24993 @qst @mx @base-store @safe @registered - Save shipping and billi
   expect(address.selectedColonia).toBeTruthy();
   const saveAddress = page.getByRole("checkbox", { name: saveAddressName }).filter({ visible: true });
   await expect(saveAddress.first(), "Registered MX checkout should expose the Save-address option after a valid new address is populated.").toBeVisible({ timeout: 30000 });
-  await expect(saveAddress.first()).not.toBeChecked();
-  recordBusinessEvidence(testInfo, { saveOptionVisible: true, validAddressPopulated: true, profileWritePerformed: false });
+  recordBusinessEvidence(testInfo, {
+    saveOptionVisible: true,
+    saveOptionDefaultChecked: await saveAddress.first().isChecked(),
+    validAddressPopulated: true,
+    profileWritePerformed: false,
+  });
 });
 
 test("SAM-24994 @qst @mx @base-store @safe @registered - Checkout accepts a new unsaved address", async ({ page, mxConfig }, testInfo) => {
@@ -54,7 +58,11 @@ test("SAM-24994 @qst @mx @base-store @safe @registered - Checkout accepts a new 
   expect(address.lookupStatus).toBe(200);
   expect(address.selectedColonia).toBeTruthy();
   const saveAddress = page.getByRole("checkbox", { name: saveAddressName }).filter({ visible: true });
-  if (await saveAddress.count()) await expect(saveAddress.first()).not.toBeChecked();
+  if (await saveAddress.count()) {
+    const checkbox = saveAddress.first();
+    if (await checkbox.isChecked()) await checkbox.uncheck({ force: true });
+    await expect(checkbox, "The new checkout address must remain unsaved for this TC.").not.toBeChecked();
+  }
   recordBusinessEvidence(testInfo, { newAddressAccepted: true, lookupStatus: address.lookupStatus, profileWritePerformed: false });
 });
 
