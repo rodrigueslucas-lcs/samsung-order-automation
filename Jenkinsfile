@@ -11,8 +11,8 @@ pipeline {
 
   parameters {
     choice(name: 'ENVIRONMENT', choices: ['S1', 'S2'], description: 'Target MX environment. S1 = stg storefront / S1 BackOffice; S2 = stg2 storefront / S2 BackOffice.')
-    choice(name: 'TEST_SUITE', choices: ['fast-guest', 'official-p1', 'backoffice-safe', 'allure-smoke'], description: 'Execution profile. fast-guest is the recommended quick feedback suite.')
-    choice(name: 'EXECUTION_MODE', choices: ['safe', 'authorized-destructive'], description: 'Safety mode. Destructive payment/order execution is accepted only by official-p1.')
+    choice(name: 'TEST_SUITE', choices: ['fast-guest', 'official-p1', 'backoffice-safe', 'allure-smoke'], description: 'Execution profile. fast-guest = quick feedback; official-p1 = official MX P1 campaign; backoffice-safe = read-only BackOffice coverage.')
+    choice(name: 'EXECUTION_MODE', choices: ['safe', 'authorized-destructive'], description: 'Safety mode. Full official-p1 payment/order execution requires authorized-destructive.')
     choice(name: 'BROWSER_MODE', choices: ['headless', 'headed'], description: 'Browser mode. Headless is recommended on Jenkins.')
     choice(name: 'EVIDENCE_MODE', choices: ['screenshots-trace', 'screenshots-trace-video'], description: 'Evidence capture. Video requires FFmpeg on the Jenkins agent.')
   }
@@ -26,26 +26,40 @@ pipeline {
   }
 
   stages {
-    stage('Build Identity') {
+    stage('01 · Build Context') {
       steps {
         script {
           def suiteLabel = [
             'fast-guest': 'FAST',
-            'official-p1': 'P1',
+            'official-p1': 'P1 · 30 TCs',
             'backoffice-safe': 'BACKOFFICE',
-            'allure-smoke': 'ALLURE'
+            'allure-smoke': 'ALLURE SMOKE'
           ][params.TEST_SUITE] ?: params.TEST_SUITE.toUpperCase()
-          currentBuild.displayName = "#${env.BUILD_NUMBER} · ${params.ENVIRONMENT} · ${suiteLabel}"
-          currentBuild.description = "Samsung SMB · MX · ${params.ENVIRONMENT} · ${params.TEST_SUITE} · ${params.EXECUTION_MODE}"
+
+          env.JENKINS_SUITE_LABEL = suiteLabel
+          currentBuild.displayName = "#${env.BUILD_NUMBER} · MX · ${params.ENVIRONMENT} · ${suiteLabel}"
+          currentBuild.description = "RUNNING | Samsung SMB | MX ${params.ENVIRONMENT} | ${suiteLabel} | ${params.EXECUTION_MODE} | ${params.BROWSER_MODE}"
+
+          echo '''
+============================================================
+ SAMSUNG SMB · MX AUTOMATION
+============================================================'''
+          echo " Environment : ${params.ENVIRONMENT}"
+          echo " Suite       : ${suiteLabel}"
+          echo " Mode        : ${params.EXECUTION_MODE}"
+          echo " Browser     : ${params.BROWSER_MODE}"
+          echo " Evidence    : ${params.EVIDENCE_MODE}"
+          echo " Build       : #${env.BUILD_NUMBER}"
+          echo '============================================================'
         }
       }
     }
 
-    stage('Checkout') {
+    stage('02 · Checkout') {
       steps { checkout scm }
     }
 
-    stage('Agent Diagnostics') {
+    stage('03 · Agent Health') {
       steps {
         script {
           if (isUnix()) {
@@ -59,7 +73,7 @@ pipeline {
       }
     }
 
-    stage('Install') {
+    stage('04 · Dependencies') {
       steps {
         script {
           if (isUnix()) {
@@ -74,7 +88,7 @@ pipeline {
       }
     }
 
-    stage('Allure Reporting Smoke') {
+    stage('05 · Allure Smoke') {
       when { expression { return params.TEST_SUITE == 'allure-smoke' } }
       steps {
         script {
@@ -84,7 +98,7 @@ pipeline {
       }
     }
 
-    stage('Validate Selection') {
+    stage('05 · Validate Request') {
       when { expression { return params.TEST_SUITE != 'allure-smoke' } }
       steps {
         script {
@@ -95,7 +109,7 @@ pipeline {
       }
     }
 
-    stage('Official SMB Gate') {
+    stage('06 · Official Coverage Gate') {
       when { expression { return params.TEST_SUITE != 'allure-smoke' } }
       steps {
         script {
@@ -110,7 +124,7 @@ pipeline {
       }
     }
 
-    stage('MX Fast Guest · Safe') {
+    stage('07 · Fast Guest · Safe') {
       when { expression { return params.TEST_SUITE == 'fast-guest' } }
       steps {
         script {
@@ -128,7 +142,7 @@ pipeline {
       }
     }
 
-    stage('SMB BackOffice · Safe') {
+    stage('07 · BackOffice · Safe') {
       when { expression { return params.TEST_SUITE == 'backoffice-safe' } }
       steps {
         script {
@@ -142,7 +156,7 @@ pipeline {
       }
     }
 
-    stage('MX Official P1 · 30 TCs') {
+    stage('07 · Official P1 · 30 TCs') {
       when { expression { return params.TEST_SUITE == 'official-p1' } }
       steps {
         script {
@@ -194,8 +208,6 @@ pipeline {
   post {
     always {
       script {
-        // Rebuild the official Allure after runtime reconciliation so the report
-        // contains Samsung business metadata, official TC status and blocker categories.
         if (params.TEST_SUITE == 'official-p1') {
           env.ALLURE_REPORT_NAME = "Samsung MX ${params.ENVIRONMENT} QST - Allure"
           env.MX_QST_ENVIRONMENT = params.ENVIRONMENT
@@ -219,57 +231,86 @@ pipeline {
           bat '@if exist playwright\\.auth rmdir /S /Q playwright\\.auth'
         }
       }
+
       archiveArtifacts artifacts: 'test-results/**/*, playwright-report/**/*', allowEmptyArchive: true, fingerprint: true
+
       script {
         if (params.TEST_SUITE == 'fast-guest') {
           publishHTML(target: [
             allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
             reportDir: 'test-results/jenkins/mx-fast/executive',
             reportFiles: 'index.html',
-            reportName: "Samsung MX ${params.ENVIRONMENT} Fast - Executive Dashboard"
+            reportName: "01 · Samsung MX ${params.ENVIRONMENT} Fast · Executive Dashboard"
           ])
           publishHTML(target: [
             allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
             reportDir: 'test-results/jenkins/mx-fast/playwright-report',
             reportFiles: 'index.html',
-            reportName: "Samsung MX ${params.ENVIRONMENT} Fast - Playwright"
+            reportName: "02 · Samsung MX ${params.ENVIRONMENT} Fast · Playwright"
           ])
           publishHTML(target: [
             allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
             reportDir: 'test-results/jenkins/mx-fast/allure-report',
             reportFiles: 'index.html',
-            reportName: "Samsung MX ${params.ENVIRONMENT} Fast - Allure"
+            reportName: "03 · Samsung MX ${params.ENVIRONMENT} Fast · Allure"
           ])
         } else if (params.TEST_SUITE == 'official-p1') {
           publishHTML(target: [
             allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
             reportDir: 'test-results/jenkins/mx-qst/executive',
             reportFiles: 'index.html',
-            reportName: "MX ${params.ENVIRONMENT} QST Executive Dashboard"
+            reportName: "01 · Samsung MX ${params.ENVIRONMENT} P1 · Executive Dashboard"
           ])
           publishHTML(target: [
             allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
             reportDir: 'playwright-report',
             reportFiles: 'index.html',
-            reportName: "Playwright MX ${params.ENVIRONMENT} QST"
+            reportName: "02 · Samsung MX ${params.ENVIRONMENT} P1 · Playwright"
           ])
           publishHTML(target: [
             allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
             reportDir: 'test-results/jenkins/mx-qst/allure-report',
             reportFiles: 'index.html',
-            reportName: "Samsung MX ${params.ENVIRONMENT} QST - Allure"
+            reportName: "03 · Samsung MX ${params.ENVIRONMENT} P1 · Allure"
           ])
         } else if (params.TEST_SUITE == 'allure-smoke') {
           publishHTML(target: [
             allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
             reportDir: 'test-results/reporter-tests/allure-smoke/allure-report',
             reportFiles: 'index.html',
-            reportName: 'Allure Reporting Smoke'
+            reportName: 'Samsung Reporting · Allure Smoke'
           ])
         }
       }
+
+      script {
+        def suiteLabel = env.JENKINS_SUITE_LABEL ?: params.TEST_SUITE.toUpperCase()
+        echo '============================================================'
+        echo " FINAL STATUS : ${currentBuild.currentResult}"
+        echo " ENVIRONMENT  : MX ${params.ENVIRONMENT}"
+        echo " SUITE        : ${suiteLabel}"
+        echo " BUILD        : #${env.BUILD_NUMBER}"
+        echo ' REPORTS      : Executive Dashboard · Playwright · Allure'
+        echo '============================================================'
+      }
     }
-    success { echo 'Samsung SMB automation build completed successfully.' }
-    unsuccessful { echo 'Samsung SMB automation build did not complete successfully. Review console output and archived Playwright/Allure evidence.' }
+
+    success {
+      script {
+        def suiteLabel = env.JENKINS_SUITE_LABEL ?: params.TEST_SUITE.toUpperCase()
+        currentBuild.displayName = "#${env.BUILD_NUMBER} · MX · ${params.ENVIRONMENT} · ${suiteLabel} · PASS"
+        currentBuild.description = "PASS | Samsung SMB | MX ${params.ENVIRONMENT} | ${suiteLabel} | ${params.EXECUTION_MODE} | ${params.BROWSER_MODE}"
+        echo 'PASS · Samsung SMB automation build completed successfully.'
+      }
+    }
+
+    unsuccessful {
+      script {
+        def suiteLabel = env.JENKINS_SUITE_LABEL ?: params.TEST_SUITE.toUpperCase()
+        currentBuild.displayName = "#${env.BUILD_NUMBER} · MX · ${params.ENVIRONMENT} · ${suiteLabel} · ${currentBuild.currentResult}"
+        currentBuild.description = "${currentBuild.currentResult} | Samsung SMB | MX ${params.ENVIRONMENT} | ${suiteLabel} | Review Executive Dashboard / Playwright / Allure"
+        echo "${currentBuild.currentResult} · Samsung SMB automation build did not complete successfully. Review the Executive Dashboard and archived Playwright/Allure evidence."
+      }
+    }
   }
 }
