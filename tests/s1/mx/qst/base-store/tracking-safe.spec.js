@@ -28,7 +28,7 @@ const provenTrackingPrerequisite = {
 };
 
 function normalizeMxOrderCode(value) {
-  return String(value || "").match(/\bMX\d{6}-\d{8}\b/i)?.[0] || null;
+  return String(value || "").match(/\bMX\d{6}-\d{8}(?:_\d+)?\b/i)?.[0] || null;
 }
 
 function readGuestOrderRuntime() {
@@ -166,7 +166,11 @@ test("SAM-25010 @destructive @qst @mx @base-store - Track Order with email and O
 
   await page.bringToFront();
   const otpRequest = await trackingPage.requestVerificationCode(orderNumber, email, {
+    // S2 confirms checkout before the guest-order lookup index is necessarily
+    // ready. Poll the observable OTP endpoint for the same causal order; never
+    // resubmit checkout/payment while waiting for that index.
     maxAttempts: process.env.MX_QST_TRACKING_CREATE_ORDER === "1" ? 4 : 1,
+    retryDelayMs: 15000,
   });
 
   await mailPage.bringToFront();

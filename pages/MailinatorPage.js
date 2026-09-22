@@ -25,9 +25,9 @@ export default class MailinatorPage extends BasePage {
   }
 
   async inboxRows() {
-    return this.page.locator("main table tbody tr").filter({
-      has: this.page.locator("td"),
-    });
+    // Mailinator's subject cell is not exposed consistently through the text
+    // engine, but the visual inbox row is a stable table row.
+    return this.page.locator("tr").filter({ hasText: /Samsung.*Verificaci/i });
   }
 
   async snapshotInbox() {
@@ -44,9 +44,12 @@ export default class MailinatorPage extends BasePage {
   async snapshotMessageIds() {
     const rows = await this.inboxRows();
     const ids = await rows.evaluateAll((elements) =>
-      elements.map((row) => row.id || row.querySelector("a[href*='msgid=']")?.getAttribute("href")).filter(Boolean)
+      elements.map((subject) => {
+        const row = subject.closest("[role='row'], tr") || subject.parentElement;
+        return row?.id || row?.querySelector("a[href*='msgid=']")?.getAttribute("href");
+      }).filter(Boolean)
     );
-    const otpCount = await rows.filter({ hasText: OTP_SUBJECT }).count();
+    const otpCount = await rows.count();
     return [...ids, `__otp_count__:${otpCount}`];
   }
 
@@ -131,8 +134,7 @@ export default class MailinatorPage extends BasePage {
 
     while (Date.now() - startedAt < timeoutMs) {
       observed = await this.snapshotInbox();
-      const rows = await this.inboxRows();
-      const otpRows = rows.filter({ hasText: OTP_SUBJECT });
+      const otpRows = await this.inboxRows();
       const otpCount = await otpRows.count();
       const candidateCount = baselineOtpCodes.length > 0
         ? otpCount
@@ -141,8 +143,10 @@ export default class MailinatorPage extends BasePage {
         const row = otpRows.nth(index);
         // Mailinator often renders the message row without an <a href="...msgid=...">.
         // Locator.getAttribute() waits 30s for that absent link on every poll.
-        const messageId = await row.evaluate((element) =>
-          element.id || element.querySelector("a[href*='msgid=']")?.getAttribute("href") || null
+        const messageId = await row.evaluate((subject) => {
+          const element = subject.closest("[role='row'], tr") || subject.parentElement;
+          return element?.id || element?.querySelector("a[href*='msgid=']")?.getAttribute("href") || null;
+        }
         ) || `otp-row-${index}-of-${otpCount}`;
         if (baseline.has(messageId)) continue;
 
@@ -174,7 +178,8 @@ export default class MailinatorPage extends BasePage {
       }
 
       await this.page.waitForTimeout(Math.min(intervalMs, Math.max(0, timeoutMs - (Date.now() - startedAt))));
-      await this.refreshInbox();
+      // Keep the inbox websocket alive. Mailinator pushes the new row immediately;
+      // reloading here can replace it with an eventually-consistent stale snapshot.
     }
 
     throw new Error(

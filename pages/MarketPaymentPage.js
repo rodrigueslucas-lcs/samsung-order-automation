@@ -92,10 +92,19 @@ export default class MarketPaymentPage extends PaymentPage {
 
   async fillCardData(card) {
     if (!this.externalMercadoPago) return super.fillCardData(card);
-    await (await this.externalCardField(/N[uú]mero de tarjeta/i)).fill(card.number);
-    await (await this.externalCardField(/Nombre del titular/i)).fill(card.holderName);
-    await (await this.externalCardField(/Vencimiento/i)).fill(card.expiry);
-    await (await this.externalCardField(/C[oó]digo de seguridad/i)).fill(card.cvv);
+    const number = await this.externalCardField(/N[uú]mero de tarjeta/i);
+    const holder = await this.externalCardField(/Nombre del titular/i);
+    const expiry = await this.externalCardField(/Vencimiento/i);
+    const cvv = await this.externalCardField(/C[oó]digo de seguridad/i);
+    for (const [field, value] of [[number, card.number], [expiry, card.expiry], [cvv, card.cvv]]) {
+      await field.fill("");
+      await field.pressSequentially(value, { delay: 50 });
+    }
+    await holder.fill(card.holderName);
+    await holder.click();
+    if ((await cvv.getAttribute("aria-invalid")) === "true") {
+      throw new Error("Mercado Pago rejected the configured security code before payment review.");
+    }
   }
 
   async externalCardField(name) {
@@ -234,29 +243,11 @@ export default class MarketPaymentPage extends PaymentPage {
 
     await payButton.click({ timeout: 30000 });
 
-    const outcome = await Promise.race([
-      this.page
-        .waitForURL(
-          /stg2\.shop\.samsung\.com\/mx\/.*(?:confirmation|confirmacion|order|success)/i,
-          { timeout: 180000 }
-        )
-        .then(() => "CONFIRMATION"),
-
-      this.page
-        .waitForFunction(
-          ({ source, flags }) => new RegExp(source, flags).test(document.body.innerText),
-          { source: orderCodePattern.source, flags: orderCodePattern.flags },
-          { timeout: 180000 }
-        )
-        .then(() => "ORDER_CODE"),
-
-      this.page
-        .getByText(/rechazad|no pudimos|problema|inv[aá]lid/i)
-        .filter({ visible: true })
-        .first()
-        .waitFor({ state: "visible", timeout: 180000 })
-        .then(() => "ERROR_MESSAGE"),
-    ]);
+    await this.page.waitForURL(
+      (url) => url.hostname === "stg2.shop.samsung.com" && /\/mx\/orderConfirmation/i.test(url.pathname),
+      { timeout: 180000 }
+    );
+    const outcome = "CONFIRMATION";
 
     // The Samsung confirmation page can render the order number a few
     // seconds after the Mercado Pago redirect completes. Do not read the
@@ -272,7 +263,10 @@ export default class MarketPaymentPage extends PaymentPage {
       .innerText({ timeout: 30000 })
       .catch(() => "");
 
-    const orderCode = body.match(orderCodePattern)?.[0] || null;
+    const confirmationUrl = decodeURIComponent(this.page.url());
+    const orderCode = confirmationUrl.match(/MX\d{6}-\d{8}(?:_\d+)?/i)?.[0] ||
+      body.match(/MX\d{6}-\d{8}(?:_\d+)?/i)?.[0] ||
+      body.match(orderCodePattern)?.[0] || null;
 
     if (!orderCode) {
       throw new Error(

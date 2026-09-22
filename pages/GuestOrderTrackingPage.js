@@ -33,7 +33,19 @@ export default class GuestOrderTrackingPage extends BasePage {
   }
 
   async validateGuestTrackingForm() {
-    await this.form.waitFor({ state: "visible", timeout: 60000 });
+    let formReady = false;
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      formReady = await this.form.waitFor({ state: "visible", timeout: 30000 })
+        .then(() => true)
+        .catch(() => false);
+      if (formReady) break;
+      if (attempt === 1) {
+        await this.page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+      }
+    }
+    if (!formReady) {
+      throw new Error("Guest Track Order form did not render after one controlled reload.");
+    }
 
     for (const field of [this.orderNumber, this.email, this.verificationCode]) {
       await field.waitFor({ state: "visible" });
@@ -127,6 +139,18 @@ export default class GuestOrderTrackingPage extends BasePage {
       );
       await this.sendCodeButton.click();
       response = await responsePromise;
+
+      const responseBody = await response.text().catch(() => "");
+      const requestBody = response.request().postData() || "";
+
+      console.log("[mx-tracking-otp]", JSON.stringify({
+        attempt,
+        status: response.status(),
+        endpoint: response.url(),
+        requestBody,
+        responseBody,
+      }));
+
       if (response.ok()) break;
       if (response.status() !== 401 || attempt === maxAttempts) {
         throw new Error(
@@ -168,8 +192,17 @@ export default class GuestOrderTrackingPage extends BasePage {
     }
 
     await this.searchButton.click();
-    await this.page.getByRole("main").getByText(orderNumber, { exact: false })
-      .first().waitFor({ state: "visible", timeout: 60000 });
+    const trackedOrder = this.page.getByRole("main").getByText(orderNumber, { exact: false }).first();
+    const notFound = this.page.getByText(/No hemos podido encontrar ning[uú]n pedido/i).first();
+    const outcome = await Promise.race([
+      trackedOrder.waitFor({ state: "visible", timeout: 60000 }).then(() => "order"),
+      notFound.waitFor({ state: "visible", timeout: 60000 }).then(() => "not-found"),
+    ]);
+    if (outcome === "not-found") {
+      throw new Error(
+        `Guest Track Order accepted the OTP but could not find ${orderNumber} in the current BaseSite.`
+      );
+    }
   }
 
   async validateTrackedOrder(orderNumber) {

@@ -18,29 +18,48 @@ export default class ProductPage extends BasePage {
 
   async addConfiguredPdpToCart({ waitForCartMutation = false } = {}) {
     if (!this.pdpUrl) throw new Error('A configured PDP URL is required.');
-    await this.safeGoto(this.pdpUrl);
-    const addButton = this.page
-      .getByRole('button', { name: /Agregar al carrito|Add to cart|Add to basket/i })
-      .filter({ visible: true })
-      .first();
-    await addButton.waitFor({ state: 'visible', timeout: 60000 });
-    const cartMutation = waitForCartMutation
-      ? this.page.waitForResponse(
-          (response) =>
-            response.request().method() === 'POST' &&
-            /\/users\/current\/carts\/(?:current|[^/]+)\/entries(?:\?|$)/.test(response.url()),
-          { timeout: 60000 }
-        )
-      : null;
-    await addButton.click();
-    if (cartMutation) {
-      const response = await cartMutation;
-      if (response.status() < 200 || response.status() >= 300) {
-        throw new Error(`Configured PDP add-to-cart returned HTTP ${response.status()}.`);
+    const isCartMutation = (request) =>
+      request.method() === 'POST' &&
+      /\/users\/current\/carts(?:\/[^/]+\/entries)?(?:\?|$)/.test(request.url());
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      await this.safeGoto(this.pdpUrl);
+      const addButton = this.page
+        .getByRole('button', { name: /Agregar al carrito|Add to cart|Add to basket/i })
+        .filter({ visible: true })
+        .first();
+      await addButton.waitFor({ state: 'visible', timeout: 60000 });
+
+      const mutationOutcome = waitForCartMutation
+        ? Promise.race([
+            this.page.waitForResponse(
+              (response) => isCartMutation(response.request()),
+              { timeout: 60000 }
+            ).then((response) => ({ response })).catch(() => null),
+            this.page.waitForEvent('requestfailed', {
+              predicate: isCartMutation,
+              timeout: 60000,
+            }).then((request) => ({ failedRequest: request })).catch(() => null),
+          ])
+        : Promise.resolve(null);
+
+      await addButton.click();
+      const outcome = await mutationOutcome;
+      if (outcome?.response && !outcome.response.ok()) {
+        throw new Error(`Configured PDP add-to-cart returned HTTP ${outcome.response.status()}.`);
+      }
+
+      await this.safeGoto(this.cartUrl);
+      const cartContainsSku = await this.waitForCartSkus([this.sku], { reloadAttempts: 1 })
+        .then(() => true)
+        .catch(() => false);
+      if (cartContainsSku) return;
+
+      if (attempt === 2) {
+        const failure = outcome?.failedRequest?.failure()?.errorText || 'no successful cart mutation was observed';
+        throw new Error(`Cart did not contain ${this.sku} after controlled PDP add-to-cart retry: ${failure}.`);
       }
     }
-    await this.safeGoto(this.cartUrl);
-    await this.waitForCartSkus([this.sku]);
   }
 
   async validateProductLoaded() {
