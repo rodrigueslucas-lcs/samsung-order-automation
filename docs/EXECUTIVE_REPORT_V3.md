@@ -1,79 +1,138 @@
 # Executive Report V3
 
-This implementation is intentionally isolated under `reporters/executive-v3/` while the live PreQA2 browser campaign continues on another working tree.
+`reporters/executive-v3/` is the current executive reporting layer for Samsung SMB QA Automation.
 
-## Goals
+Its purpose is to present current build health first, while preserving coverage, official scope, auditability and historical traceability behind controlled drill-downs.
 
-- Keep the 144-case official SMB denominator visible at all times.
-- Treat PreQA2 official validation as authoritative for campaign PASS/FAIL/BLOCKED state.
-- Keep official validation status separate from persisted automation coverage.
-- Make it visually explicit that current Full/Partial/Missing coverage is MX-only (37 TCs), not 144-wide.
-- Stay useful when the latest Playwright execution artifact contains zero tests.
-- Never fabricate feature/store/execution metrics when no real artifact exists.
-- Preserve unknown CL/CO metadata as `Unknown` rather than inventing taxonomy.
+## Reporting principles
 
-## Intelligence layers
+The dashboard keeps these dimensions separate:
 
-V3 now contains the following independent views:
+1. **Current official scope** — the Samsung P1/P2 priority model.
+2. **Current build runtime** — what Playwright actually executed in this build.
+3. **Automation coverage** — implementation maturity, independent from PASS/FAIL.
+4. **Technical evidence** — screenshots, trace, video, context and failure/blocker details.
+5. **Governance/history** — regional ledger, audit checks and preserved historical campaign data.
 
-1. Official validation by market for MX, CL, CO and PE.
-2. MX automation coverage and coverage-by-feature.
-3. Automation Gap Queue for Partial/Missing MX cases only.
-4. Runtime Attention Required for official FAIL/BLOCKED evidence only.
-5. Market × Feature validation matrix prepared for all four markets.
-6. Snapshot-ready validation trend/history.
-7. Data Consistency Audit covering registry totals, MX coverage totals, canonical statuses and unknown ledger IDs.
-8. Full 144-TC drilldown with client-side search and Market/Status/Feature/Store filters.
-9. Recent timestamped official validation evidence.
-10. Execution Intelligence placeholder that intentionally stays empty until a real Playwright execution artifact is supplied.
+The current official SMB model is:
 
-The Market × Feature view is conservative: MX uses verified MX mapping metadata, PE uses the existing PE reuse metadata, and CL/CO remain `Unknown` unless case-level metadata is actually present in runtime evidence or later verified sources.
+- **362** total DST rows;
+- **144** P1 / QST rows;
+- **218** P2 / DST-only rows;
+- **30** MX Base Store P1 TCs in the current official runner;
+- **38** MX P1 rows overall when EPP is included.
 
-## Current isolated command
+The preserved 144-ID Zephyr campaign remains historical evidence. It must not be treated as the current 144 P1/QST denominator just because both totals happen to be 144.
 
-Until this branch is integrated, run the generator directly:
+## Final presentation structure
+
+The generated dashboard is intentionally executive-first:
+
+1. **QA Execution Dashboard / Build Health**
+2. **Execution at a glance**
+3. **Needs Attention** — rendered only when current FAIL/BLOCKED items exist
+4. **Test Execution** — TC-level current runtime and browser evidence
+5. **MX Automation Coverage** — Full / Partial / Missing implementation maturity
+6. **Official SMB Scope** — compact 362 / 144 / 218 / current-runner reference
+7. **Coverage Details**
+   - MX Coverage by Feature
+   - Automation Gap Queue
+8. **Technical Governance** — collapsed by default
+   - Regional Validation Matrix
+   - Data Integrity
+   - Historical TC Inventory
+
+The default page intentionally avoids dumping historical tables into the primary presentation flow. Governance information is preserved, but exposed on demand.
+
+## Technical Governance
+
+`Technical Governance` groups supporting information that is useful for auditability but should not dominate the first view.
+
+### Regional Validation Matrix
+
+Shows the preserved historical market × feature execution ledger for MX, CL, CO and PE. It is a reference layer and does not replace the current official scope or current build runtime denominator.
+
+### Data Integrity
+
+The dashboard validates source consistency without mutating source data. Checks include:
+
+- official registry totals;
+- expected unique official IDs by market;
+- MX coverage denominator consistency;
+- Full + Partial + Missing reconciliation;
+- ledger IDs belonging to the expected official registry;
+- canonical executed statuses.
+
+The executive view shows a compact audit summary first; full check details remain available inside governance.
+
+### Historical TC Inventory
+
+The preserved 144-ID Zephyr campaign remains available for traceability, but is collapsed by default and constrained to a scrollable drill-down so it does not make the executive dashboard visually overwhelming.
+
+## Current build evidence
+
+The current runtime is rendered independently from historical governance.
+
+For each TC, the report can expose:
+
+- SAM/Jira ID;
+- runtime status;
+- failure/blocker category;
+- duration;
+- screenshot;
+- video when enabled;
+- Playwright trace;
+- error context.
+
+A clean build does not render a large `Needs Attention` section. FAIL/BLOCKED rows remain explicit and are never hidden behind a healthy aggregate.
+
+## Trace Viewer behavior
+
+`Open Trace` uses the archived Jenkins trace URL with Playwright Trace Viewer.
+
+The Jenkins artifact must be browser-reachable. Authentication, CORS and local-network browser policy can block remote loading even when the trace ZIP itself is valid.
+
+When Jenkins is served from `localhost`, Chromium-based browsers may require **Local Network Access** permission for `trace.playwright.dev` before the viewer can fetch the local Jenkins artifact.
+
+## Generator
+
+Direct generation:
 
 ```bash
 node reporters/executive-v3/generateExecutiveV3.cjs
 ```
 
-Output:
+Default output:
 
-`test-results/executive-v3/index.html`
-
-Optional arguments:
-
-```bash
-node reporters/executive-v3/generateExecutiveV3.cjs path/to/preqa2-validation.json path/to/output.html path/to/history.json
+```text
+test-results/executive-v3/index.html
 ```
 
-The optional history file must be a JSON array. Each item may be either a canonical ledger snapshot directly or an object shaped like:
+The Jenkins pipeline generates the presentation copy under:
 
-```json
-{
-  "label": "Before MX registered campaign",
-  "generatedAt": "2026-09-09T18:00:00.000Z",
-  "ledger": { "markets": {} }
-}
+```text
+test-results/jenkins/mx-qst/executive/index.html
 ```
 
-V3 never creates fake historical points. If no prior snapshots exist, only the current ledger state is shown.
+The generator accepts optional ledger/output/history/execution arguments according to the implementation in `generateExecutiveV3.cjs`.
 
-## Data consistency audit
+## Non-fabrication rules
 
-The dashboard checks, without mutating source data:
+The dashboard must never:
 
-- official registry total equals the market-count sum;
-- each market has the expected number of unique official IDs;
-- MX coverage contains exactly the MX official case count;
-- MX Full + Partial + Missing equals the MX official total;
-- every ledger result ID belongs to that market's official registry;
-- every executed ledger status is canonical.
+- infer PASS from missing runtime evidence;
+- mix current runtime totals with historical ledger totals;
+- present automation coverage as execution status;
+- fabricate feature/store metadata for unknown cases;
+- silently hide an audit inconsistency;
+- convert environment/authentication failures into automation PASS.
 
-Any failed audit changes campaign health to `DATA CHECK` so a visually healthy report cannot hide a denominator/schema inconsistency.
+When no real Playwright runtime is supplied, execution-specific metrics remain unavailable rather than being invented.
 
-## Integration rule
+## Presentation usage
 
-Do not merge live Codex ledger changes by selecting an entire `ours` or `theirs` version. Preserve runtime evidence first, reconcile the canonical PreQA2 ledger, then integrate V3.
+Recommended presentation flow:
 
-Do not add V3 to `package.json` while the live Codex campaign is still editing package/runtime files. Add the final npm script only after the worktrees are reconciled.
+`Executive Dashboard → current build health → TC evidence → Allure drilldown → Jenkins pipeline/stages → regional scalability`
+
+The Executive Dashboard answers the release/execution question first. Allure and Playwright remain the detailed technical investigation layers; Jenkins demonstrates how the reporting and evidence are produced automatically.
