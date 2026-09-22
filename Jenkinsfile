@@ -12,7 +12,7 @@ pipeline {
 
   parameters {
     choice(name: 'ENVIRONMENT', choices: ['S1', 'S2'], description: 'Target MX environment. S1 = stg storefront / S1 BackOffice; S2 = stg2 storefront / S2 BackOffice.')
-    choice(name: 'TEST_SUITE', choices: ['fast-guest', 'official-p1', 'backoffice-safe', 'allure-smoke'], description: 'Execution profile. fast-guest = quick feedback; official-p1 = official MX P1 campaign; backoffice-safe = read-only BackOffice coverage.')
+    choice(name: 'TEST_SUITE', choices: ['fast-guest', 'authenticated-safe', 'official-p1', 'backoffice-safe', 'allure-smoke'], description: 'Execution profile. authenticated-safe validates the registered Samsung session without payment/order submission; official-p1 runs the full official MX P1 campaign.')
     choice(name: 'EXECUTION_MODE', choices: ['safe', 'authorized-destructive'], description: 'Safety mode. Full official-p1 payment/order execution requires authorized-destructive.')
     choice(name: 'BROWSER_MODE', choices: ['headless', 'headed'], description: 'Browser mode. Headless is recommended on Jenkins.')
     choice(name: 'EVIDENCE_MODE', choices: ['screenshots-trace', 'screenshots-trace-video'], description: 'Evidence capture. Video requires FFmpeg on the Jenkins agent.')
@@ -22,6 +22,7 @@ pipeline {
     CI = '1'
     MX_QST_ARTIFACT_DIR = 'test-results/jenkins/mx-qst'
     MX_QST_USE_EXISTING_AUTH = '1'
+    MX_AUTH_AUTO_RENEW = '0'
     ENABLE_ALLURE = '1'
     PLAYWRIGHT_BROWSERS_PATH = '0'
     NATIVE_ALLURE_PUBLISHED = '0'
@@ -33,6 +34,7 @@ pipeline {
         script {
           def suiteLabel = [
             'fast-guest': 'FAST',
+            'authenticated-safe': 'AUTH SAFE',
             'official-p1': 'P1 · 30 TCs',
             'backoffice-safe': 'BACKOFFICE',
             'allure-smoke': 'ALLURE SMOKE'
@@ -146,6 +148,52 @@ pipeline {
             env.TEST_SUITE = 'FAST/GUEST'
             if (isUnix()) sh 'npx -y node@22 scripts/run-mx-qst-fast-guest.cjs'
             else bat '@call npx -y node@22 scripts/run-mx-qst-fast-guest.cjs'
+          }
+        }
+      }
+    }
+
+    stage('07 · Authenticated · Safe') {
+      when { expression { return params.TEST_SUITE == 'authenticated-safe' } }
+      steps {
+        script {
+          env.MX_QST_ENVIRONMENT = params.ENVIRONMENT
+          env.BACKOFFICE_ENV = params.ENVIRONMENT.toLowerCase()
+          env.MX_AUTH_STATE_CREDENTIAL = params.ENVIRONMENT == 'S2' ? 'samsung-mx-s2-auth-state' : 'samsung-mx-s1-auth-state'
+          env.MX_SESSION_CREDENTIAL = params.ENVIRONMENT == 'S2' ? 'samsung-mx-s2-session-storage' : 'samsung-mx-s1-session-storage'
+          env.MX_AUTH_SUFFIX = params.ENVIRONMENT.toLowerCase()
+          env.PLAYWRIGHT_HTML_OUTPUT_DIR = 'test-results/jenkins/mx-auth/playwright-report'
+        }
+        catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+          withCredentials([
+            file(credentialsId: env.MX_AUTH_STATE_CREDENTIAL, variable: 'MX_AUTH_STATE_SECRET'),
+            file(credentialsId: env.MX_SESSION_CREDENTIAL, variable: 'MX_SESSION_STORAGE_SECRET')
+          ]) {
+            script {
+              if (isUnix()) {
+                sh '''
+                  set -eu
+                  mkdir -p playwright/.auth
+                  cp "$MX_AUTH_STATE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-user.json
+                  cp "$MX_SESSION_STORAGE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-session-storage.json
+                  chmod 600 playwright/.auth/mx-${MX_AUTH_SUFFIX}-user.json playwright/.auth/mx-${MX_AUTH_SUFFIX}-session-storage.json || true
+                  EXTRA=""
+                  if [ "${BROWSER_MODE}" = "headed" ]; then EXTRA="--headed"; fi
+                  npx playwright test tests/s1/mx/qst/base-store/authenticated-safe.spec.js --project=chromium --workers=1 --retries=0 --reporter=html $EXTRA
+                '''
+              } else {
+                bat '''@echo off
+                  if not exist playwright\\.auth mkdir playwright\\.auth
+                  copy /Y "%MX_AUTH_STATE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-user.json" >nul || exit /b 2
+                  copy /Y "%MX_SESSION_STORAGE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-session-storage.json" >nul || exit /b 2
+                  if /I "%BROWSER_MODE%"=="headed" (
+                    call npx playwright test tests/s1/mx/qst/base-store/authenticated-safe.spec.js --project=chromium --workers=1 --retries=0 --reporter=html --headed
+                  ) else (
+                    call npx playwright test tests/s1/mx/qst/base-store/authenticated-safe.spec.js --project=chromium --workers=1 --retries=0 --reporter=html
+                  )
+                '''
+              }
+            }
           }
         }
       }
@@ -299,6 +347,13 @@ pipeline {
               reportName: "03 · Samsung MX ${params.ENVIRONMENT} Fast · Allure HTML"
             ])
           }
+        } else if (params.TEST_SUITE == 'authenticated-safe') {
+          publishHTML(target: [
+            allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
+            reportDir: 'test-results/jenkins/mx-auth/playwright-report',
+            reportFiles: 'index.html',
+            reportName: "Samsung MX ${params.ENVIRONMENT} Auth Safe · Playwright"
+          ])
         } else if (params.TEST_SUITE == 'official-p1') {
           publishHTML(target: [
             allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
