@@ -43,6 +43,9 @@ test.afterEach(async ({ context, page, mxConfig }, testInfo) => {
   if (!hasAuthState() || page.url() === "about:blank") return;
   const currentUrl = page.url();
   if (/^chrome-error:\/\/chromewebdata\//i.test(currentUrl)) return;
+  const paymentTc = testInfo.title.includes("SAM-25002") || testInfo.title.includes("SAM-25010");
+  if (paymentTc && process.env.ALLOW_PAYMENT_SUBMIT === "1" && testInfo.status === "failed" &&
+      new URL(currentUrl).hostname === "www.mercadopago.com.mx") return;
   await assertMxStagingPage(page, "MX authenticated final environment guard");
   if (testInfo.status === "passed") {
     // Preserve a legitimately rotated session for the next isolated context.

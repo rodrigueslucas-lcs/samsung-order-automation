@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { writeJsonAtomically } = require("./atomicJson");
 
 function createAuthState({
   authStatePath,
@@ -86,13 +87,9 @@ function createAuthState({
       [AUTH_STATE_PATH, filteredState],
       [AUTH_SESSION_STORAGE_PATH, sessionStorage],
     ]) {
-      const temporary = `${destination}.tmp`;
-      fs.writeFileSync(temporary, JSON.stringify(value, null, 2), { mode: 0o600 });
-      fs.chmodSync(temporary, 0o600);
       try {
-        fs.renameSync(temporary, destination);
+        writeJsonAtomically(destination, value);
       } catch (error) {
-        fs.rmSync(temporary, { force: true });
         throw new Error(`Could not refresh ${label} auth state safely: ${error.message}`);
       }
     }

@@ -1,5 +1,6 @@
 const { chromium } = require("@playwright/test");
 const fs = require("node:fs");
+const { writeJsonAtomically } = require("../utils/atomicJson");
 const { resolveMxEnvironment } = require("../utils/mxConfig");
 const target = resolveMxEnvironment();
 const {
@@ -11,10 +12,7 @@ const {
 } = require("../utils/mxAuthState");
 
 function writeJsonSecurely(destination, value) {
-  const temporary = `${destination}.tmp`;
-  fs.writeFileSync(temporary, JSON.stringify(value, null, 2), { mode: 0o600 });
-  fs.chmodSync(temporary, 0o600);
-  fs.renameSync(temporary, destination);
+  writeJsonAtomically(destination, value);
 }
 
 async function verifyMxAuthentication() {

@@ -90,6 +90,37 @@ if (useExistingAuth) {
   console.log(`[mx-qst] Fresh MX ${targetEnvironment} authentication state exported by the login bootstrap.`);
 }
 
+// A state file existing on disk does not prove that its Samsung session is
+// still valid. Fail fast (or perform the existing one-time manual bootstrap)
+// before spending the campaign on guest tests and discovering stale auth only
+// when the registered block begins.
+let authVerification = spawnSync(process.execPath, [path.resolve("scripts/auth-verify-mx.cjs")], {
+  env: { ...process.env, MX_QST_ENVIRONMENT: targetEnvironment },
+  stdio: "inherit",
+});
+if (authVerification.status !== 0) {
+  if (useExistingAuth) {
+    console.error(`[mx-qst] Pre-provisioned MX ${targetEnvironment} auth state is expired; QST execution was not started.`);
+    process.exit(authVerification.status || 1);
+  }
+  const login = spawnSync(process.execPath, [path.resolve("scripts/auth-login-mx.cjs")], {
+    env: { ...process.env, MX_QST_ENVIRONMENT: targetEnvironment, MX_AUTH_MANUAL: "1" },
+    stdio: "inherit",
+  });
+  if (login.status !== 0 || !hasAuthState()) {
+    console.error("[mx-qst] MX manual authentication refresh failed; QST execution was not started.");
+    process.exit(login.status || 1);
+  }
+  authVerification = spawnSync(process.execPath, [path.resolve("scripts/auth-verify-mx.cjs")], {
+    env: { ...process.env, MX_QST_ENVIRONMENT: targetEnvironment },
+    stdio: "inherit",
+  });
+  if (authVerification.status !== 0) {
+    console.error(`[mx-qst] Refreshed MX ${targetEnvironment} authentication did not validate; QST execution was not started.`);
+    process.exit(authVerification.status || 1);
+  }
+}
+
 const qstExecutionEnv = {
   ...process.env,
   // SAM-24969 uses the already authenticated PreQA2 Chrome through CDP. Keep
@@ -99,9 +130,11 @@ const qstExecutionEnv = {
   ALLOW_PAYMENT_SUBMIT: "1",
   TEST_ENV: environmentLabel,
   MX_QST_ENVIRONMENT: targetEnvironment,
+  BACKOFFICE_ENV: targetEnvironment.toLowerCase(),
   TEST_MARKET: "MX",
   TEST_STORE: "BASE_STORE",
   TEST_SUITE: "P1/QST",
+  MX_QST_TRACKING_CREATE_ORDER: process.env.MX_QST_TRACKING_CREATE_ORDER || (targetEnvironment === "S2" ? "1" : "0"),
   PLAYWRIGHT_JSON_OUTPUT_FILE: reportFile,
   PLAYWRIGHT_HTML_OUTPUT_DIR: path.resolve("playwright-report"),
   SMB_EVIDENCE_DIR: path.join(artifactDir, "evidence"),

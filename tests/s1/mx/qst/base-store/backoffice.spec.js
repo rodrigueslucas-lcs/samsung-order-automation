@@ -5,20 +5,25 @@ import evidenceContext from "../../../../../reporters/evidence/evidenceContext.j
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import backofficeCredentials from "../../../../../utils/backofficeAdminCredentials.js";
 import mxConfigModule from "../../../../../utils/mxConfig.js";
+import mxBackofficeTestData from "../../../../../utils/mxBackofficeTestData.js";
 
 const { recordBusinessEvidence } = evidenceContext;
 const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
 const { getBackOfficeAdminCredentials } = backofficeCredentials;
 const { getMxConfig } = mxConfigModule;
-
-const DEFAULT_MX_QST_ORDER_CODE = "MX260908-63926930";
+const { getMxBackofficeTestData } = mxBackofficeTestData;
 
 test.describe.configure({ timeout: 360000 });
 
-function requireS1Admin(testInfo) {
+function requireMxAdmin(testInfo) {
   const credentials = getBackOfficeAdminCredentials();
-  test.skip(!credentials.password, "S1 BackOffice Admin password is required via the ignored local auth file or runtime env.");
-  expect((process.env.BACKOFFICE_ENV || "s1").toLowerCase()).toBe("s1");
+  const storefrontEnvironment = (process.env.MX_QST_ENVIRONMENT || "S1").toLowerCase();
+  test.skip(
+    !credentials.password,
+    `MX BackOffice ${storefrontEnvironment.toUpperCase()} Admin password is required via its environment-specific ignored auth file or runtime env.`
+  );
+  expect(credentials.environment).toBe(storefrontEnvironment);
+  expect((process.env.BACKOFFICE_ENV || storefrontEnvironment).toLowerCase()).toBe(storefrontEnvironment);
   testInfo.annotations.push({
     type: "backoffice-admin-user",
     description: credentials.username,
@@ -27,7 +32,7 @@ function requireS1Admin(testInfo) {
 }
 
 test("MX QST 18 @qst @mx @base-store @backoffice @safe - BackOffice login", async ({ page }, testInfo) => {
-  const credentials = requireS1Admin(testInfo);
+  const credentials = requireMxAdmin(testInfo);
   const backOffice = new BackOfficePage(page);
   await backOffice.login({ ...credentials, authority: "admin" });
   await backOffice.expectPerspective("admin");
@@ -36,15 +41,20 @@ test("MX QST 18 @qst @mx @base-store @backoffice @safe - BackOffice login", asyn
 test("SAM-25011 @qst @mx @base-store @backoffice @safe - BackOffice order and product basic advanced search", async ({ page }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-25011"));
 
-  const credentials = requireS1Admin(testInfo);
+  const credentials = requireMxAdmin(testInfo);
   const mxConfig = getMxConfig();
-  const orderCode = process.env.MX_QST_ORDER_CODE || DEFAULT_MX_QST_ORDER_CODE;
-  const productCode = process.env.MX_QST_PRODUCT_CODE || mxConfig.sku;
+  const testData = getMxBackofficeTestData();
+  expect(testData.environment).toBe(mxConfig.environment);
+  const { orderCode, productCode } = testData;
   expect(orderCode).toMatch(/^MX/i);
   expect(productCode).toBeTruthy();
 
   const backOffice = new BackOfficeSearchPage(page);
   await backOffice.login({ ...credentials, authority: "admin" });
+  expect(new URL(page.url()).hostname).toContain(`-${mxConfig.environment.toLowerCase()}-public.`);
+  expect(new URL(page.url()).hostname).not.toContain(
+    `-${mxConfig.environment === "S2" ? "s1" : "s2"}-public.`
+  );
 
   await backOffice.openAdminOrders();
   const basicOrderRow = await backOffice.searchAdminOrder(orderCode);
@@ -69,10 +79,12 @@ test("SAM-25011 @qst @mx @base-store @backoffice @safe - BackOffice order and pr
     basicProductSearch: true,
     advancedProductSearch: true,
     finalStatus: status,
+    environment: testData.environment,
+    backOfficeHost: new URL(page.url()).hostname,
   });
 
   console.log(
     "MX_QST_BACKOFFICE_SEARCH",
-    JSON.stringify({ orderCode, productCode, status, basic: true, advanced: true })
+    JSON.stringify({ environment: testData.environment, backOfficeHost: new URL(page.url()).hostname, orderCode, productCode, status, basic: true, advanced: true })
   );
 });

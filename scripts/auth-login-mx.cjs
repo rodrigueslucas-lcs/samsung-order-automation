@@ -1,6 +1,7 @@
 const { chromium } = require("@playwright/test");
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
+const { writeJsonAtomically } = require("../utils/atomicJson");
 const path = require("node:path");
 const { resolveMxEnvironment } = require("../utils/mxConfig");
 
@@ -175,10 +176,7 @@ async function hasVisibleCaptchaChallenge(page) {
 }
 
 function writeJsonSecurely(destination, value) {
-  const temporary = `${destination}.tmp`;
-  fs.writeFileSync(temporary, JSON.stringify(value, null, 2), { mode: 0o600 });
-  fs.chmodSync(temporary, 0o600);
-  fs.renameSync(temporary, destination);
+  writeJsonAtomically(destination, value);
 }
 
 async function exportAuthenticatedState(context, page) {

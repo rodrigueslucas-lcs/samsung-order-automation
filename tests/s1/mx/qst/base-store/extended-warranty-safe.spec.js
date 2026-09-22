@@ -1,7 +1,8 @@
 import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
+import ProductPage from "../../../../../pages/ProductPage";
 import { test, expect } from "./mxQst.fixture";
-import { prepareMxQstCart, openMxService } from "./mxQstFlows";
+import { mxQstCart } from "./mxQstFlows";
 
 const { recordBusinessEvidence } = evidenceContext;
 const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
@@ -15,53 +16,49 @@ test.describe.configure({ timeout: 420000 });
 
 test("SAM-24985 @qst @mx @base-store @safe - Extended Warranty on Cart", async ({ page, mxConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24985"));
-  const cart = await prepareMxQstCart(page, mxConfig);
-  await cart.validateControlledSingleSku(mxConfig.sku);
+  const warrantySku = process.env.MX_QST_EXTENDED_WARRANTY_SKU || "WD26DB8995BZAX";
+  const warrantyConfig = {
+    ...mxConfig,
+    sku: warrantySku,
+    pdpUrl: new URL(`/mx/p/${warrantySku}`, mxConfig.baseUrl.origin),
+  };
+  const cart = mxQstCart(page, warrantyConfig);
+  await cart.clearMxCartAndConfirmEmpty();
+  const product = new ProductPage(page, {
+    setupUrl: warrantyConfig.bootstrapUrl.toString(),
+    sku: warrantySku,
+    pdpUrl: warrantyConfig.pdpUrl.toString(),
+    cartUrl: warrantyConfig.cartUrl.toString(),
+  });
+  await product.addConfiguredPdpToCart({ waitForCartMutation: true });
+  await cart.validateControlledSingleSku(warrantySku);
 
   const totalHeading = page.getByRole("heading", { name: /Total con IVA/i });
   await expect(totalHeading).toBeVisible({ timeout: 30000 });
   const totalBefore = parseMxCurrency(await totalHeading.locator("..").innerText());
   expect(totalBefore).not.toBeNull();
 
-  const careSurface = await openMxService(page, "Samsung Care\\+");
-  const extendedWarrantyPlan = careSurface
-    .getByText(/Garant[ií]a extendida/i)
-    .filter({ visible: true })
-    .first();
-  await expect(extendedWarrantyPlan).toBeVisible({ timeout: 30000 });
+  const productCard = page.locator("div.cart-item", { hasText: warrantySku }).filter({ visible: true }).first();
+  const warrantyAction = productCard.locator('button[data-an-la="add service:warranty"]');
+  await expect(warrantyAction, "The eligible appliance must expose Servicios Adicionales.").toBeVisible();
+  await warrantyAction.click();
+  const careSurface = page.getByRole("dialog", { name: /Servicios Adicionales/i }).filter({ visible: true }).first();
+  await expect(careSurface).toBeVisible({ timeout: 30000 });
 
-  const planCard = extendedWarrantyPlan.locator(
-    "xpath=ancestor::*[.//input[@type='radio'] or .//*[@role='radio']][1]"
-  );
-  await expect(planCard).toBeVisible({ timeout: 30000 });
+  const planRadio = careSurface.getByRole("radio", { name: /Service Pack/i }).first();
+  await expect(planRadio).toBeVisible({ timeout: 30000 });
+  const selectedPlan = ((await planRadio.getAttribute("aria-label")) ||
+    (await planRadio.locator("xpath=..").innerText())).replace(/\s+/g, " ").trim();
+  await planRadio.check({ force: true });
+  await expect(planRadio).toBeChecked({ timeout: 10000 });
 
-  // Click the Material control, not its hidden native input. This mirrors the
-  // real user interaction and lets Angular update the selected-plan state.
-  const planRadio = planCard.locator("mat-radio-button").first();
-  if (await planRadio.count()) {
-    await planRadio.locator("label, .mat-mdc-radio-touch-target").first().click();
-  } else {
-    await planCard.click();
-  }
-
-  const planInput = planCard.locator("input[type='radio']").first();
-  await expect(planInput).toBeChecked({ timeout: 10000 });
-
-  const termsSection = careSurface.getByText(/T[eé]rminos y condiciones de Samsung Care\+/i).first();
+  const termsSection = careSurface.getByText(/T[eé]rminos y condiciones de nuestros Servicios Adicionales/i).first();
   await expect(termsSection).toBeVisible({ timeout: 30000 });
 
-  // The four legal consents are checkboxes, distinct from the plan radios.
-  // Use their accessible names so the legal links are not clicked.
-  const consentCopies = [
-    /He tomado nota de las condiciones generales del seguro/i,
-    /He le[ií]do y estoy de acuerdo los T[eé]rminos y Condiciones/i,
-    /Entiendo que es una p[oó]liza de seguro con un plazo fijo/i,
-    /Declaro que tengo m[aá]s de 18 a[nñ]os/i,
-  ];
-
-  for (const copy of consentCopies) {
-    const consent = careSurface.getByRole("checkbox", { name: copy }).first();
-    await expect(consent).toBeVisible({ timeout: 30000 });
+  const consents = careSurface.getByRole("checkbox").filter({ visible: true });
+  expect(await consents.count(), "Servicios Adicionales must require its legal consents.").toBeGreaterThanOrEqual(3);
+  for (let index = 0; index < await consents.count(); index += 1) {
+    const consent = consents.nth(index);
     await consent.check();
     await expect(consent).toBeChecked({ timeout: 10000 });
   }
@@ -77,7 +74,7 @@ test("SAM-24985 @qst @mx @base-store @safe - Extended Warranty on Cart", async (
   await expect(careSurface).toBeHidden({ timeout: 30000 });
 
   const summaryWarranty = page
-    .getByText(/Samsung Care.*Garant[ií]a extendida|Garant[ií]a extendida/i)
+    .getByText(/Service Pack\s*\$\s*[\d,.]+/i)
     .filter({ visible: true });
   await expect(summaryWarranty.first()).toBeVisible({ timeout: 30000 });
 
@@ -86,9 +83,9 @@ test("SAM-24985 @qst @mx @base-store @safe - Extended Warranty on Cart", async (
   expect(totalAfter).toBeGreaterThan(totalBefore);
 
   recordBusinessEvidence(testInfo, {
-    configuredSku: mxConfig.sku,
-    service: "Samsung Care+",
-    plan: "Garantía extendida",
+    configuredSku: warrantySku,
+    service: "Servicios Adicionales",
+    plan: selectedPlan,
     acceptedCareTerms: true,
     totalBefore,
     totalAfter,

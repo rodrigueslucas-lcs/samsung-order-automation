@@ -78,6 +78,7 @@ const env = {
   ...process.env,
   TEST_ENV: environmentLabel,
   MX_QST_ENVIRONMENT: targetEnvironment,
+  BACKOFFICE_ENV: targetEnvironment.toLowerCase(),
   TEST_MARKET: "MX",
   TEST_STORE: "BASE_STORE",
   TEST_SUITE: "FAST/GUEST",

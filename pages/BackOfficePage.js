@@ -12,17 +12,28 @@ const BACKOFFICE_URLS = {
 };
 
 export function getBackOfficeUrl(explicitUrl) {
-  if (explicitUrl) return explicitUrl;
-  if (process.env.BACKOFFICE_URL) return process.env.BACKOFFICE_URL;
-
-  const environment = (process.env.BACKOFFICE_ENV || "s1").toLowerCase();
+  const mxEnvironment = process.env.MX_QST_ENVIRONMENT?.toLowerCase();
+  const configuredEnvironment = process.env.BACKOFFICE_ENV?.toLowerCase();
+  if (mxEnvironment && configuredEnvironment && mxEnvironment !== configuredEnvironment) {
+    throw new Error(
+      `BackOffice environment mismatch: MX_QST_ENVIRONMENT=${mxEnvironment.toUpperCase()} but BACKOFFICE_ENV=${configuredEnvironment}.`
+    );
+  }
+  const environment = configuredEnvironment || mxEnvironment || "s1";
   const url = BACKOFFICE_URLS[environment];
   if (!url) {
     throw new Error(
       `Unsupported BACKOFFICE_ENV: ${environment}. Use s1, s2, s3, or BACKOFFICE_URL.`
     );
   }
-  return url;
+  const resolvedUrl = explicitUrl || process.env.BACKOFFICE_URL || url;
+  const hostname = new URL(resolvedUrl).hostname;
+  if (!hostname.includes(`-${environment}-public.`)) {
+    throw new Error(
+      `BackOffice URL/environment mismatch: ${environment} resolved host ${hostname}.`
+    );
+  }
+  return resolvedUrl;
 }
 
 export default class BackOfficePage extends BasePage {
@@ -104,6 +115,12 @@ export default class BackOfficePage extends BasePage {
     }
 
     await this.expectPerspective(authority);
+    const expectedHost = new URL(this.url).hostname;
+    if (new URL(this.page.url()).hostname !== expectedHost) {
+      throw new Error(
+        `BackOffice redirected to the wrong environment: expected ${expectedHost}, got ${new URL(this.page.url()).hostname}.`
+      );
+    }
   }
 
   async expectPerspective(authority) {

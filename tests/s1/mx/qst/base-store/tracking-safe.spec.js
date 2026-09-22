@@ -4,13 +4,16 @@ import evidenceContext from "../../../../../reporters/evidence/evidenceContext.j
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import GuestOrderTrackingPage from "../../../../../pages/GuestOrderTrackingPage";
 import MailinatorPage from "../../../../../pages/MailinatorPage";
+import MarketPaymentPage from "../../../../../pages/MarketPaymentPage";
 import destructiveGuards from "../../../../../utils/destructiveGuards";
+import mxTestCard from "../../../../../utils/mxTestCard.js";
 import { reachMxGuestPayment } from "../../dst/base-store/mxFlows";
 import { test, expect } from "./mxQst.fixture";
 
 const { recordBusinessEvidence } = evidenceContext;
 const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
 const { requirePaymentSubmitOptIn } = destructiveGuards;
+const { getMxTestCard } = mxTestCard;
 
 test.describe.configure({ timeout: 1200000, retries: 0 });
 const guestOrderRuntimeFile = path.resolve("test-results/mx-qst/latest-guest-order.json");
@@ -53,6 +56,35 @@ async function createFreshGuestOrder(page, mxConfig) {
   const inbox = `mx-qst-${Date.now()}`;
   const email = `${inbox}@mailinator.com`;
   const { checkout } = await reachMxGuestPayment(page, mxConfig, email);
+  if (mxConfig.environment === "S2") {
+    const payment = new MarketPaymentPage(page, { market: "MX" });
+    const card = getMxTestCard();
+    const cardDigits = card.number.replace(/\D/g, "");
+    const mastercardBin = Number(cardDigits.slice(0, 4));
+    const isMastercard = cardDigits.length === 16 && (
+      /^5[1-5]/.test(cardDigits) ||
+      (mastercardBin >= 2221 && mastercardBin <= 2720)
+    );
+    if (!isMastercard) {
+      throw new Error("MX S2 Track Order prerequisite requires the approved Mastercard test data in the ignored local card file.");
+    }
+    await payment.selectCreditCard();
+    await payment.fillCardData(card);
+    await payment.validateCreditCardReady(card);
+    const result = await payment.placeOrderAndCapture();
+    fs.mkdirSync(path.dirname(guestOrderRuntimeFile), { recursive: true });
+    fs.writeFileSync(guestOrderRuntimeFile, JSON.stringify({
+      orderNumber: result.orderCode,
+      email,
+      inbox,
+      market: "mx",
+      environment: mxConfig.environment,
+      paymentMode: "mx-mercadoCC",
+      confirmed: true,
+      createdAt: new Date().toISOString(),
+    }, null, 2));
+    return { orderNumber: result.orderCode, email, inbox, fresh: true };
+  }
   await checkout.selectPaymentMode(/^SPEI/i);
 
   let responseOrderCode = null;
@@ -79,7 +111,7 @@ async function createFreshGuestOrder(page, mxConfig) {
   if (!orderNumber) throw new Error("Guest order submit produced no observable order code; do not retry.");
   await expect(target.getByText(/confirmaci[oó]n|pedido recibido|gracias por tu compra/i).filter({ visible: true }).first())
     .toBeVisible({ timeout: 60000 });
-  return { orderNumber, email, inbox };
+  return { orderNumber, email, inbox, fresh: true };
 }
 
 test("SAM-25010 @destructive @qst @mx @base-store - Track Order with email and Order ID", async ({ page, context, mxConfig }, testInfo) => {
@@ -102,6 +134,9 @@ test("SAM-25010 @destructive @qst @mx @base-store - Track Order with email and O
   }
 
   if (!orderNumber || !email || !inbox) {
+    if (mxConfig.environment === "S2") {
+      test.skip(true, "S2 Track Order requires a fresh causal order; set MX_QST_TRACKING_CREATE_ORDER=1 with the guarded test card configured.");
+    }
     ({ orderNumber, email, inbox } = provenTrackingPrerequisite);
     testInfo.annotations.push({
       type: "guest-tracking-prerequisite",
@@ -130,7 +165,9 @@ test("SAM-25010 @destructive @qst @mx @base-store - Track Order with email and O
   const baselineMessageIds = await mailinator.snapshotMessageIds();
 
   await page.bringToFront();
-  const otpRequest = await trackingPage.requestVerificationCode(orderNumber, email);
+  const otpRequest = await trackingPage.requestVerificationCode(orderNumber, email, {
+    maxAttempts: process.env.MX_QST_TRACKING_CREATE_ORDER === "1" ? 4 : 1,
+  });
 
   await mailPage.bringToFront();
   // A previously delivered code can be invalidated by this new request.

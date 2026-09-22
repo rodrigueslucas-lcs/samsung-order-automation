@@ -200,7 +200,19 @@ export default class MxCheckoutPage extends BasePage {
   }
 
   async selectDeliveryAndContinue() {
-    const standardDeliveryCards = this.page
+    if (new URL(this.page.url()).hostname === "stg2.shop.samsung.com") {
+      const scheduledDelivery = this.page.getByText(/^Entrega Programada$/i).filter({ visible: true }).first();
+      const scheduledLayout = await scheduledDelivery
+        .waitFor({ state: "visible", timeout: 10000 })
+        .then(() => true)
+        .catch(() => false);
+      if (scheduledLayout) {
+        await this.selectS2ScheduledDeliveryAndContinue();
+        return;
+      }
+    }
+
+    const legacyStandardDeliveryCards = this.page
       .locator("label")
       .filter({ hasText: /Entrega Est[aá]ndar/i })
       .filter({ visible: true });
@@ -209,42 +221,65 @@ export default class MxCheckoutPage extends BasePage {
       .filter({ visible: true })
       .first();
 
-    await standardDeliveryCards.first().waitFor({ state: "visible", timeout: 60000 });
     await deliveryEta.waitFor({ state: "visible", timeout: 60000 });
+    const legacyCardCount = await legacyStandardDeliveryCards.count();
+    let selectedDeliveryMode;
+    if (legacyCardCount) {
+      if (legacyCardCount !== 1) {
+        throw new Error(
+          `MX Delivery expected exactly one visible Standard delivery card; found ${legacyCardCount}.`
+        );
+      }
 
-    const visibleCardCount = await standardDeliveryCards.count();
-    if (visibleCardCount !== 1) {
-      throw new Error(
-        `MX Delivery expected exactly one visible Standard delivery card; found ${visibleCardCount}.`
-      );
-    }
-
-    const standardDeliveryCard = standardDeliveryCards.first();
-    const deliveryModeUpdate = this.page.waitForResponse(
-      (response) =>
-        response.request().method() === "POST" &&
-        /\/users\/current\/carts\/current\/deliverymodes\/update(?:\?|$)/.test(
-          new URL(response.url()).pathname
-        ),
-      { timeout: 30000 }
-    );
-    await standardDeliveryCard.click();
-    const selected = await this.page
-      .waitForFunction(
-        (card) => Boolean(card.control?.checked || card.querySelector('input[type="radio"]')?.checked),
-        await standardDeliveryCard.elementHandle(),
+      const standardDeliveryCard = legacyStandardDeliveryCards.first();
+      const deliveryModeUpdate = this.page.waitForResponse(
+        (response) =>
+          response.request().method() === "POST" &&
+          /\/users\/current\/carts\/current\/deliverymodes\/update(?:\?|$)/.test(
+            new URL(response.url()).pathname
+          ),
         { timeout: 30000 }
-      )
-      .then(() => true)
-      .catch(() => false);
-    if (!selected) {
-      throw new Error("MX Standard delivery card did not become selected.");
-    }
-    const deliveryModeResponse = await deliveryModeUpdate;
-    if (!deliveryModeResponse.ok()) {
-      throw new Error(
-        `MX Standard delivery update failed with HTTP ${deliveryModeResponse.status()}.`
       );
+      await standardDeliveryCard.click();
+      const selected = await this.page
+        .waitForFunction(
+          (card) => Boolean(card.control?.checked || card.querySelector('input[type="radio"]')?.checked),
+          await standardDeliveryCard.elementHandle(),
+          { timeout: 30000 }
+        )
+        .then(() => true)
+        .catch(() => false);
+      if (!selected) throw new Error("MX Standard delivery card did not become selected.");
+      const deliveryModeResponse = await deliveryModeUpdate;
+      if (!deliveryModeResponse.ok()) {
+        throw new Error(
+          `MX Standard delivery update failed with HTTP ${deliveryModeResponse.status()}.`
+        );
+      }
+      selectedDeliveryMode = "Entrega Estándar";
+    } else {
+      // S2 can expose a single already-applied delivery mode (for example
+      // "Pre Venta") without a radio/label. Prove the mode is both present in
+      // the delivery list and reflected in the order summary before continuing.
+      const deliveryOptions = this.page
+        .getByRole("listitem")
+        .filter({ hasText: /(?:Pre Venta|Entrega Est[aá]ndar)[\s\S]*(?:Recibir[aá]s|Enviaremos)/i })
+        .filter({ visible: true });
+      await deliveryOptions.first().waitFor({ state: "visible", timeout: 30000 });
+      const optionCount = await deliveryOptions.count();
+      if (optionCount !== 1) {
+        throw new Error(`MX Delivery expected exactly one applied delivery option; found ${optionCount}.`);
+      }
+      const optionText = (await deliveryOptions.first().innerText()).replace(/\s+/g, " ").trim();
+      selectedDeliveryMode = optionText.match(/Pre Venta|Entrega Est[aá]ndar/i)?.[0];
+      if (!selectedDeliveryMode) {
+        throw new Error(`MX Delivery option was not recognized: ${optionText}`);
+      }
+      const summaryMode = this.page
+        .getByRole("region", { name: /Accordion Panel Header/i })
+        .getByText(new RegExp(selectedDeliveryMode, "i"))
+        .filter({ visible: true });
+      await summaryMode.first().waitFor({ state: "visible", timeout: 30000 });
     }
 
     const resolveContinueButton = async () => {
@@ -345,9 +380,16 @@ export default class MxCheckoutPage extends BasePage {
       throw new Error(`MX Delivery Continue reached an unexpected URL: ${this.page.url()}`);
     }
 
-    const stillSelected = await standardDeliveryCards.first().evaluate(
-      (card) => Boolean(card.control?.checked || card.querySelector('input[type="radio"]')?.checked)
-    );
+    const stillSelected = legacyCardCount
+      ? await legacyStandardDeliveryCards.first().evaluate(
+        (card) => Boolean(card.control?.checked || card.querySelector('input[type="radio"]')?.checked)
+      )
+      : await this.page
+        .getByRole("region", { name: /Accordion Panel Header/i })
+        .getByText(new RegExp(selectedDeliveryMode, "i"))
+        .filter({ visible: true })
+        .first()
+        .isVisible();
     if (!stillSelected) {
       throw new Error("MX Standard delivery became unselected after the first Continue attempt.");
     }
@@ -374,6 +416,51 @@ export default class MxCheckoutPage extends BasePage {
       }
       throw new Error(`MX Delivery Continue reached an unexpected URL: ${this.page.url()}`);
     }
+  }
+
+  async selectS2ScheduledDeliveryAndContinue() {
+    const selectOption = async (textPattern, description) => {
+      const text = this.page.getByText(textPattern).filter({ visible: true }).first();
+      await text.waitFor({ state: "visible", timeout: 60000 });
+      const container = text.locator(
+        "xpath=ancestor::label[1] | xpath=ancestor::*[@role='radio'][1] | xpath=ancestor::*[self::div or self::li][.//input][1]"
+      );
+      await container.scrollIntoViewIfNeeded();
+      await container.click();
+      await container.locator('input:checked, [aria-checked="true"]').first()
+        .waitFor({ state: "attached", timeout: 30000 })
+        .catch(() => { throw new Error(`MX S2 ${description} did not remain selected.`); });
+    };
+
+    await selectOption(/^Entrega Programada$/i, "scheduled delivery");
+    await selectOption(/^One Stop Service$/i, "One Stop Service");
+
+    const scheduleHeading = this.page.getByText(/Elige una fecha y hora para agendar tu servicio/i);
+    await scheduleHeading.waitFor({ state: "visible", timeout: 60000 });
+    const firstDate = scheduleHeading.locator(
+      "xpath=following::*[self::label or @role='radio' or .//input[@type='radio']][1]"
+    );
+    await firstDate.scrollIntoViewIfNeeded();
+    await firstDate.click();
+    await firstDate.locator('input:checked, [aria-checked="true"]').first()
+      .waitFor({ state: "attached", timeout: 30000 })
+      .catch(() => { throw new Error("MX S2 first available service date did not remain selected."); });
+
+    const noInvoice = this.page.getByRole("radio", { name: /^No$/i }).filter({ visible: true }).first();
+    if (await noInvoice.count()) {
+      if (!(await noInvoice.isChecked())) await noInvoice.check({ force: true });
+      if (!(await noInvoice.isChecked())) throw new Error("MX S2 invoice option No did not remain selected.");
+    }
+
+    const continueButton = this.page.getByRole("button", { name: /^Continuar$/i }).filter({ visible: true }).first();
+    await continueButton.scrollIntoViewIfNeeded();
+    if (!(await continueButton.isEnabled())) {
+      throw new Error("MX S2 Delivery continue remained disabled after delivery, service and date selection.");
+    }
+    await Promise.all([
+      this.page.waitForURL(/CHECKOUT_STEP_PAYMENT/, { timeout: 120000 }),
+      continueButton.click(),
+    ]);
   }
 
   async inspectPayment() {

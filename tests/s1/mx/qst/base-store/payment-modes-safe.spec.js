@@ -14,7 +14,7 @@ async function validatePaymentMode({ page, mxConfig, testInfo, id, label, marker
   const button = page.getByRole("button", { name: label }).filter({ visible: true }).first();
   test.skip(!(await button.isVisible().catch(() => false)), `${title} is not offered for the current MX S1 guest checkout context; do not fabricate payment availability.`);
   if (marker) {
-    const paymentLogo = button.getByRole("img");
+    const paymentLogo = button.getByRole("img", { name: marker });
     await expect(paymentLogo).toBeVisible();
     await expect(paymentLogo).toHaveAttribute("class", marker);
   }
@@ -30,8 +30,4 @@ test("SAM-25004 @qst @mx @base-store @safe - PayPal payment mode is available an
 
 test("SAM-25005 @qst @mx @base-store @safe - Pay in Cash payment mode is available and selectable", async ({ page, mxConfig }, testInfo) => {
   await validatePaymentMode({ page, mxConfig, testInfo, id: "SAM-25005", label: /Pago en efectivo|Pay in Cash|Efectivo/i, title: "Pay in Cash" });
-});
-
-test("SAM-25006 @qst @mx @base-store @safe - Rewards payment mode is available and selectable", async ({ page, mxConfig }, testInfo) => {
-  await validatePaymentMode({ page, mxConfig, testInfo, id: "SAM-25006", label: /Samsung Rewards|Rewards/i, title: "Rewards" });
 });

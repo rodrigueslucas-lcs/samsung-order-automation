@@ -109,7 +109,7 @@ export default class GuestOrderTrackingPage extends BasePage {
     };
   }
 
-  async requestVerificationCode(orderNumber, email) {
+  async requestVerificationCode(orderNumber, email, { maxAttempts = 1, retryDelayMs = 15000 } = {}) {
     if (!orderNumber || !email) {
       throw new Error(
         "Guest order number and email must be supplied at runtime."
@@ -119,18 +119,23 @@ export default class GuestOrderTrackingPage extends BasePage {
     await this.orderNumber.fill(orderNumber);
     await this.email.fill(email);
 
-    const responsePromise = this.page.waitForResponse(
-      (response) => this.isOtpEndpoint(response),
-      { timeout: 30000 }
-    );
-
-    await this.sendCodeButton.click();
-    const response = await responsePromise;
-
-    if (!response.ok()) {
-      throw new Error(
-        `Guest order OTP request was rejected with HTTP ${response.status()}.`
+    let response;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const responsePromise = this.page.waitForResponse(
+        (candidate) => this.isOtpEndpoint(candidate),
+        { timeout: 30000 }
       );
+      await this.sendCodeButton.click();
+      response = await responsePromise;
+      if (response.ok()) break;
+      if (response.status() !== 401 || attempt === maxAttempts) {
+        throw new Error(
+          `Guest order OTP request was rejected with HTTP ${response.status()} after ${attempt} attempt(s).`
+        );
+      }
+      // A newly confirmed order can need a short backend indexing window
+      // before guest tracking accepts the causal order/email pair.
+      await this.page.waitForTimeout(retryDelayMs);
     }
 
     // MX currently confirms an accepted OTP request by switching the form to

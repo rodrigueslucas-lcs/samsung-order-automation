@@ -94,10 +94,21 @@ export default class CartPage extends BasePage {
       const { productEntries } = await this.loadMxCartState();
       const main = this.page.getByRole('main');
       const removeButtons = main.getByRole('button', { name: /^Remove$/i });
+      const emptyCart = main.getByRole('heading', { name: /Su carrito esta vac[ií]o/i });
 
       if (!productEntries.length) {
         if (await removeButtons.count()) {
           throw new Error('MX cart API is empty but a visible product row is still rendered.');
+        }
+        return;
+      }
+
+      // S2 can briefly return the pre-removal cart payload after the UI has
+      // already committed the empty state. Do not keep deleting a stale API
+      // entry when the rendered cart has no removable product rows.
+      if (await emptyCart.isVisible().catch(() => false)) {
+        if (await removeButtons.count()) {
+          throw new Error('MX cart rendered an empty state together with removable product rows.');
         }
         return;
       }
