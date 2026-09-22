@@ -29,16 +29,17 @@ See [Official SMB Priority Model](docs/OFFICIAL_SMB_PRIORITY_MODEL.md).
 - **Runtime reconciliation** so Playwright output is translated into official PASS / FAIL / BLOCKED / NOT_RUN without treating implementation coverage as execution.
 - **Evidence capture** for screenshots, traces, videos and business evidence.
 - **Jenkins CI** with guarded destructive execution, secret-file injection and archived reports.
-- **Executive Dashboard** for presentation, release health, scope and evidence.
+- **Executive Dashboard** for presentation, release health, scope, coverage and evidence.
 - **Allure** for technical drilldown, failure categories and TC-level investigation.
 - **Environment safety** that blocks Production writes and prevents blind retries after payment/order submission.
+- **Controlled MX auth recovery** for recoverable expired sessions, with CI auto-renew explicitly opt-in.
 
 ## Reporting model
 
 The reporting stack deliberately separates four questions:
 
 1. **What is the current official scope?** — 362 DST rows: 144 P1/QST + 218 P2.
-2. **What ran in this build?** — the runtime summary for the selected campaign, e.g. the 30 MX S1 Base Store P1 TCs.
+2. **What ran in this build?** — the runtime summary for the selected campaign, e.g. the 30 MX Base Store P1 TCs.
 3. **What is implemented?** — automation coverage/mapping, independent from PASS/FAIL.
 4. **What happened technically?** — evidence, trace, screenshot, video, error and blocker classification.
 
@@ -48,7 +49,21 @@ The Executive Dashboard is the official entry point for demos and build review:
 
 `test-results/jenkins/mx-qst/executive/index.html`
 
-Its first view is intentionally compact: build/environment/scope, execution KPIs, result distribution and items requiring attention. Detailed coverage, regional matrix, data audit and historical inventory are collapsible so the report remains useful without becoming visually overwhelming.
+The presentation order is intentionally executive-first:
+
+1. **QA Execution Dashboard / Build Health**
+2. **Execution at a glance**
+3. **Needs Attention** — rendered only when FAIL/BLOCKED exists
+4. **Test Execution** — current TC-level runtime and evidence
+5. **MX Automation Coverage** — implementation maturity, separate from execution
+6. **Official SMB Scope** — compact 362 / 144 / 218 / current-runner reference
+7. **Coverage by Feature + Automation Gap Queue**
+8. **Technical Governance** — collapsed by default
+   - Regional Validation Matrix
+   - Data Integrity
+   - Historical TC Inventory
+
+The dashboard intentionally keeps historical/governance detail behind drill-down so the default view stays presentation-ready without removing traceability.
 
 Evidence links are designed for browser-first investigation:
 
@@ -57,11 +72,15 @@ Evidence links are designed for browser-first investigation:
 - **Open Trace** launches Playwright Trace Viewer with the archived trace URL.
 - **Error Context** opens the supporting artifact.
 
-The Jenkins artifact must remain reachable by the browser for Trace Viewer to load it; Jenkins authentication/CORS/network policy can still restrict remote Trace Viewer access.
+The Jenkins artifact must remain reachable by the browser for Trace Viewer to load it. Jenkins authentication, CORS and browser network policy can restrict remote Trace Viewer access. When Jenkins is served from `localhost`, Chromium-based browsers may additionally require **Local Network Access** permission for `trace.playwright.dev` before the remote viewer can fetch the archived trace.
 
 ### Allure
 
 Allure complements the Executive Dashboard rather than replacing it. It is the technical investigation view with Samsung business hierarchy, SAM IDs, runtime status, blocker categories, environment/build metadata and attachments.
+
+The intended hierarchy is:
+
+`Samsung SMB Automation → MX · <environment> · Base Store → P1/QST · <feature> → SAM-xxxxx`
 
 Jenkins publishes:
 
@@ -90,13 +109,23 @@ Registered-user execution uses environment-specific storefront state (`mx-s1-*` 
 
 ## Authentication
 
-MX storefront authentication artifacts are local/runtime-only under `playwright/.auth/` and must never be committed. The current operator workflow for refreshing the MX login is:
+MX storefront authentication artifacts are local/runtime-only under `playwright/.auth/` and must never be committed. The approved operator workflow for creating or manually refreshing the MX login is:
 
 ```bash
 npm run auth:login:mx
 ```
 
-MFA, CAPTCHA and other human-only challenges remain manual. Credentials, cookies, tokens and storage state must never be logged or committed.
+The authenticated fixture validates the saved session before registered-user execution. For recoverable failures such as an expired session, unusable auth state or expired setup cookie, it can perform **one controlled renewal**, reload the freshly persisted browser state into the already-running Playwright context, validate authentication again and then continue the TC.
+
+Auto-renew policy:
+
+- **Local:** enabled by default unless `MX_AUTH_AUTO_RENEW=0`.
+- **CI/Jenkins:** disabled by default; enable only with `MX_AUTH_AUTO_RENEW=1` where interactive Samsung Account verification can be completed safely.
+- **MFA/CAPTCHA:** never bypassed; if presented, they remain human verification steps in the dedicated Chrome login flow.
+
+A failed renewal remains a failure/blocker. The framework never converts an unverified session into PASS.
+
+Credentials, cookies, tokens and storage state must never be logged or committed.
 
 ## Safety rules
 
@@ -168,9 +197,9 @@ npm run reporting:allure:install
 
 For a team demo, the intended story is:
 
-`Official Samsung scope → Jenkins execution → Executive Dashboard → evidence/trace → Allure drilldown → regional scalability`
+`Executive Dashboard → current build health → TC evidence → Allure drilldown → Jenkins pipeline/stages → regional scalability`
 
-The dashboard is the executive entry point; Allure and Playwright remain the technical investigation layers. This keeps the presentation concise while preserving full engineering evidence underneath.
+The dashboard is the executive entry point; Allure and Playwright remain the technical investigation layers. Jenkins demonstrates how those outputs are produced automatically. This keeps the presentation concise while preserving full engineering evidence underneath.
 
 ## Documentation
 
@@ -179,4 +208,5 @@ The dashboard is the executive entry point; Allure and Playwright remain the tec
 - [Environment Validation Policy](docs/ENVIRONMENT_VALIDATION_POLICY.md)
 - [MX QST Coverage](docs/MX_QST_COVERAGE_MATRIX.md)
 - [Executive Report V3](docs/EXECUTIVE_REPORT_V3.md)
+- [Jenkins Setup](docs/JENKINS_SETUP.md)
 - [Documentation index](docs/README.md)
