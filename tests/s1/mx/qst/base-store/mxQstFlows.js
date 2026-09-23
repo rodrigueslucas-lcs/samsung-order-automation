@@ -168,14 +168,6 @@ export async function prepareMxQstCart(page, config) {
   });
   await openMxQstPdp(page, config);
 
-  const storage = page.getByRole("button", { name: "512GB", exact: true });
-  await expect(storage).toBeVisible({ timeout: 30000 });
-  await test.step("Select the controlled product configuration", async () => {
-    if (!/\bselected\b/.test((await storage.getAttribute("class")) || "")) {
-      await storage.click();
-    }
-  });
-
   const product = new ProductPage(page, {
     setupUrl: config.bootstrapUrl.toString(),
     sku: config.sku,
@@ -183,7 +175,16 @@ export async function prepareMxQstCart(page, config) {
     cartUrl: config.cartUrl.toString(),
   });
   await test.step("Add configured product to cart", async () => {
-    await product.addConfiguredPdpToCart({ waitForCartMutation: true });
+    await product.addConfiguredPdpToCart({
+      waitForCartMutation: true,
+      configureProduct: async (pdp) => {
+        const storage = pdp.getByRole("button", { name: "512GB", exact: true });
+        await expect(storage).toBeVisible({ timeout: 30000 });
+        if (!/\bselected\b/.test((await storage.getAttribute("class")) || "")) {
+          await storage.click();
+        }
+      },
+    });
   });
   await test.step("Validate controlled cart state", async () => {
     await validateControlledCartUi(page, config);
