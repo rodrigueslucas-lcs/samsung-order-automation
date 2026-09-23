@@ -10,36 +10,50 @@ test.describe.configure({ timeout: 420000 });
 
 async function validatePaymentMode({ page, mxConfig, testInfo, id, label, nestedLabel, title }) {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata(id));
-  const { checkout } = await reachMxGuestPayment(page, mxConfig, `mx.qst.${id.toLowerCase()}@example.com`);
-  const button = page.getByRole("button", { name: label }).filter({ visible: true }).first();
-  test.skip(!(await button.isVisible().catch(() => false)), `${title} is not offered for the current MX guest checkout context; do not fabricate payment availability.`);
 
-  const { panel } = await checkout.selectPaymentMode(label);
+  const { checkout } = await test.step("Reach MX guest payment step", async () =>
+    reachMxGuestPayment(page, mxConfig, `mx.qst.${id.toLowerCase()}@example.com`)
+  );
+
+  const button = page.getByRole("button", { name: label }).filter({ visible: true }).first();
+  await test.step(`Validate ${title} payment option is available`, async () => {
+    test.skip(!(await button.isVisible().catch(() => false)), `${title} is not offered for the current MX guest checkout context; do not fabricate payment availability.`);
+    await expect(button).toBeVisible();
+  });
+
+  const { panel } = await test.step(`Select ${title} payment option`, async () =>
+    checkout.selectPaymentMode(label)
+  );
 
   if (nestedLabel) {
-    const nestedButton = panel
-      .getByRole("button", { name: nestedLabel })
-      .filter({ visible: true })
-      .first();
-    const nestedText = panel
-      .getByText(nestedLabel)
-      .filter({ visible: true })
-      .first();
+    await test.step(`Validate nested ${title} option`, async () => {
+      const nestedButton = panel
+        .getByRole("button", { name: nestedLabel })
+        .filter({ visible: true })
+        .first();
+      const nestedText = panel
+        .getByText(nestedLabel)
+        .filter({ visible: true })
+        .first();
 
-    const nestedButtonVisible = await nestedButton.isVisible().catch(() => false);
-    if (nestedButtonVisible) {
-      await nestedButton.click();
-      const expanded = await nestedButton.getAttribute("aria-expanded");
-      if (expanded !== null) {
-        await expect(nestedButton).toHaveAttribute("aria-expanded", "true");
+      const nestedButtonVisible = await nestedButton.isVisible().catch(() => false);
+      if (nestedButtonVisible) {
+        await nestedButton.click();
+        const expanded = await nestedButton.getAttribute("aria-expanded");
+        if (expanded !== null) {
+          await expect(nestedButton).toHaveAttribute("aria-expanded", "true");
+        }
+      } else {
+        await expect(nestedText).toBeVisible({ timeout: 30000 });
       }
-    } else {
-      await expect(nestedText).toBeVisible({ timeout: 30000 });
-    }
+    });
   }
 
-  await expect(button).toHaveAttribute("aria-expanded", "true");
-  await expect(page).toHaveURL(/CHECKOUT_STEP_PAYMENT/i);
+  await test.step("Confirm payment accordion state and checkout URL", async () => {
+    await expect(button).toHaveAttribute("aria-expanded", "true");
+    await expect(page).toHaveURL(/CHECKOUT_STEP_PAYMENT/i);
+  });
+
   recordBusinessEvidence(testInfo, {
     paymentMode: title,
     selectedWithoutSubmit: true,
