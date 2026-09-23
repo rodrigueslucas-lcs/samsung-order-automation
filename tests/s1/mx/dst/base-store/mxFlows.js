@@ -37,6 +37,49 @@ async function ensureMxBootstrapReady(page, config) {
   await page.goto(config.baseUrl.toString(), { waitUntil: "domcontentloaded", timeout: 60000 });
 }
 
+async function fillGuestEmailOnContactInfo(page, email) {
+  const contactEmail = page
+    .getByRole("textbox", { name: "email", exact: true })
+    .filter({ visible: true })
+    .first();
+  await contactEmail.waitFor({ state: "visible", timeout: 30000 });
+  await contactEmail.fill(email);
+  await expect(contactEmail).toHaveValue(email);
+}
+
+async function startMxGuestCheckout(page, cart, email) {
+  let proceedError = null;
+  try {
+    await cart.proceedToCheckout();
+  } catch (error) {
+    proceedError = error;
+  }
+
+  const checkout = new MxCheckoutPage(page);
+  if (/CHECKOUT_STEP_CONTACT_INFO/i.test(page.url())) {
+    // S2 can reuse a guest checkout shell/session and land directly on Contact
+    // Info after Finalizar Compra. This is a valid guest path only when the
+    // required contact email field is present and we can set the requested email.
+    await fillGuestEmailOnContactInfo(page, email);
+    return checkout;
+  }
+
+  if (proceedError) {
+    const mainText = await page
+      .getByRole("main")
+      .innerText({ timeout: 5000 })
+      .catch(() => "");
+    throw new Error(
+      `MX guest checkout did not reach Guest Login or Contact Info. ` +
+      `url=${page.url()} main=${String(mainText || "").replace(/\s+/g, " ").trim().slice(0, 500) || "<empty>"}. ` +
+      `Original error: ${proceedError.message || proceedError}`
+    );
+  }
+
+  await checkout.startGuest(email);
+  return checkout;
+}
+
 export async function reachMxGuestDelivery(page, config, email) {
   await ensureMxBootstrapReady(page, config);
   const product = configuredProduct(page, config);
@@ -44,9 +87,7 @@ export async function reachMxGuestDelivery(page, config, email) {
   // immediately after the click can abort the request and render an empty cart.
   await product.addConfiguredPdpToCart({ waitForCartMutation: true });
   const cart = configuredCart(page, config);
-  await cart.proceedToCheckout();
-  const checkout = new MxCheckoutPage(page);
-  await checkout.startGuest(email);
+  const checkout = await startMxGuestCheckout(page, cart, email);
   await checkout.fillContact({ firstName: "MX", lastName: "Automation", phone: "5512345678" });
   await checkout.validateCheckoutSummary(config.sku);
   return { checkout, cart };
