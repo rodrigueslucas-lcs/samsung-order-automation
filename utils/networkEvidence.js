@@ -1,4 +1,3 @@
-import { test } from "@playwright/test";
 import sanitizer from "../reporters/evidence/sanitizer.js";
 
 const { sanitize } = sanitizer;
@@ -43,7 +42,9 @@ async function responseBody(response, timeout = 3000) {
   ]);
 }
 
-export async function attachNetworkEvidence(name, { request, response, requestBody, responseBody: explicitResponseBody } = {}) {
+export async function attachNetworkEvidence(testInfo, name, { request, response, requestBody, responseBody: explicitResponseBody } = {}) {
+  if (!testInfo?.attach) return null;
+
   try {
     const req = request || response?.request?.();
     const payload = sanitize({
@@ -62,7 +63,7 @@ export async function attachNetworkEvidence(name, { request, response, requestBo
       capturedAt: new Date().toISOString(),
     });
 
-    await test.info().attach(`API · ${name}`, {
+    await testInfo.attach(`API · ${name}`, {
       body: Buffer.from(JSON.stringify(payload, null, 2), "utf8"),
       contentType: "application/json",
     });
