@@ -10,9 +10,6 @@ const MX_BASE_P1_IDS = Object.freeze([
   'SAM-24999','SAM-25000','SAM-25001','SAM-25002','SAM-25004','SAM-25005','SAM-25006','SAM-25010','SAM-25011','SAM-25016',
 ]);
 
-// Recent runtime-proven improvements that supersede stale entries in the preserved
-// 37-ID mapping. This keeps the historical source intact while the presentation
-// layer reports the current MX Base Store P1 implementation state truthfully.
 const MX_COVERAGE_OVERRIDES = Object.freeze({
   'SAM-24969': {
     coverage: 'full',
@@ -101,6 +98,17 @@ function metadataForCase(market, id) {
     return { title: tc.title || null, feature: tc.feature || 'Unknown', store: tc.store || 'Unknown', coverage: tc.reuse || null };
   }
   return { title: null, feature: 'Unknown', store: 'Unknown', coverage: null };
+}
+
+function environmentMetadata(result = null) {
+  if (!result) {
+    return { validationEnvironment: null, nextEnvironment: null, environmentReason: null };
+  }
+  return {
+    validationEnvironment: result.validationEnvironment || result.environment || result.sourceEnvironment || null,
+    nextEnvironment: result.nextEnvironment || result.targetEnvironment || result.routeTo || result.handoffEnvironment || null,
+    environmentReason: result.environmentReason || result.handoffReason || result.reason || null,
+  };
 }
 
 function buildMxFeatureCoverage() {
