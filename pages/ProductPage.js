@@ -25,11 +25,34 @@ export default class ProductPage extends BasePage {
     for (let attempt = 1; attempt <= 2; attempt++) {
       await this.safeGoto(this.pdpUrl);
       if (configureProduct) await configureProduct(this.page);
+
       const addButton = this.page
+        .getByRole('main')
         .getByRole('button', { name: /Agregar al carrito|Add to cart|Add to basket/i })
         .filter({ visible: true })
         .first();
-      await addButton.waitFor({ state: 'visible', timeout: 60000 });
+
+      const buttonReady = await addButton
+        .waitFor({ state: 'visible', timeout: 30000 })
+        .then(() => true)
+        .catch(() => false);
+
+      if (!buttonReady) {
+        if (attempt < 2) {
+          await this.page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
+          continue;
+        }
+
+        const mainText = await this.page
+          .getByRole('main')
+          .innerText({ timeout: 5000 })
+          .catch(() => '');
+        throw new Error(
+          `Configured PDP add-to-cart button was not rendered after controlled retry. ` +
+          `url=${this.page.url()} title=${await this.page.title().catch(() => '')} ` +
+          `main=${String(mainText || '').replace(/\s+/g, ' ').trim().slice(0, 500) || '<empty>'}`
+        );
+      }
 
       const mutationOutcome = waitForCartMutation
         ? Promise.race([
@@ -44,7 +67,21 @@ export default class ProductPage extends BasePage {
           ])
         : Promise.resolve(null);
 
-      await addButton.click();
+      await addButton.scrollIntoViewIfNeeded();
+      try {
+        await addButton.click({ timeout: 8000 });
+      } catch (error) {
+        if (!/intercepts pointer events/i.test(String(error?.message || ''))) throw error;
+
+        // S2 can leave the global navigation expanded over the PDP CTA. Escape
+        // closes the transient GNB surface; keyboard activation then preserves
+        // a real user interaction without forcing the click through an overlay.
+        await this.page.keyboard.press('Escape').catch(() => {});
+        await addButton.scrollIntoViewIfNeeded();
+        await addButton.focus();
+        await addButton.press('Enter');
+      }
+
       const outcome = await mutationOutcome;
       if (outcome?.response && !outcome.response.ok()) {
         throw new Error(`Configured PDP add-to-cart returned HTTP ${outcome.response.status()}.`);
