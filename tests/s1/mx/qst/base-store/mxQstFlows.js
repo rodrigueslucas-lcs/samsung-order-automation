@@ -8,11 +8,16 @@ const { validateCartItemPresentation, validateStickyControl } = cartPresentation
 const { assertMxStagingPage } = mxStagingGuard;
 
 async function bootstrapMx(page, config) {
-  await test.step("Bootstrap MX S1 storefront session", async () => {
-    await page.goto(config.bootstrapUrl.toString(), { waitUntil: "domcontentloaded" });
-    // The cookie endpoint may render its success copy or an empty response. Its
-    // contract is completed by explicitly returning to, and validating, MX S1.
-    await page.goto(config.baseUrl.toString(), { waitUntil: "domcontentloaded" });
+  await test.step(`Bootstrap MX ${config.environment || "staging"} storefront session`, async () => {
+    const currentUrl = new URL(page.url());
+    const alreadyReady =
+      currentUrl.hostname === config.hostname &&
+      (currentUrl.pathname === "/mx" || currentUrl.pathname.startsWith("/mx/"));
+
+    if (!alreadyReady) {
+      await page.goto(config.bootstrapUrl.toString(), { waitUntil: "domcontentloaded", timeout: 60000 });
+      await page.goto(config.baseUrl.toString(), { waitUntil: "domcontentloaded", timeout: 60000 });
+    }
     await assertMxStagingPage(page, "MX QST flow bootstrap");
   });
 }
@@ -29,10 +34,62 @@ export function mxQstCart(page, config) {
   });
 }
 
+async function resetMxCartViaUi(page, config) {
+  await page.goto(config.cartUrl.toString(), { waitUntil: "domcontentloaded", timeout: 60000 });
+  const main = page.getByRole("main");
+  await main.waitFor({ state: "attached", timeout: 30000 });
+
+  for (let removed = 0; removed < 20; removed += 1) {
+    const emptyCart = main.getByRole("heading", { name: /Su carrito esta vac[ií]o/i });
+    if (await emptyCart.isVisible().catch(() => false)) return;
+
+    const removeButtons = main.getByRole("button", { name: /^Remove$/i }).filter({ visible: true });
+    const count = await removeButtons.count();
+    if (!count) {
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+      if (await emptyCart.isVisible().catch(() => false)) return;
+      const afterReload = await removeButtons.count();
+      if (!afterReload) {
+        throw new Error("MX cart reset found neither an empty-cart state nor a removable product row.");
+      }
+    }
+
+    await removeButtons.first().click();
+    const dialog = page
+      .getByRole("dialog")
+      .or(page.getByRole("alertdialog"))
+      .filter({ hasText: /Eliminar producto del carrito/i })
+      .filter({ visible: true })
+      .first();
+    await dialog.waitFor({ state: "visible", timeout: 30000 });
+    const confirm = dialog.getByRole("button", { name: /^S[ií]$/i }).filter({ visible: true }).first();
+    await confirm.waitFor({ state: "visible", timeout: 30000 });
+    await Promise.all([
+      dialog.waitFor({ state: "hidden", timeout: 30000 }),
+      confirm.click(),
+    ]);
+  }
+
+  throw new Error("MX cart reset exceeded the 20-item safety limit.");
+}
+
+async function validateControlledCartUi(page, config) {
+  const main = page.getByRole("main");
+  const sku = main.getByText(config.sku, { exact: true }).filter({ visible: true });
+  await expect(sku).toHaveCount(1, { timeout: 30000 });
+
+  const item = sku.first().locator(
+    "xpath=ancestor::*[.//input[@aria-label='Quantity'] and .//button[@aria-label='Remove']][1]"
+  );
+  const quantity = item.getByRole("textbox", { name: "Quantity" });
+  await expect(quantity).toHaveValue("1", { timeout: 30000 });
+  await expect(main.getByRole("button", { name: /^Remove$/i })).toHaveCount(1, { timeout: 30000 });
+}
+
 export async function openMxQstPdp(page, config) {
   await bootstrapMx(page, config);
   await test.step("Open controlled MX product detail page", async () => {
-    await page.goto(config.pdpUrl.toString(), { waitUntil: "domcontentloaded" });
+    await page.goto(config.pdpUrl.toString(), { waitUntil: "domcontentloaded", timeout: 60000 });
     await expect(page).toHaveURL(new RegExp(`/mx/p/${config.sku}`, "i"));
     await expect(page.getByText(config.sku, { exact: true }).first()).toBeVisible({ timeout: 60000 });
   });
@@ -42,7 +99,7 @@ export async function prepareMxQstCart(page, config) {
   const cart = mxQstCart(page, config);
   await bootstrapMx(page, config);
   await test.step("Reset cart to a controlled state", async () => {
-    await cart.clearMxCartAndConfirmEmpty();
+    await resetMxCartViaUi(page, config);
   });
   await openMxQstPdp(page, config);
 
@@ -64,7 +121,7 @@ export async function prepareMxQstCart(page, config) {
     await product.addConfiguredPdpToCart({ waitForCartMutation: true });
   });
   await test.step("Validate controlled cart state", async () => {
-    await cart.validateControlledSingleSku(config.sku);
+    await validateControlledCartUi(page, config);
   });
   return cart;
 }
@@ -100,49 +157,49 @@ function parseMxCurrency(text) {
 
 export async function validateMxCheckoutSummaryPresentation(page) {
   return test.step("Validate checkout order summary", async () => {
-  const summaryHeading = page.getByRole("heading", {
-    name: "Resumen de tu pedido",
-    level: 2,
-  });
-  const totalHeading = page.getByRole("heading", {
-    name: "Total con IVA",
-    level: 3,
-  });
+    const summaryHeading = page.getByRole("heading", {
+      name: "Resumen de tu pedido",
+      level: 2,
+    });
+    const totalHeading = page.getByRole("heading", {
+      name: "Total con IVA",
+      level: 3,
+    });
 
-  await expect(summaryHeading).toBeVisible({ timeout: 30000 });
-  await expect(totalHeading).toBeVisible({ timeout: 30000 });
+    await expect(summaryHeading).toBeVisible({ timeout: 30000 });
+    await expect(totalHeading).toBeVisible({ timeout: 30000 });
 
-  const summaryBlock = summaryHeading.locator(
-    "xpath=ancestor::*[.//*[normalize-space()='Subtotal'] and .//*[normalize-space()='IVA']][1]"
-  );
-  await expect(summaryBlock).toBeVisible({ timeout: 30000 });
+    const summaryBlock = summaryHeading.locator(
+      "xpath=ancestor::*[.//*[normalize-space()='Subtotal'] and .//*[normalize-space()='IVA']][1]"
+    );
+    await expect(summaryBlock).toBeVisible({ timeout: 30000 });
 
-  const summaryText = await summaryBlock.innerText();
-  const totalText = await totalHeading.locator("..").innerText();
+    const summaryText = await summaryBlock.innerText();
+    const totalText = await totalHeading.locator("..").innerText();
 
-  expect(summaryText).toMatch(/Subtotal/i);
-  expect(summaryText).toMatch(/\bIVA\b/i);
+    expect(summaryText).toMatch(/Subtotal/i);
+    expect(summaryText).toMatch(/\bIVA\b/i);
 
-  const subtotalMatch = summaryText.match(/Subtotal\s*\$\s*([\d,.]+)/i);
-  const ivaMatch = summaryText.match(/\bIVA\s*\$\s*([\d,.]+)/i);
-  const subtotal = parseMxCurrency(subtotalMatch ? `$${subtotalMatch[1]}` : "");
-  const iva = parseMxCurrency(ivaMatch ? `$${ivaMatch[1]}` : "");
-  const total = parseMxCurrency(totalText);
+    const subtotalMatch = summaryText.match(/Subtotal\s*\$\s*([\d,.]+)/i);
+    const ivaMatch = summaryText.match(/\bIVA\s*\$\s*([\d,.]+)/i);
+    const subtotal = parseMxCurrency(subtotalMatch ? `$${subtotalMatch[1]}` : "");
+    const iva = parseMxCurrency(ivaMatch ? `$${ivaMatch[1]}` : "");
+    const total = parseMxCurrency(totalText);
 
-  expect(subtotal).not.toBeNull();
-  expect(iva).not.toBeNull();
-  expect(total).not.toBeNull();
-  expect(subtotal).toBeGreaterThan(0);
-  expect(iva).toBeGreaterThan(0);
-  expect(total).toBeGreaterThan(0);
+    expect(subtotal).not.toBeNull();
+    expect(iva).not.toBeNull();
+    expect(total).not.toBeNull();
+    expect(subtotal).toBeGreaterThan(0);
+    expect(iva).toBeGreaterThan(0);
+    expect(total).toBeGreaterThan(0);
 
-  return {
-    subtotal,
-    iva,
-    total,
-    voucherVisible: (await page.getByText(/Voucher|Cup[oó]n/i).filter({ visible: true }).count()) > 0,
-    promoVisible: (await page.getByText(/Promoci[oó]n|Promo/i).filter({ visible: true }).count()) > 0,
-  };
+    return {
+      subtotal,
+      iva,
+      total,
+      voucherVisible: (await page.getByText(/Voucher|Cup[oó]n/i).filter({ visible: true }).count()) > 0,
+      promoVisible: (await page.getByText(/Promoci[oó]n|Promo/i).filter({ visible: true }).count()) > 0,
+    };
   });
 }
 
@@ -150,18 +207,18 @@ export { validateStickyControl };
 
 export async function openMxService(page, name) {
   return test.step(`Open ${name.replace(/\\\\/g, "")} service configuration`, async () => {
-  const button = page.getByRole("button", {
-    name: new RegExp(`Agregar ahora\\s*${name}`, "i"),
-  });
-  await expect(button).toBeVisible({ timeout: 30000 });
-  await button.scrollIntoViewIfNeeded();
-  await button.click();
-  const surface = page.getByRole("dialog").filter({ visible: true }).or(
-    page.locator("[role='presentation']:visible").filter({ hasText: new RegExp(name, "i") })
-  ).first();
-  await expect(page.getByText(new RegExp(name, "i")).filter({ visible: true }).last()).toBeVisible({
-    timeout: 30000,
-  });
-  return surface;
+    const button = page.getByRole("button", {
+      name: new RegExp(`Agregar ahora\\s*${name}`, "i"),
+    });
+    await expect(button).toBeVisible({ timeout: 30000 });
+    await button.scrollIntoViewIfNeeded();
+    await button.click();
+    const surface = page.getByRole("dialog").filter({ visible: true }).or(
+      page.locator("[role='presentation']:visible").filter({ hasText: new RegExp(name, "i") })
+    ).first();
+    await expect(page.getByText(new RegExp(name, "i")).filter({ visible: true }).last()).toBeVisible({
+      timeout: 30000,
+    });
+    return surface;
   });
 }
