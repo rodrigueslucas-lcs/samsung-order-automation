@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { execFileSync } = require("node:child_process");
 const { sanitize } = require("../reporters/evidence/sanitizer");
 
 const TERMINAL_FAILURES = new Set(["failed", "timedOut", "interrupted"]);
@@ -12,12 +13,25 @@ function safeArtifact(filePath, root) {
   return relative;
 }
 
+function resolveGitCommit(root = process.cwd()) {
+  if (process.env.GIT_COMMIT) return process.env.GIT_COMMIT;
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 function buildMxQstRuntimeSummary(report, {
   officialIds, root = process.cwd(), market = "MX", store = "BASE_STORE",
   suite = "P1/QST", environment = "S1/STG",
   buildNumber = process.env.BUILD_NUMBER || null,
   buildUrl = process.env.BUILD_URL || null,
-  gitCommit = process.env.GIT_COMMIT || null,
+  gitCommit = resolveGitCommit(root),
   timestamp = report?.stats?.startTime || new Date().toISOString(),
   titles = {},
 } = {}) {
@@ -78,4 +92,4 @@ function writeRuntimeSummary(filePath, summary) {
   fs.writeFileSync(filePath, JSON.stringify(summary, null, 2));
 }
 
-module.exports = { buildMxQstRuntimeSummary, writeRuntimeSummary, safeArtifact };
+module.exports = { buildMxQstRuntimeSummary, writeRuntimeSummary, safeArtifact, resolveGitCommit };
