@@ -2,13 +2,22 @@ import { test } from "@playwright/test";
 import sanitizer from "../reporters/evidence/sanitizer.js";
 
 const { sanitize } = sanitizer;
+const BODY_PREVIEW_LIMIT = 20000;
 
 function parseBody(text) {
   if (!text) return null;
+  const raw = String(text);
+  if (raw.length > BODY_PREVIEW_LIMIT) {
+    return {
+      truncated: true,
+      originalLength: raw.length,
+      preview: raw.slice(0, BODY_PREVIEW_LIMIT),
+    };
+  }
   try {
-    return JSON.parse(text);
+    return JSON.parse(raw);
   } catch {
-    return String(text).slice(0, 4000);
+    return raw.slice(0, 4000);
   }
 }
 
