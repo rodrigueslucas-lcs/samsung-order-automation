@@ -24,9 +24,21 @@ function configuredCart(page, config) {
   });
 }
 
-export async function reachMxGuestDelivery(page, config, email) {
-  await page.goto(config.bootstrapUrl.toString(), { waitUntil: "domcontentloaded" });
+async function ensureMxBootstrapReady(page, config) {
+  const currentUrl = new URL(page.url());
+  const alreadyOnMxStorefront =
+    currentUrl.hostname === config.hostname &&
+    (currentUrl.pathname === "/mx" || currentUrl.pathname.startsWith("/mx/"));
+
+  if (alreadyOnMxStorefront) return;
+
+  await page.goto(config.bootstrapUrl.toString(), { waitUntil: "domcontentloaded", timeout: 60000 });
   await expect(page.getByText(/You can access pages now/i)).toBeVisible({ timeout: 60000 });
+  await page.goto(config.baseUrl.toString(), { waitUntil: "domcontentloaded", timeout: 60000 });
+}
+
+export async function reachMxGuestDelivery(page, config, email) {
+  await ensureMxBootstrapReady(page, config);
   const product = configuredProduct(page, config);
   // Do not leave the PDP until the cart POST completes. Navigating to /cart
   // immediately after the click can abort the request and render an empty cart.
@@ -53,6 +65,7 @@ export async function reachMxGuestPayment(page, config, email) {
 }
 
 export async function reachMxRegisteredDelivery(page, config) {
+  await ensureMxBootstrapReady(page, config);
   const cart = configuredCart(page, config);
   await cart.clearMxCartAndConfirmEmpty();
   await configuredProduct(page, config).addConfiguredPdpToCart({
