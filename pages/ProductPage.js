@@ -20,7 +20,7 @@ export default class ProductPage extends BasePage {
     if (!this.pdpUrl) throw new Error('A configured PDP URL is required.');
     const isCartMutation = (request) =>
       request.method() === 'POST' &&
-      /\/users\/current\/carts(?:\/[^/]+\/entries)?(?:\?|$)/.test(request.url());
+      /\/users\/current\/carts\/(?:current|[^/]+)\/entries(?:\?|$)/.test(request.url());
 
     for (let attempt = 1; attempt <= 2; attempt++) {
       await this.safeGoto(this.pdpUrl);

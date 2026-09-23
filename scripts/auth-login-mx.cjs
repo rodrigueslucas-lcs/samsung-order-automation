@@ -7,20 +7,23 @@ const { resolveMxEnvironment } = require("../utils/mxConfig");
 
 const TARGET = resolveMxEnvironment();
 const HOSTNAME = TARGET.hostname;
+const API_HOSTNAME = `${TARGET.name.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com`;
 const ENV_NAME = TARGET.name;
 const ENV_SUFFIX = ENV_NAME.toLowerCase();
+const accountSlot = process.env.MX_AUTH_SLOT || "primary";
+if (!["primary", "second"].includes(accountSlot)) throw new Error("Unsupported MX auth account slot.");
 const ACCOUNT_HOSTNAME = "account.samsung.com";
 const setupUrl = `https://${HOSTNAME}/getcookie.html`;
 const homeUrl = `https://${HOSTNAME}/mx/`;
-const profileDir = path.resolve(`playwright/profiles/${ENV_SUFFIX}-mx-qa`);
+const profileDir = path.resolve(`playwright/profiles/${ENV_SUFFIX}-mx-${accountSlot === "second" ? "second" : "qa"}`);
 const authDir = path.resolve("playwright/.auth");
-const authFile = path.join(authDir, `mx-${ENV_SUFFIX}-user.json`);
-const sessionStorageFile = path.join(authDir, `mx-${ENV_SUFFIX}-session-storage.json`);
+const authFile = path.join(authDir, `mx-${ENV_SUFFIX}-${accountSlot === "second" ? "second-user" : "user"}.json`);
+const sessionStorageFile = path.join(authDir, `mx-${ENV_SUFFIX}-${accountSlot === "second" ? "second-session-storage" : "session-storage"}.json`);
 const devToolsActivePortFile = path.join(profileDir, "DevToolsActivePort");
 const interactiveTimeout = Number(process.env.MX_AUTH_INTERACTIVE_TIMEOUT_MS || 600000);
 const manualLogin = process.env.MX_AUTH_MANUAL === "1";
 
-const localCredentialsFile = path.join(authDir, "mx-storefront-user.json");
+const localCredentialsFile = path.join(authDir, accountSlot === "second" ? "mx-second-storefront-user.json" : "mx-storefront-user.json");
 
 function readLocalCredentials() {
   if (!fs.existsSync(localCredentialsFile)) return {};
@@ -79,17 +82,17 @@ function assertAllowedHost(page, allowed, step) {
   if (!allowed.includes(new URL(page.url()).hostname)) throw new Error(`${step} reached an unexpected host.`);
 }
 
-function isMxHome(page) {
+function isMxStorefront(page) {
   try {
     const url = new URL(page.url());
-    return url.hostname === HOSTNAME && /^\/mx\/?(?:[?#]|$)/i.test(url.pathname);
+    return url.hostname === HOSTNAME && (url.pathname === "/mx" || url.pathname.startsWith("/mx/"));
   } catch {
     return false;
   }
 }
 
 async function hasRenderedStorefront(page, timeout = 3000) {
-  if (!isMxHome(page)) return false;
+  if (!isMxStorefront(page)) return false;
   return page.getByRole("button", { name: "My Profile", exact: true })
     .waitFor({ state: "visible", timeout })
     .then(() => true)
@@ -184,12 +187,15 @@ async function exportAuthenticatedState(context, page) {
   const mxState = {
     cookies: fullState.cookies.filter((cookie) => {
       const domain = cookie.domain.replace(/^\./, "");
-      return domain === HOSTNAME || cookie.domain === ".samsung.com";
+      return domain === HOSTNAME || domain === API_HOSTNAME || cookie.domain === ".samsung.com";
     }),
     origins: fullState.origins.filter(({ origin }) => new URL(origin).hostname === HOSTNAME),
   };
   if (!mxState.cookies.some((cookie) => cookie.domain.replace(/^\./, "") === HOSTNAME)) {
     throw new Error(`No MX ${ENV_NAME} storefront cookies were available after login.`);
+  }
+  if (accountSlot === "second" && !mxState.cookies.some((cookie) => cookie.domain.replace(/^\./, "") === API_HOSTNAME)) {
+    throw new Error(`No MX ${ENV_NAME} second-account cart API cookies were available after login.`);
   }
   const sessionStorage = await page.evaluate(() => Object.fromEntries(
     Array.from({ length: window.sessionStorage.length }, (_, index) => {
@@ -200,6 +206,17 @@ async function exportAuthenticatedState(context, page) {
   fs.mkdirSync(authDir, { recursive: true });
   writeJsonSecurely(authFile, mxState);
   writeJsonSecurely(sessionStorageFile, sessionStorage);
+}
+
+async function warmSecondCartSession(context) {
+  if (accountSlot !== "second") return;
+  const cartPage = await context.newPage();
+  try {
+    await cartPage.goto(`https://${HOSTNAME}/mx/cart`, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await cartPage.getByRole("main").getByText(/carrito|cart/i).first().waitFor({ state: "visible", timeout: 60000 });
+  } finally {
+    await cartPage.close();
+  }
 }
 
 async function loginMxSamsungAccount() {
@@ -226,6 +243,9 @@ async function loginMxSamsungAccount() {
       console.log(`[auth:login:mx] opening MX ${ENV_NAME} storefront in dedicated Chrome`);
       page = await openMxHome(page, context);
       console.log(`[auth:login:mx] MX ${ENV_NAME} My Profile is visible`);
+      await warmSecondCartSession(context);
+      page = await openMxHome(page, context);
+      if (accountSlot === "second") await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
       ({ menu } = await waitForProfileMenu(page));
       console.log("[auth:login:mx] MX profile menu is stable");
       login = menu.locator('a[data-an-la="login"]').filter({ visible: true });
@@ -284,6 +304,9 @@ async function loginMxSamsungAccount() {
 
     console.log("[auth:login:mx] validating authenticated storefront after return");
     page = await openMxHome(page, context);
+    await warmSecondCartSession(context);
+    page = await openMxHome(page, context);
+    if (accountSlot === "second") await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
     ({ menu } = await waitForProfileMenu(page));
     if (!/Cerrar Sesi[oó]n/i.test(await menu.innerText())) {
       throw new Error(`MX ${ENV_NAME} returned from Samsung Account without an authenticated profile menu.`);

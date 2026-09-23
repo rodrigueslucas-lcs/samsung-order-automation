@@ -95,9 +95,11 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
     const s25Card = page.locator("[role='listitem'].pd21-product-card__item")
       .filter({ has: page.locator(`a.pd21-product-card__name[data-modelcode='${PRE_QA_MODEL_CODE}']`) })
       .first();
+    // Product cards are lazy-revealed when they enter the viewport. The exact
+    // model exists in the DOM but starts with visibility:hidden below the fold.
+    await s25Card.evaluate((card) => card.scrollIntoView({ block: "center" }));
     await expect(s25Card, "The PreQA BC catalog must render the configured Galaxy S25 Ultra product card.")
       .toBeVisible({ timeout: 60000 });
-    await s25Card.scrollIntoViewIfNeeded();
     await s25Card.getByRole("link", { name: /^Comprar:Galaxy S25 Ultra$/i }).click();
 
     await page.waitForURL((url) =>
@@ -142,6 +144,16 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
       });
     }
     await expect(page).toHaveURL(new RegExp("p6-pre-qa2\\.samsung\\.com/mx/smartphones/galaxy-s25-ultra/buy", "i"));
+    const badgeUpdated = await expect.poll(() => readHeaderCartCount(page), {
+      timeout: 10000,
+      message: "The PDP minicart badge should refresh after Add to Cart.",
+    }).toBeGreaterThan(cartCountBefore).then(() => true, () => false);
+    if (!badgeUpdated) {
+      // Browser history can restore a cached PDP header after SystemParking.
+      // Rehydrate once, then still require the real badge to reflect the add.
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+      await dismissLocationBanner(page);
+    }
     await expect.poll(() => readHeaderCartCount(page), {
       timeout: 30000,
       message: "The PreQA PDP header minicart must show the added product after returning from maintenance.",

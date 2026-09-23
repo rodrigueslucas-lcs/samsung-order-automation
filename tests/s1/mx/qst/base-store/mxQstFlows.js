@@ -44,7 +44,7 @@ async function readMxCartUiState(page) {
   }
 
   const removeButtons = main
-    .getByRole("button", { name: /^Remove$/i })
+    .locator('button[aria-label="Remove"]:enabled')
     .filter({ visible: true });
   const removeCount = await removeButtons.count();
   if (removeCount > 0) {
@@ -113,7 +113,14 @@ async function resetMxCartViaUi(page, config) {
 
     recoveryReloads = 0;
     const removeButton = state.removeButtons.first();
-    await removeButton.click();
+    try {
+      await removeButton.click();
+    } catch (error) {
+      // The cart can finish an in-flight mutation while Playwright waits for
+      // actionability. Only recover if the live UI actually became empty.
+      if ((await readMxCartUiState(page)).kind === "empty") return;
+      throw error;
+    }
 
     const dialog = page
       .getByRole("dialog")
@@ -156,7 +163,19 @@ export async function openMxQstPdp(page, config) {
   await test.step("Open controlled MX product detail page", async () => {
     await page.goto(config.pdpUrl.toString(), { waitUntil: "domcontentloaded", timeout: 60000 });
     await expect(page).toHaveURL(new RegExp(`/mx/p/${config.sku}`, "i"));
-    await expect(page.getByText(config.sku, { exact: true }).first()).toBeVisible({ timeout: 60000 });
+    const sku = page.getByText(config.sku, { exact: true }).first();
+    const loaded = await sku.waitFor({ state: "visible", timeout: 30000 }).then(() => true).catch(() => false);
+    if (!loaded) {
+      // S2 occasionally renders the PDP shell while its product request stalls.
+      // Recover that loading state once; the SKU remains mandatory afterward.
+      const hasProductAction = await page.getByRole("button", { name: /^(Comprar|Agregar al carrito|Add to cart)$/i })
+        .first().isVisible().catch(() => false);
+      if (!hasProductAction) {
+        await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+        await expect(page).toHaveURL(new RegExp(`/mx/p/${config.sku}`, "i"));
+      }
+    }
+    await expect(sku).toBeVisible({ timeout: 60000 });
   });
 }
 

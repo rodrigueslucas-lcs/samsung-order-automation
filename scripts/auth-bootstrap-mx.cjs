@@ -1,19 +1,26 @@
 const { chromium } = require("@playwright/test");
 const fs = require("node:fs");
 const path = require("node:path");
+const { resolveMxEnvironment } = require("../utils/mxConfig");
 
-const HOSTNAME = "stg.shop.samsung.com";
+const target = resolveMxEnvironment();
+const environment = target.name.toLowerCase();
+const accountSlot = process.env.MX_AUTH_SLOT || "primary";
+if (!["primary", "second"].includes(accountSlot)) throw new Error("Unsupported MX auth account slot.");
+const label = `${target.name} MX${accountSlot === "second" ? " second account" : ""}`;
+const HOSTNAME = target.hostname;
+const API_HOSTNAME = `${environment}-smb-api-cdn.ecom-stg.samsung.com`;
 const setupUrl = `https://${HOSTNAME}/getcookie.html`;
 const homeUrl = `https://${HOSTNAME}/mx/`;
-const profileDir = path.resolve("playwright/profiles/s1-mx-qa");
+const profileDir = path.resolve(`playwright/profiles/${environment}-mx-${accountSlot === "second" ? "second" : "qa"}`);
 const authDir = path.resolve("playwright/.auth");
-const authFile = path.join(authDir, "mx-s1-user.json");
+const authFile = path.join(authDir, `mx-${environment}-${accountSlot === "second" ? "second-user" : "user"}.json`);
 const authTempFile = `${authFile}.tmp`;
-const sessionStorageFile = path.join(authDir, "mx-s1-session-storage.json");
+const sessionStorageFile = path.join(authDir, `mx-${environment}-${accountSlot === "second" ? "second-session-storage" : "session-storage"}.json`);
 const sessionStorageTempFile = `${sessionStorageFile}.tmp`;
 const devToolsActivePortFile = path.join(profileDir, "DevToolsActivePort");
 
-let currentStep = "starting S1 MX export";
+let currentStep = `starting ${label} export`;
 
 function reportStep(message) {
   currentStep = message;
@@ -28,20 +35,20 @@ function safeErrorSummary(error) {
 
 function assertMxHost(page, step) {
   if (new URL(page.url()).hostname !== HOSTNAME) {
-    throw new Error(`${step} left the allowed S1 MX host`);
+    throw new Error(`${step} left the allowed ${label} host`);
   }
 }
 
 function readDevToolsPort() {
   if (!fs.existsSync(devToolsActivePortFile)) {
     throw new Error(
-      "the dedicated S1 MX Chrome is not available; run npm run auth:login:mx"
+      `the dedicated ${label} Chrome is not available; open its profile before exporting`
     );
   }
   const [portText] = fs.readFileSync(devToolsActivePortFile, "utf8").split("\n");
   const port = Number(portText);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error("the dedicated S1 MX Chrome debugging endpoint is invalid");
+    throw new Error(`the dedicated ${label} Chrome debugging endpoint is invalid`);
   }
   return port;
 }
@@ -65,7 +72,7 @@ async function findLiveMxStorefront(context) {
     if (page.isClosed()) return false;
     try {
       const url = new URL(page.url());
-      return url.hostname === HOSTNAME && /^\/mx\/?(?:[?#]|$)/i.test(`${url.pathname}${url.search}${url.hash}`);
+      return url.hostname === HOSTNAME && (url.pathname === "/mx" || url.pathname.startsWith("/mx/"));
     } catch {
       return false;
     }
@@ -99,7 +106,7 @@ async function openAuthenticatedProfileMenu(page) {
     .last();
   if (!/Cerrar Sesi[oó]n/i.test(await profileMenu.innerText())) {
     throw new Error(
-      "the S1 MX profile menu is signed out; complete the manual login and keep Chrome open"
+      `the ${label} profile menu is signed out; complete the manual login and keep Chrome open`
     );
   }
   reportStep("authenticated profile menu is open and Cerrar sesión is visible");
@@ -108,18 +115,18 @@ async function openAuthenticatedProfileMenu(page) {
 async function openMxStorefrontForExport(context) {
   const livePage = await findLiveMxStorefront(context);
   if (livePage) {
-    reportStep("reusing the live S1 MX storefront already open in dedicated Chrome");
+    reportStep(`reusing the live ${label} storefront already open in dedicated Chrome`);
     await livePage.bringToFront();
     return livePage;
   }
 
   const page = await context.newPage();
-  reportStep("no rendered MX tab found; opening S1 MX cookie setup");
+  reportStep(`no rendered MX tab found; opening ${label} cookie setup`);
   await page.goto(setupUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
   assertMxHost(page, "cookie setup");
   await page.getByText(/You can access pages now/i).waitFor({ state: "visible", timeout: 60000 });
 
-  reportStep("opening S1 MX storefront");
+  reportStep(`opening ${label} storefront`);
   await page.goto(homeUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
   assertMxHost(page, "storefront navigation");
   return page;
@@ -133,29 +140,44 @@ function writeJsonAtomically(tempFile, destination, value) {
 
 async function exportMxAuthentication() {
   fs.mkdirSync(authDir, { recursive: true });
-  reportStep("connecting to the live dedicated S1 MX Chrome");
+  reportStep(`connecting to the live dedicated ${label} Chrome`);
   const browser = await chromium.connectOverCDP(`http://127.0.0.1:${readDevToolsPort()}`);
   const context = browser.contexts()[0];
-  if (!context) throw new Error("the dedicated S1 MX Chrome did not expose its browser context");
+  if (!context) throw new Error(`the dedicated ${label} Chrome did not expose its browser context`);
   let page;
 
   try {
     page = await openMxStorefrontForExport(context);
     await openAuthenticatedProfileMenu(page);
 
-    reportStep("collecting filtered S1 MX storage state");
+    if (accountSlot === "second") {
+      const cartPage = await context.newPage();
+      try {
+        await cartPage.goto(`https://${HOSTNAME}/mx/cart`, { waitUntil: "domcontentloaded", timeout: 60000 });
+        await cartPage.getByRole("main").getByText(/carrito|cart/i).first().waitFor({ state: "visible", timeout: 60000 });
+      } finally {
+        await cartPage.close();
+      }
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+      await openAuthenticatedProfileMenu(page);
+    }
+
+    reportStep(`collecting filtered ${label} storage state`);
     const fullState = await context.storageState({ indexedDB: true });
     const mxState = {
       cookies: fullState.cookies.filter((cookie) => {
         const domain = cookie.domain.replace(/^\./, "");
-        return domain === HOSTNAME || cookie.domain === ".samsung.com";
+        return domain === HOSTNAME || domain === API_HOSTNAME || cookie.domain === ".samsung.com";
       }),
       origins: fullState.origins.filter(
         ({ origin }) => new URL(origin).hostname === HOSTNAME
       ),
     };
     if (!mxState.cookies.some((cookie) => cookie.domain.replace(/^\./, "") === HOSTNAME)) {
-      throw new Error("No S1 MX storefront cookies were available for export");
+      throw new Error(`No ${label} storefront cookies were available for export`);
+    }
+    if (accountSlot === "second" && !mxState.cookies.some((cookie) => cookie.domain.replace(/^\./, "") === API_HOSTNAME)) {
+      throw new Error(`No ${label} cart API cookies were available for export`);
     }
 
     const sessionStorage = await page.evaluate(() =>
@@ -169,9 +191,9 @@ async function exportMxAuthentication() {
 
     writeJsonAtomically(authTempFile, authFile, mxState);
     writeJsonAtomically(sessionStorageTempFile, sessionStorageFile, sessionStorage);
-    reportStep("S1 MX auth state exported to dedicated ignored artifacts");
+    reportStep(`${label} auth state exported to dedicated ignored artifacts`);
     console.log(
-      "[auth:export:mx] S1 MX storefront and required parent-domain state exported; identity-provider and third-party state excluded"
+      `[auth:export:mx] ${label} storefront and required parent-domain state exported; identity-provider and third-party state excluded`
     );
   } finally {
     for (const tempFile of [authTempFile, sessionStorageTempFile]) {

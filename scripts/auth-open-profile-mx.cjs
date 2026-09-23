@@ -5,8 +5,10 @@ const { resolveMxEnvironment } = require("../utils/mxConfig");
 
 const target = resolveMxEnvironment();
 const suffix = target.name.toLowerCase();
+const accountSlot = process.env.MX_AUTH_SLOT || "primary";
+if (!["primary", "second"].includes(accountSlot)) throw new Error("Unsupported MX auth account slot.");
 
-const profileDir = path.resolve(`playwright/profiles/${suffix}-mx-qa`);
+const profileDir = path.resolve(`playwright/profiles/${suffix}-mx-${accountSlot === "second" ? "second" : "qa"}`);
 const setupUrl = `https://${target.hostname}/getcookie.html`;
 
 fs.mkdirSync(profileDir, { recursive: true });
