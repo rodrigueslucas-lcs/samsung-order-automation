@@ -3,6 +3,8 @@ import { defineConfig, devices } from '@playwright/test';
 
 const allureEnabled = process.env.ENABLE_ALLURE === '1';
 const videoEnabled = process.env.PW_VIDEO === '1';
+const headless = process.env.MX_QST_HEADLESS === '1' ||
+  (!!process.env.CI && process.env.MX_QST_HEADLESS !== '0');
 
 export default defineConfig({
   testDir: './tests',
@@ -36,13 +38,15 @@ export default defineConfig({
   ],
 
   use: {
-    // On the Windows Jenkins service, Chrome-for-Testing video frames were
-    // intermittently blank. When video is requested use Playwright's bundled
-    // Chromium/headless-shell, which is installed by the pipeline together with
-    // its matching FFmpeg build. Normal executions keep the installed Chrome.
-    channel: videoEnabled ? undefined : 'chrome',
+    // Jenkins runs as a Windows service and must not rely on an interactive
+    // desktop. Respect the pipeline's headless flag; CI defaults to headless
+    // unless MX_QST_HEADLESS=0/--headed explicitly opts out.
+    headless,
 
-    headless: false,
+    // Chrome-for-Testing produced blank video frames on the Windows service.
+    // When video is requested use Playwright's bundled Chromium/headless-shell,
+    // installed by the pipeline together with its matching FFmpeg build.
+    channel: videoEnabled ? undefined : 'chrome',
 
     viewport: {
       width: 1440,
