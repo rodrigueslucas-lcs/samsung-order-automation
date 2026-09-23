@@ -1,9 +1,29 @@
 import { test as base, expect } from "@playwright/test";
 import mxConfigModule from "../../../../../utils/mxConfig";
 import mxStagingGuard from "../../../../../utils/mxStagingGuard";
+import { attachNetworkEvidence } from "../../../../../utils/networkEvidence";
 
 const { getMxConfig } = mxConfigModule;
 const { assertMxStagingPage } = mxStagingGuard;
+
+function classifyBusinessApi(response) {
+  const request = response.request();
+  const method = request.method();
+  const url = response.url();
+
+  if (/\/users\/current\/carts(?:\/[^/]+\/entries)?(?:\?|$)/i.test(url) && /POST|PUT|PATCH|DELETE/i.test(method)) {
+    return `Cart ${method}`;
+  }
+  if (/getAddressForWardPostCode/i.test(url)) return "Postal code lookup";
+  if (/\/deliverymodes\/update(?:\?|$)/i.test(url)) return "Delivery mode update";
+  if (/\/payment(?:details|mode|modes)?(?:\/|\?|$)/i.test(url) && /POST|PUT|PATCH/i.test(method)) {
+    return `Payment ${method}`;
+  }
+  if (/\/users\/current\/orders(?:\/|\?|$)/i.test(url) && /POST/i.test(method)) {
+    return "Order creation";
+  }
+  return null;
+}
 
 export const test = base.extend({
   mxConfig: async ({}, use) => {
@@ -16,6 +36,19 @@ export const test = base.extend({
     });
   },
   mxStagingSession: [async ({ page, mxConfig }, use, testInfo) => {
+    const evidenceTasks = [];
+    const evidenceCounts = new Map();
+    const onResponse = (response) => {
+      const kind = classifyBusinessApi(response);
+      if (!kind || evidenceTasks.length >= 20) return;
+      const count = (evidenceCounts.get(kind) || 0) + 1;
+      evidenceCounts.set(kind, count);
+      evidenceTasks.push(
+        attachNetworkEvidence(`${kind} #${count}`, { response })
+      );
+    };
+    page.on("response", onResponse);
+
     let bootstrapError;
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
@@ -29,6 +62,7 @@ export const test = base.extend({
       }
     }
     if (bootstrapError) {
+      page.off("response", onResponse);
       throw new Error(
         `MX ${mxConfig.environment} getcookie bootstrap did not become ready after one controlled retry: ${bootstrapError.message}`
       );
@@ -36,6 +70,10 @@ export const test = base.extend({
     await page.goto(mxConfig.baseUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
     await assertMxStagingPage(page, "MX QST bootstrap");
     await use();
+
+    page.off("response", onResponse);
+    await Promise.allSettled(evidenceTasks);
+
     // Tracking legitimately visits Mercado Pago. If its prerequisite failed
     // there, keep that primary failure instead of replacing it with the MX
     // storefront guard's wrong-host error.
