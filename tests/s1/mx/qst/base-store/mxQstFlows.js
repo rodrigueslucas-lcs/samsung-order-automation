@@ -34,27 +34,87 @@ export function mxQstCart(page, config) {
   });
 }
 
+async function readMxCartUiState(page) {
+  const main = page.getByRole("main");
+  const emptyCart = main
+    .getByText(/(?:Su|Tu) carrito est[aá] vac[ií]o|carrito.*vac[ií]o/i)
+    .filter({ visible: true });
+  if (await emptyCart.first().isVisible().catch(() => false)) {
+    return { kind: "empty", removeCount: 0 };
+  }
+
+  const removeButtons = main
+    .getByRole("button", { name: /^Remove$/i })
+    .filter({ visible: true });
+  const removeCount = await removeButtons.count();
+  if (removeCount > 0) {
+    return { kind: "removable", removeCount, removeButtons };
+  }
+
+  const loadingCount = await page
+    .locator('[aria-busy="true"], [class*="skeleton" i], [class*="loading" i], [class*="spinner" i]')
+    .filter({ visible: true })
+    .count()
+    .catch(() => 0);
+
+  return { kind: "pending", removeCount: 0, loadingCount };
+}
+
+async function waitForMxCartUiState(page, timeout = 45000) {
+  const deadline = Date.now() + timeout;
+  let lastState = { kind: "pending", removeCount: 0, loadingCount: 0 };
+
+  while (Date.now() < deadline) {
+    lastState = await readMxCartUiState(page);
+    if (lastState.kind !== "pending") return lastState;
+    await page.waitForTimeout(500);
+  }
+
+  return lastState;
+}
+
+async function cartDiagnostic(page) {
+  const mainText = await page
+    .getByRole("main")
+    .innerText({ timeout: 5000 })
+    .catch(() => "");
+  return {
+    url: page.url(),
+    title: await page.title().catch(() => ""),
+    main: String(mainText || "").replace(/\s+/g, " ").trim().slice(0, 500),
+  };
+}
+
 async function resetMxCartViaUi(page, config) {
   await page.goto(config.cartUrl.toString(), { waitUntil: "domcontentloaded", timeout: 60000 });
   const main = page.getByRole("main");
   await main.waitFor({ state: "attached", timeout: 30000 });
 
-  for (let removed = 0; removed < 20; removed += 1) {
-    const emptyCart = main.getByRole("heading", { name: /Su carrito esta vac[ií]o/i });
-    if (await emptyCart.isVisible().catch(() => false)) return;
+  let recoveryReloads = 0;
 
-    const removeButtons = main.getByRole("button", { name: /^Remove$/i }).filter({ visible: true });
-    const count = await removeButtons.count();
-    if (!count) {
-      await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
-      if (await emptyCart.isVisible().catch(() => false)) return;
-      const afterReload = await removeButtons.count();
-      if (!afterReload) {
-        throw new Error("MX cart reset found neither an empty-cart state nor a removable product row.");
+  for (let removed = 0; removed < 20; removed += 1) {
+    const state = await waitForMxCartUiState(page, 30000);
+    if (state.kind === "empty") return;
+
+    if (state.kind === "pending") {
+      if (recoveryReloads < 1) {
+        recoveryReloads += 1;
+        await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+        await main.waitFor({ state: "attached", timeout: 30000 });
+        continue;
       }
+
+      const diagnostic = await cartDiagnostic(page);
+      throw new Error(
+        `MX cart reset remained in an indeterminate UI state after controlled recovery. ` +
+        `url=${diagnostic.url} title=${diagnostic.title} loading=${state.loadingCount || 0} main=${diagnostic.main || "<empty>"}`
+      );
     }
 
-    await removeButtons.first().click();
+    recoveryReloads = 0;
+    const removeButton = state.removeButtons.first();
+    await removeButton.click();
+
     const dialog = page
       .getByRole("dialog")
       .or(page.getByRole("alertdialog"))
@@ -62,8 +122,13 @@ async function resetMxCartViaUi(page, config) {
       .filter({ visible: true })
       .first();
     await dialog.waitFor({ state: "visible", timeout: 30000 });
-    const confirm = dialog.getByRole("button", { name: /^S[ií]$/i }).filter({ visible: true }).first();
+
+    const confirm = dialog
+      .getByRole("button", { name: /^S[ií]$/i })
+      .filter({ visible: true })
+      .first();
     await confirm.waitFor({ state: "visible", timeout: 30000 });
+
     await Promise.all([
       dialog.waitFor({ state: "hidden", timeout: 30000 }),
       confirm.click(),
