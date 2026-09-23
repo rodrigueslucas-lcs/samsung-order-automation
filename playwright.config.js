@@ -2,6 +2,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const allureEnabled = process.env.ENABLE_ALLURE === '1';
+const videoEnabled = process.env.PW_VIDEO === '1';
 
 export default defineConfig({
   testDir: './tests',
@@ -35,7 +36,11 @@ export default defineConfig({
   ],
 
   use: {
-    channel: 'chrome',
+    // On the Windows Jenkins service, Chrome-for-Testing video frames were
+    // intermittently blank. When video is requested use Playwright's bundled
+    // Chromium/headless-shell, which is installed by the pipeline together with
+    // its matching FFmpeg build. Normal executions keep the installed Chrome.
+    channel: videoEnabled ? undefined : 'chrome',
 
     headless: false,
 
@@ -46,11 +51,9 @@ export default defineConfig({
 
     screenshot: 'on',
 
-    // Playwright video requires its bundled FFmpeg. On managed Windows machines
-    // where that executable is unavailable/blocked, context teardown fails with
-    // `spawn EPERM` after an otherwise valid test. Trace and screenshots remain
-    // enabled; opt in to video only after FFmpeg is available.
-    video: process.env.PW_VIDEO === '1' ? 'on' : 'off',
+    video: videoEnabled
+      ? { mode: 'on', size: { width: 1280, height: 800 } }
+      : 'off',
 
     trace: 'retain-on-failure',
 
