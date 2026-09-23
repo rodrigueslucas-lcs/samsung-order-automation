@@ -44,7 +44,7 @@ export const test = base.extend({
       const count = (evidenceCounts.get(kind) || 0) + 1;
       evidenceCounts.set(kind, count);
       evidenceTasks.push(
-        attachNetworkEvidence(`${kind} #${count}`, { response })
+        attachNetworkEvidence(testInfo, `${kind} #${count}`, { response })
       );
     };
     page.on("response", onResponse);
