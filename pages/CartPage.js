@@ -160,6 +160,16 @@ export default class CartPage extends BasePage {
         confirmButton.click(),
       ]);
     }
+    // The final removal may render the empty cart just after the last API
+    // snapshot. Accept only the observed empty UI with no removable rows.
+    const main = this.page.getByRole('main');
+    const emptyCart = main.getByRole('heading', { name: /Su carrito esta vac[ií]o/i });
+    if (await emptyCart.waitFor({ state: 'visible', timeout: 10000 }).then(() => true, () => false)) {
+      if (await main.getByRole('button', { name: /^Remove$/i }).count()) {
+        throw new Error('MX cart rendered an empty state together with removable product rows.');
+      }
+      return;
+    }
     throw new Error('MX cart cleanup exceeded the 20-item safety limit.');
   }
 

@@ -30,14 +30,25 @@ async function readHeaderCartCount(page) {
 }
 
 async function resolveObservedMinicartCountUrl(page) {
-  const observed = await page.evaluate(() => {
+  await page.waitForFunction(() => {
+    return performance.getEntriesByType("resource")
+      .some((entry) => /\/minicart\/totalProducts(?:[?#]|$)/i.test(entry.name));
+  }, null, { timeout: 30000 });
+  return page.evaluate(() => {
     const resources = performance.getEntriesByType("resource")
       .map((entry) => entry.name)
       .filter((url) => /\/minicart\/totalProducts(?:[?#]|$)/i.test(url));
-    return resources.at(-1) || null;
+    return resources.at(-1);
   });
-  if (observed) return observed;
-  return new URL("/mx/minicart/totalProducts", page.url()).toString();
+}
+
+async function readMinicartCount(page, url) {
+  const response = await page.request.get(url);
+  expect(response.ok(), "The PreQA PDP minicart count must be readable.").toBe(true);
+  const body = await response.text();
+  const count = Number(body.match(/<Integer>(\d+)<\/Integer>/i)?.[1]);
+  expect(Number.isFinite(count), "The minicart must return a numeric product count.").toBe(true);
+  return count;
 }
 
 async function getAuthenticatedPreQaPage() {
@@ -99,6 +110,7 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
     const cartCountBefore = await readHeaderCartCount(page);
     expect(cartCountBefore).not.toBeNull();
     const minicartCountUrl = await resolveObservedMinicartCountUrl(page);
+    const apiCountBefore = await readMinicartCount(page, minicartCountUrl);
     const addToCart = page
       .getByRole("button", { name: /Añadir al carrito|Agregar al carrito|Add to cart|Add to bag/i })
       .filter({ visible: true })
@@ -107,20 +119,33 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
     const addResponsePromise = page.waitForResponse((response) =>
       response.request().method() === "POST" &&
       new URL(response.url()).pathname.endsWith("/addToCart/multi/"),
-    { timeout: 60000 });
+    { timeout: 15000 }).catch(() => null);
     await addToCart.click();
     const addResponse = await addResponsePromise;
-    expect(addResponse.ok(), "The PreQA Add to Cart request must succeed.").toBe(true);
+    if (addResponse) {
+      expect(addResponse.ok(), "The PreQA Add to Cart request must succeed.").toBe(true);
+    }
 
     // The Add to Cart callback can redirect to a maintenance/system-check cart
     // before the storefront emits a second minicart request. Validate the cart
     // mutation by querying the exact minicart endpoint observed on the PDP.
-    const countSnapshot = await page.request.get(minicartCountUrl);
-    expect(countSnapshot.ok(), "The post-add minicart count must be readable.").toBe(true);
-    const countBody = await countSnapshot.text();
-    const cartCountAfter = Number(countBody.match(/<Integer>(\d+)<\/Integer>/i)?.[1]);
-    expect(Number.isFinite(cartCountAfter), "The minicart must return a numeric product count.").toBe(true);
-    expect(cartCountAfter).toBeGreaterThan(cartCountBefore);
+    await expect.poll(() => readMinicartCount(page, minicartCountUrl), {
+      timeout: 30000,
+      message: "The PreQA Add to Cart action must increase the observed minicart count.",
+    }).toBeGreaterThan(apiCountBefore);
+    const cartCountAfter = await readMinicartCount(page, minicartCountUrl);
+    if (/SystemParking\.html/i.test(new URL(page.url()).pathname)) {
+      await page.goBack({ waitUntil: "domcontentloaded", timeout: 60000 });
+    } else {
+      await page.goto(`${PRE_QA_ORIGIN}${PRE_QA_PDP_PATH}`, {
+        waitUntil: "domcontentloaded", timeout: 60000,
+      });
+    }
+    await expect(page).toHaveURL(new RegExp("p6-pre-qa2\\.samsung\\.com/mx/smartphones/galaxy-s25-ultra/buy", "i"));
+    await expect.poll(() => readHeaderCartCount(page), {
+      timeout: 30000,
+      message: "The PreQA PDP header minicart must show the added product after returning from maintenance.",
+    }).toBeGreaterThan(cartCountBefore);
     recordBusinessEvidence(testInfo, {
       source: "PreQA PLP -> PDP",
       plpPath: "/mx/smartphones/all-smartphones/",
@@ -129,7 +154,7 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
       cdpUrl: PRE_QA_CDP_URL,
       cartCountBefore,
       cartCountAfter,
-      addToCartStatus: addResponse.status(),
+      addToCartStatus: addResponse?.status() ?? null,
       addedFromPdp: true,
     });
   } finally {

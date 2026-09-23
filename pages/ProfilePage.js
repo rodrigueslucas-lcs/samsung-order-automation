@@ -100,7 +100,7 @@ export default class ProfilePage extends MyAccountPage {
       const payload = await response.json();
       const addresses = Array.isArray(payload) ? payload : payload.addresses || [];
       const found = addresses.some((address) =>
-        [address.line1, address.formattedAddress, address.addressName]
+        [address.line1, address.line2, address.formattedAddress, address.addressName]
           .filter(Boolean)
           .some((value) => String(value).includes(marker)),
       );
@@ -218,7 +218,7 @@ export default class ProfilePage extends MyAccountPage {
     const payload = await response.json();
     const addresses = payload.addresses || payload || [];
     const matches = addresses.filter((address) =>
-      [address.line1, address.formattedAddress, address.addressName]
+      [address.line1, address.line2, address.formattedAddress, address.addressName]
         .filter(Boolean)
         .some((value) => String(value).includes(marker))
     );

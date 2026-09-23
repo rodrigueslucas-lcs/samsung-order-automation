@@ -128,6 +128,7 @@ const qstExecutionEnv = {
   // part of the official runner so normal QST does not require a manual prefix.
   PREQA2_CDP_URL: process.env.PREQA2_CDP_URL || "http://127.0.0.1:9223",
   ALLOW_PAYMENT_SUBMIT: "1",
+  ALLOW_PROFILE_WRITE: process.env.ALLOW_PROFILE_WRITE ?? "1",
   TEST_ENV: environmentLabel,
   MX_QST_ENVIRONMENT: targetEnvironment,
   BACKOFFICE_ENV: targetEnvironment.toLowerCase(),
