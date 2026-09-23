@@ -110,6 +110,8 @@ pipeline {
       when { expression { return params.TEST_SUITE != 'allure-smoke' } }
       steps {
         script {
+          env.MX_QST_ENVIRONMENT = params.ENVIRONMENT
+          env.BACKOFFICE_ENV = params.ENVIRONMENT.toLowerCase()
           if (isUnix()) {
             sh 'npm run qst:official:gate'
             sh 'npm run qst:mx:list'
