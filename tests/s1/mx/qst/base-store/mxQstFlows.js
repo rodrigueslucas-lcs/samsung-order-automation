@@ -116,8 +116,6 @@ async function resetMxCartViaUi(page, config) {
     try {
       await removeButton.click();
     } catch (error) {
-      // The cart can finish an in-flight mutation while Playwright waits for
-      // actionability. Only recover if the live UI actually became empty.
       if ((await readMxCartUiState(page)).kind === "empty") return;
       throw error;
     }
@@ -145,6 +143,26 @@ async function resetMxCartViaUi(page, config) {
   throw new Error("MX cart reset exceeded the 20-item safety limit.");
 }
 
+async function normalizeControlledQuantity(item, quantity) {
+  let current = Number(await quantity.inputValue());
+  if (!Number.isInteger(current) || current < 1) {
+    throw new Error(`Controlled MX cart rendered invalid quantity: ${await quantity.inputValue()}.`);
+  }
+
+  if (current === 1) return;
+
+  const minus = item.getByRole("button", { name: "-", exact: true });
+  await expect(minus).toBeVisible({ timeout: 30000 });
+
+  while (current > 1) {
+    await expect(minus).toBeEnabled({ timeout: 30000 });
+    const expected = String(current - 1);
+    await minus.click();
+    await expect(quantity).toHaveValue(expected, { timeout: 30000 });
+    current -= 1;
+  }
+}
+
 async function validateControlledCartUi(page, config) {
   const main = page.getByRole("main");
   const sku = main.getByText(config.sku, { exact: true }).filter({ visible: true });
@@ -154,6 +172,8 @@ async function validateControlledCartUi(page, config) {
     "xpath=ancestor::*[.//input[@aria-label='Quantity'] and .//button[@aria-label='Remove']][1]"
   );
   const quantity = item.getByRole("textbox", { name: "Quantity" });
+  await expect(quantity).toBeVisible({ timeout: 30000 });
+  await normalizeControlledQuantity(item, quantity);
   await expect(quantity).toHaveValue("1", { timeout: 30000 });
   await expect(main.getByRole("button", { name: /^Remove$/i })).toHaveCount(1, { timeout: 30000 });
 }
@@ -166,8 +186,6 @@ export async function openMxQstPdp(page, config) {
     const sku = page.getByText(config.sku, { exact: true }).first();
     const loaded = await sku.waitFor({ state: "visible", timeout: 30000 }).then(() => true).catch(() => false);
     if (!loaded) {
-      // S2 occasionally renders the PDP shell while its product request stalls.
-      // Recover that loading state once; the SKU remains mandatory afterward.
       const hasProductAction = await page.getByRole("button", { name: /^(Comprar|Agregar al carrito|Add to cart)$/i })
         .first().isVisible().catch(() => false);
       if (!hasProductAction) {
