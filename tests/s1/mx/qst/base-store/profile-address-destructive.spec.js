@@ -56,7 +56,7 @@ test("SAM-24991 @destructive @qst @mx @base-store @registered - Add or edit save
     await expect(newAddress).toBeChecked({ timeout: 30000 });
     const address = await checkout.fillDelivery({ postalCode: "01000", street: marker, exteriorNumber: "1000" }, { registered: true });
     expect(address.lookupStatus).toBe(200);
-    const saveAddress = page.getByRole("checkbox", { name: /Guardar detalhes para compras futuras|Guardar.*(direcci[oó]n|env[ií]o|Mi cuenta)|Save.*address/i }).filter({ visible: true });
+    const saveAddress = page.getByRole("checkbox", { name: /Guardar detalles para compras futuras|Guardar.*(direcci[oó]n|env[ií]o|Mi cuenta)|Save.*address/i }).filter({ visible: true });
     await expect(saveAddress.first()).toBeVisible({ timeout: 30000 });
     await saveAddress.first().check({ force: true });
     await expect(saveAddress.first()).toBeChecked();
