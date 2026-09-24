@@ -40,33 +40,60 @@ if (!listOnly) {
   console.log("[mx-qst] Clean execution workspace prepared before authentication preflight.");
 }
 
-const p1Set = new Set(MX_BASE_P1_IDS);
-const p1Pattern = `(?:${MX_BASE_P1_IDS.join("|")})\\b`;
-const activeP1Count = MX_BASE_P1_IDS.length;
+const officialP1Set = new Set(MX_BASE_P1_IDS);
+const requestedTargetIds = String(process.env.MX_QST_TARGET_IDS || "")
+  .split(/[\s,;]+/)
+  .map((value) => value.trim().toUpperCase())
+  .filter(Boolean);
+const invalidTargetIds = requestedTargetIds.filter((id) => !officialP1Set.has(id));
+if (invalidTargetIds.length) {
+  console.error(`[mx-qst] Invalid targeted P1 SAM IDs: ${[...new Set(invalidTargetIds)].join(", ")}.`);
+  console.error("[mx-qst] Targeted execution accepts only active official MX Base P1 IDs.");
+  process.exit(2);
+}
+const selectedP1Ids = requestedTargetIds.length
+  ? MX_BASE_P1_IDS.filter((id) => requestedTargetIds.includes(id))
+  : [...MX_BASE_P1_IDS];
+const targetedRun = selectedP1Ids.length !== MX_BASE_P1_IDS.length;
+if (!selectedP1Ids.length) {
+  console.error("[mx-qst] Targeted P1 selection is empty; QST execution was not started.");
+  process.exit(2);
+}
+const selectedP1Set = new Set(selectedP1Ids);
+const p1Pattern = `(?:${selectedP1Ids.join("|")})\\b`;
+const activeP1Count = selectedP1Ids.length;
 
 const allTitles = fs.readdirSync(qstRoot)
   .filter((name) => name.endsWith(".spec.js"))
   .flatMap((name) => testTitles(fs.readFileSync(path.join(qstRoot, name), "utf8")));
-const officialP1Titles = allTitles.filter((title) => {
+const fullOfficialP1Titles = allTitles.filter((title) => {
   const id = title.match(/SAM-\d+/)?.[0];
-  return id && p1Set.has(id);
+  return id && officialP1Set.has(id);
 });
-const officialTitlesById = Object.fromEntries(officialP1Titles.map((title) => [title.match(/SAM-\d+/)?.[0], title]));
-const p1TitleCounts = new Map(MX_BASE_P1_IDS.map((id) => [id, 0]));
-for (const title of officialP1Titles) {
+const fullTitleCounts = new Map(MX_BASE_P1_IDS.map((id) => [id, 0]));
+for (const title of fullOfficialP1Titles) {
   const id = title.match(/SAM-\d+/)?.[0];
-  p1TitleCounts.set(id, (p1TitleCounts.get(id) || 0) + 1);
+  fullTitleCounts.set(id, (fullTitleCounts.get(id) || 0) + 1);
 }
-const invalidP1Inventory = [...p1TitleCounts].filter(([, count]) => count !== 1);
-if (officialP1Titles.length !== activeP1Count || invalidP1Inventory.length) {
-  console.error("[mx-qst] Active MX Base P1 selection is invalid; QST execution was not started.");
-  console.error(`Expected ${activeP1Count} unique active P1 tests, found ${officialP1Titles.length}.`);
+const invalidP1Inventory = [...fullTitleCounts].filter(([, count]) => count !== 1);
+if (fullOfficialP1Titles.length !== MX_BASE_P1_IDS.length || invalidP1Inventory.length) {
+  console.error("[mx-qst] Active MX Base P1 inventory is invalid; QST execution was not started.");
+  console.error(`Expected ${MX_BASE_P1_IDS.length} unique active P1 tests, found ${fullOfficialP1Titles.length}.`);
   for (const [id, count] of invalidP1Inventory) console.error(`  ${id}: ${count} test title(s)`);
   process.exit(1);
 }
 
+const officialP1Titles = fullOfficialP1Titles.filter((title) => {
+  const id = title.match(/SAM-\d+/)?.[0];
+  return id && selectedP1Set.has(id);
+});
+const officialTitlesById = Object.fromEntries(
+  officialP1Titles.map((title) => [title.match(/SAM-\d+/)?.[0], title])
+);
 const destructiveTitles = officialP1Titles.filter((title) => /@destructive\b/i.test(title));
-console.log(`[mx-qst] Active MX ${targetEnvironment} Base P1 selection: ${officialP1Titles.length}/${activeP1Count} tests.`);
+const selectionLabel = targetedRun ? "TARGETED P1" : "Base P1";
+console.log(`[mx-qst] Active MX ${targetEnvironment} ${selectionLabel} selection: ${officialP1Titles.length}/${MX_BASE_P1_IDS.length} tests.`);
+if (targetedRun) console.log(`[mx-qst] Target IDs: ${selectedP1Ids.join(", ")}`);
 for (const exclusion of Object.values(MX_BASE_P1_EXCLUSIONS)) {
   console.log(`[mx-qst] Scope exclusion preserved for audit: ${exclusion.id} - ${exclusion.reason}`);
 }
@@ -130,10 +157,10 @@ if (authVerification.status !== 0) {
   }
 }
 
-// SAM-24986 requires a second authenticated account. Validate it before the
-// active P1 campaign so an expired secondary credential cannot waste most of
-// the build and fail only when cart isolation is reached.
-if (targetEnvironment === "S2") {
+// SAM-24986 is the only active P1 case that requires the dedicated second
+// authenticated account. Do not spend time validating that credential when a
+// targeted lane does not execute this scenario.
+if (targetEnvironment === "S2" && selectedP1Set.has("SAM-24986")) {
   const suffix = targetEnvironment.toLowerCase();
   const secondAuthPath = path.resolve(`playwright/.auth/mx-${suffix}-second-user.json`);
   const secondSessionPath = path.resolve(`playwright/.auth/mx-${suffix}-second-session-storage.json`);
@@ -174,10 +201,10 @@ console.log(`[mx-qst] PreQA2 CDP endpoint for SAM-24969: ${qstExecutionEnv.PREQA
 
 for (const target of executionArtifacts) fs.rmSync(target, { recursive: true, force: true });
 
-// Run both MX P1 projects in one consolidated Playwright execution. The auth
-// project is declared first in playwright.config.js, so workers=1 keeps the
-// session-sensitive registered cases at the front. Selecting only `chromium`
-// would silently exclude those 9 cases now that the projects are independent.
+// Keep the established one-worker full-P1 behavior. Registered/account/cart
+// scenarios share state, so broad parallelism is intentionally not enabled
+// until an isolated multi-worker lane is runtime-proven. Targeted execution is
+// the safe speed-up for stabilization work.
 const playwrightArgs = [
   playwrightCli, "test", "tests/s1/mx/qst/base-store",
   "--project=mx-auth-priority", "--project=chromium",
@@ -185,14 +212,17 @@ const playwrightArgs = [
   "--grep", p1Pattern, "--output", path.join(artifactDir, "playwright"),
 ];
 if (!headless) playwrightArgs.push("--headed");
-console.log("[mx-qst] Execution projects: mx-auth-priority -> chromium (independent; failures do not suppress remaining P1 tests).");
+console.log(`[mx-qst] Execution projects: mx-auth-priority -> chromium; workers=1; ${targetedRun ? "targeted stabilization" : "full official P1"}.`);
 
 const result = spawnSync(process.execPath, playwrightArgs, {
   env: qstExecutionEnv,
   stdio: "inherit",
 });
 
-if (process.env.ENABLE_ALLURE === "1" && fs.existsSync(allureResultsDir)) {
+// Jenkins finalization already generates/publishes Allure HTML from the raw
+// results. Avoid generating the same HTML twice in CI; local runs keep the
+// convenience report exactly as before. Video capture is untouched.
+if (!process.env.CI && process.env.ENABLE_ALLURE === "1" && fs.existsSync(allureResultsDir)) {
   const allureCli = process.platform === "win32"
     ? path.resolve("node_modules/.bin/allure.cmd")
     : path.resolve("node_modules/.bin/allure");
@@ -210,24 +240,29 @@ if (process.env.ENABLE_ALLURE === "1" && fs.existsSync(allureResultsDir)) {
 
 if (fs.existsSync(reportFile)) {
   const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
-  const runtimeSummary = buildMxQstRuntimeSummary(report, { officialIds: MX_BASE_P1_IDS, titles: officialTitlesById, environment: environmentLabel, suite: "P1/QST" });
+  const runtimeSummary = buildMxQstRuntimeSummary(report, {
+    officialIds: selectedP1Ids,
+    titles: officialTitlesById,
+    environment: environmentLabel,
+    suite: targetedRun ? "P1/QST TARGETED" : "P1/QST",
+  });
   writeRuntimeSummary(runtimeSummaryFile, runtimeSummary);
   const outcomes = new Map(runtimeSummary.tests.map((entry) => [entry.samId, {
     status: entry.status,
     reason: entry.blockedReason || entry.error || "",
     title: entry.title || entry.samId,
   }]));
-  console.log("\nMX QST ACTIVE P1 TC SUMMARY");
+  console.log(`\nMX QST ${targetedRun ? "TARGETED" : "ACTIVE"} P1 TC SUMMARY`);
   for (const [id, outcome] of [...outcomes].sort()) {
     console.log(`${id}: ${outcome.status}${outcome.status === "SKIPPED-BLOCKED" && outcome.reason ? ` - ${outcome.reason.split("\n")[0]}` : ""}`);
   }
   const values = [...outcomes.values()];
-  console.log(`Totals: official=${activeP1Count} reported=${values.length} executed=${values.filter(({ status }) => !["SKIPPED-BLOCKED", "NOT_RUN"].includes(status)).length} passed=${values.filter(({ status }) => status === "PASS").length} failed=${values.filter(({ status }) => status === "FAIL").length} skipped=${values.filter(({ status }) => status === "SKIPPED-BLOCKED").length} notRun=${values.filter(({ status }) => status === "NOT_RUN").length}`);
+  console.log(`Totals: selected=${activeP1Count} reported=${values.length} executed=${values.filter(({ status }) => !["SKIPPED-BLOCKED", "NOT_RUN"].includes(status)).length} passed=${values.filter(({ status }) => status === "PASS").length} failed=${values.filter(({ status }) => status === "FAIL").length} skipped=${values.filter(({ status }) => status === "SKIPPED-BLOCKED").length} notRun=${values.filter(({ status }) => status === "NOT_RUN").length}`);
   for (const status of ["PASS", "FAIL", "SKIPPED-BLOCKED", "NOT_RUN"]) {
     const ids = [...outcomes].filter(([, outcome]) => outcome.status === status).map(([id]) => id);
     console.log(`${status}: ${ids.join(", ") || "none"}`);
   }
-  console.log(`Guarded destructive P1: ${destructiveTitles.length}`);
+  console.log(`Guarded destructive selected P1: ${destructiveTitles.length}`);
   for (const title of destructiveTitles) console.log(`  - ${title.match(/SAM-\d+/)?.[0] || title}`);
   const failing = [...outcomes].filter(([, { status }]) => status === "FAIL").map(([id]) => id);
   console.log(`Failing SAM IDs: ${failing.join(", ") || "none"}`);
