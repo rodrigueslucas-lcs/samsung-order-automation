@@ -32,7 +32,7 @@ pipeline {
     stage('01 · Build Context') {
       steps {
         script {
-          def p1Count = params.MARKET == 'MX' ? '30' : params.MARKET == 'PE' ? '28' : '—'
+          def p1Count = params.MARKET == 'MX' ? '29' : params.MARKET == 'PE' ? '28' : '—'
           def suiteLabel = [
             'fast-guest': 'FAST',
             'authenticated-safe': 'AUTH SAFE',
@@ -251,8 +251,30 @@ pipeline {
         }
         catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
           script {
-            if (isUnix()) sh 'npx playwright test tests/s1/smb/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "$JENKINS_ARTIFACT_DIR/playwright"'
-            else bat '@call npx playwright test tests/s1/smb/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "%JENKINS_ARTIFACT_DIR%\\playwright"'
+            if (params.ENVIRONMENT == 'S2') {
+              withCredentials([
+                file(credentialsId: 'samsung-mx-s2-backoffice-admin', variable: 'MX_BACKOFFICE_ADMIN_SECRET')
+              ]) {
+                if (isUnix()) {
+                  sh '''
+                    set -eu
+                    mkdir -p playwright/.auth
+                    cp "$MX_BACKOFFICE_ADMIN_SECRET" playwright/.auth/backoffice-admin-s2.json
+                    chmod 600 playwright/.auth/backoffice-admin-s2.json || true
+                    npx playwright test tests/s1/smb/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "$JENKINS_ARTIFACT_DIR/playwright"
+                  '''
+                } else {
+                  bat '''@echo off
+                    if not exist playwright\\.auth mkdir playwright\\.auth
+                    copy /Y "%MX_BACKOFFICE_ADMIN_SECRET%" "playwright\\.auth\\backoffice-admin-s2.json" >nul || exit /b 2
+                    call npx playwright test tests/s1/smb/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "%JENKINS_ARTIFACT_DIR%\\playwright"
+                  '''
+                }
+              }
+            } else {
+              if (isUnix()) sh 'npx playwright test tests/s1/smb/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "$JENKINS_ARTIFACT_DIR/playwright"'
+              else bat '@call npx playwright test tests/s1/smb/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "%JENKINS_ARTIFACT_DIR%\\playwright"'
+            }
           }
         }
       }
@@ -281,7 +303,8 @@ pipeline {
                   file(credentialsId: env.MX_SESSION_CREDENTIAL, variable: 'MX_SESSION_STORAGE_SECRET'),
                   file(credentialsId: 'samsung-mx-s2-second-auth-state', variable: 'MX_SECOND_AUTH_STATE_SECRET'),
                   file(credentialsId: 'samsung-mx-s2-second-session-storage', variable: 'MX_SECOND_SESSION_STORAGE_SECRET'),
-                  file(credentialsId: 'samsung-mx-test-card', variable: 'MX_TEST_CARD_SECRET')
+                  file(credentialsId: 'samsung-mx-test-card', variable: 'MX_TEST_CARD_SECRET'),
+                  file(credentialsId: 'samsung-mx-s2-backoffice-admin', variable: 'MX_BACKOFFICE_ADMIN_SECRET')
                 ]) {
                   if (isUnix()) {
                     sh '''
@@ -292,6 +315,7 @@ pipeline {
                       cp "$MX_SECOND_AUTH_STATE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-second-user.json
                       cp "$MX_SECOND_SESSION_STORAGE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-second-session-storage.json
                       cp "$MX_TEST_CARD_SECRET" playwright/.auth/mx-test-card.json
+                      cp "$MX_BACKOFFICE_ADMIN_SECRET" playwright/.auth/backoffice-admin-s2.json
                       chmod 600 playwright/.auth/*.json || true
                       npx -y node@22 scripts/run-mx-qst-safe.cjs
                     '''
@@ -303,6 +327,7 @@ pipeline {
                       copy /Y "%MX_SECOND_AUTH_STATE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-second-user.json" >nul || exit /b 2
                       copy /Y "%MX_SECOND_SESSION_STORAGE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-second-session-storage.json" >nul || exit /b 2
                       copy /Y "%MX_TEST_CARD_SECRET%" "playwright\\.auth\\mx-test-card.json" >nul || exit /b 2
+                      copy /Y "%MX_BACKOFFICE_ADMIN_SECRET%" "playwright\\.auth\\backoffice-admin-s2.json" >nul || exit /b 2
                       call npx -y node@22 scripts/run-mx-qst-safe.cjs
                     '''
                   }
