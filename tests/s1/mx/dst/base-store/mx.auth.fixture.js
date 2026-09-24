@@ -69,6 +69,15 @@ export const test = base.extend({
   mxConfig: async ({}, use) => {
     await use(getMxConfig());
   },
+  qstBusinessScenario: [async ({}, use, testInfo) => {
+    const samId = testInfo.title.match(/SAM-\d+/)?.[0];
+    const stepName = samId
+      ? `${samId} · Execute and validate authenticated QST business scenario`
+      : "Execute and validate authenticated QST business scenario";
+    await base.step(stepName, async () => {
+      await use();
+    });
+  }, { auto: true }],
   storageState: hasAuthState() ? AUTH_STATE_PATH : undefined,
   viewport: { width: 1440, height: 900 },
   launchOptions: { args: ["--start-maximized"] },
