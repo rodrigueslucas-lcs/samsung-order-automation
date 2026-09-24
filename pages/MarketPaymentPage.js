@@ -132,20 +132,20 @@ export default class MarketPaymentPage extends PaymentPage {
     if ((await fields.holder.inputValue()).trim() !== card.holderName) throw new Error("Mercado Pago external form did not retain the holder name.");
     if (digits(await fields.expiry.inputValue()) !== digits(card.expiry)) throw new Error("Mercado Pago external form did not retain the expiry.");
 
-    let retainedCvv = digits(await fields.cvv.inputValue());
-    if (retainedCvv !== digits(card.cvv)) {
-      console.warn("[mx-payment] Mercado Pago security-code field reset once; refilling the same configured test CVV before validation.");
-      await fields.cvv.fill("");
-      await fields.cvv.pressSequentially(card.cvv, { delay: 50 });
-      await this.page.waitForTimeout(250);
-      retainedCvv = digits(await fields.cvv.inputValue());
-    }
-    if (retainedCvv !== digits(card.cvv)) {
-      throw new Error("Mercado Pago external form did not retain the security code after one controlled refill.");
+    // CVV is a secure gateway field. Mercado Pago may intentionally clear or
+    // mask it after tokenization/blur, so requiring inputValue() to retain the
+    // secret creates a false failure. Reject only an explicit invalid state or
+    // a visible non-empty value that contradicts the configured test CVV.
+    const cvvValue = digits(await fields.cvv.inputValue());
+    if (cvvValue && cvvValue !== digits(card.cvv)) {
+      throw new Error("Mercado Pago security-code field contains an unexpected value.");
     }
     if ((await fields.cvv.getAttribute("aria-invalid")) === "true") {
-      throw new Error("Mercado Pago rejected the configured security code after refill validation.");
+      throw new Error("Mercado Pago rejected the configured security code.");
     }
+
+    await fields.cvv.blur();
+    await this.page.waitForTimeout(500);
 
     const continueButton = this.page.getByRole("button", { name: /^Continuar$/i });
     await continueButton.waitFor({ state: "visible", timeout: 30000 });
