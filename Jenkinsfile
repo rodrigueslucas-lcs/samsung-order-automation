@@ -17,6 +17,7 @@ pipeline {
     choice(name: 'EXECUTION_MODE', choices: ['safe', 'authorized-destructive'], description: 'Safety mode. Full official-p1 payment/order execution requires authorized-destructive.')
     choice(name: 'BROWSER_MODE', choices: ['headless', 'headed'], description: 'Browser mode. Headless is recommended on Jenkins.')
     choice(name: 'EVIDENCE_MODE', choices: ['screenshots-trace', 'screenshots-trace-video'], description: 'Evidence capture. Video requires FFmpeg on the Jenkins agent.')
+    string(name: 'P1_TARGET_IDS', defaultValue: '', description: 'Optional MX official-p1 stabilization filter. Comma/space separated active SAM IDs, e.g. SAM-24969,SAM-24991,SAM-25002. Leave empty for the full 29-TC P1.')
   }
 
   environment {
@@ -32,18 +33,21 @@ pipeline {
     stage('01 · Build Context') {
       steps {
         script {
+          def targetedIds = params.P1_TARGET_IDS?.trim()
+            ? params.P1_TARGET_IDS.split(/[\\s,;]+/).findAll { it?.trim() }
+            : []
           def p1Count = params.MARKET == 'MX' ? '29' : params.MARKET == 'PE' ? '28' : '—'
           def suiteLabel = [
             'fast-guest': 'FAST',
             'authenticated-safe': 'AUTH SAFE',
-            'official-p1': p1Count == '—' ? 'P1' : "P1 · ${p1Count} TCs",
+            'official-p1': targetedIds ? "P1 TARGETED · ${targetedIds.size()} TCs" : (p1Count == '—' ? 'P1' : "P1 · ${p1Count} TCs"),
             'backoffice-safe': 'BACKOFFICE',
             'allure-smoke': 'ALLURE SMOKE'
           ][params.TEST_SUITE] ?: params.TEST_SUITE.toUpperCase()
           def suiteFolder = [
             'fast-guest': 'fast',
             'authenticated-safe': 'auth',
-            'official-p1': 'qst',
+            'official-p1': targetedIds ? 'qst-targeted' : 'qst',
             'backoffice-safe': 'backoffice',
             'allure-smoke': 'allure-smoke'
           ][params.TEST_SUITE]
@@ -64,7 +68,15 @@ pipeline {
           env.PE_QST_ENVIRONMENT = params.ENVIRONMENT
           env.BACKOFFICE_ENV = params.ENVIRONMENT.toLowerCase()
           env.MX_QST_HEADLESS = params.BROWSER_MODE == 'headless' ? '1' : '0'
+          env.MX_QST_TARGET_IDS = params.P1_TARGET_IDS?.trim() ?: ''
           env.PE_STOREFRONT_URL = params.ENVIRONMENT == 'S2' ? 'https://stg2.shop.samsung.com/pe/' : 'https://stg.shop.samsung.com/pe/'
+
+          // Keep Playwright browsers outside node_modules so npm ci does not
+          // force a ~300 MB Chromium/FFmpeg download on every Jenkins build.
+          // First build seeds the cache; following builds reuse it.
+          env.PLAYWRIGHT_BROWSERS_PATH = isUnix()
+            ? "${env.HOME}/.cache/ms-playwright"
+            : "${env.JENKINS_HOME}\\playwright-browsers"
 
           currentBuild.displayName = "#${env.BUILD_NUMBER} · ${params.MARKET} · ${params.ENVIRONMENT} · ${suiteLabel}"
           currentBuild.description = "RUNNING | Samsung SMB | ${params.MARKET} ${params.ENVIRONMENT} | ${suiteLabel} | ${params.EXECUTION_MODE} | ${params.BROWSER_MODE}"
@@ -76,6 +88,7 @@ pipeline {
           echo " Market      : ${params.MARKET}"
           echo " Environment : ${params.ENVIRONMENT}"
           echo " Suite       : ${suiteLabel}"
+          if (targetedIds) echo " Target IDs  : ${targetedIds.join(', ')}"
           echo " Mode        : ${params.EXECUTION_MODE}"
           echo " Browser     : ${params.BROWSER_MODE}"
           echo " Evidence    : ${params.EVIDENCE_MODE}"
@@ -107,6 +120,9 @@ pipeline {
           }
           if (params.MARKET == 'PE' && params.TEST_SUITE != 'official-p1') {
             error('PE phase 1 currently exposes the coverage-aware official-p1 stabilization lane only. FAST/AUTH/BACKOFFICE lanes will be enabled after PE S2 credentials and runtime baselines are proven.')
+          }
+          if (params.P1_TARGET_IDS?.trim() && (params.MARKET != 'MX' || params.TEST_SUITE != 'official-p1')) {
+            error('P1_TARGET_IDS is supported only for MX official-p1. Clear the field for other suites/markets.')
           }
           if (params.TEST_SUITE == 'official-p1' && params.EXECUTION_MODE != 'authorized-destructive') {
             error("${params.MARKET} official P1 contains payment/order scenarios. Select EXECUTION_MODE=authorized-destructive for the campaign.")
