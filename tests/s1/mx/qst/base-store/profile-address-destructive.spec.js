@@ -25,11 +25,9 @@ function mxAddressApiUrl(mxConfig) {
 }
 
 async function reachRegisteredDeliveryViaUi(page, mxConfig) {
-  // Do not depend on current-cart response bodies for this address scenario.
-  // The business assertion is checkout/profile persistence, so use the same
-  // UI-controlled cart preparation already proven by the registered safe cases.
+  // prepareMxQstCart already validates the controlled SKU/quantity from the
+  // rendered cart. Do not re-read current-cart response bodies in this TC.
   const cart = await prepareMxQstCart(page, mxConfig);
-  await cart.validateControlledSingleSku(mxConfig.sku);
   await cart.proceedToAuthenticatedCheckout();
 
   const checkout = new MxCheckoutPage(page);
@@ -58,7 +56,7 @@ test("SAM-24991 @destructive @qst @mx @base-store @registered - Add or edit save
     await expect(newAddress).toBeChecked({ timeout: 30000 });
     const address = await checkout.fillDelivery({ postalCode: "01000", street: marker, exteriorNumber: "1000" }, { registered: true });
     expect(address.lookupStatus).toBe(200);
-    const saveAddress = page.getByRole("checkbox", { name: /Guardar detalles para compras futuras|Guardar.*(direcci[oó]n|env[ií]o|Mi cuenta)|Save.*address/i }).filter({ visible: true });
+    const saveAddress = page.getByRole("checkbox", { name: /Guardar detalhes para compras futuras|Guardar.*(direcci[oó]n|env[ií]o|Mi cuenta)|Save.*address/i }).filter({ visible: true });
     await expect(saveAddress.first()).toBeVisible({ timeout: 30000 });
     await saveAddress.first().check({ force: true });
     await expect(saveAddress.first()).toBeChecked();
