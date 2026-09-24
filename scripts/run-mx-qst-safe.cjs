@@ -34,16 +34,11 @@ const executionArtifacts = [
   allureReportDir,
 ];
 
-// Jenkins workspaces are reused. Clear this campaign's outputs before auth
-// preflight so a failed/expired session can never publish previous-build
-// Playwright, Executive Dashboard or Allure evidence as if it belonged here.
 if (!listOnly) {
   for (const target of executionArtifacts) fs.rmSync(target, { recursive: true, force: true });
   console.log("[mx-qst] Clean execution workspace prepared before authentication preflight.");
 }
 
-// Current Samsung MX Base Store P1/QST inventory. Helpers and non-P1 cases must
-// not appear as independent tests in the official QST execution result.
 const MX_BASE_P1_IDS = Object.freeze([
   "SAM-24962", "SAM-24963", "SAM-24964", "SAM-24968", "SAM-24969",
   "SAM-24971", "SAM-24972", "SAM-24975", "SAM-24981", "SAM-24982",
@@ -138,6 +133,28 @@ if (authVerification.status !== 0) {
   }
 }
 
+// SAM-24986 requires a second authenticated account. Validate it before the
+// 30-TC campaign so an expired secondary credential cannot waste most of the
+// build and fail only when cart isolation is reached.
+if (targetEnvironment === "S2") {
+  const suffix = targetEnvironment.toLowerCase();
+  const secondAuthPath = path.resolve(`playwright/.auth/mx-${suffix}-second-user.json`);
+  const secondSessionPath = path.resolve(`playwright/.auth/mx-${suffix}-second-session-storage.json`);
+  if (!fs.existsSync(secondAuthPath) || !fs.existsSync(secondSessionPath)) {
+    console.error(`[mx-qst] MX ${targetEnvironment} second-account auth/session files are missing; QST execution was not started.`);
+    process.exit(2);
+  }
+  console.log(`[mx-qst] Verifying pre-provisioned MX ${targetEnvironment} second-account session for SAM-24986.`);
+  const secondVerification = spawnSync(process.execPath, [path.resolve("scripts/auth-verify-mx.cjs")], {
+    env: { ...process.env, MX_QST_ENVIRONMENT: targetEnvironment, MX_AUTH_SLOT: "second" },
+    stdio: "inherit",
+  });
+  if (secondVerification.status !== 0) {
+    console.error(`[mx-qst] Pre-provisioned MX ${targetEnvironment} second-account auth state is expired; QST execution was not started.`);
+    process.exit(secondVerification.status || 1);
+  }
+}
+
 const qstExecutionEnv = {
   ...process.env,
   PREQA2_CDP_URL: process.env.PREQA2_CDP_URL || "http://127.0.0.1:9223",
@@ -158,8 +175,6 @@ const qstExecutionEnv = {
 };
 console.log(`[mx-qst] PreQA2 CDP endpoint for SAM-24969: ${qstExecutionEnv.PREQA2_CDP_URL}`);
 
-// Clear once more immediately before Playwright in case auth verification created
-// report-like files. Auth artifacts live under playwright/.auth and are untouched.
 for (const target of executionArtifacts) fs.rmSync(target, { recursive: true, force: true });
 
 const playwrightArgs = [
