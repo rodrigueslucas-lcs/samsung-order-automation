@@ -35,6 +35,15 @@ export const test = base.extend({
       pdpUrl: new URL(`/mx/p/${sku}`, baseConfig.baseUrl.origin),
     });
   },
+  qstBusinessScenario: [async ({}, use, testInfo) => {
+    const samId = testInfo.title.match(/SAM-\d+/)?.[0];
+    const stepName = samId
+      ? `${samId} · Execute and validate QST business scenario`
+      : "Execute and validate QST business scenario";
+    await base.step(stepName, async () => {
+      await use();
+    });
+  }, { auto: true }],
   mxStagingSession: [async ({ page, mxConfig }, use, testInfo) => {
     const evidenceTasks = [];
     const evidenceCounts = new Map();
@@ -74,9 +83,6 @@ export const test = base.extend({
     page.off("response", onResponse);
     await Promise.allSettled(evidenceTasks);
 
-    // Tracking legitimately visits Mercado Pago. If its prerequisite failed
-    // there, keep that primary failure instead of replacing it with the MX
-    // storefront guard's wrong-host error.
     const paymentTc = testInfo.title.includes("SAM-25002") || testInfo.title.includes("SAM-25010");
     if (paymentTc && process.env.ALLOW_PAYMENT_SUBMIT === "1" && testInfo.status === "failed" &&
         new URL(page.url()).hostname === "www.mercadopago.com.mx") return;
