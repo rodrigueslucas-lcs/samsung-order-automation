@@ -11,8 +11,9 @@ pipeline {
   }
 
   parameters {
-    choice(name: 'ENVIRONMENT', choices: ['S1', 'S2'], description: 'Target MX environment. S1 = stg storefront / S1 BackOffice; S2 = stg2 storefront / S2 BackOffice.')
-    choice(name: 'TEST_SUITE', choices: ['fast-guest', 'authenticated-safe', 'official-p1', 'backoffice-safe', 'allure-smoke'], description: 'Execution profile. Functional suites use the same Executive Dashboard + Playwright + Allure reporting standard.')
+    choice(name: 'MARKET', choices: ['MX', 'PE', 'CL', 'CO'], description: 'SMB market / storefront target. MX is the reference lane; PE S2 is the next stabilization lane. CL/CO are visible roadmap targets and remain runtime-guarded until enabled.')
+    choice(name: 'ENVIRONMENT', choices: ['S1', 'S2'], description: 'Target staging environment. S1 = stg, S2 = stg2.')
+    choice(name: 'TEST_SUITE', choices: ['fast-guest', 'authenticated-safe', 'official-p1', 'backoffice-safe', 'allure-smoke'], description: 'Execution profile. Functional suites use the shared Executive Dashboard + Playwright + Allure reporting standard.')
     choice(name: 'EXECUTION_MODE', choices: ['safe', 'authorized-destructive'], description: 'Safety mode. Full official-p1 payment/order execution requires authorized-destructive.')
     choice(name: 'BROWSER_MODE', choices: ['headless', 'headed'], description: 'Browser mode. Headless is recommended on Jenkins.')
     choice(name: 'EVIDENCE_MODE', choices: ['screenshots-trace', 'screenshots-trace-video'], description: 'Evidence capture. Video requires FFmpeg on the Jenkins agent.')
@@ -31,36 +32,48 @@ pipeline {
     stage('01 · Build Context') {
       steps {
         script {
+          def p1Count = params.MARKET == 'MX' ? '30' : params.MARKET == 'PE' ? '28' : '—'
           def suiteLabel = [
             'fast-guest': 'FAST',
             'authenticated-safe': 'AUTH SAFE',
-            'official-p1': 'P1 · 30 TCs',
+            'official-p1': p1Count == '—' ? 'P1' : "P1 · ${p1Count} TCs",
             'backoffice-safe': 'BACKOFFICE',
             'allure-smoke': 'ALLURE SMOKE'
           ][params.TEST_SUITE] ?: params.TEST_SUITE.toUpperCase()
-          def artifactDir = [
-            'fast-guest': 'test-results/jenkins/mx-fast',
-            'authenticated-safe': 'test-results/jenkins/mx-auth',
-            'official-p1': 'test-results/jenkins/mx-qst',
-            'backoffice-safe': 'test-results/jenkins/mx-backoffice',
-            'allure-smoke': 'test-results/reporter-tests/allure-smoke'
+          def suiteFolder = [
+            'fast-guest': 'fast',
+            'authenticated-safe': 'auth',
+            'official-p1': 'qst',
+            'backoffice-safe': 'backoffice',
+            'allure-smoke': 'allure-smoke'
           ][params.TEST_SUITE]
+          def marketLower = params.MARKET.toLowerCase()
+          def artifactDir = params.TEST_SUITE == 'allure-smoke'
+            ? 'test-results/reporter-tests/allure-smoke'
+            : "test-results/jenkins/${marketLower}-${suiteFolder}"
 
           env.JENKINS_SUITE_LABEL = suiteLabel
+          env.JENKINS_ARTIFACT_DIR = artifactDir
           env.MX_JENKINS_ARTIFACT_DIR = artifactDir
           env.MX_QST_ARTIFACT_DIR = artifactDir
+          env.PE_QST_ARTIFACT_DIR = artifactDir
           env.PW_VIDEO = params.EVIDENCE_MODE == 'screenshots-trace-video' ? '1' : '0'
+          env.TEST_MARKET = params.MARKET
+          env.MARKET = params.MARKET
           env.MX_QST_ENVIRONMENT = params.ENVIRONMENT
+          env.PE_QST_ENVIRONMENT = params.ENVIRONMENT
           env.BACKOFFICE_ENV = params.ENVIRONMENT.toLowerCase()
           env.MX_QST_HEADLESS = params.BROWSER_MODE == 'headless' ? '1' : '0'
+          env.PE_STOREFRONT_URL = params.ENVIRONMENT == 'S2' ? 'https://stg2.shop.samsung.com/pe/' : 'https://stg.shop.samsung.com/pe/'
 
-          currentBuild.displayName = "#${env.BUILD_NUMBER} · MX · ${params.ENVIRONMENT} · ${suiteLabel}"
-          currentBuild.description = "RUNNING | Samsung SMB | MX ${params.ENVIRONMENT} | ${suiteLabel} | ${params.EXECUTION_MODE} | ${params.BROWSER_MODE}"
+          currentBuild.displayName = "#${env.BUILD_NUMBER} · ${params.MARKET} · ${params.ENVIRONMENT} · ${suiteLabel}"
+          currentBuild.description = "RUNNING | Samsung SMB | ${params.MARKET} ${params.ENVIRONMENT} | ${suiteLabel} | ${params.EXECUTION_MODE} | ${params.BROWSER_MODE}"
 
           echo '''
 ============================================================
- SAMSUNG SMB · QUALITY ENGINEERING · MX
+ SAMSUNG SMB · REGIONAL QUALITY ENGINEERING
 ============================================================'''
+          echo " Market      : ${params.MARKET}"
           echo " Environment : ${params.ENVIRONMENT}"
           echo " Suite       : ${suiteLabel}"
           echo " Mode        : ${params.EXECUTION_MODE}"
@@ -80,13 +93,25 @@ pipeline {
     stage('03 · Validate Request') {
       steps {
         script {
+          if (!['MX', 'PE', 'CL', 'CO'].contains(params.MARKET)) {
+            error('Unsupported market. Select MX, PE, CL or CO.')
+          }
           if (!['S1', 'S2'].contains(params.ENVIRONMENT)) {
-            error('Unsupported MX environment. Select S1 or S2.')
+            error('Unsupported environment. Select S1 or S2.')
+          }
+          if (['CL', 'CO'].contains(params.MARKET)) {
+            error("${params.MARKET} is exposed as a regional roadmap target but is not runtime-enabled yet. Stabilize PE first, then enable ${params.MARKET}.")
+          }
+          if (params.MARKET == 'PE' && params.ENVIRONMENT != 'S2') {
+            error('PE phase 1 is intentionally limited to S2/STG2 while the existing PE QST automation is stabilized.')
+          }
+          if (params.MARKET == 'PE' && params.TEST_SUITE != 'official-p1') {
+            error('PE phase 1 currently exposes the coverage-aware official-p1 stabilization lane only. FAST/AUTH/BACKOFFICE lanes will be enabled after PE S2 credentials and runtime baselines are proven.')
           }
           if (params.TEST_SUITE == 'official-p1' && params.EXECUTION_MODE != 'authorized-destructive') {
-            error('Official MX QST contains authorized payment/order P1 scenarios. Select EXECUTION_MODE=authorized-destructive for the full 30-TC campaign.')
+            error("${params.MARKET} official P1 contains payment/order scenarios. Select EXECUTION_MODE=authorized-destructive for the campaign.")
           }
-          echo "Validated request: MX ${params.ENVIRONMENT} · ${params.TEST_SUITE} · ${params.EXECUTION_MODE}"
+          echo "Validated request: ${params.MARKET} ${params.ENVIRONMENT} · ${params.TEST_SUITE} · ${params.EXECUTION_MODE}"
         }
       }
     }
@@ -126,10 +151,12 @@ pipeline {
         script {
           if (isUnix()) {
             sh 'npm run qst:official:gate'
-            sh 'npm run qst:mx:list'
+            if (params.MARKET == 'MX') sh 'npm run qst:mx:list'
+            else if (params.MARKET == 'PE') sh 'node scripts/run-pe-qst-p1.cjs --list'
           } else {
             bat '@npm run qst:official:gate'
-            bat '@npm run qst:mx:list'
+            if (params.MARKET == 'MX') bat '@npm run qst:mx:list'
+            else if (params.MARKET == 'PE') bat '@call node scripts/run-pe-qst-p1.cjs --list'
           }
         }
       }
@@ -148,11 +175,11 @@ pipeline {
     }
 
     stage('07 · Fast Guest · Safe') {
-      when { expression { return params.TEST_SUITE == 'fast-guest' } }
+      when { expression { return params.MARKET == 'MX' && params.TEST_SUITE == 'fast-guest' } }
       steps {
         catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
           script {
-            env.MX_FAST_ARTIFACT_DIR = env.MX_JENKINS_ARTIFACT_DIR
+            env.MX_FAST_ARTIFACT_DIR = env.JENKINS_ARTIFACT_DIR
             env.TEST_SUITE = 'FAST/GUEST'
             env.TEST_STORE = 'BASE_STORE'
             if (isUnix()) sh 'npx -y node@22 scripts/run-mx-qst-fast-guest.cjs'
@@ -163,7 +190,7 @@ pipeline {
     }
 
     stage('07 · Authenticated · Safe') {
-      when { expression { return params.TEST_SUITE == 'authenticated-safe' } }
+      when { expression { return params.MARKET == 'MX' && params.TEST_SUITE == 'authenticated-safe' } }
       steps {
         script {
           env.MX_AUTH_STATE_CREDENTIAL = params.ENVIRONMENT == 'S2' ? 'samsung-mx-s2-auth-state' : 'samsung-mx-s1-auth-state'
@@ -171,10 +198,10 @@ pipeline {
           env.MX_AUTH_SUFFIX = params.ENVIRONMENT.toLowerCase()
           env.TEST_SUITE = 'AUTH/REGISTERED'
           env.TEST_STORE = 'BASE_STORE'
-          env.PLAYWRIGHT_HTML_OUTPUT_DIR = "${env.MX_JENKINS_ARTIFACT_DIR}/playwright-report"
-          env.PLAYWRIGHT_JSON_OUTPUT_FILE = "${env.MX_JENKINS_ARTIFACT_DIR}/results.json"
-          env.ALLURE_RESULTS_DIR = "${env.MX_JENKINS_ARTIFACT_DIR}/allure-results"
-          env.SMB_EVIDENCE_DIR = "${env.MX_JENKINS_ARTIFACT_DIR}/evidence"
+          env.PLAYWRIGHT_HTML_OUTPUT_DIR = "${env.JENKINS_ARTIFACT_DIR}/playwright-report"
+          env.PLAYWRIGHT_JSON_OUTPUT_FILE = "${env.JENKINS_ARTIFACT_DIR}/results.json"
+          env.ALLURE_RESULTS_DIR = "${env.JENKINS_ARTIFACT_DIR}/allure-results"
+          env.SMB_EVIDENCE_DIR = "${env.JENKINS_ARTIFACT_DIR}/evidence"
         }
         catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
           withCredentials([
@@ -191,7 +218,7 @@ pipeline {
                   chmod 600 playwright/.auth/mx-${MX_AUTH_SUFFIX}-user.json playwright/.auth/mx-${MX_AUTH_SUFFIX}-session-storage.json || true
                   EXTRA=""
                   if [ "${BROWSER_MODE}" = "headed" ]; then EXTRA="--headed"; fi
-                  npx playwright test tests/s1/mx/qst/base-store/authenticated-safe.spec.js --project=chromium --workers=1 --retries=0 --output "$MX_JENKINS_ARTIFACT_DIR/playwright" $EXTRA
+                  npx playwright test tests/s1/mx/qst/base-store/authenticated-safe.spec.js --project=chromium --workers=1 --retries=0 --output "$JENKINS_ARTIFACT_DIR/playwright" $EXTRA
                 '''
               } else {
                 bat '''@echo off
@@ -199,9 +226,9 @@ pipeline {
                   copy /Y "%MX_AUTH_STATE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-user.json" >nul || exit /b 2
                   copy /Y "%MX_SESSION_STORAGE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-session-storage.json" >nul || exit /b 2
                   if /I "%BROWSER_MODE%"=="headed" (
-                    call npx playwright test tests/s1/mx/qst/base-store/authenticated-safe.spec.js --project=chromium --workers=1 --retries=0 --output "%MX_JENKINS_ARTIFACT_DIR%\\playwright" --headed
+                    call npx playwright test tests/s1/mx/qst/base-store/authenticated-safe.spec.js --project=chromium --workers=1 --retries=0 --output "%JENKINS_ARTIFACT_DIR%\\playwright" --headed
                   ) else (
-                    call npx playwright test tests/s1/mx/qst/base-store/authenticated-safe.spec.js --project=chromium --workers=1 --retries=0 --output "%MX_JENKINS_ARTIFACT_DIR%\\playwright"
+                    call npx playwright test tests/s1/mx/qst/base-store/authenticated-safe.spec.js --project=chromium --workers=1 --retries=0 --output "%JENKINS_ARTIFACT_DIR%\\playwright"
                   )
                 '''
               }
@@ -212,96 +239,99 @@ pipeline {
     }
 
     stage('07 · BackOffice · Safe') {
-      when { expression { return params.TEST_SUITE == 'backoffice-safe' } }
+      when { expression { return params.MARKET == 'MX' && params.TEST_SUITE == 'backoffice-safe' } }
       steps {
         script {
           env.TEST_SUITE = 'BACKOFFICE/SAFE'
           env.TEST_STORE = 'BACKOFFICE'
-          env.PLAYWRIGHT_HTML_OUTPUT_DIR = "${env.MX_JENKINS_ARTIFACT_DIR}/playwright-report"
-          env.PLAYWRIGHT_JSON_OUTPUT_FILE = "${env.MX_JENKINS_ARTIFACT_DIR}/results.json"
-          env.ALLURE_RESULTS_DIR = "${env.MX_JENKINS_ARTIFACT_DIR}/allure-results"
-          env.SMB_EVIDENCE_DIR = "${env.MX_JENKINS_ARTIFACT_DIR}/evidence"
+          env.PLAYWRIGHT_HTML_OUTPUT_DIR = "${env.JENKINS_ARTIFACT_DIR}/playwright-report"
+          env.PLAYWRIGHT_JSON_OUTPUT_FILE = "${env.JENKINS_ARTIFACT_DIR}/results.json"
+          env.ALLURE_RESULTS_DIR = "${env.JENKINS_ARTIFACT_DIR}/allure-results"
+          env.SMB_EVIDENCE_DIR = "${env.JENKINS_ARTIFACT_DIR}/evidence"
         }
         catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
           script {
-            if (isUnix()) {
-              sh 'npx playwright test tests/s1/smb/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "$MX_JENKINS_ARTIFACT_DIR/playwright"'
-            } else {
-              bat '@call npx playwright test tests/s1/smb/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "%MX_JENKINS_ARTIFACT_DIR%\\playwright"'
-            }
+            if (isUnix()) sh 'npx playwright test tests/s1/smb/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "$JENKINS_ARTIFACT_DIR/playwright"'
+            else bat '@call npx playwright test tests/s1/smb/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "%JENKINS_ARTIFACT_DIR%\\playwright"'
           }
         }
       }
     }
 
-    stage('07 · Official P1 · 30 TCs') {
+    stage('07 · Official P1') {
       when { expression { return params.TEST_SUITE == 'official-p1' } }
       steps {
         script {
-          env.MX_AUTH_STATE_CREDENTIAL = params.ENVIRONMENT == 'S2' ? 'samsung-mx-s2-auth-state' : 'samsung-mx-s1-auth-state'
-          env.MX_SESSION_CREDENTIAL = params.ENVIRONMENT == 'S2' ? 'samsung-mx-s2-session-storage' : 'samsung-mx-s1-session-storage'
-          env.MX_AUTH_SUFFIX = params.ENVIRONMENT.toLowerCase()
           env.TEST_SUITE = 'P1/QST'
           env.TEST_STORE = 'BASE_STORE'
         }
         catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
           script {
-            if (params.ENVIRONMENT == 'S2') {
-              withCredentials([
-                file(credentialsId: env.MX_AUTH_STATE_CREDENTIAL, variable: 'MX_AUTH_STATE_SECRET'),
-                file(credentialsId: env.MX_SESSION_CREDENTIAL, variable: 'MX_SESSION_STORAGE_SECRET'),
-                file(credentialsId: 'samsung-mx-s2-second-auth-state', variable: 'MX_SECOND_AUTH_STATE_SECRET'),
-                file(credentialsId: 'samsung-mx-s2-second-session-storage', variable: 'MX_SECOND_SESSION_STORAGE_SECRET'),
-                file(credentialsId: 'samsung-mx-test-card', variable: 'MX_TEST_CARD_SECRET')
-              ]) {
-                if (isUnix()) {
-                  sh '''
-                    set -eu
-                    mkdir -p playwright/.auth
-                    cp "$MX_AUTH_STATE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-user.json
-                    cp "$MX_SESSION_STORAGE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-session-storage.json
-                    cp "$MX_SECOND_AUTH_STATE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-second-user.json
-                    cp "$MX_SECOND_SESSION_STORAGE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-second-session-storage.json
-                    cp "$MX_TEST_CARD_SECRET" playwright/.auth/mx-test-card.json
-                    chmod 600 playwright/.auth/*.json || true
-                    npx -y node@22 scripts/run-mx-qst-safe.cjs
-                  '''
-                } else {
-                  bat '''@echo off
-                    if not exist playwright\\.auth mkdir playwright\\.auth
-                    copy /Y "%MX_AUTH_STATE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-user.json" >nul || exit /b 2
-                    copy /Y "%MX_SESSION_STORAGE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-session-storage.json" >nul || exit /b 2
-                    copy /Y "%MX_SECOND_AUTH_STATE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-second-user.json" >nul || exit /b 2
-                    copy /Y "%MX_SECOND_SESSION_STORAGE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-second-session-storage.json" >nul || exit /b 2
-                    copy /Y "%MX_TEST_CARD_SECRET%" "playwright\\.auth\\mx-test-card.json" >nul || exit /b 2
-                    call npx -y node@22 scripts/run-mx-qst-safe.cjs
-                  '''
-                }
-              }
+            if (params.MARKET == 'PE') {
+              if (isUnix()) sh 'npx -y node@22 scripts/run-pe-qst-p1.cjs'
+              else bat '@call npx -y node@22 scripts/run-pe-qst-p1.cjs'
             } else {
-              withCredentials([
-                file(credentialsId: env.MX_AUTH_STATE_CREDENTIAL, variable: 'MX_AUTH_STATE_SECRET'),
-                file(credentialsId: env.MX_SESSION_CREDENTIAL, variable: 'MX_SESSION_STORAGE_SECRET'),
-                file(credentialsId: 'samsung-mx-test-card', variable: 'MX_TEST_CARD_SECRET')
-              ]) {
-                if (isUnix()) {
-                  sh '''
-                    set -eu
-                    mkdir -p playwright/.auth
-                    cp "$MX_AUTH_STATE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-user.json
-                    cp "$MX_SESSION_STORAGE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-session-storage.json
-                    cp "$MX_TEST_CARD_SECRET" playwright/.auth/mx-test-card.json
-                    chmod 600 playwright/.auth/*.json || true
-                    npx -y node@22 scripts/run-mx-qst-safe.cjs
-                  '''
-                } else {
-                  bat '''@echo off
-                    if not exist playwright\\.auth mkdir playwright\\.auth
-                    copy /Y "%MX_AUTH_STATE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-user.json" >nul || exit /b 2
-                    copy /Y "%MX_SESSION_STORAGE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-session-storage.json" >nul || exit /b 2
-                    copy /Y "%MX_TEST_CARD_SECRET%" "playwright\\.auth\\mx-test-card.json" >nul || exit /b 2
-                    call npx -y node@22 scripts/run-mx-qst-safe.cjs
-                  '''
+              env.MX_AUTH_STATE_CREDENTIAL = params.ENVIRONMENT == 'S2' ? 'samsung-mx-s2-auth-state' : 'samsung-mx-s1-auth-state'
+              env.MX_SESSION_CREDENTIAL = params.ENVIRONMENT == 'S2' ? 'samsung-mx-s2-session-storage' : 'samsung-mx-s1-session-storage'
+              env.MX_AUTH_SUFFIX = params.ENVIRONMENT.toLowerCase()
+
+              if (params.ENVIRONMENT == 'S2') {
+                withCredentials([
+                  file(credentialsId: env.MX_AUTH_STATE_CREDENTIAL, variable: 'MX_AUTH_STATE_SECRET'),
+                  file(credentialsId: env.MX_SESSION_CREDENTIAL, variable: 'MX_SESSION_STORAGE_SECRET'),
+                  file(credentialsId: 'samsung-mx-s2-second-auth-state', variable: 'MX_SECOND_AUTH_STATE_SECRET'),
+                  file(credentialsId: 'samsung-mx-s2-second-session-storage', variable: 'MX_SECOND_SESSION_STORAGE_SECRET'),
+                  file(credentialsId: 'samsung-mx-test-card', variable: 'MX_TEST_CARD_SECRET')
+                ]) {
+                  if (isUnix()) {
+                    sh '''
+                      set -eu
+                      mkdir -p playwright/.auth
+                      cp "$MX_AUTH_STATE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-user.json
+                      cp "$MX_SESSION_STORAGE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-session-storage.json
+                      cp "$MX_SECOND_AUTH_STATE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-second-user.json
+                      cp "$MX_SECOND_SESSION_STORAGE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-second-session-storage.json
+                      cp "$MX_TEST_CARD_SECRET" playwright/.auth/mx-test-card.json
+                      chmod 600 playwright/.auth/*.json || true
+                      npx -y node@22 scripts/run-mx-qst-safe.cjs
+                    '''
+                  } else {
+                    bat '''@echo off
+                      if not exist playwright\\.auth mkdir playwright\\.auth
+                      copy /Y "%MX_AUTH_STATE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-user.json" >nul || exit /b 2
+                      copy /Y "%MX_SESSION_STORAGE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-session-storage.json" >nul || exit /b 2
+                      copy /Y "%MX_SECOND_AUTH_STATE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-second-user.json" >nul || exit /b 2
+                      copy /Y "%MX_SECOND_SESSION_STORAGE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-second-session-storage.json" >nul || exit /b 2
+                      copy /Y "%MX_TEST_CARD_SECRET%" "playwright\\.auth\\mx-test-card.json" >nul || exit /b 2
+                      call npx -y node@22 scripts/run-mx-qst-safe.cjs
+                    '''
+                  }
+                }
+              } else {
+                withCredentials([
+                  file(credentialsId: env.MX_AUTH_STATE_CREDENTIAL, variable: 'MX_AUTH_STATE_SECRET'),
+                  file(credentialsId: env.MX_SESSION_CREDENTIAL, variable: 'MX_SESSION_STORAGE_SECRET'),
+                  file(credentialsId: 'samsung-mx-test-card', variable: 'MX_TEST_CARD_SECRET')
+                ]) {
+                  if (isUnix()) {
+                    sh '''
+                      set -eu
+                      mkdir -p playwright/.auth
+                      cp "$MX_AUTH_STATE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-user.json
+                      cp "$MX_SESSION_STORAGE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-session-storage.json
+                      cp "$MX_TEST_CARD_SECRET" playwright/.auth/mx-test-card.json
+                      chmod 600 playwright/.auth/*.json || true
+                      npx -y node@22 scripts/run-mx-qst-safe.cjs
+                    '''
+                  } else {
+                    bat '''@echo off
+                      if not exist playwright\\.auth mkdir playwright\\.auth
+                      copy /Y "%MX_AUTH_STATE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-user.json" >nul || exit /b 2
+                      copy /Y "%MX_SESSION_STORAGE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-session-storage.json" >nul || exit /b 2
+                      copy /Y "%MX_TEST_CARD_SECRET%" "playwright\\.auth\\mx-test-card.json" >nul || exit /b 2
+                      call npx -y node@22 scripts/run-mx-qst-safe.cjs
+                    '''
+                  }
                 }
               }
             }
@@ -314,13 +344,9 @@ pipeline {
       when { expression { return params.TEST_SUITE != 'allure-smoke' } }
       steps {
         script {
-          def resultsPath = "${env.MX_JENKINS_ARTIFACT_DIR}/allure-results"
-          if (params.TEST_SUITE == 'official-p1') {
-            env.ALLURE_REPORT_NAME = "Samsung MX ${params.ENVIRONMENT} QST - Allure"
-            if (isUnix()) sh 'npx -y node@22 scripts/finalize-allure-mx-qst.cjs || true'
-            else bat '@call npx -y node@22 scripts/finalize-allure-mx-qst.cjs || exit /b 0'
-          } else if (params.TEST_SUITE == 'fast-guest') {
-            env.ALLURE_REPORT_NAME = "Samsung MX ${params.ENVIRONMENT} Fast - Allure"
+          def resultsPath = "${env.JENKINS_ARTIFACT_DIR}/allure-results"
+          if (params.MARKET == 'MX' && ['official-p1', 'fast-guest'].contains(params.TEST_SUITE)) {
+            env.ALLURE_REPORT_NAME = "Samsung ${params.MARKET} ${params.ENVIRONMENT} ${env.JENKINS_SUITE_LABEL} - Allure"
             if (isUnix()) sh 'npx -y node@22 scripts/finalize-allure-mx-qst.cjs || true'
             else bat '@call npx -y node@22 scripts/finalize-allure-mx-qst.cjs || exit /b 0'
           } else {
@@ -345,10 +371,11 @@ pipeline {
         script {
           def suiteLabel = env.JENKINS_SUITE_LABEL ?: params.TEST_SUITE.toUpperCase()
           echo '============================================================'
-          echo ' SAMSUNG SMB · QUALITY SUMMARY'
+          echo ' SAMSUNG SMB · REGIONAL QUALITY SUMMARY'
           echo '============================================================'
           echo " RESULT       : ${currentBuild.currentResult}"
-          echo " ENVIRONMENT  : MX ${params.ENVIRONMENT}"
+          echo " MARKET       : ${params.MARKET}"
+          echo " ENVIRONMENT  : ${params.ENVIRONMENT}"
           echo " SUITE        : ${suiteLabel}"
           echo " BUILD        : #${env.BUILD_NUMBER}"
           echo " REPORTS      : Executive Dashboard · Playwright · Allure"
@@ -361,11 +388,8 @@ pipeline {
   post {
     always {
       script {
-        if (isUnix()) {
-          sh 'rm -rf playwright/.auth || true'
-        } else {
-          bat '@if exist playwright\\.auth rmdir /S /Q playwright\\.auth'
-        }
+        if (isUnix()) sh 'rm -rf playwright/.auth || true'
+        else bat '@if exist playwright\\.auth rmdir /S /Q playwright\\.auth'
       }
 
       archiveArtifacts artifacts: 'test-results/**/*, playwright-report/**/*', allowEmptyArchive: true, fingerprint: true
@@ -381,22 +405,22 @@ pipeline {
         } else {
           publishHTML(target: [
             allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
-            reportDir: "${env.MX_JENKINS_ARTIFACT_DIR}/executive",
+            reportDir: "${env.JENKINS_ARTIFACT_DIR}/executive",
             reportFiles: 'index.html',
-            reportName: "01 · Samsung MX ${params.ENVIRONMENT} ${env.JENKINS_SUITE_LABEL} · Executive Dashboard"
+            reportName: "01 · Samsung ${params.MARKET} ${params.ENVIRONMENT} ${env.JENKINS_SUITE_LABEL} · Executive Dashboard"
           ])
           publishHTML(target: [
             allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
-            reportDir: params.TEST_SUITE == 'official-p1' ? 'playwright-report' : "${env.MX_JENKINS_ARTIFACT_DIR}/playwright-report",
+            reportDir: params.MARKET == 'MX' && params.TEST_SUITE == 'official-p1' ? 'playwright-report' : "${env.JENKINS_ARTIFACT_DIR}/playwright-report",
             reportFiles: 'index.html',
-            reportName: "02 · Samsung MX ${params.ENVIRONMENT} ${env.JENKINS_SUITE_LABEL} · Playwright"
+            reportName: "02 · Samsung ${params.MARKET} ${params.ENVIRONMENT} ${env.JENKINS_SUITE_LABEL} · Playwright"
           ])
           if (env.NATIVE_ALLURE_PUBLISHED != '1') {
             publishHTML(target: [
               allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
-              reportDir: "${env.MX_JENKINS_ARTIFACT_DIR}/allure-report",
+              reportDir: "${env.JENKINS_ARTIFACT_DIR}/allure-report",
               reportFiles: 'index.html',
-              reportName: "03 · Samsung MX ${params.ENVIRONMENT} ${env.JENKINS_SUITE_LABEL} · Allure HTML"
+              reportName: "03 · Samsung ${params.MARKET} ${params.ENVIRONMENT} ${env.JENKINS_SUITE_LABEL} · Allure HTML"
             ])
           }
         }
@@ -406,8 +430,8 @@ pipeline {
     success {
       script {
         def suiteLabel = env.JENKINS_SUITE_LABEL ?: params.TEST_SUITE.toUpperCase()
-        currentBuild.displayName = "#${env.BUILD_NUMBER} · MX · ${params.ENVIRONMENT} · ${suiteLabel} · PASS"
-        currentBuild.description = "PASS | Samsung SMB | MX ${params.ENVIRONMENT} | ${suiteLabel} | ${params.EXECUTION_MODE} | ${params.BROWSER_MODE}"
+        currentBuild.displayName = "#${env.BUILD_NUMBER} · ${params.MARKET} · ${params.ENVIRONMENT} · ${suiteLabel} · PASS"
+        currentBuild.description = "PASS | Samsung SMB | ${params.MARKET} ${params.ENVIRONMENT} | ${suiteLabel} | ${params.EXECUTION_MODE} | ${params.BROWSER_MODE}"
         echo 'PASS · Samsung SMB automation build completed successfully.'
       }
     }
@@ -415,8 +439,8 @@ pipeline {
     unsuccessful {
       script {
         def suiteLabel = env.JENKINS_SUITE_LABEL ?: params.TEST_SUITE.toUpperCase()
-        currentBuild.displayName = "#${env.BUILD_NUMBER} · MX · ${params.ENVIRONMENT} · ${suiteLabel} · ${currentBuild.currentResult}"
-        currentBuild.description = "${currentBuild.currentResult} | Samsung SMB | MX ${params.ENVIRONMENT} | ${suiteLabel} | Review Executive Dashboard / Playwright / Allure"
+        currentBuild.displayName = "#${env.BUILD_NUMBER} · ${params.MARKET} · ${params.ENVIRONMENT} · ${suiteLabel} · ${currentBuild.currentResult}"
+        currentBuild.description = "${currentBuild.currentResult} | Samsung SMB | ${params.MARKET} ${params.ENVIRONMENT} | ${suiteLabel} | Review Executive Dashboard / Playwright / Allure"
         echo "${currentBuild.currentResult} · Samsung SMB automation build did not complete successfully. Review the Executive Dashboard and archived Playwright/Allure evidence."
       }
     }
