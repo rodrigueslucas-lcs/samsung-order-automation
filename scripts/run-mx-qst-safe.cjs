@@ -22,6 +22,26 @@ fs.mkdirSync(path.dirname(reportFile), { recursive: true });
 const playwrightCli = path.resolve("node_modules/@playwright/test/cli.js");
 const qstRoot = path.resolve("tests/s1/mx/qst/base-store");
 
+const executionArtifacts = [
+  path.resolve("playwright-report"),
+  path.resolve("allure-report"),
+  reportFile,
+  runtimeSummaryFile,
+  path.join(artifactDir, "playwright"),
+  path.join(artifactDir, "evidence"),
+  path.join(artifactDir, "executive"),
+  allureResultsDir,
+  allureReportDir,
+];
+
+// Jenkins workspaces are reused. Clear this campaign's outputs before auth
+// preflight so a failed/expired session can never publish previous-build
+// Playwright, Executive Dashboard or Allure evidence as if it belonged here.
+if (!listOnly) {
+  for (const target of executionArtifacts) fs.rmSync(target, { recursive: true, force: true });
+  console.log("[mx-qst] Clean execution workspace prepared before authentication preflight.");
+}
+
 // Current Samsung MX Base Store P1/QST inventory. Helpers and non-P1 cases must
 // not appear as independent tests in the official QST execution result.
 const MX_BASE_P1_IDS = Object.freeze([
@@ -73,6 +93,7 @@ if (useExistingAuth) {
     process.exit(2);
   }
   console.log(`[mx-qst] Using pre-provisioned MX ${targetEnvironment} authentication state (CI mode).`);
+  console.log("[mx-qst] Auth lifecycle: refresh + verify locally, upload Jenkins credentials, then run P1 directly. Do not place AUTH SAFE between upload and P1.");
 } else if (hasVerifiedAuthState()) {
   console.log(`[mx-qst] Reusing verified MX ${targetEnvironment} authentication state; login bootstrap will not run again.`);
 } else if (hasAuthState()) {
@@ -90,10 +111,6 @@ if (useExistingAuth) {
   console.log(`[mx-qst] Fresh MX ${targetEnvironment} authentication state exported by the login bootstrap.`);
 }
 
-// A state file existing on disk does not prove that its Samsung session is
-// still valid. Fail fast (or perform the existing one-time manual bootstrap)
-// before spending the campaign on guest tests and discovering stale auth only
-// when the registered block begins.
 let authVerification = spawnSync(process.execPath, [path.resolve("scripts/auth-verify-mx.cjs")], {
   env: { ...process.env, MX_QST_ENVIRONMENT: targetEnvironment },
   stdio: "inherit",
@@ -123,9 +140,6 @@ if (authVerification.status !== 0) {
 
 const qstExecutionEnv = {
   ...process.env,
-  // SAM-24969 uses the already authenticated PreQA2 Chrome through CDP. Keep
-  // this overridable for CI/alternate agents, but make the proven local port
-  // part of the official runner so normal QST does not require a manual prefix.
   PREQA2_CDP_URL: process.env.PREQA2_CDP_URL || "http://127.0.0.1:9223",
   ALLOW_PAYMENT_SUBMIT: "1",
   ALLOW_PROFILE_WRITE: process.env.ALLOW_PROFILE_WRITE ?? "1",
@@ -144,17 +158,9 @@ const qstExecutionEnv = {
 };
 console.log(`[mx-qst] PreQA2 CDP endpoint for SAM-24969: ${qstExecutionEnv.PREQA2_CDP_URL}`);
 
-// Only a real execution owns these official build artifacts. Removing stale
-// output here prevents a cancelled build from publishing a previous/list report.
-for (const target of [
-  path.resolve("playwright-report"),
-  reportFile,
-  runtimeSummaryFile,
-  path.join(artifactDir, "evidence"),
-  path.join(artifactDir, "executive"),
-  allureResultsDir,
-  allureReportDir,
-]) fs.rmSync(target, { recursive: true, force: true });
+// Clear once more immediately before Playwright in case auth verification created
+// report-like files. Auth artifacts live under playwright/.auth and are untouched.
+for (const target of executionArtifacts) fs.rmSync(target, { recursive: true, force: true });
 
 const playwrightArgs = [
   playwrightCli, "test", "tests/s1/mx/qst/base-store",
