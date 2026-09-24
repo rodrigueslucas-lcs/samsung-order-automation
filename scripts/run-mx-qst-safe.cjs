@@ -6,6 +6,7 @@ const preqa2Ledger = require("../test-mapping/preqa2-validation.json");
 const { writeMxS1RuntimeResults } = require("../utils/mxS1RuntimeLedger");
 const { testTitles } = require("../utils/qstS1Implementation");
 const { buildMxQstRuntimeSummary, writeRuntimeSummary } = require("../utils/mxQstRuntimeSummary.cjs");
+const { MX_BASE_P1_IDS, MX_BASE_P1_EXCLUSIONS } = require("../utils/mxQstScope.cjs");
 
 const listOnly = process.argv.includes("--list");
 const targetEnvironment = String(process.env.MX_QST_ENVIRONMENT || "S1").toUpperCase();
@@ -39,16 +40,9 @@ if (!listOnly) {
   console.log("[mx-qst] Clean execution workspace prepared before authentication preflight.");
 }
 
-const MX_BASE_P1_IDS = Object.freeze([
-  "SAM-24962", "SAM-24963", "SAM-24964", "SAM-24968", "SAM-24969",
-  "SAM-24971", "SAM-24972", "SAM-24975", "SAM-24981", "SAM-24982",
-  "SAM-24985", "SAM-24986", "SAM-24988", "SAM-24989", "SAM-24990",
-  "SAM-24991", "SAM-24992", "SAM-24993", "SAM-24994", "SAM-24995",
-  "SAM-24999", "SAM-25000", "SAM-25001", "SAM-25002", "SAM-25004",
-  "SAM-25005", "SAM-25006", "SAM-25010", "SAM-25011", "SAM-25016",
-]);
 const p1Set = new Set(MX_BASE_P1_IDS);
 const p1Pattern = `(?:${MX_BASE_P1_IDS.join("|")})\\b`;
+const activeP1Count = MX_BASE_P1_IDS.length;
 
 const allTitles = fs.readdirSync(qstRoot)
   .filter((name) => name.endsWith(".spec.js"))
@@ -64,15 +58,18 @@ for (const title of officialP1Titles) {
   p1TitleCounts.set(id, (p1TitleCounts.get(id) || 0) + 1);
 }
 const invalidP1Inventory = [...p1TitleCounts].filter(([, count]) => count !== 1);
-if (MX_BASE_P1_IDS.length !== 30 || officialP1Titles.length !== 30 || invalidP1Inventory.length) {
-  console.error("[mx-qst] Official MX Base P1 selection is invalid; QST execution was not started.");
-  console.error(`Expected 30 unique P1 tests, found ${officialP1Titles.length}.`);
+if (officialP1Titles.length !== activeP1Count || invalidP1Inventory.length) {
+  console.error("[mx-qst] Active MX Base P1 selection is invalid; QST execution was not started.");
+  console.error(`Expected ${activeP1Count} unique active P1 tests, found ${officialP1Titles.length}.`);
   for (const [id, count] of invalidP1Inventory) console.error(`  ${id}: ${count} test title(s)`);
   process.exit(1);
 }
 
 const destructiveTitles = officialP1Titles.filter((title) => /@destructive\b/i.test(title));
-console.log(`[mx-qst] Official MX ${targetEnvironment} Base P1 selection: ${officialP1Titles.length}/30 tests.`);
+console.log(`[mx-qst] Active MX ${targetEnvironment} Base P1 selection: ${officialP1Titles.length}/${activeP1Count} tests.`);
+for (const exclusion of Object.values(MX_BASE_P1_EXCLUSIONS)) {
+  console.log(`[mx-qst] Scope exclusion preserved for audit: ${exclusion.id} - ${exclusion.reason}`);
+}
 
 if (listOnly) {
   const listed = spawnSync(process.execPath, [
@@ -134,8 +131,8 @@ if (authVerification.status !== 0) {
 }
 
 // SAM-24986 requires a second authenticated account. Validate it before the
-// 30-TC campaign so an expired secondary credential cannot waste most of the
-// build and fail only when cart isolation is reached.
+// active P1 campaign so an expired secondary credential cannot waste most of
+// the build and fail only when cart isolation is reached.
 if (targetEnvironment === "S2") {
   const suffix = targetEnvironment.toLowerCase();
   const secondAuthPath = path.resolve(`playwright/.auth/mx-${suffix}-second-user.json`);
@@ -214,12 +211,12 @@ if (fs.existsSync(reportFile)) {
     reason: entry.blockedReason || entry.error || "",
     title: entry.title || entry.samId,
   }]));
-  console.log("\nMX QST OFFICIAL P1 TC SUMMARY");
+  console.log("\nMX QST ACTIVE P1 TC SUMMARY");
   for (const [id, outcome] of [...outcomes].sort()) {
     console.log(`${id}: ${outcome.status}${outcome.status === "SKIPPED-BLOCKED" && outcome.reason ? ` - ${outcome.reason.split("\n")[0]}` : ""}`);
   }
   const values = [...outcomes.values()];
-  console.log(`Totals: official=30 reported=${values.length} executed=${values.filter(({ status }) => !["SKIPPED-BLOCKED", "NOT_RUN"].includes(status)).length} passed=${values.filter(({ status }) => status === "PASS").length} failed=${values.filter(({ status }) => status === "FAIL").length} skipped=${values.filter(({ status }) => status === "SKIPPED-BLOCKED").length} notRun=${values.filter(({ status }) => status === "NOT_RUN").length}`);
+  console.log(`Totals: official=${activeP1Count} reported=${values.length} executed=${values.filter(({ status }) => !["SKIPPED-BLOCKED", "NOT_RUN"].includes(status)).length} passed=${values.filter(({ status }) => status === "PASS").length} failed=${values.filter(({ status }) => status === "FAIL").length} skipped=${values.filter(({ status }) => status === "SKIPPED-BLOCKED").length} notRun=${values.filter(({ status }) => status === "NOT_RUN").length}`);
   for (const status of ["PASS", "FAIL", "SKIPPED-BLOCKED", "NOT_RUN"]) {
     const ids = [...outcomes].filter(([, outcome]) => outcome.status === status).map(([id]) => id);
     console.log(`${status}: ${ids.join(", ") || "none"}`);
@@ -234,7 +231,7 @@ if (fs.existsSync(reportFile)) {
     .map(([id, outcome]) => ({
       id,
       status: outcome.status === "SKIPPED-BLOCKED" ? "BLOCKED" : outcome.status,
-      evidence: outcome.status === "PASS" ? `Official MX P1 QST runner completed: ${outcome.title}` : null,
+      evidence: outcome.status === "PASS" ? `Active MX P1 QST runner completed: ${outcome.title}` : null,
       blocker: outcome.status === "SKIPPED-BLOCKED" ? outcome.reason.split("\n")[0] || `${targetEnvironment} prerequisite was not available.` : outcome.status === "FAIL" ? `MX ${targetEnvironment} functional assertion failed: ${outcome.title}` : null,
     }));
   if (targetEnvironment === "S1" && stagingUpdates.length) {
