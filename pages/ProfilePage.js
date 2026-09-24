@@ -3,6 +3,7 @@ import MyAccountPage from "./MyAccountPage";
 
 const LEGACY_PE_ST2_ADDRESS_API =
   "https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/pe/users/current/addresses";
+const ADDRESS_API_TIMEOUT_MS = Number(process.env.PROFILE_ADDRESS_API_TIMEOUT_MS || 15000);
 
 export default class ProfilePage extends MyAccountPage {
   constructor(page, options = {}) {
@@ -24,6 +25,21 @@ export default class ProfilePage extends MyAccountPage {
       throw new Error(`Unexpected profile address API path: ${url.pathname}`);
     }
     return url.href;
+  }
+
+  async requestAddressApi(method, url) {
+    const request = this.page.context().request;
+    const action = method === "DELETE" ? request.delete.bind(request) : request.get.bind(request);
+    try {
+      return await action(url, {
+        failOnStatusCode: false,
+        timeout: ADDRESS_API_TIMEOUT_MS,
+      });
+    } catch (error) {
+      throw new Error(
+        `Profile address API ${method} did not complete within ${ADDRESS_API_TIMEOUT_MS}ms: ${error?.message || error}`
+      );
+    }
   }
 
   async openProfileMenu() {
@@ -70,7 +86,7 @@ export default class ProfilePage extends MyAccountPage {
 
   async inspectSavedAddressesApi() {
     const endpoint = this.assertAddressApiUrl();
-    const response = await this.page.request.get(endpoint);
+    const response = await this.requestAddressApi("GET", endpoint);
     const evidence = {
       endpoint,
       status: response.status(),
@@ -93,7 +109,7 @@ export default class ProfilePage extends MyAccountPage {
     }
     const endpoint = this.assertAddressApiUrl();
     for (let attempt = 1; attempt <= attempts; attempt++) {
-      const response = await this.page.request.get(endpoint);
+      const response = await this.requestAddressApi("GET", endpoint);
       if (!response.ok()) {
         throw new Error(`Address readback returned HTTP ${response.status()}.`);
       }
@@ -211,7 +227,7 @@ export default class ProfilePage extends MyAccountPage {
       throw new Error("Refusing API cleanup for a non-QA address.");
     }
     const endpoint = this.assertAddressApiUrl();
-    const response = await this.page.request.get(endpoint);
+    const response = await this.requestAddressApi("GET", endpoint);
     if (!response.ok()) {
       throw new Error(`Address cleanup listing returned HTTP ${response.status()}.`);
     }
@@ -224,7 +240,10 @@ export default class ProfilePage extends MyAccountPage {
     );
     for (const address of matches) {
       if (!address.id) throw new Error("QA address has no deletable id.");
-      const deletion = await this.page.request.delete(`${endpoint}/${encodeURIComponent(address.id)}`);
+      const deletion = await this.requestAddressApi(
+        "DELETE",
+        `${endpoint}/${encodeURIComponent(address.id)}`
+      );
       if (!deletion.ok()) {
         throw new Error(`QA address cleanup returned HTTP ${deletion.status()}.`);
       }
