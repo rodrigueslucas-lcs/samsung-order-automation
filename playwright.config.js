@@ -10,10 +10,11 @@ const mxOfficialP1 = process.env.TEST_MARKET === 'MX' && process.env.TEST_SUITE 
 const { MX_BASE_P1_IDS } = mxQstScope;
 const mxActiveP1Pattern = new RegExp(`(?:${MX_BASE_P1_IDS.join('|')})\\b`);
 
-// Authenticated/registered scenarios are intentionally executed before the
-// remaining MX P1 campaign. These are the cases most sensitive to session TTL,
-// so Playwright project dependencies give them a guaranteed phase boundary
-// while preserving one consolidated Playwright/Allure/JSON execution.
+// Authenticated/registered scenarios are intentionally declared as the first
+// MX P1 project. With workers=1 Playwright executes this project first, keeping
+// session-sensitive cases at the front of the campaign. The remaining project
+// is intentionally NOT a dependency: failures in auth-priority must be reported
+// without preventing the other official P1 scenarios from running.
 const mxAuthenticatedPriorityFiles = [
   '**/s1/mx/qst/base-store/authenticated-safe.spec.js',
   '**/s1/mx/qst/base-store/cart-isolation-safe.spec.js',
@@ -94,7 +95,6 @@ export default defineConfig({
         },
         {
           name: 'chromium',
-          dependencies: ['mx-auth-priority'],
           testIgnore: mxAuthenticatedPriorityFiles,
           grep: mxActiveP1Pattern,
           use: chromiumUse
