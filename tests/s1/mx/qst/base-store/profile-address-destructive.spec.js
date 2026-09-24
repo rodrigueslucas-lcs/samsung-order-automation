@@ -1,9 +1,10 @@
 import ProfilePage from "../../../../../pages/ProfilePage";
+import MxCheckoutPage from "../../../../../pages/MxCheckoutPage";
 import destructiveGuards from "../../../../../utils/destructiveGuards";
 import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import { test, expect } from "../../dst/base-store/mx.auth.fixture";
-import { reachMxRegisteredDelivery } from "../../dst/base-store/mxFlows";
+import { prepareMxQstCart } from "./mxQstFlows";
 
 const { requireProfileWriteOptIn } = destructiveGuards;
 const { recordBusinessEvidence } = evidenceContext;
@@ -23,6 +24,24 @@ function mxAddressApiUrl(mxConfig) {
   return url.href;
 }
 
+async function reachRegisteredDeliveryViaUi(page, mxConfig) {
+  // Do not depend on current-cart response bodies for this address scenario.
+  // The business assertion is checkout/profile persistence, so use the same
+  // UI-controlled cart preparation already proven by the registered safe cases.
+  const cart = await prepareMxQstCart(page, mxConfig);
+  await cart.validateControlledSingleSku(mxConfig.sku);
+  await cart.proceedToAuthenticatedCheckout();
+
+  const checkout = new MxCheckoutPage(page);
+  await checkout.fillRegisteredContact({
+    firstName: "MX",
+    lastName: "Automation",
+    phone: "5512345678",
+  });
+  await checkout.validateCheckoutSummary(mxConfig.sku);
+  return checkout;
+}
+
 test("SAM-24991 @destructive @qst @mx @base-store @registered - Add or edit saved/new address on checkout", async ({ page, mxConfig }, testInfo) => {
   requireProfileWriteOptIn();
   const addressApiUrl = mxAddressApiUrl(mxConfig);
@@ -32,7 +51,7 @@ test("SAM-24991 @destructive @qst @mx @base-store @registered - Add or edit save
   const updatedMarker = marker.replace(" QST ", " EDT ");
   try {
     await profile.deleteQaAddressesViaApi(marker).catch(() => 0);
-    const { checkout } = await reachMxRegisteredDelivery(page, mxConfig);
+    const checkout = await reachRegisteredDeliveryViaUi(page, mxConfig);
     const newAddress = page.getByRole("radio", { name: /Nueva direcci[oó]n|New address/i }).filter({ visible: true }).first();
     await newAddress.waitFor({ state: "visible", timeout: 60000 });
     await newAddress.check({ force: true });
