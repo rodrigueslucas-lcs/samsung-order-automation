@@ -58,9 +58,6 @@ async function renewMxAuthSession({ context, page, mxConfig }) {
     );
   }
 
-  // The Playwright test context was created before the fresh state was exported.
-  // Hydrate that existing context with the newly written cookies/local/session storage,
-  // then prove authentication again before allowing the registered TC to continue.
   await installPersistedBrowserState(context, page);
   await validateAuthenticatedSession(page);
   await refreshAuthenticatedState(context, page);
@@ -75,6 +72,19 @@ export const test = base.extend({
   storageState: hasAuthState() ? AUTH_STATE_PATH : undefined,
   viewport: { width: 1440, height: 900 },
   launchOptions: { args: ["--start-maximized"] },
+});
+
+test.beforeAll(async () => {
+  if (!process.env.CI) return;
+
+  const suite = String(process.env.TEST_SUITE || "").toUpperCase();
+  if (suite === "AUTH/REGISTERED") {
+    console.warn("[mx-auth] AUTH SAFE validates the current Jenkins credential, but the Samsung session may rotate during this build.");
+    console.warn("[mx-auth] Before a later P1 campaign, refresh + verify locally, re-upload the primary auth/session credentials, then run P1 directly.");
+  } else if (suite === "P1/QST") {
+    console.log("[mx-auth] P1 lifecycle policy: use freshly refreshed + verified Jenkins credentials and run P1 directly after upload.");
+    console.log("[mx-auth] Do not run AUTH SAFE between credential upload and this P1 campaign.");
+  }
 });
 
 test.beforeEach(async ({ context, page, mxConfig }, testInfo) => {
@@ -110,8 +120,6 @@ test.afterEach(async ({ context, page, mxConfig }, testInfo) => {
       new URL(currentUrl).hostname === "www.mercadopago.com.mx") return;
   await assertMxStagingPage(page, "MX authenticated final environment guard");
   if (testInfo.status === "passed") {
-    // Preserve a legitimately rotated session for the next isolated context.
-    // Never replace the saved state with a signed-out checkout page.
     try {
       await page.goto(mxConfig.baseUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
       await validateCurrentPageAuthenticated(page);
