@@ -23,12 +23,11 @@ async function openNewAddressMode(page) {
 }
 
 async function reachRegisteredDeliveryForSavedAddress(page, mxConfig) {
-  // SAM-24992 only needs a clean registered checkout to validate selection of
-  // an existing saved address. Use the UI-controlled cart helper here instead
-  // of parsing the intercepted current-cart response body; S2 has occasionally
-  // left response.json() pending until the test timeout even while the UI is
-  // healthy. This keeps the business assertion unchanged and avoids weakening
-  // the shared registered flow used by the already-stable scenarios below.
+  // Saved-address scenarios only need a clean registered checkout and the
+  // address-mode UI. Use the UI-controlled cart helper instead of depending on
+  // current-cart response.json(), which S2 can leave pending while the UI is
+  // already healthy. This preserves the business assertion without weakening
+  // the shared registered flow used by scenarios that need backend cart data.
   const cart = await prepareMxQstCart(page, mxConfig);
   await cart.validateControlledSingleSku(mxConfig.sku);
   await cart.proceedToAuthenticatedCheckout();
@@ -48,7 +47,7 @@ test("SAM-24992 @qst @mx @base-store @safe @registered - Select saved address", 
   const { checkout } = await reachRegisteredDeliveryForSavedAddress(page, mxConfig);
   const savedAddress = page.getByRole("radio", { name: /Direcci[oó]n guardada|Saved address/i }).filter({ visible: true });
   const savedAddressAvailable = await savedAddress.first().waitFor({ state: "visible", timeout: 60000 }).then(() => true).catch(() => false);
-  test.skip(!savedAddressAvailable, "No saved address is available in the authenticated MX S1 account; safe TC does not create persistent profile data.");
+  test.skip(!savedAddressAvailable, "No saved address is available in the authenticated MX account; safe TC does not create persistent profile data.");
   await selectAddressMode(page, /Direcci[oó]n guardada|Saved address/i);
   const checked = page.getByRole("radio", { checked: true }).filter({ visible: true });
   await expect(checked.first()).toBeVisible({ timeout: 30000 });
@@ -91,7 +90,7 @@ test("SAM-24994 @qst @mx @base-store @safe @registered - Checkout accepts a new 
 
 test("SAM-25000 @qst @mx @base-store @safe @registered - Switch saved and new address modes", async ({ page, mxConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-25000"));
-  await reachMxRegisteredDelivery(page, mxConfig);
+  await reachRegisteredDeliveryForSavedAddress(page, mxConfig);
   const saved = page.getByRole("radio", { name: /Direcci[oó]n guardada|Saved address/i }).filter({ visible: true });
   const fresh = page.getByRole("radio", { name: /Nueva direcci[oó]n|New address/i }).filter({ visible: true });
   const [savedAvailable, freshAvailable] = await Promise.all([
