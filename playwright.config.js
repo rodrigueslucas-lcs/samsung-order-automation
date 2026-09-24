@@ -1,10 +1,28 @@
 // @ts-check
 import { defineConfig, devices } from '@playwright/test';
+import mxQstScope from './utils/mxQstScope.cjs';
 
 const allureEnabled = process.env.ENABLE_ALLURE === '1';
 const videoEnabled = process.env.PW_VIDEO === '1';
 const headless = process.env.MX_QST_HEADLESS === '1' ||
   (!!process.env.CI && process.env.MX_QST_HEADLESS !== '0');
+const mxOfficialP1 = process.env.TEST_MARKET === 'MX' && process.env.TEST_SUITE === 'P1/QST';
+const { MX_BASE_P1_IDS } = mxQstScope;
+const mxActiveP1Pattern = new RegExp(`(?:${MX_BASE_P1_IDS.join('|')})\\b`);
+
+// Authenticated/registered scenarios are intentionally executed before the
+// remaining MX P1 campaign. These are the cases most sensitive to session TTL,
+// so Playwright project dependencies give them a guaranteed phase boundary
+// while preserving one consolidated Playwright/Allure/JSON execution.
+const mxAuthenticatedPriorityFiles = [
+  '**/s1/mx/qst/base-store/authenticated-safe.spec.js',
+  '**/s1/mx/qst/base-store/cart-isolation-safe.spec.js',
+  '**/s1/mx/qst/base-store/profile-address-destructive.spec.js',
+  '**/s1/mx/qst/base-store/registered-address-safe.spec.js',
+  '**/s1/mx/qst/base-store/registered-order.spec.js',
+];
+
+const chromiumUse = { ...devices['Desktop Chrome'] };
 
 export default defineConfig({
   testDir: './tests',
@@ -66,10 +84,26 @@ export default defineConfig({
     navigationTimeout: 60000
   },
 
-  projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] }
-    }
-  ]
+  projects: mxOfficialP1
+    ? [
+        {
+          name: 'mx-auth-priority',
+          testMatch: mxAuthenticatedPriorityFiles,
+          grep: mxActiveP1Pattern,
+          use: chromiumUse
+        },
+        {
+          name: 'chromium',
+          dependencies: ['mx-auth-priority'],
+          testIgnore: mxAuthenticatedPriorityFiles,
+          grep: mxActiveP1Pattern,
+          use: chromiumUse
+        }
+      ]
+    : [
+        {
+          name: 'chromium',
+          use: chromiumUse
+        }
+      ]
 });
