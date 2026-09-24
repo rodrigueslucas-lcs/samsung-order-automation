@@ -1,7 +1,9 @@
 import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
+import MxCheckoutPage from "../../../../../pages/MxCheckoutPage";
 import { test, expect } from "../../dst/base-store/mx.auth.fixture";
 import { reachMxRegisteredDelivery } from "../../dst/base-store/mxFlows";
+import { prepareMxQstCart } from "./mxQstFlows";
 
 const { recordBusinessEvidence } = evidenceContext;
 const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
@@ -20,9 +22,30 @@ async function openNewAddressMode(page) {
   await selectAddressMode(page, /Nueva direcci[oó]n|New address/i);
 }
 
+async function reachRegisteredDeliveryForSavedAddress(page, mxConfig) {
+  // SAM-24992 only needs a clean registered checkout to validate selection of
+  // an existing saved address. Use the UI-controlled cart helper here instead
+  // of parsing the intercepted current-cart response body; S2 has occasionally
+  // left response.json() pending until the test timeout even while the UI is
+  // healthy. This keeps the business assertion unchanged and avoids weakening
+  // the shared registered flow used by the already-stable scenarios below.
+  const cart = await prepareMxQstCart(page, mxConfig);
+  await cart.validateControlledSingleSku(mxConfig.sku);
+  await cart.proceedToAuthenticatedCheckout();
+
+  const checkout = new MxCheckoutPage(page);
+  await checkout.fillRegisteredContact({
+    firstName: "MX",
+    lastName: "Automation",
+    phone: "5512345678",
+  });
+  await checkout.validateCheckoutSummary(mxConfig.sku);
+  return { checkout, cart };
+}
+
 test("SAM-24992 @qst @mx @base-store @safe @registered - Select saved address", async ({ page, mxConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24992"));
-  const { checkout } = await reachMxRegisteredDelivery(page, mxConfig);
+  const { checkout } = await reachRegisteredDeliveryForSavedAddress(page, mxConfig);
   const savedAddress = page.getByRole("radio", { name: /Direcci[oó]n guardada|Saved address/i }).filter({ visible: true });
   const savedAddressAvailable = await savedAddress.first().waitFor({ state: "visible", timeout: 60000 }).then(() => true).catch(() => false);
   test.skip(!savedAddressAvailable, "No saved address is available in the authenticated MX S1 account; safe TC does not create persistent profile data.");
