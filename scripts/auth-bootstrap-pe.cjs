@@ -1,19 +1,20 @@
 const { chromium } = require("@playwright/test");
 const fs = require("node:fs");
 const path = require("node:path");
-const { getPeS1QstConfig } = require("../config/markets/pe");
+const { getPeQstConfig } = require("../config/markets/pe");
 
-const config = getPeS1QstConfig();
+const config = getPeQstConfig();
+const envSuffix = config.environment.toLowerCase();
 const HOSTNAME = config.baseUrl.hostname;
-const profileDir = path.resolve("playwright/profiles/s1-pe-qa");
+const profileDir = path.resolve(`playwright/profiles/${envSuffix}-pe-qa`);
 const authDir = path.resolve("playwright/.auth");
-const authFile = path.join(authDir, "pe-s1-user.json");
+const authFile = path.join(authDir, `pe-${envSuffix}-user.json`);
 const authTempFile = `${authFile}.tmp`;
-const sessionStorageFile = path.join(authDir, "pe-s1-session-storage.json");
+const sessionStorageFile = path.join(authDir, `pe-${envSuffix}-session-storage.json`);
 const sessionStorageTempFile = `${sessionStorageFile}.tmp`;
 const devToolsActivePortFile = path.join(profileDir, "DevToolsActivePort");
 
-let currentStep = "starting S1 PE export";
+let currentStep = `starting ${config.environment} PE export`;
 
 function reportStep(message) {
   currentStep = message;
@@ -28,9 +29,7 @@ function safeErrorSummary(error) {
 
 function assertPeHostAndRoute(page, step) {
   const url = new URL(page.url());
-  if (url.hostname !== HOSTNAME) {
-    throw new Error(`${step} left the configured S1 PE host`);
-  }
+  if (url.hostname !== HOSTNAME) throw new Error(`${step} left the configured ${config.environment} PE host`);
   if (step === "storefront navigation" && !url.pathname.toLowerCase().startsWith("/pe/")) {
     throw new Error(`${step} left the PE storefront route`);
   }
@@ -38,14 +37,12 @@ function assertPeHostAndRoute(page, step) {
 
 function readDevToolsPort() {
   if (!fs.existsSync(devToolsActivePortFile)) {
-    throw new Error(
-      "the dedicated S1 PE Chrome is not available; run npm run auth:open-profile:pe"
-    );
+    throw new Error(`the dedicated ${config.environment} PE Chrome is not available; run PE_QST_ENVIRONMENT=${config.environment} npm run auth:open-profile:pe`);
   }
   const [portText] = fs.readFileSync(devToolsActivePortFile, "utf8").split("\n");
   const port = Number(portText);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error("the dedicated S1 PE Chrome debugging endpoint is invalid");
+    throw new Error(`the dedicated ${config.environment} PE Chrome debugging endpoint is invalid`);
   }
   return port;
 }
@@ -55,10 +52,7 @@ async function openAuthenticatedProfileMenu(page) {
   await profileButton.waitFor({ state: "visible", timeout: 60000 });
   await page.keyboard.press("Escape");
   await profileButton.click();
-
-  const logout = page
-    .getByText(/Cerrar sesi[oó]n/i, { exact: true })
-    .filter({ visible: true });
+  const logout = page.getByText(/Cerrar sesi[oó]n/i, { exact: true }).filter({ visible: true });
   await logout.waitFor({ state: "visible", timeout: 30000 });
   reportStep("authenticated profile action is visible");
 }
@@ -71,37 +65,35 @@ function writeJsonAtomically(tempFile, destination, value) {
 
 async function exportPeAuthentication() {
   fs.mkdirSync(authDir, { recursive: true });
-  reportStep("connecting to the live dedicated S1 PE Chrome");
+  reportStep(`connecting to the live dedicated ${config.environment} PE Chrome`);
   const browser = await chromium.connectOverCDP(`http://127.0.0.1:${readDevToolsPort()}`);
   const context = browser.contexts()[0];
-  if (!context) throw new Error("the dedicated S1 PE Chrome did not expose its browser context");
+  if (!context) throw new Error(`the dedicated ${config.environment} PE Chrome did not expose its browser context`);
   const page = await context.newPage();
 
   try {
     if (config.setupUrl) {
-      reportStep("opening configured S1 PE storefront setup");
+      reportStep(`opening configured ${config.environment} PE storefront setup`);
       await page.goto(config.setupUrl.href, { waitUntil: "domcontentloaded" });
       assertPeHostAndRoute(page, "storefront setup");
     }
 
-    reportStep("opening S1 PE storefront");
+    reportStep(`opening ${config.environment} PE storefront`);
     await page.goto(config.baseUrl.href, { waitUntil: "domcontentloaded" });
     assertPeHostAndRoute(page, "storefront navigation");
     await openAuthenticatedProfileMenu(page);
 
-    reportStep("collecting filtered S1 PE storage state");
+    reportStep(`collecting filtered ${config.environment} PE storage state`);
     const fullState = await context.storageState({ indexedDB: true });
     const peState = {
       cookies: fullState.cookies.filter((cookie) => {
         const domain = cookie.domain.replace(/^\./, "");
         return domain === HOSTNAME || cookie.domain === ".samsung.com";
       }),
-      origins: fullState.origins.filter(
-        ({ origin }) => new URL(origin).hostname === HOSTNAME
-      ),
+      origins: fullState.origins.filter(({ origin }) => new URL(origin).hostname === HOSTNAME),
     };
     if (!peState.cookies.some((cookie) => cookie.domain.replace(/^\./, "") === HOSTNAME)) {
-      throw new Error("No configured S1 PE storefront cookies were available for export");
+      throw new Error(`No configured ${config.environment} PE storefront cookies were available for export`);
     }
 
     const sessionStorage = await page.evaluate(() =>
@@ -115,7 +107,7 @@ async function exportPeAuthentication() {
 
     writeJsonAtomically(authTempFile, authFile, peState);
     writeJsonAtomically(sessionStorageTempFile, sessionStorageFile, sessionStorage);
-    reportStep("S1 PE auth state exported to dedicated ignored artifacts");
+    reportStep(`${config.environment} PE auth state exported to dedicated ignored artifacts`);
   } finally {
     for (const tempFile of [authTempFile, sessionStorageTempFile]) {
       if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
@@ -125,9 +117,7 @@ async function exportPeAuthentication() {
 }
 
 exportPeAuthentication().catch((error) => {
-  console.error(
-    `[auth:export:pe] failed while ${currentStep}: ${error.name}: ${safeErrorSummary(error)}`
-  );
+  console.error(`[auth:export:pe] failed while ${currentStep}: ${error.name}: ${safeErrorSummary(error)}`);
   console.error("[auth:export:pe] existing PE auth artifacts, if any, were preserved");
   process.exitCode = 1;
 });
