@@ -131,7 +131,22 @@ export default class MarketPaymentPage extends PaymentPage {
     if (digits(await fields.number.inputValue()) !== digits(card.number)) throw new Error("Mercado Pago external form did not retain the card number.");
     if ((await fields.holder.inputValue()).trim() !== card.holderName) throw new Error("Mercado Pago external form did not retain the holder name.");
     if (digits(await fields.expiry.inputValue()) !== digits(card.expiry)) throw new Error("Mercado Pago external form did not retain the expiry.");
-    if (digits(await fields.cvv.inputValue()) !== digits(card.cvv)) throw new Error("Mercado Pago external form did not retain the security code.");
+
+    let retainedCvv = digits(await fields.cvv.inputValue());
+    if (retainedCvv !== digits(card.cvv)) {
+      console.warn("[mx-payment] Mercado Pago security-code field reset once; refilling the same configured test CVV before validation.");
+      await fields.cvv.fill("");
+      await fields.cvv.pressSequentially(card.cvv, { delay: 50 });
+      await this.page.waitForTimeout(250);
+      retainedCvv = digits(await fields.cvv.inputValue());
+    }
+    if (retainedCvv !== digits(card.cvv)) {
+      throw new Error("Mercado Pago external form did not retain the security code after one controlled refill.");
+    }
+    if ((await fields.cvv.getAttribute("aria-invalid")) === "true") {
+      throw new Error("Mercado Pago rejected the configured security code after refill validation.");
+    }
+
     const continueButton = this.page.getByRole("button", { name: /^Continuar$/i });
     await continueButton.waitFor({ state: "visible", timeout: 30000 });
     if (!(await continueButton.isEnabled())) throw new Error("Mercado Pago Continue remained disabled after valid test-card data.");
@@ -152,9 +167,6 @@ export default class MarketPaymentPage extends PaymentPage {
       throw new Error("Mercado Pago Continue is visible but disabled after card data was filled.");
     }
 
-    // Mercado Pago validates the last secure field on blur.
-    // Blur the CVV directly instead of pressing Tab, because Tab focuses
-    // the security-code help icon and opens a tooltip over the Continue flow.
     const cvvField = await this.externalCardField(/C[oó]digo de seguridad/i);
     await cvvField.blur();
     await this.page.waitForTimeout(500);
@@ -186,9 +198,6 @@ export default class MarketPaymentPage extends PaymentPage {
 
     let advancedToReview = await reviewReached(8000);
 
-    // Mercado Pago can require a second Continue interaction after the
-    // card fields are validated/blurred. Retry the SAME visible button once
-    // before falling back to a DOM click.
     if (!advancedToReview) {
       const secondContinue = this.page
         .getByRole("button", { name: /^Continuar$/i })
@@ -205,9 +214,6 @@ export default class MarketPaymentPage extends PaymentPage {
       advancedToReview = await reviewReached(15000);
     }
 
-    // Final controlled fallback. Continue is still not the final payment
-    // submit, so one DOM click is acceptable if the normal Playwright
-    // interactions did not trigger the review transition.
     if (!advancedToReview) {
       const fallbackButton = this.page
         .locator("button")
@@ -249,9 +255,6 @@ export default class MarketPaymentPage extends PaymentPage {
     );
     const outcome = "CONFIRMATION";
 
-    // The Samsung confirmation page can render the order number a few
-    // seconds after the Mercado Pago redirect completes. Do not read the
-    // body immediately after navigation.
     await this.page.waitForFunction(
       ({ source, flags }) => new RegExp(source, flags).test(document.body.innerText),
       { source: orderCodePattern.source, flags: orderCodePattern.flags },
