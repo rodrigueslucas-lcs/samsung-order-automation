@@ -34,8 +34,10 @@ function requireMxAdmin(testInfo) {
 test("MX QST 18 @qst @mx @base-store @backoffice @safe - BackOffice login", async ({ page }, testInfo) => {
   const credentials = requireMxAdmin(testInfo);
   const backOffice = new BackOfficePage(page);
-  await backOffice.login({ ...credentials, authority: "admin" });
-  await backOffice.expectPerspective("admin");
+  await test.step("Authenticate in MX BackOffice as Admin", async () => {
+    await backOffice.login({ ...credentials, authority: "admin" });
+    await backOffice.expectPerspective("admin");
+  });
 });
 
 test("SAM-25011 @qst @mx @base-store @backoffice @safe - BackOffice order and product basic advanced search", async ({ page }, testInfo) => {
@@ -50,26 +52,41 @@ test("SAM-25011 @qst @mx @base-store @backoffice @safe - BackOffice order and pr
   expect(productCode).toBeTruthy();
 
   const backOffice = new BackOfficeSearchPage(page);
-  await backOffice.login({ ...credentials, authority: "admin" });
-  expect(new URL(page.url()).hostname).toContain(`-${mxConfig.environment.toLowerCase()}-public.`);
-  expect(new URL(page.url()).hostname).not.toContain(
-    `-${mxConfig.environment === "S2" ? "s1" : "s2"}-public.`
-  );
+  await test.step("Authenticate and validate the target BackOffice environment", async () => {
+    await backOffice.login({ ...credentials, authority: "admin" });
+    expect(new URL(page.url()).hostname).toContain(`-${mxConfig.environment.toLowerCase()}-public.`);
+    expect(new URL(page.url()).hostname).not.toContain(
+      `-${mxConfig.environment === "S2" ? "s1" : "s2"}-public.`
+    );
+  });
 
-  await backOffice.openAdminOrders();
-  const basicOrderRow = await backOffice.searchAdminOrder(orderCode);
+  const basicOrderRow = await test.step("Validate basic order search", async () => {
+    await backOffice.openAdminOrders();
+    const row = await backOffice.searchAdminOrder(orderCode);
+    await expect(row).toBeVisible();
+    return row;
+  });
   await expect(basicOrderRow).toBeVisible();
 
-  await backOffice.openAdminOrders();
-  const advancedOrderRow = await backOffice.searchAdminOrderAdvanced(orderCode);
+  const advancedOrderRow = await test.step("Validate advanced order search", async () => {
+    await backOffice.openAdminOrders();
+    const row = await backOffice.searchAdminOrderAdvanced(orderCode);
+    await expect(row).toBeVisible();
+    return row;
+  });
   await expect(advancedOrderRow).toBeVisible();
 
-  await backOffice.openAdminOrders();
-  await backOffice.openAdminOrderByCode(orderCode);
-  const status = await backOffice.readOpenAdminOrderStatus(orderCode);
-  expect(status).toBeTruthy();
+  const status = await test.step("Open the order and validate its current status", async () => {
+    await backOffice.openAdminOrders();
+    await backOffice.openAdminOrderByCode(orderCode);
+    const currentStatus = await backOffice.readOpenAdminOrderStatus(orderCode);
+    expect(currentStatus).toBeTruthy();
+    return currentStatus;
+  });
 
-  await backOffice.validateProductBasicAndAdvancedSearch(productCode);
+  await test.step("Validate basic and advanced product search", async () => {
+    await backOffice.validateProductBasicAndAdvancedSearch(productCode);
+  });
 
   recordBusinessEvidence(testInfo, {
     orderCode,
