@@ -4,7 +4,7 @@ const {
   PE_AUTH_SESSION_STORAGE_PATH,
   getPeAuthState,
 } = require("../utils/peAuthState");
-const { getPeS1QstConfig } = require("../config/markets/pe");
+const { getPeQstConfig } = require("../config/markets/pe");
 
 function writeJsonSecurely(destination, value) {
   const temporary = `${destination}.tmp`;
@@ -14,26 +14,19 @@ function writeJsonSecurely(destination, value) {
 }
 
 async function verifyPeAuthentication() {
-  const config = getPeS1QstConfig();
+  const config = getPeQstConfig();
   const auth = getPeAuthState();
-  const browser = await chromium.launch({
-    channel: "chrome",
-    headless: false,
-    args: ["--start-maximized"],
-  });
+  const browser = await chromium.launch({ channel: "chrome", headless: false, args: ["--start-maximized"] });
 
   try {
-    const context = await browser.newContext({
-      storageState: auth.requireAuthState(),
-      viewport: null,
-    });
+    const context = await browser.newContext({ storageState: auth.requireAuthState(), viewport: null });
     await auth.applyAuthSessionStorage(context);
     const page = await context.newPage();
 
-    console.log("[auth:verify:pe] fresh S1 PE browser context created");
-    console.log(`[auth:verify:pe] target: S1 | PE | ${config.baseUrl.hostname}`);
+    console.log(`[auth:verify:pe] fresh ${config.environment} PE browser context created`);
+    console.log(`[auth:verify:pe] target: ${config.environment} | PE | ${config.baseUrl.hostname}`);
     await auth.validateAuthenticatedSession(page);
-    console.log("[auth:verify:pe] authenticated profile action validated in a fresh S1 PE context");
+    console.log(`[auth:verify:pe] authenticated profile action validated in a fresh ${config.environment} PE context`);
 
     await context.storageState({ path: auth.requireAuthState(), indexedDB: true });
     const sessionStorage = await page.evaluate(() =>
@@ -45,7 +38,7 @@ async function verifyPeAuthentication() {
       )
     );
     writeJsonSecurely(PE_AUTH_SESSION_STORAGE_PATH, sessionStorage);
-    console.log("[auth:verify:pe] refreshed PE session state preserved for the test fixture");
+    console.log(`[auth:verify:pe] refreshed ${config.environment} PE session state preserved for the test fixture`);
   } finally {
     await browser.close();
   }
