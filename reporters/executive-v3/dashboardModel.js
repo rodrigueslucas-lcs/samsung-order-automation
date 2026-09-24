@@ -202,7 +202,7 @@ function buildMarketFeatureMatrix(catalog) {
   return features.map(feature => {
     const markets = {};
     for (const market of MARKETS) {
-      const rows = catalog.filter(row => row.market === market && row.feature === feature && !row.scopeExcluded);
+      const rows = catalog.filter(row => row.market === market && row.feature === feature);
       markets[market] = {
         total: rows.length,
         executed: rows.filter(row => row.status !== 'NOT_RUN').length,
@@ -218,7 +218,7 @@ function buildMarketFeatureMatrix(catalog) {
 }
 
 function summarizeLedger(ledger) {
-  const catalog = buildCaseCatalog(ledger).filter(row => !row.scopeExcluded);
+  const catalog = buildCaseCatalog(ledger);
   const count = status => catalog.filter(row => row.status === status).length;
   return {
     official: catalog.length,
@@ -288,17 +288,14 @@ function buildConsistencyAudit(ledger = null) {
 
 function buildDashboardModel({ ledger = null, execution = null, history = [] } = {}) {
   const marketModels = MARKETS.map(market => {
-    const historicalOfficial = smb.markets[market]?.count || 0;
-    const excluded = market === 'MX' ? Object.keys(MX_BASE_P1_EXCLUSIONS).length : 0;
-    const official = historicalOfficial - excluded;
+    const official = smb.markets[market]?.count || 0;
     const results = ledger?.markets?.[market]?.results || {};
     const status = countStatuses(results);
     const coverage = coverageForMarket(market);
     return {
       market,
       official,
-      historicalOfficial,
-      excluded,
+      scopeExcluded: market === 'MX' ? Object.keys(MX_BASE_P1_EXCLUSIONS).length : 0,
       ...status,
       pending: Math.max(0, official - status.executed),
       validationPercent: official ? status.executed / official * 100 : 0,
@@ -308,9 +305,10 @@ function buildDashboardModel({ ledger = null, execution = null, history = [] } =
   });
 
   const totals = marketModels.reduce((acc, market) => {
-    for (const key of ['official', 'executed', 'pass', 'fail', 'blocked', 'notApplicable', 'pending', 'excluded']) acc[key] += market[key];
+    for (const key of ['official', 'executed', 'pass', 'fail', 'blocked', 'notApplicable', 'pending']) acc[key] += market[key];
+    acc.scopeExcluded += market.scopeExcluded;
     return acc;
-  }, { official: 0, executed: 0, pass: 0, fail: 0, blocked: 0, notApplicable: 0, pending: 0, excluded: 0 });
+  }, { official: 0, executed: 0, pass: 0, fail: 0, blocked: 0, notApplicable: 0, pending: 0, scopeExcluded: 0 });
 
   const catalog = buildCaseCatalog(ledger);
   const validationRows = catalog.filter(row => row.status !== 'NOT_RUN' && !row.scopeExcluded);
