@@ -17,12 +17,10 @@ test.skip(process.env.ALLOW_PAYMENT_SUBMIT !== "1", "Registered order submit is 
 
 async function reachRegisteredPaymentViaUi(page, config) {
   // Keep this destructive order flow independent from current-cart response bodies.
-  // Jenkins has repeatedly shown a healthy rendered cart while response.json() on
-  // /users/current/carts/current remains pending. The UI-controlled helper is
-  // already exercised by other registered P1 scenarios and preserves the same
-  // business precondition without weakening the payment assertion.
+  // prepareMxQstCart already proves one rendered SKU at quantity 1 via the UI,
+  // so do not call CartPage.validateControlledSingleSku() here because that
+  // reintroduces the hanging /users/current/carts/current response-body dependency.
   const cart = await prepareMxQstCart(page, config);
-  await cart.validateControlledSingleSku(config.sku);
   await cart.proceedToAuthenticatedCheckout();
 
   const checkout = new MxCheckoutPage(page);
