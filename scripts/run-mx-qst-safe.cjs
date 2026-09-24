@@ -174,12 +174,18 @@ console.log(`[mx-qst] PreQA2 CDP endpoint for SAM-24969: ${qstExecutionEnv.PREQA
 
 for (const target of executionArtifacts) fs.rmSync(target, { recursive: true, force: true });
 
+// Run both MX P1 projects in one consolidated Playwright execution. The auth
+// project is declared first in playwright.config.js, so workers=1 keeps the
+// session-sensitive registered cases at the front. Selecting only `chromium`
+// would silently exclude those 9 cases now that the projects are independent.
 const playwrightArgs = [
   playwrightCli, "test", "tests/s1/mx/qst/base-store",
-  "--project=chromium", "--workers=1", "--retries=0",
+  "--project=mx-auth-priority", "--project=chromium",
+  "--workers=1", "--retries=0",
   "--grep", p1Pattern, "--output", path.join(artifactDir, "playwright"),
 ];
-if (!headless) playwrightArgs.splice(4, 0, "--headed");
+if (!headless) playwrightArgs.push("--headed");
+console.log("[mx-qst] Execution projects: mx-auth-priority -> chromium (independent; failures do not suppress remaining P1 tests).");
 
 const result = spawnSync(process.execPath, playwrightArgs, {
   env: qstExecutionEnv,
