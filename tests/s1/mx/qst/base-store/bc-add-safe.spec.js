@@ -65,16 +65,27 @@ async function getAuthenticatedPreQaPage() {
 
 async function returnToPreQaPdp(page) {
   const expected = new RegExp("p6-pre-qa2\\.samsung\\.com/mx/smartphones/galaxy-s25-ultra/buy", "i");
-  if (/SystemParking\.html/i.test(new URL(page.url()).pathname)) {
-    await page.goBack({ waitUntil: "commit", timeout: 90000 });
-  } else {
+  if (expected.test(page.url())) {
+    await page.waitForLoadState("domcontentloaded", { timeout: 15000 }).catch(() => {});
+    await dismissLocationBanner(page);
+    return;
+  }
+
+  // The Add-to-Cart experience can transiently navigate through maintenance or
+  // another PreQA route. Prefer browser history because the immediately prior
+  // stable page is the PDP. If history does not restore it, perform one bounded
+  // direct navigation. Do not spend the full test timeout on an unhealthy route.
+  await page.goBack({ waitUntil: "commit", timeout: 30000 }).catch(() => null);
+
+  if (!expected.test(page.url())) {
     await page.goto(`${PRE_QA_ORIGIN}${PRE_QA_PDP_PATH}`, {
       waitUntil: "commit",
-      timeout: 90000,
+      timeout: 30000,
     });
   }
-  await expect(page).toHaveURL(expected, { timeout: 60000 });
-  await page.waitForLoadState("domcontentloaded", { timeout: 30000 }).catch(() => {});
+
+  await expect(page).toHaveURL(expected, { timeout: 30000 });
+  await page.waitForLoadState("domcontentloaded", { timeout: 15000 }).catch(() => {});
   await dismissLocationBanner(page);
 }
 
