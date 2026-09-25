@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 import BackOfficeOrderPage from "../../../../../pages/BackOfficeOrderPage";
-import evidenceContext from "../../../../../reporters/evidence/evidenceContext";
+import evidenceContext from "../../../../../reporting/evidence/evidenceContext";
 import sharedEvidenceMetadata from "../../../../../utils/qstSharedEvidenceMetadata";
 
 const { recordBusinessEvidence } = evidenceContext;
