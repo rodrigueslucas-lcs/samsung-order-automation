@@ -3,7 +3,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..');
-const fixture = path.join(root, 'fixtures', 'executive-v3', 'build-5-runtime-summary.json');
+const fixture = path.join(root, 'reporters', 'tests', 'fixtures', 'executive-v3', 'build-5-runtime-summary.json');
 const runtime = path.join(root, 'test-results', 'jenkins', 'mx-qst', 'runtime-summary.json');
 const outDir = path.join(root, 'test-results', 'executive-v3');
 const output = path.join(outDir, 'index.html');
