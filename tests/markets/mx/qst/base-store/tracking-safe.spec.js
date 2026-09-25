@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
+import evidenceContext from "../../../../../reporting/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import GuestOrderTrackingPage from "../../../../../pages/GuestOrderTrackingPage";
 import MailinatorPage from "../../../../../pages/MailinatorPage";
