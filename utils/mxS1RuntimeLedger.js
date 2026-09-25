@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const LEDGER_PATH = path.resolve("governance/mx-s1-qst-runtime.json");
+const COMPAT_LEDGER_PATH = path.resolve("test-mapping/mx-s1-qst-runtime.json");
 const STATUSES = new Set(["PASS", "FAIL", "BLOCKED"]);
 
 function loadMxS1RuntimeLedger() {
@@ -11,6 +12,12 @@ function loadMxS1RuntimeLedger() {
     if (!/^SAM-\d+$/.test(id) || !STATUSES.has(result.status)) throw new Error(`Invalid MX S1 runtime result: ${id}.`);
   }
   return ledger;
+}
+
+function atomicWrite(file, body) {
+  const temporary = `${file}.tmp-${process.pid}`;
+  fs.writeFileSync(temporary, body, { flag: "wx" });
+  fs.renameSync(temporary, file);
 }
 
 function writeMxS1RuntimeResults(updates) {
@@ -24,10 +31,13 @@ function writeMxS1RuntimeResults(updates) {
       validatedAt: update.validatedAt || new Date().toISOString(),
     };
   }
-  const temporary = `${LEDGER_PATH}.tmp-${process.pid}`;
-  fs.writeFileSync(temporary, `${JSON.stringify(ledger, null, 2)}\n`, { flag: "wx" });
-  fs.renameSync(temporary, LEDGER_PATH);
+
+  const body = `${JSON.stringify(ledger, null, 2)}\n`;
+  atomicWrite(LEDGER_PATH, body);
+  // Transitional compatibility mirror: remove this second write only after all
+  // remaining test-mapping consumers are cut over and the compatibility tree is deleted.
+  if (fs.existsSync(COMPAT_LEDGER_PATH)) atomicWrite(COMPAT_LEDGER_PATH, body);
   return ledger;
 }
 
-module.exports = { LEDGER_PATH, loadMxS1RuntimeLedger, writeMxS1RuntimeResults };
+module.exports = { LEDGER_PATH, COMPAT_LEDGER_PATH, loadMxS1RuntimeLedger, writeMxS1RuntimeResults };
