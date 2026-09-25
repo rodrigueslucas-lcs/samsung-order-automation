@@ -21,7 +21,9 @@ function validateMxQstCoverage() {
   const coverageIds = Object.keys(coverageCases);
 
   if (mxCoverage.market !== "MX") errors.push(`coverage market: expected MX, found ${mxCoverage.market || "<missing>"}`);
-  if (mxCoverage.officialTotal !== officialIds.length) errors.push(`MX officialTotal: expected ${officialIds.length}, found ${mxCoverage.officialTotal}`);
+  if (mxCoverage.historicalQstTotal !== officialIds.length) {
+    errors.push(`MX historicalQstTotal: expected ${officialIds.length}, found ${mxCoverage.historicalQstTotal}`);
+  }
 
   const missingIds = officialIds.filter((id) => !coverageCases[id]);
   const extraIds = coverageIds.filter((id) => !officialIds.includes(id));
@@ -50,10 +52,37 @@ function validateMxQstCoverage() {
     if (!current.notes || !String(current.notes).trim()) errors.push(`${id}: coverage notes are required`);
   }
 
+  const historicalSummaryKeys = {
+    full: "historicalMappedFull",
+    partial: "historicalMappedPartial",
+    missing: "historicalMappedMissing",
+  };
   for (const state of COVERAGE_STATES) {
-    if (mxCoverage.summary?.[state] !== counts[state]) {
-      errors.push(`MX summary ${state}: declared ${mxCoverage.summary?.[state]}, actual ${counts[state]}`);
+    const key = historicalSummaryKeys[state];
+    if (mxCoverage.summary?.[key] !== counts[state]) {
+      errors.push(`MX summary ${key}: declared ${mxCoverage.summary?.[key]}, actual ${counts[state]}`);
     }
+  }
+
+  const activeExclusions = new Set(Object.keys(mxCoverage.activeScopeExclusions || {}));
+  const activeBaseStore = officialIds.filter((id) => coverageCases[id]?.store === "BS" && !activeExclusions.has(id));
+  const activeCounts = { full: 0, partial: 0, missing: 0 };
+  for (const id of activeBaseStore) activeCounts[coverageCases[id].coverage] += 1;
+
+  if (mxCoverage.sourceMappedBaseStoreP1 !== activeBaseStore.length + activeExclusions.size) {
+    errors.push(`MX sourceMappedBaseStoreP1: expected ${activeBaseStore.length + activeExclusions.size}, found ${mxCoverage.sourceMappedBaseStoreP1}`);
+  }
+  if (mxCoverage.activeBaseStoreP1 !== activeBaseStore.length) {
+    errors.push(`MX activeBaseStoreP1: expected ${activeBaseStore.length}, found ${mxCoverage.activeBaseStoreP1}`);
+  }
+  for (const state of COVERAGE_STATES) {
+    const key = `activeBaseStore${state[0].toUpperCase()}${state.slice(1)}`;
+    if (mxCoverage.summary?.[key] !== activeCounts[state]) {
+      errors.push(`MX summary ${key}: declared ${mxCoverage.summary?.[key]}, actual ${activeCounts[state]}`);
+    }
+  }
+  if (mxCoverage.summary?.activeBaseStoreExcluded !== activeExclusions.size) {
+    errors.push(`MX summary activeBaseStoreExcluded: declared ${mxCoverage.summary?.activeBaseStoreExcluded}, actual ${activeExclusions.size}`);
   }
 
   const classifiedTotal = Object.values(counts).reduce((sum, count) => sum + count, 0);
