@@ -1,7 +1,7 @@
-# PE QST — Current Regional Stabilization Path
+# PE QST — Current Regional Implementation
 
-This tree is the **current PE Base Store P1 stabilization implementation** used by `scripts/run-pe-qst-p1.cjs` and the Jenkins PE official-p1 lane.
+Canonical current PE QST tree used by `scripts/run-pe-qst-p1.cjs` and the Jenkins PE official-p1 stabilization lane.
 
-The runner currently discovers `tests/s1/pe/qst/base-store` even when `PE_QST_ENVIRONMENT=S2`; therefore the `s1` directory name is compatibility debt, not an environment restriction.
+S1/S2 are selected at runtime through `PE_QST_ENVIRONMENT`; do not duplicate these specs by environment.
 
-Do not copy these specs into a second environment directory. Target migration is `tests/pe/qst/...` after the older `tests/s2/pe/qst` generation is reconciled.
+The older PE/ST2 QST generation is isolated under `tests/legacy/pe/qst` until unique coverage and legacy callers are fully reconciled.
