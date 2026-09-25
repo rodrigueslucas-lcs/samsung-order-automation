@@ -32,11 +32,9 @@ Therefore the active MX Base Store runner selects **29 TCs** on either S1/STG or
 
 MX still has **38 P1 rows overall** when the 8 EPP P1 rows are included.
 
-See `docs/OFFICIAL_SMB_PRIORITY_MODEL.md` and `docs/REPOSITORY_AUDIT.md`.
-
 ## Proven MX S2 baseline
 
-The current stabilized MX S2 official Base Store P1 baseline is:
+The stabilized MX S2 official Base Store P1 baseline is:
 
 ```text
 29 selected
@@ -77,16 +75,6 @@ Coverage never implies PASS, and missing runtime never becomes PASS.
 Primary build-review entry point:
 
 `test-results/jenkins/mx-qst/executive/index.html`
-
-Typical presentation order:
-
-1. Execution at a glance
-2. Needs Attention
-3. Test Execution
-4. Market Automation Coverage
-5. Official SMB Scope
-6. Coverage by Feature / Gap Queue
-7. Technical Governance
 
 ### Allure
 
@@ -154,40 +142,41 @@ Ambiguous payment/order submission must never be blindly retried.
 
 ## Repository architecture
 
-The repository is currently in a **controlled architecture migration**. Runtime is stable, but some physical paths still reflect older environment-first organization.
-
-Current hybrid layout:
+Executable tests are now organized by **ownership**, not by staging environment:
 
 ```text
-tests/s1/mx/...        active MX QST/DST implementation
-tests/s1/pe/...        newer PE QST stabilization implementation
-tests/s2/pe/...        established PE/ST2 QST + DST generation
-tests/s1/smb/...       shared SMB candidates
+tests/
+├── markets/
+│   ├── mx/
+│   │   ├── qst/
+│   │   └── dst/
+│   └── pe/
+│       ├── qst/
+│       └── dst/
+├── shared/
+│   └── smb/qst/
+└── legacy/
+    └── pe/qst/
 
-pages/                 current Page Objects
+pages/                 Page Objects
 flows/                 reusable business/presentation flows
-utils/                 runtime + governance helpers
+config/                market/runtime configuration
 scripts/               auth, CI, reporting and governance CLIs
-reporters/             Executive / evidence / PreQA2 reporting
-test-mapping/          scope, mapping and runtime ledgers
-mapping-tests/         governance integrity tests
-reporter-tests/        reporting integrity tests
+reporters/             Executive, evidence, PreQA2 and reporting tests
+test-mapping/          scope, mapping, runtime ledgers and governance tests
+fixtures/               compatibility data; PE data is explicitly namespaced
 ```
 
-Target logical architecture:
+The important rule is:
 
 ```text
-tests/<market>/<qst|dst>/<store>/
-pages/{shared,mx,pe,backoffice}/
-flows/{shared,mx,pe}/
-reporting/{executive,allure,evidence,tests}/
-governance/{scope,mapping,reconciliation,tests}/
-scripts/{auth,ci,reporting,governance}/
+market/store/suite = physical ownership
+environment S1/S2   = runtime configuration
 ```
 
-S1/S2 should ultimately be runtime configuration rather than permanent top-level test folders. The migration is intentionally phased so the stabilized MX P1 is not broken by cosmetic path churn.
+`tests/legacy/pe/qst` is intentionally explicit: it contains the older PE QST generation retained for reconciliation. New PE QST work belongs under `tests/markets/pe/qst`.
 
-Read `docs/REPOSITORY_AUDIT.md` before moving or deleting legacy-looking files.
+The next structural cleanup area is the still-flat `scripts/` / `pages/` ownership. See `docs/REPOSITORY_AUDIT.md` for the active migration contract.
 
 ## Important legacy compatibility
 
@@ -197,7 +186,7 @@ Active MX payment data comes from ignored runtime file:
 
 `playwright/.auth/mx-test-card.json`
 
-Do not delete the versioned fixtures until PE consolidation proves they are unused.
+Do not delete the versioned card fixture until PE consolidation proves it is unused.
 
 ## Environments
 
@@ -206,9 +195,7 @@ MX supports environment-parity execution:
 - S1 -> `stg.shop.samsung.com`
 - S2 -> `stg2.shop.samsung.com`
 
-The selected environment changes endpoints/configuration, not the active MX Base Store TC inventory.
-
-The existing `tests/s1/...` and `tests/s2/...` paths are historical physical organization and should not be interpreted as the desired final architecture.
+The selected environment changes endpoints/configuration, not the physical test ownership or active MX Base Store TC inventory.
 
 ## Local setup
 
@@ -220,6 +207,7 @@ npx playwright install chromium
 Useful gates:
 
 ```bash
+npm run repo:architecture:validate
 npm run qst:official:gate
 npm run qst:mx:list
 npm run reporting:mx-runtime:test
