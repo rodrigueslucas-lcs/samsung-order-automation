@@ -1,6 +1,6 @@
 import { test } from "@playwright/test";
 import peConfigModule from "../../../../../config/markets/pe";
-import evidenceContext from "../../../../../reporters/evidence/evidenceContext";
+import evidenceContext from "../../../../../reporting/evidence/evidenceContext";
 import peEvidenceMetadata from "../../../../../utils/qstPeEvidenceMetadata";
 import { reachPeGuestPayment } from "./peQstFlows";
 
