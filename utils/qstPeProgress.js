@@ -1,4 +1,4 @@
-const pePlan = require("../test-mapping/pe-qst-reuse-plan.json");
+const pePlan = require("../governance/pe-qst-reuse-plan.json");
 const { validateS1OfficialImplementation } = require("./qstS1Implementation");
 
 function getPeS1ImplementationProgress() {
