@@ -76,9 +76,13 @@ test.describe("PE QST - official safe gap reconciliation", () => {
     evidence(testInfo, "SAM-25094");
     const cfg = config();
     await addConfiguredProductToPeCart(page, cfg);
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    const backToTop = page.getByRole("button", { name: /back to top|volver arriba|ir arriba|subir/i })
-      .or(page.getByRole("link", { name: /back to top|volver arriba|ir arriba|subir/i }))
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.waitForFunction(() => {
+      window.scrollTo(0, document.documentElement.scrollHeight);
+      return /Volver al inicio|Back to top|Volver arriba|Ir arriba|Subir/i.test(document.body.innerText);
+    }, null, { timeout: 60000, polling: "raf" });
+    const backToTop = page.getByRole("button", { name: /Volver al inicio|Back to top|Volver arriba|Ir arriba|Subir/i })
+      .or(page.getByRole("link", { name: /Volver al inicio|Back to top|Volver arriba|Ir arriba|Subir/i }))
       .filter({ visible: true });
     await expect(backToTop.first()).toBeVisible({ timeout: 30000 });
   });
