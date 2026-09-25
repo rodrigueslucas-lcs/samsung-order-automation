@@ -48,14 +48,25 @@ function specFilesUnder(directory) {
 }
 const specFiles = specFilesUnder(root);
 const allTitles = specFiles.flatMap((file) => testTitles(fs.readFileSync(file, "utf8")));
-const implementedTitles = allTitles.filter((title) => officialSet.has(title.match(/SAM-\d+/)?.[0]));
+const officialTitles = allTitles.filter((title) => officialSet.has(title.match(/SAM-\d+/)?.[0]));
+const implementedTitles = officialTitles.filter((title) => !/@not-run\b/i.test(title));
+const representedIds = new Set(officialTitles.map((title) => title.match(/SAM-\d+/)?.[0]));
 const implementedIds = new Set(implementedTitles.map((title) => title.match(/SAM-\d+/)?.[0]));
-const missingIds = PE_BASE_P1_IDS.filter((id) => !implementedIds.has(id));
+const missingIds = PE_BASE_P1_IDS.filter((id) => !representedIds.has(id));
+const explicitNotRunIds = officialTitles
+  .filter((title) => /@not-run\b/i.test(title))
+  .map((title) => title.match(/SAM-\d+/)?.[0])
+  .filter(Boolean);
 const duplicateIds = PE_BASE_P1_IDS.filter((id) => implementedTitles.filter((title) => title.includes(id)).length > 1);
 
 console.log(`[pe-qst] Official PE ${targetEnvironment} Base Store P1 scope: ${PE_BASE_P1_IDS.length} TCs.`);
-console.log(`[pe-qst] Implemented in current branch: ${implementedIds.size}/${PE_BASE_P1_IDS.length}.`);
-if (missingIds.length) console.log(`[pe-qst] NOT_RUN implementation gaps: ${missingIds.join(", ")}`);
+console.log(`[pe-qst] Represented in canonical Base Store scope: ${representedIds.size}/${PE_BASE_P1_IDS.length}.`);
+console.log(`[pe-qst] Executable implementations: ${implementedIds.size}/${PE_BASE_P1_IDS.length}.`);
+console.log(`[pe-qst] Explicit NOT_RUN: ${explicitNotRunIds.join(", ") || "none"}.`);
+if (missingIds.length) {
+  console.error(`[pe-qst] Missing canonical implementations: ${missingIds.join(", ")}`);
+  process.exit(1);
+}
 if (duplicateIds.length) {
   console.error(`[pe-qst] Duplicate official PE IDs detected: ${duplicateIds.join(", ")}`);
   process.exit(1);
