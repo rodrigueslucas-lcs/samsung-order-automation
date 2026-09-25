@@ -1,10 +1,10 @@
 # Current SMB QA Automation Architecture
 
-This document describes the **current executable architecture** and the **target physical architecture**. The repository is in a controlled migration: runtime behavior is stabilized, but test paths still expose historical S1/S2 organization.
+This document describes the executable architecture after the repository cleanup and the remaining compatibility debt.
 
 ## 1. Authoritative business scope
 
-The business source of truth is the Samsung priority-template model under `docs/smb_priority_templates/`, represented by the official inventory contract.
+The business source of truth is the Samsung priority-template model under `docs/smb_priority_templates/`.
 
 | Market | Base Store | EPP | P1 / QST | P2 / DST only | DST total |
 |---|---:|---:|---:|---:|---:|
@@ -14,23 +14,11 @@ The business source of truth is the Samsung priority-template model under `docs/
 | CO | 54 | 35 | 34 | 55 | 89 |
 | **SMB** | **218** | **144** | **144** | **218** | **362** |
 
-Priority and store are independent dimensions:
+P1 runs in QST + DST; P2 runs in DST only. Base Store and EPP remain independent store contexts.
 
-- P1 runs in QST + DST;
-- P2 runs in DST only;
-- Base Store and EPP remain distinct contexts.
+## 2. Proven MX runtime contract
 
-`test-mapping/smb-qst.json` is preserved historical Zephyr traceability and is not the current P1 denominator.
-
-## 2. Active MX execution model
-
-MX has 38 P1 rows overall. The historical Base Store source contains 30 P1 rows, but `SAM-25006` is excluded from active MX execution because the inherited PSE path is Colombia-specific rather than a valid MX payment path.
-
-The active MX Base Store runner therefore executes **29 TCs** on either S1/STG or S2/STG2. Environment selection changes configuration/endpoints, not the active TC inventory.
-
-## 3. Proven runtime baseline
-
-The stabilized MX S2 baseline is:
+The active MX Base Store runner selects 29 TCs because `SAM-25006` is preserved as an audited exclusion. The stabilized S2 baseline is:
 
 ```text
 selected=29
@@ -41,206 +29,151 @@ blocked=0
 notRun=0
 ```
 
-The only current FAIL is `SAM-25010`: guest Track Order creates an order, receives/accepts OTP, then the current BaseSite cannot resolve that new order. The framework preserves the product/environment defect instead of weakening the assertion.
+The only expected current FAIL is `SAM-25010`: Track Order creates the guest order, obtains/accepts OTP, then the current BaseSite cannot resolve the new order.
 
-## 4. Runtime, coverage, scope and history stay separate
-
-The architecture keeps four dimensions independent:
-
-- **Runtime result** — PASS / FAIL / BLOCKED / NOT_RUN for one execution;
-- **Automation coverage** — what is implemented;
-- **Official scope** — current Samsung inventory;
-- **Historical evidence** — previous Zephyr/PreQA2/runtime ledgers and campaigns.
-
-No reporting layer may infer PASS from coverage or from missing execution data.
-
-## 5. Current physical repository
+## 3. Canonical engineer-facing repository
 
 ```text
-config/                 market/runtime configuration
-fixtures/               compatibility test data; PE data is being namespaced
-flows/                  reusable storefront/business flows
-pages/                  Page Objects (shared + market-specific still mixed)
-reporters/
-  evidence/              evidence reporter
-  executive/             legacy/current executive utilities
-  executive-v3/          active Executive Dashboard generator
-  preqa2/                governance/reporting compatibility
-  tests/                 reporting integrity tests
-scripts/                 auth + execution + reporting + governance CLIs (still flat)
-test-mapping/
-  *.json                  scope/mapping/runtime/governance data
-  tests/                  governance integrity tests
 tests/
-  s1/
-    mx/{qst,dst}/         active MX generation
-    pe/qst/               newer PE QST stabilization generation
-    smb/qst/              shared SMB candidates
-  s2/
-    pe/{qst,dst}/         established PE/ST2 compatibility generation
-utils/                   runtime + governance helpers still mixed
+  markets/
+    mx/
+      qst/base-store/
+      dst/base-store/
+      dst/backoffice/
+    pe/
+    shared/
+  legacy/
+    pe-s2/
+
+config/                 runtime/market configuration
+fixtures/               test-data compatibility
+flows/                  reusable business flows
+pages/                  Page Objects
+reporters/
+  evidence/
+  executive/
+  executive-v3/
+  preqa2/
+  tests/
+test-mapping/
+  *.json
+  tests/
+scripts/                 executable CLIs, still flat
+utils/                   runtime/governance helpers
 ```
 
-Already-completed cleanup:
+The navigation rule is **market -> suite -> store**. Environment is selected at runtime.
 
-- root `reporter-tests/` consolidated into `reporters/tests/`;
-- root `mapping-tests/` consolidated into `test-mapping/tests/`;
-- empty placeholders removed;
-- non-payment PE fixtures namespaced under `fixtures/pe/`;
-- generated/runtime clutter hidden from the VS Code explorer/search;
-- stale discovery/handoff documents removed from the active docs tree.
+## 4. Temporary compatibility layer
 
-The repository structure guard is available through:
+`tests/s1/**` and `tests/s2/**` still exist physically because some stable runners, Jenkins commands and relative imports reference them directly. They are hidden from the default VS Code Explorer/search so engineers see the canonical structure first.
+
+Current mirror mapping:
+
+```text
+tests/s1/mx   <-> tests/markets/mx
+tests/s1/pe   <-> tests/markets/pe
+tests/s1/smb  <-> tests/markets/shared
+tests/s2/pe   <-> tests/legacy/pe-s2
+```
+
+The repository guard checks these mirrors byte-for-byte until runtime cutover is complete:
 
 ```bash
 npm run repo:architecture:validate
 ```
 
-## 6. Target physical architecture
+This transitional duplication is deliberate: it gives a clean tree immediately while avoiding a risky big-bang change to the official P1 runtime.
+
+## 5. Runtime cutover status
+
+Already using canonical paths:
+
+- MX DST package commands;
+- MX fast-guest runner;
+- normal VS Code navigation.
+
+Still intentionally using compatibility paths until an atomic migration is runtime-proven:
+
+- MX official P1 runner;
+- MX auth-priority project matching;
+- some Jenkins direct test commands;
+- PE current/legacy runners;
+- shared BackOffice/direct SMB commands.
+
+No compatibility tree is deleted until every consumer has moved and the official runner has reproduced the established baseline.
+
+## 6. Reporting and governance ownership
+
+Completed consolidation:
+
+- reporting integrity tests live in `reporters/tests/`;
+- governance integrity tests live in `test-mapping/tests/`;
+- old root `reporter-tests/` and `mapping-tests/` boundaries are forbidden by the architecture guard.
+
+Renaming `reporters` to `reporting` or `test-mapping` to `governance` is lower priority than runtime-safe test cutover because ownership is already unambiguous.
+
+## 7. PE dual-generation problem
+
+PE still has two generations:
+
+- canonical current view `tests/markets/pe` mirrors the newer `tests/s1/pe` generation;
+- `tests/legacy/pe-s2` mirrors the older ST2 generation currently under `tests/s2/pe`.
+
+The older tree contains established DST coverage and an older QST implementation, so it cannot be deleted based on age alone. Reconciliation must be per TC and per runtime consumer.
+
+## 8. Page Object / flow strategy
+
+Current `pages/` remains flat because MX and PE generations share imports. Target ownership remains:
 
 ```text
-tests/
-  mx/
-    qst/{base-store,epp,backoffice}/
-    dst/{base-store,epp,backoffice}/
-  pe/
-    qst/{base-store,epp,backoffice}/
-    dst/{base-store,epp,backoffice}/
-  cl/
-  co/
-  shared/
+pages/shared
+pages/mx
+pages/pe
+pages/backoffice
 
-pages/
-  shared/
-  mx/
-  pe/
-  backoffice/
-
-flows/
-  shared/
-  mx/
-  pe/
-
-reporting/
-  executive/
-  allure/
-  evidence/
-  tests/
-
-governance/
-  scope/
-  mapping/
-  reconciliation/
-  tests/
-
-scripts/
-  auth/
-  ci/
-  reporting/
-  governance/
+flows/shared
+flows/mx
+flows/pe
 ```
 
-The key rule is: **market is a physical taxonomy; S1/S2 is runtime configuration**.
+Move by responsibility/consumer boundary, not file size. This phase comes after test-path cutover so relative imports are not churned twice.
 
-## 7. Why S1/S2 remains in test paths temporarily
+## 9. Script strategy
 
-The active MX runner, Playwright project matching, package scripts, relative imports, reporter source paths and Jenkins commands still reference `tests/s1/mx/...` directly.
-
-Moving that directory is therefore not a harmless rename. It must be atomic across:
-
-- Playwright config;
-- MX runners;
-- package scripts;
-- Jenkinsfile;
-- relative imports;
-- reporting/governance source-path assumptions;
-- docs and targeted commands.
-
-The current path is a compatibility layer until the market-first move is runtime-validated.
-
-## 8. PE dual-generation problem
-
-PE exists in both `tests/s1/pe` and `tests/s2/pe` and must be reconciled per TC:
-
-- `tests/s2/pe/dst` — established ST2/DST generation;
-- `tests/s2/pe/qst` — older QST generation;
-- `tests/s1/pe/qst` — newer regional QST stabilization generation.
-
-Folder age alone is not enough evidence to delete either implementation.
-
-## 9. Page Object strategy
-
-Current Page Objects remain flat for compatibility while active MX and PE generations share imports.
-
-Target ownership:
-
-- `pages/shared` — genuinely cross-market storefront components;
-- `pages/mx` — MX-specific checkout/tracking behavior;
-- `pages/pe` — PE-specific behavior;
-- `pages/backoffice` — BackOffice-only objects.
-
-Large file size alone is not a reason to split a Page Object. Responsibility and consumer boundaries decide decomposition.
-
-## 10. Authentication model
-
-MX registered execution uses environment-specific persisted state under ignored `playwright/.auth/`.
-
-Policy:
-
-- local auto-renew enabled unless `MX_AUTH_AUTO_RENEW=0`;
-- Jenkins auto-renew disabled unless explicitly enabled;
-- MFA/CAPTCHA is never bypassed;
-- failed renewal stays a failure/blocker;
-- second-account state is validated only when `SAM-24986` is selected.
-
-## 11. Payment data boundary
-
-Two card-data mechanisms coexist today:
-
-- the versioned generic card fixture remains a PE/DST compatibility dependency through `utils/testData.js`;
-- `playwright/.auth/mx-test-card.json` is runtime-only MX test-card data consumed by `utils/mxTestCard.js`.
-
-They must not be collapsed until the PE payment-data path is migrated safely.
-
-## 12. Reporting architecture
-
-Reporting implementation and integrity tests now share the `reporters/` boundary. This removed the old top-level `reporter-tests/` split without changing runtime reporting behavior.
-
-The presentation stack remains:
-
-1. Executive Dashboard — build/release health;
-2. Allure — TC-level drilldown and evidence;
-3. Playwright — execution/trace detail;
-4. Jenkins — orchestration and publication.
-
-A later naming migration may rename `reporters/` to `reporting/`, but the current consolidation is already one ownership boundary and avoids unnecessary path churn.
-
-## 13. Governance architecture
-
-Governance data and integrity tests now share `test-mapping/`:
+`scripts/` still mixes auth, CI, reporting and governance commands. Target groups:
 
 ```text
-test-mapping/
-  *.json
-  tests/
+scripts/auth
+scripts/ci
+scripts/reporting
+scripts/governance
 ```
 
-The old root `mapping-tests/` folder has been removed. Governance-oriented helpers/scripts remain spread across `utils/` and `scripts/`; those are the next low-risk consolidation candidates before test-path migration.
+Unlike the test-tree mirror, scripts cannot be copied blindly into one-level-deeper folders because many use `../utils` and sibling-relative imports. Script migration must therefore be an executable move with import/package/Jenkins updates, not a cosmetic duplicate.
 
-## 14. Safety boundaries
+## 10. Authentication and payment boundaries
 
-Production is read-only. Destructive non-Production actions remain explicitly guarded. Payment/order submission uses zero retries in the controlled campaign. Backend/environment defects must not be hidden by weakened assertions.
+MX auth artifacts are runtime-only under ignored `playwright/.auth/`. MFA/CAPTCHA is never bypassed. The second account is validated only when `SAM-24986` is selected.
 
-## 15. Refactor acceptance
+Payment data remains intentionally split:
 
-Every architecture phase must preserve:
+- `fixtures/card.json` — PE/DST compatibility data through `utils/testData.js`;
+- `playwright/.auth/mx-test-card.json` — ignored MX runtime data through `utils/mxTestCard.js`.
+
+Do not collapse these until PE migration proves the generic fixture is unused.
+
+## 11. Architecture acceptance
+
+Every phase must preserve:
 
 - official scope gates;
-- runner selection correctness;
-- secret/runtime-only artifact handling;
-- reporting generation;
-- current MX behavior.
+- selected TC inventory;
+- destructive guards and zero blind payment retries;
+- auth secret handling;
+- Executive / Allure / Playwright reporting;
+- current MX runtime behavior.
 
-For MX-affecting changes, the acceptance baseline is the official 29-TC campaign. A new automation failure introduced by refactor blocks the next migration phase.
+For MX-affecting cutovers the acceptance contract is the official 29-TC campaign. A new automation failure introduced by refactor blocks deletion of the compatibility source.
 
-See `REPOSITORY_AUDIT.md` for the detailed KEEP / RELOCATE / LEGACY / DELETE classification.
+See `REPOSITORY_AUDIT.md` for completed phases and remaining work.
