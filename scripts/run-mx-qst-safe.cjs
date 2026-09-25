@@ -2,7 +2,7 @@ const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const { hasAuthState, hasVerifiedAuthState } = require("../utils/mxAuthState");
-const preqa2Ledger = require("../test-mapping/preqa2-validation.json");
+const preqa2Ledger = require("../governance/preqa2-validation.json");
 const { writeMxS1RuntimeResults } = require("../utils/mxS1RuntimeLedger");
 const { testTitles } = require("../utils/qstS1Implementation");
 const { buildMxQstRuntimeSummary, writeRuntimeSummary } = require("../utils/mxQstRuntimeSummary.cjs");
@@ -283,8 +283,8 @@ if (fs.existsSync(reportFile)) {
   }
 
   const executive = spawnSync(process.execPath, [
-    path.resolve("reporters/executive-v3/generateExecutiveV3.cjs"),
-    path.resolve("test-mapping/preqa2-validation.json"),
+    path.resolve("reporting/executive-v3/generateExecutiveV3.cjs"),
+    path.resolve("governance/preqa2-validation.json"),
     path.join(artifactDir, "executive", "index.html"),
     path.join(artifactDir, "executive", "history.json"),
     runtimeSummaryFile,
