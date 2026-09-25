@@ -1,0 +1,23 @@
+{
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "package.json": "package-lock.json",
+    "README.md": "docs/README.md"
+  },
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/test-results": true,
+    "**/playwright-report": true,
+    "**/allure-report": true,
+    "**/allure-results": true,
+    "**/playwright/.auth": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/test-results": true,
+    "**/playwright-report": true,
+    "**/allure-report": true,
+    "**/allure-results": true,
+    "**/playwright/.auth": true
+  }
+}
