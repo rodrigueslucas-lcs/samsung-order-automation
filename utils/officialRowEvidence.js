@@ -1,6 +1,6 @@
-const mxCoverage = require("../test-mapping/mx-qst-coverage.json");
-const preqa2 = require("../test-mapping/preqa2-validation.json");
-const mxS1Runtime = require("../test-mapping/mx-s1-qst-runtime.json");
+const mxCoverage = require("../governance/mx-qst-coverage.json");
+const preqa2 = require("../governance/preqa2-validation.json");
+const mxS1Runtime = require("../governance/mx-s1-qst-runtime.json");
 const { collectMarketImplementation } = require("./qstS1Implementation");
 
 const MX_P1_LEGACY_LINKS = Object.freeze({
