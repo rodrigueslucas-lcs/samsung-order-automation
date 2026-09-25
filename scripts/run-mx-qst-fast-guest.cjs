@@ -18,10 +18,6 @@ const allureResultsDir = path.join(fastArtifactDir, "allure-results");
 const allureReportDir = path.join(fastArtifactDir, "allure-report");
 const executiveDir = path.join(fastArtifactDir, "executive");
 
-// Fast, non-destructive MX Base Store campaign.
-// These are official P1 cases that do not require the registered storefront
-// session and are intended for quick validation while registered auth is blocked.
-// Keep this suite separate from the official active P1 denominator.
 const MX_FAST_GUEST_IDS = Object.freeze([
   "SAM-24971", "SAM-24972", "SAM-24975", "SAM-24981", "SAM-24982",
   "SAM-24988", "SAM-24989", "SAM-24990", "SAM-24995", "SAM-24999",
@@ -62,11 +58,8 @@ const args = [
   "--grep-invert", "@registered|@destructive",
   "--output", path.resolve(process.env.MX_FAST_ARTIFACT_DIR || "test-results/jenkins/mx-fast", "playwright"),
 ];
-if (listOnly) {
-  args.push("--list", "--reporter=list");
-} else if (!headless) {
-  args.splice(4, 0, "--headed");
-}
+if (listOnly) args.push("--list", "--reporter=list");
+else if (!headless) args.splice(4, 0, "--headed");
 
 if (!listOnly) {
   for (const target of [reportFile, runtimeSummaryFile, allureResultsDir, allureReportDir, executiveDir, path.join(fastArtifactDir, "playwright-report"), path.join(fastArtifactDir, "playwright"), path.join(fastArtifactDir, "evidence")]) {
@@ -98,8 +91,8 @@ if (!listOnly && fs.existsSync(reportFile)) {
   writeRuntimeSummary(runtimeSummaryFile, runtimeSummary);
 
   const executive = spawnSync(process.execPath, [
-    path.resolve("reporters/executive-v3/generateExecutiveV3.cjs"),
-    path.resolve("test-mapping/preqa2-validation.json"),
+    path.resolve("reporting/executive-v3/generateExecutiveV3.cjs"),
+    path.resolve("governance/preqa2-validation.json"),
     path.join(executiveDir, "index.html"),
     path.join(executiveDir, "history.json"),
     runtimeSummaryFile,
