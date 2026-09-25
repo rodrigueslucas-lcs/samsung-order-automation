@@ -2,11 +2,9 @@
 
 Playwright-based QA automation, governance and CI reporting for Samsung LATAM SMB eCommerce on SAP Commerce/Hybris.
 
-This repository is a **regional QA engineering platform**, not a set of isolated scripts. It combines Samsung scope governance, Playwright execution, evidence, Jenkins CI, an Executive Dashboard and Allure investigation across Mexico, Peru, Chile and Colombia.
+This repository is a **regional QA engineering platform**: official Samsung scope governance -> Playwright execution -> Jenkins -> Executive Dashboard -> Allure/evidence.
 
 ## Current official scope
-
-The business source of truth is the Samsung priority-template model under `docs/smb_priority_templates/`.
 
 Priority and execution context are independent:
 
@@ -22,21 +20,15 @@ Priority and execution context are independent:
 | CO | 54 | 35 | 34 | 55 | 89 |
 | **SMB** | **218** | **144** | **144** | **218** | **362** |
 
-`test-mapping/smb-qst.json` is a preserved historical 144-ID Zephyr campaign. Its size happens to equal the current P1 total, but it is **not** the current P1/P2 denominator.
+`test-mapping/smb-qst.json` is preserved historical Zephyr traceability, not the current denominator.
 
 ### Active MX Base Store P1
 
-The official MX Base Store source contains 30 historical P1 rows, but `SAM-25006` is currently excluded from active MX execution because Samsung SMB QA clarified that the PSE bank-payment path in the copied test data is Colombia-specific and is not a valid MX payment path.
+The historical MX Base Store source contains 30 P1 rows. `SAM-25006` is preserved as an audited exclusion because Samsung SMB QA clarified that the inherited PSE bank-payment path is Colombia-specific rather than a valid MX path.
 
-Therefore the active MX Base Store runner selects **29 TCs** on either S1/STG or S2/STG2. The exclusion remains preserved for audit; it is not silently deleted from scope history.
-
-MX still has **38 P1 rows overall** when the 8 EPP P1 rows are included.
-
-See `docs/OFFICIAL_SMB_PRIORITY_MODEL.md` and `docs/REPOSITORY_AUDIT.md`.
+The active MX Base Store runner therefore selects **29 TCs** on S1/STG or S2/STG2. Environment changes endpoints/configuration, not the active inventory.
 
 ## Proven MX S2 baseline
-
-The current stabilized MX S2 official Base Store P1 baseline is:
 
 ```text
 29 selected
@@ -47,54 +39,51 @@ The current stabilized MX S2 official Base Store P1 baseline is:
 0 NOT_RUN
 ```
 
-`SAM-25010` creates a guest order, requests/accepts OTP successfully, then the current BaseSite cannot resolve the newly created order. That remains a product/environment defect until Samsung fixes the behavior; the automation must not be weakened to manufacture PASS.
+`SAM-25010` creates a guest order, requests and accepts OTP successfully, then the current BaseSite cannot resolve the newly created order. The automation intentionally preserves that product/environment defect.
 
-## What the framework provides
+## Repository navigation
 
-- Playwright 1.60 / Node.js automation with Page Objects and reusable business flows.
-- Official-scope governance for P1/P2, QST/DST and Base Store/EPP.
-- Runtime reconciliation into PASS / FAIL / BLOCKED / NOT_RUN.
-- Screenshots, traces, optional video and business evidence.
-- Jenkins CI with guarded destructive execution and secret-file injection.
-- Executive Dashboard for build health, scope, coverage and evidence.
-- Allure for technical drilldown and TC-level investigation.
-- Environment safety that prevents Production writes.
-- Controlled authentication validation/recovery without bypassing MFA/CAPTCHA.
+The **canonical engineer-facing test tree is market-first**:
 
-## Reporting model
+```text
+tests/
+  markets/
+    mx/
+      qst/base-store/
+      dst/base-store/
+      dst/backoffice/
+    pe/
+    shared/
+  legacy/
+    pe-s2/
+```
 
-The framework deliberately keeps four dimensions separate:
+Rule: **market -> suite -> store**. S1/S2 are runtime environments, not permanent test taxonomy.
 
-1. **Official scope** — current Samsung inventory.
-2. **Current runtime** — what actually happened in this build.
-3. **Implementation coverage** — what has automation implemented.
-4. **Historical/governance evidence** — previous campaigns, ledgers and reconciliation.
+During the controlled migration, `tests/s1/**` and `tests/s2/**` remain as hidden compatibility sources for runners that have not yet completed runtime cutover. VS Code hides those roots by default so normal navigation stays clean. A repository guard verifies that canonical mirrors cannot drift from compatibility sources:
 
-Coverage never implies PASS, and missing runtime never becomes PASS.
+```bash
+npm run repo:architecture:validate
+```
 
-### Executive Dashboard
+Do not add new work to the hidden compatibility tree without keeping the canonical path synchronized.
 
-Primary build-review entry point:
+Other ownership boundaries:
 
-`test-results/jenkins/mx-qst/executive/index.html`
+```text
+config/                 market/runtime configuration
+fixtures/               compatibility test data; PE data namespaced under fixtures/pe
+flows/                  reusable business/presentation flows
+pages/                  Page Objects; market decomposition still pending
+reporters/              Executive, evidence, PreQA2 and reporting integrity tests
+test-mapping/           scope/mapping/runtime data + governance integrity tests
+scripts/                executable CLIs; categorization is the next structural phase
+utils/                  runtime/governance helpers
+```
 
-Typical presentation order:
+The removed root `reporter-tests/` and `mapping-tests/` boundaries must not return; those tests now live under `reporters/tests/` and `test-mapping/tests/` respectively.
 
-1. Execution at a glance
-2. Needs Attention
-3. Test Execution
-4. Market Automation Coverage
-5. Official SMB Scope
-6. Coverage by Feature / Gap Queue
-7. Technical Governance
-
-### Allure
-
-Technical investigation hierarchy:
-
-`Samsung SMB Automation -> <market> · <environment> · <store> -> <suite> · <feature> -> SAM-xxxxx`
-
-Allure complements the Executive Dashboard; it does not replace the current runtime contract.
+Read `docs/REPOSITORY_AUDIT.md` before deleting anything that merely looks old.
 
 ## MX official runner
 
@@ -110,13 +99,13 @@ Discovery only:
 npm run qst:mx:list
 ```
 
-Jenkins also supports targeted stabilization through `P1_TARGET_IDS`, for example:
+Jenkins supports targeted stabilization through `P1_TARGET_IDS`, for example:
 
 ```text
 SAM-24969,SAM-24991,SAM-25002
 ```
 
-Targeted execution uses the same official runner, credentials, guards and reporting stack but selects only active official MX IDs.
+Targeted execution uses the same guards, credentials and reporting stack while selecting only active official IDs.
 
 ## Authentication
 
@@ -134,15 +123,36 @@ Second-account flow used by `SAM-24986`:
 MX_QST_ENVIRONMENT=S2 MX_AUTH_SLOT=second MX_AUTH_MANUAL=1 node scripts/auth-login-mx.cjs && MX_QST_ENVIRONMENT=S2 MX_AUTH_SLOT=second npm run auth:verify:mx
 ```
 
-CI uses pre-provisioned secret files. Interactive renewal is intentionally disabled in Jenkins unless explicitly enabled.
+CI uses pre-provisioned secret files. MFA/CAPTCHA is never bypassed.
+
+## Payment-data boundary
+
+`fixtures/card.json` is **not** the MX runtime test card. It remains a PE/DST compatibility dependency through `utils/testData.js`.
+
+Active MX payment data is runtime-only:
+
+```text
+playwright/.auth/mx-test-card.json
+```
+
+Do not merge/delete those mechanisms until PE reconciliation proves the legacy dependency is gone.
+
+## Reporting model
+
+The platform keeps four dimensions separate:
+
+1. **Official scope** — current Samsung inventory.
+2. **Current runtime** — what happened in this build.
+3. **Implementation coverage** — what automation exists.
+4. **Historical/governance evidence** — previous campaigns and ledgers.
+
+Primary review surfaces are Executive Dashboard, Allure, Playwright trace/evidence and Jenkins orchestration. Coverage never implies PASS.
 
 ## Safety rules
 
-Production is read-only.
+Production is read-only. Never submit Production payments/orders, modify Production profile data, execute Production CronJobs/cancellations or use Production as fallback.
 
-Never submit Production payments/orders, modify Production profile data, execute Production CronJobs/cancellations or use Production as a fallback environment.
-
-State-changing non-Production actions remain explicitly guarded:
+State-changing non-Production actions remain guarded:
 
 ```text
 ALLOW_PAYMENT_SUBMIT=1
@@ -152,63 +162,14 @@ ALLOW_PROFILE_WRITE=1
 
 Ambiguous payment/order submission must never be blindly retried.
 
-## Repository architecture
-
-The repository is currently in a **controlled architecture migration**. Runtime is stable, but some physical paths still reflect older environment-first organization.
-
-Current hybrid layout:
-
-```text
-tests/s1/mx/...        active MX QST/DST implementation
-tests/s1/pe/...        newer PE QST stabilization implementation
-tests/s2/pe/...        established PE/ST2 QST + DST generation
-tests/s1/smb/...       shared SMB candidates
-
-pages/                 current Page Objects
-flows/                 reusable business/presentation flows
-utils/                 runtime + governance helpers
-scripts/               auth, CI, reporting and governance CLIs
-reporters/             Executive / evidence / PreQA2 reporting
-test-mapping/          scope, mapping and runtime ledgers
-mapping-tests/         governance integrity tests
-reporter-tests/        reporting integrity tests
-```
-
-Target logical architecture:
-
-```text
-tests/<market>/<qst|dst>/<store>/
-pages/{shared,mx,pe,backoffice}/
-flows/{shared,mx,pe}/
-reporting/{executive,allure,evidence,tests}/
-governance/{scope,mapping,reconciliation,tests}/
-scripts/{auth,ci,reporting,governance}/
-```
-
-S1/S2 should ultimately be runtime configuration rather than permanent top-level test folders. The migration is intentionally phased so the stabilized MX P1 is not broken by cosmetic path churn.
-
-Read `docs/REPOSITORY_AUDIT.md` before moving or deleting legacy-looking files.
-
-## Important legacy compatibility
-
-`fixtures/card.json` is **not** the MX runtime test card. It remains consumed by PE DST through `utils/testData.js`.
-
-Active MX payment data comes from ignored runtime file:
-
-`playwright/.auth/mx-test-card.json`
-
-Do not delete the versioned fixtures until PE consolidation proves they are unused.
-
 ## Environments
 
-MX supports environment-parity execution:
+MX environment parity:
 
 - S1 -> `stg.shop.samsung.com`
 - S2 -> `stg2.shop.samsung.com`
 
-The selected environment changes endpoints/configuration, not the active MX Base Store TC inventory.
-
-The existing `tests/s1/...` and `tests/s2/...` paths are historical physical organization and should not be interpreted as the desired final architecture.
+The same active test inventory is routed by runtime configuration.
 
 ## Local setup
 
@@ -220,6 +181,7 @@ npx playwright install chromium
 Useful gates:
 
 ```bash
+npm run repo:architecture:validate
 npm run qst:official:gate
 npm run qst:mx:list
 npm run reporting:mx-runtime:test
@@ -228,12 +190,10 @@ npm run reporting:preqa2:test
 
 ## Documentation
 
-Start here:
-
 - `docs/README.md` — documentation index
-- `docs/REPOSITORY_AUDIT.md` — cleanup/refactor contract
-- `docs/CURRENT_ARCHITECTURE.md` — runtime/architecture model
-- `docs/OFFICIAL_SMB_PRIORITY_MODEL.md` — priority/source model
+- `docs/REPOSITORY_AUDIT.md` — refactor/cleanup contract
+- `docs/CURRENT_ARCHITECTURE.md` — current and target architecture
+- `docs/OFFICIAL_SMB_PRIORITY_MODEL.md` — scope/priority source model
 - `docs/ENVIRONMENT_VALIDATION_POLICY.md` — environment rules
 - `docs/JENKINS_SETUP.md` — CI setup
 - `docs/EXECUTIVE_REPORT_V3.md` — reporting model
