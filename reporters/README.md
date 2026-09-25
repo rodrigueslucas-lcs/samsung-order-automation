@@ -1,27 +1,15 @@
 # Reporting
 
-`reporters/` contains the current reporting implementation used by Jenkins and local validation.
+`reporting/` is the canonical reporting boundary for Jenkins and local validation.
 
-## Current responsibilities
+Responsibilities:
 
-- `evidence/` — structured evidence model and Playwright reporter.
-- `executive-v3/` — current Executive Dashboard generation.
-- `executive/` — previous executive reporter retained for compatibility/tests.
-- `preqa2/` — PreQA2 campaign/status reporting.
+- `evidence/` — structured evidence model and Playwright reporter;
+- `executive-v3/` — current Executive Dashboard generator;
+- `executive/` — previous executive generator retained while compatibility/integrity consumers still exercise it;
+- `preqa2/` — PreQA2 campaign/status reporting;
+- `tests/` — reporting integrity tests.
 
-`reporter-tests/` at repository root contains integrity tests for these reporting layers.
+During migration the hidden root `reporters/` tree is a byte-identical compatibility source for callers not yet cut over. Do not add separate logic to both trees. Structural guards fail if they drift.
 
-## Target structure
-
-The final repository should expose one obvious reporting boundary:
-
-```text
-reporting/
-  executive/
-  allure/
-  evidence/
-  preqa2/
-  tests/
-```
-
-Do not delete `reporters/executive/` or move reporter tests merely because V3 is the current presentation layer; package scripts still exercise historical/current reporters as integrity checks. Consolidation must update those scripts and pass the reporting test suite.
+Long-term rule: one reporting ownership boundary, with Executive, Allure/evidence and integrity tests kept separate from official-scope governance data.
