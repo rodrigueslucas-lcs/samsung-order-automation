@@ -77,9 +77,4 @@ function getPeQstConfig(environment = process.env) {
   });
 }
 
-// Backward-compatible name while the legacy tests are gradually made market/environment neutral.
-function getPeS1QstConfig(environment = process.env) {
-  return getPeQstConfig(environment);
-}
-
-module.exports = { PROVEN_PE_QST_ST2_SKU, getPeQstConfig, getPeS1QstConfig, targetEnvironment };
+module.exports = { PROVEN_PE_QST_ST2_SKU, getPeQstConfig, targetEnvironment };
