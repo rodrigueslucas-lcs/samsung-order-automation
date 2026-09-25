@@ -1,43 +1,41 @@
 # Tests
 
-This directory is executable Playwright automation.
-
-## Current compatibility layout
-
-The repository still contains an environment-first physical structure:
+Executable Playwright automation is organized by **ownership**, not environment.
 
 ```text
-tests/s1/mx/...
-tests/s1/pe/...
-tests/s1/smb/...
-tests/s2/pe/...
+tests/
+  markets/
+    mx/
+      qst/
+      dst/
+    pe/
+      qst/
+      dst/
+  shared/
+    smb/
+      qst/
+  legacy/
+    pe/
+      qst/
 ```
 
-That structure reflects project history, not the desired final architecture.
+## Rule
 
-## Target rule
+S1/S2 are runtime environments. They do not own physical spec trees.
 
-New architecture should converge to:
+Use one market-owned spec and route storefront/API configuration with `MX_QST_ENVIRONMENT`, `PE_QST_ENVIRONMENT` or the corresponding runtime config whenever business behavior is equivalent.
 
-```text
-tests/<market>/<qst|dst>/<store>/
-```
+## Ownership
 
-S1/S2 are runtime environments and should ultimately be selected by configuration rather than duplicated top-level directories.
+- `markets/mx/qst/base-store` — active MX QST and official 29-TC Base Store P1 implementation.
+- `markets/mx/dst` — MX DST plus current MX auth/flow compatibility used by QST.
+- `markets/pe/qst` — current regional PE QST stabilization implementation.
+- `markets/pe/dst` — established PE DST implementation.
+- `shared/smb/qst` — explicitly shared/regional candidate coverage.
+- `legacy/pe/qst` — older PE/ST2 QST generation retained only for compatibility commands until reconciliation is complete.
 
-Do **not** create a new test in both S1 and S2 merely to support both environments. Reuse one spec and route endpoints/config at runtime whenever the business flow is equivalent.
+## Safety
 
-## Current ownership
+Do not add new code under `legacy/` unless explicitly maintaining a legacy entry point. Do not recreate `tests/s1` or `tests/s2`.
 
-- `s1/mx/qst/base-store` — active MX QST implementation and official Base Store P1 runner.
-- `s1/mx/dst` — MX DST generation and shared MX auth/flow compatibility used by current QST imports.
-- `s1/pe/qst` — newer PE QST stabilization generation.
-- `s2/pe/qst` — older PE/ST2 QST generation; migration candidate, not safe to delete yet.
-- `s2/pe/dst` — established PE DST generation and still referenced by package scripts.
-- `s1/smb/qst` — shared/regional candidates.
-
-## Migration safety
-
-Moving test folders affects relative imports, Playwright project matching, runners, Jenkins commands, package scripts and reporting source paths. Perform those moves atomically and validate the affected official runner before deleting the old path.
-
-For MX-affecting changes, the regression baseline is the active 29-TC Base Store P1 campaign documented in `docs/REPOSITORY_AUDIT.md`.
+For MX-affecting changes, preserve the established 29-TC campaign behavior documented in `docs/REPOSITORY_AUDIT.md`. Physical refactors are not considered runtime-proven until the official gates/runner execute successfully.
