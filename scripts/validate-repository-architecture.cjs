@@ -10,6 +10,8 @@ const required = [
   "docs/REPOSITORY_AUDIT.md",
   "docs/CURRENT_ARCHITECTURE.md",
   "tests/README.md",
+  "tests/markets/README.md",
+  "tests/legacy/README.md",
   "reporters/README.md",
   "reporters/tests",
   "test-mapping/README.md",
@@ -63,6 +65,9 @@ const runtimeRoots = [
   "utils",
   "config",
   "reporters",
+  "tests",
+  "test-mapping/mx-qst-coverage.json",
+  "test-mapping/pe-qst-reuse-plan.json",
 ].flatMap((entry) => walkFiles(path.join(root, entry)));
 
 const staleRuntimeReferences = [];
@@ -97,6 +102,7 @@ if (missing.length || resurrected.length || staleRuntimeReferences.length) {
 console.log("[repo-architecture] PASS");
 console.log("[repo-architecture] Executable tests use tests/markets/<market>/<qst|dst> plus explicit tests/shared and tests/legacy boundaries.");
 console.log("[repo-architecture] S1/S2 no longer define physical test ownership; environment is runtime configuration.");
+console.log("[repo-architecture] Current MX/PE governance mappings use canonical/explicit-legacy paths.");
 console.log("[repo-architecture] Reporting tests are consolidated under reporters/tests.");
 console.log("[repo-architecture] Governance tests are consolidated under test-mapping/tests.");
 console.log("[repo-architecture] PE non-payment fixtures are namespaced under fixtures/pe.");
