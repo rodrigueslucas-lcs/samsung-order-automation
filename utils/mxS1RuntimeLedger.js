@@ -2,7 +2,6 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const LEDGER_PATH = path.resolve("governance/mx-s1-qst-runtime.json");
-const COMPAT_LEDGER_PATH = path.resolve("test-mapping/mx-s1-qst-runtime.json");
 const STATUSES = new Set(["PASS", "FAIL", "BLOCKED"]);
 
 function loadMxS1RuntimeLedger() {
@@ -34,10 +33,7 @@ function writeMxS1RuntimeResults(updates) {
 
   const body = `${JSON.stringify(ledger, null, 2)}\n`;
   atomicWrite(LEDGER_PATH, body);
-  // Transitional compatibility mirror: remove this second write only after all
-  // remaining test-mapping consumers are cut over and the compatibility tree is deleted.
-  if (fs.existsSync(COMPAT_LEDGER_PATH)) atomicWrite(COMPAT_LEDGER_PATH, body);
   return ledger;
 }
 
-module.exports = { LEDGER_PATH, COMPAT_LEDGER_PATH, loadMxS1RuntimeLedger, writeMxS1RuntimeResults };
+module.exports = { LEDGER_PATH, loadMxS1RuntimeLedger, writeMxS1RuntimeResults };
