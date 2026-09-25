@@ -4,7 +4,7 @@ Status: active refactor plan for `agent/mx-qst-p1-finish`.
 
 ## Baseline that must not regress
 
-The current MX S2 official Base Store P1 baseline is:
+Current MX S2 official Base Store P1 baseline:
 
 - 29 active official TCs selected;
 - 28 PASS;
@@ -12,193 +12,240 @@ The current MX S2 official Base Store P1 baseline is:
 - 0 BLOCKED;
 - 0 NOT_RUN.
 
-Any architecture cleanup must preserve this runtime behavior. A refactor is not considered complete merely because imports compile; the official gates and MX P1 runtime remain the acceptance criteria.
+Architecture cleanup must preserve that behavior. Import success alone is not enough; official scope, report generation and runtime behavior remain the acceptance contract.
 
-## Main finding
+## What was confusing
 
-The repository evolved in layers. Runtime code is healthy enough to execute the current campaign, but the physical tree still exposes historical implementation decisions as if they were current architecture.
+The repository grew in layers and exposed historical implementation decisions as if they were the current architecture:
 
-The largest sources of confusion are:
+1. S1/S2 are encoded in physical test paths even though environment is now runtime configuration;
+2. PE exists in both `tests/s1/pe` and `tests/s2/pe` with different automation generations;
+3. MX QST still consumes authenticated fixture/flow code from the MX DST compatibility location;
+4. reporting implementation and tests used to be split across root folders;
+5. governance data and integrity tests used to be split across root folders;
+6. `pages/`, `utils/` and `scripts/` still mix shared, market-specific and compatibility responsibilities;
+7. documentation contained current contracts mixed with obsolete discovery/handoff material.
 
-1. environment names (`s1`, `s2`) are encoded in physical test paths even though environment is now a runtime selection;
-2. PE exists in both `tests/s1/pe` and `tests/s2/pe`, with different generations of QST/DST automation;
-3. MX QST currently imports its authenticated fixture/flows from the historical MX DST location;
-4. reporting code is split between `reporters/`, `reporter-tests/`, scripts and fixtures;
-5. governance code is split between `test-mapping/`, `mapping-tests/`, `utils/` and scripts;
-6. root-level `pages/`, `utils/` and `scripts/` mix shared, market-specific, reporting and historical responsibilities;
-7. documentation contains both current contracts and discovery/historical material without a strong current-vs-archive boundary.
+## Completed cleanup
 
-## Classification
+### Phase 0 — inventory / zero-risk cleanup ✅
 
-### KEEP — current runtime contracts
+Completed:
+
+- removed empty `pages/CookiePage.js` placeholder;
+- removed empty `docs/test-plan.md`;
+- added ownership README files for `config`, `fixtures`, `flows`, `pages`, `reporters`, `scripts`, `test-mapping`, `tests` and `utils`;
+- cleaned `.gitignore` and added VS Code exclusions for generated/runtime-only artifacts;
+- added `.vscode/settings.json` so `node_modules`, Playwright/Allure output, test results and runtime auth files do not dominate the Explorer/search;
+- corrected MX active Base Store P1 documentation to 29 TCs with `SAM-25006` preserved as an audited exclusion;
+- documented the proven 28 PASS / 1 functional FAIL MX S2 baseline.
+
+### Phase 1 — docs / ownership boundaries ✅
+
+Completed:
+
+- root `README.md` is now the project/platform entry point;
+- `docs/README.md` is the documentation index;
+- obsolete BackOffice discovery, PreQA2 investigation, old ST2 context/handoff, old QST guide and health-audit snapshots were removed from the active docs tree and remain available in Git history;
+- current architecture, Jenkins, priority and coverage docs were reconciled with the active runner.
+
+### Phase 2A — reporting consolidation ✅
+
+Completed:
+
+- removed root `reporter-tests/`;
+- moved reporting integrity tests and their fixtures/config into `reporters/tests/`;
+- updated package scripts and reporting helpers to use the consolidated boundary.
+
+Current reporting ownership:
+
+```text
+reporters/
+  evidence/
+  executive/
+  executive-v3/
+  preqa2/
+  tests/
+```
+
+A future `reporters/` -> `reporting/` rename is cosmetic compared with the ownership consolidation already completed and is intentionally lower priority than test-path cleanup.
+
+### Phase 2B — governance consolidation ✅
+
+Completed:
+
+- removed root `mapping-tests/`;
+- moved governance integrity tests under `test-mapping/tests/`;
+- updated package scripts/test-relative imports;
+- kept runtime/scope ledgers beside their integrity tests instead of duplicating a second root boundary.
+
+Current governance ownership:
+
+```text
+test-mapping/
+  *.json
+  tests/
+```
+
+A future `test-mapping/` -> `governance/` rename remains possible, but it is naming debt rather than an ownership split.
+
+### Phase 2C — fixture cleanup ✅ / partial
+
+Completed:
+
+- namespaced PE non-payment fixtures under `fixtures/pe/`;
+- updated `utils/testData.js` accordingly;
+- documented that the generic versioned card fixture is **not** MX runtime payment data.
+
+Intentionally not moved/deleted:
+
+- the generic PE/DST card fixture remains in its compatibility location because current PE DST still consumes it;
+- MX active payment data remains runtime-only under ignored `playwright/.auth/mx-test-card.json`.
+
+### Architecture regression guard ✅
+
+Added:
+
+```bash
+npm run repo:architecture:validate
+```
+
+The guard fails if completed cleanup regresses (for example root `mapping-tests/` / `reporter-tests/` reappear, empty placeholders return, or required ownership boundaries disappear).
+
+## Current classification
+
+### KEEP — active runtime contracts
 
 - `Jenkinsfile`
 - `playwright.config.js`
 - `package.json` / `package-lock.json`
 - `config/markets/`
-- current MX P1 tests in `tests/s1/mx/qst/base-store/`
-- current MX authentication/runtime helpers used by Jenkins
-- `pages/` classes referenced by active MX/PE automation
+- active MX P1 tests under `tests/s1/mx/qst/base-store/`
+- MX auth/runtime helpers used by Jenkins
+- Page Objects consumed by active MX/PE automation
 - `flows/smb/`
 - `reporters/evidence/`
 - `reporters/executive-v3/`
-- official inventory and active runtime ledgers in `test-mapping/`
-- `docs/smb_priority_templates/` as source templates
+- official inventory/runtime ledgers under `test-mapping/`
+- `docs/smb_priority_templates/`
 
-### KEEP BUT RELOCATE LATER — structurally valid, physically confusing
+### KEEP BUT RELOCATE — valid code, confusing physical location
 
-- `tests/s1/mx/*` -> logical target `tests/mx/*`
-- `tests/s1/pe/qst/*` and `tests/s2/pe/*` -> logical target `tests/pe/*`, after PE generation reconciliation
-- `tests/s1/smb/*` -> logical target `tests/shared/*`
-- `reporters/*` + `reporter-tests/*` -> logical target under one `reporting/` boundary
-- `test-mapping/*` + `mapping-tests/*` -> logical target under one `governance/` boundary
-- auth-related scripts/helpers -> one `auth/` or `scripts/auth/` boundary
-- CI runners/finalizers -> `scripts/ci/`
+- `tests/s1/mx/*` -> target `tests/mx/*`
+- `tests/s1/pe/qst/*` + `tests/s2/pe/*` -> target `tests/pe/*` after per-TC PE reconciliation
+- `tests/s1/smb/*` -> target `tests/shared/*`
+- auth scripts/helpers -> target `scripts/auth/` / explicit auth boundary
+- CI runners/finalizers -> target `scripts/ci/`
+- governance CLIs -> target `scripts/governance/`
+- reporting CLIs -> target `scripts/reporting/`
+- market-specific Page Objects -> target `pages/{mx,pe,backoffice}` after import migration
 
-These moves are intentionally deferred until references can be changed as one atomic migration and validated. Moving them file-by-file without runtime validation would add risk without business value.
+### LEGACY / HISTORICAL — preserve until zero usage is proven
 
-### LEGACY / HISTORICAL — preserve until usage is proven zero
+- `tests/s2/pe/dst/**` — established PE/ST2 generation; package scripts still execute it;
+- `tests/s2/pe/qst/**` — older PE QST generation; must be reconciled against `tests/s1/pe/qst/**` before removal;
+- `test-mapping/smb-qst.json` — historical Zephyr campaign, not current P1 denominator;
+- `test-mapping/mx-s1-qst-runtime.json` — historical/runtime reconciliation ledger;
+- PreQA2 data/CLIs still referenced by governance/reporting tests;
+- generic PE fixture bundle through `utils/testData.js`;
+- legacy reconciliation utilities/scripts that still participate in governance commands.
 
-- `tests/s2/pe/dst/**`: established PE/ST2 generation; not safe to delete because package scripts still execute it
-- `tests/s2/pe/qst/**`: older PE QST generation; must be reconciled against `tests/s1/pe/qst/**` before removal
-- `test-mapping/smb-qst.json`: preserved historical Zephyr campaign, not current P1 denominator
-- `test-mapping/mx-s1-qst-runtime.json`: historical/runtime ledger used by reconciliation
-- PreQA2 discovery/campaign docs and ledgers
-- `fixtures/address.json`, `billingAddress.json`, `card.json`, `customer.json`: still used by PE DST through `utils/testData.js`
-- `utils/testData.js`: still used by PE DST guest checkout and therefore not dead
-- legacy reconciliation utilities/scripts: governance tooling, not safe to delete by name alone
+### DELETE — proven dead
 
-### DELETE — proven empty placeholders
+Already removed:
 
-Removed during this audit:
+- `pages/CookiePage.js`
+- `docs/test-plan.md`
+- obsolete discovery/handoff documents that contradicted or duplicated current contracts
+- root `reporter-tests/` after migration to `reporters/tests/`
+- root `mapping-tests/` after migration to `test-mapping/tests/`
 
-- `pages/CookiePage.js` — empty file, no implementation
-- `docs/test-plan.md` — empty file
+## Highest-risk remaining work
 
-## Important non-deletions
+### Phase 3 — market-first test-path migration
 
-### `fixtures/card.json`
+Target:
 
-Do not confuse the generic versioned PE/DST fixture with the MX runtime test card.
+```text
+tests/<market>/<qst|dst>/<store>/
+```
 
-- PE legacy/DST flows still consume `utils/testData.js`, which imports `fixtures/card.json`.
-- MX active P1 uses runtime-only `playwright/.auth/mx-test-card.json` via `utils/mxTestCard.js`.
+This is the change that will make the VS Code test tree immediately intuitive, but it touches:
 
-The files serve different generations of automation today. Removing the versioned fixture before PE consolidation would break existing coverage.
+- Playwright project matching;
+- MX/PE runners;
+- Jenkins paths;
+- package scripts;
+- relative imports;
+- reporting source paths;
+- docs and local commands.
 
-### `tests/s2/pe`
+Because MX P1 is now stabilized, this move must be atomic and then runtime-validated. Do not duplicate S1 and S2 specs in the new tree; environment remains runtime configuration.
 
-This directory looks old beside `tests/s1/pe`, but it still contains the established DST suite and scripts in `package.json` target it directly. It is a migration candidate, not a deletion candidate.
+### Phase 4 — PE reconciliation / legacy deletion
 
-## Canonical logical architecture
+Compare `tests/s1/pe/qst` vs `tests/s2/pe/qst` per TC and choose one canonical implementation. Only after runner/package consumers point at the canonical generation can superseded PE QST files be removed.
 
-The physical repository should converge to this model:
+### Phase 5 — scripts / Page Object decomposition
+
+After test paths stop moving:
+
+- group scripts under `auth`, `ci`, `reporting`, `governance`;
+- move BackOffice-specific Page Objects together;
+- separate truly MX-specific Page Objects from shared storefront components;
+- split large Cart/Checkout objects only where stable business responsibilities justify it.
+
+This ordering avoids changing the same imports twice.
+
+## Canonical target architecture
 
 ```text
 samsung-order-automation/
 ├── tests/
 │   ├── mx/
-│   │   ├── qst/
-│   │   │   ├── base-store/
-│   │   │   ├── epp/
-│   │   │   └── backoffice/
-│   │   └── dst/
-│   │       ├── base-store/
-│   │       ├── epp/
-│   │       └── backoffice/
+│   │   ├── qst/{base-store,epp,backoffice}/
+│   │   └── dst/{base-store,epp,backoffice}/
 │   ├── pe/
-│   │   ├── qst/
-│   │   └── dst/
+│   │   ├── qst/{base-store,epp,backoffice}/
+│   │   └── dst/{base-store,epp,backoffice}/
 │   ├── cl/
 │   ├── co/
 │   └── shared/
-├── pages/
-│   ├── shared/
-│   ├── mx/
-│   ├── pe/
-│   └── backoffice/
-├── flows/
-│   ├── shared/
-│   ├── mx/
-│   └── pe/
+├── pages/{shared,mx,pe,backoffice}/
+├── flows/{shared,mx,pe}/
 ├── config/
-│   ├── markets/
-│   └── environments/
-├── reporting/
-│   ├── executive/
-│   ├── allure/
-│   ├── evidence/
-│   └── tests/
-├── governance/
-│   ├── scope/
-│   ├── mapping/
-│   ├── reconciliation/
-│   └── tests/
-├── scripts/
-│   ├── auth/
-│   ├── ci/
-│   ├── reporting/
-│   └── governance/
+├── reporters/{evidence,executive,executive-v3,preqa2,tests}/
+├── test-mapping/{tests,...governance data}
+├── scripts/{auth,ci,reporting,governance}/
 ├── docs/
 ├── Jenkinsfile
 ├── playwright.config.js
 └── package.json
 ```
 
+The final naming of `reporters` and `test-mapping` is less important than having one obvious owner for each concern. The remaining architectural priority is the test tree because that is what engineers navigate most often.
+
 ## Migration rules
 
-1. S1/S2 are runtime configuration, not a permanent physical taxonomy.
-2. Market comes before suite: `tests/<market>/<qst|dst>/<store>`.
-3. Shared code must be truly cross-market; market behavior must not be hidden in a generic helper solely to reduce file count.
-4. No destructive test is parallelized or retried blindly during refactor.
-5. No file is deleted based on name/age alone; imports, npm scripts, Jenkins and governance consumers must be checked first.
+1. S1/S2 are runtime configuration, not permanent physical taxonomy.
+2. Market precedes suite: `tests/<market>/<qst|dst>/<store>`.
+3. Shared code must actually be cross-market.
+4. No destructive test is parallelized or blindly retried during refactor.
+5. Nothing is deleted based only on age/name.
 6. Runtime result, implementation coverage, official scope and historical evidence remain separate.
-7. Each migration should be one concern per commit and be reversible.
-8. The MX 29-TC official runner is the regression gate for MX-affecting changes.
-
-## Refactor sequence
-
-### Phase 0 — inventory and zero-risk cleanup
-
-- remove empty placeholders;
-- document active vs historical responsibilities;
-- correct stale scope documentation;
-- add folder-level READMEs so the current hybrid layout is understandable while migration is in progress;
-- hide generated/runtime-only clutter in VS Code.
-
-### Phase 1 — documentation and ownership boundaries
-
-- make root README the project entry point only;
-- make `docs/README.md` the documentation index;
-- mark discovery/historical docs explicitly;
-- document which folders are runtime, governance, reporting or compatibility.
-
-### Phase 2 — reporting/governance consolidation
-
-Move reporting and governance code only after package scripts/imports are updated atomically. These changes do not alter business test behavior, but they affect CI/report generation and therefore require reporting tests before merge.
-
-### Phase 3 — test path migration
-
-Migrate environment-first paths to market-first paths. This is the highest-risk structural step because it affects imports, runner discovery, Playwright project matching, Jenkins paths, package scripts and report source paths.
-
-Do not perform this as a cosmetic rename without a runtime gate.
-
-### Phase 4 — PE reconciliation and legacy deletion
-
-Compare `tests/s1/pe/qst` with `tests/s2/pe/qst`, choose the canonical implementation per TC, then remove superseded PE files only after package/Jenkins consumers point to the canonical tree.
-
-### Phase 5 — page/helper decomposition
-
-Large shared Page Objects such as Cart/Checkout should be split only by stable business responsibility, not by arbitrary file size. This comes after path cleanup so import churn happens once.
+7. One concern per commit; changes stay reversible.
+8. `npm run repo:architecture:validate` runs after structural edits.
+9. MX-affecting migrations are accepted only when the official 29-TC runner preserves the established behavior.
 
 ## Definition of done
 
 The architecture refactor is complete when:
 
-- a new engineer can infer market, suite and store from a test path;
-- S1/S2 selection is configuration rather than duplicated folder structure;
-- reporting and governance each have one obvious home;
-- no empty/dead placeholder remains;
-- historical artifacts are clearly marked and do not look like current runtime contracts;
-- root README and docs index do not disagree on scope;
-- MX S2 official P1 still produces the established baseline or better, with `SAM-25010` remaining a product defect until Samsung fixes it.
+- market/suite/store are obvious from every executable test path;
+- S1/S2 selection is runtime configuration instead of duplicated top-level taxonomy;
+- reporting and governance each have one ownership boundary;
+- scripts/Page Objects have clear responsibility folders;
+- PE has one canonical QST generation;
+- dead placeholders/duplicated discovery material are gone;
+- root README and docs index agree on scope and architecture;
+- MX S2 official P1 still produces the established baseline or better, with `SAM-25010` remaining a real product defect until Samsung fixes it.
