@@ -1,10 +1,10 @@
-# MX Automation — Active Compatibility Path
+# MX Automation
 
-This is the **active MX automation tree** today.
+Canonical MX executable tree.
 
-- `qst/base-store/` contains the stabilized active MX Base Store P1 implementation.
-- `dst/` contains MX DST coverage plus auth/flow helpers still imported by current QST code.
+- `qst/base-store/` — stabilized active MX Base Store P1 implementation.
+- `dst/` — MX DST coverage plus current auth/flow helpers reused by QST.
 
-The `s1` segment is historical physical organization. The runner can target S1 or S2 through runtime configuration; do not interpret this directory as S1-only behavior and do not create a duplicate `tests/s2/mx` tree.
+S1/S2 are selected at runtime through `MX_QST_ENVIRONMENT`; there is no environment-owned duplicate tree.
 
-Target migration: `tests/mx/{qst,dst}/...` once runner/import/report paths can be changed atomically and runtime-validated.
+Current regression baseline: 29 selected/executed, 28 PASS, `SAM-25010` functional Track Order failure, 0 blocked/not-run.
