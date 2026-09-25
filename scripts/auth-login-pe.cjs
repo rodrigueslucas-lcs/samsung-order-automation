@@ -7,6 +7,7 @@ const { getPeQstConfig } = require("../config/markets/pe");
 
 const CONFIG = getPeQstConfig();
 const HOSTNAME = CONFIG.baseUrl.hostname;
+const API_HOSTNAME = "pe-smb-api-cdn.ecom-stg.samsung.com";
 const ENV_NAME = CONFIG.environment;
 const ENV_SUFFIX = ENV_NAME.toLowerCase();
 const ACCOUNT_HOSTNAME = "account.samsung.com";
