@@ -41,7 +41,14 @@ function getPeQstConfig(environment = process.env) {
     requireHttpsUrl(environment.PE_STOREFRONT_URL || defaultBase, "PE_STOREFRONT_URL", envName),
     "PE_STOREFRONT_URL"
   );
-  const setupUrl = optionalHttpsUrl(environment.PE_SETUP_URL, "PE_SETUP_URL", envName);
+  const defaultSetupUrl = envName === "S2"
+    ? new URL("/getcookie.html", baseUrl.origin).href
+    : null;
+  const setupUrl = optionalHttpsUrl(
+    environment.PE_SETUP_URL || defaultSetupUrl,
+    "PE_SETUP_URL",
+    envName
+  );
   if (setupUrl && setupUrl.hostname !== baseUrl.hostname) {
     throw new Error("PE_SETUP_URL must use the same host as PE_STOREFRONT_URL.");
   }
