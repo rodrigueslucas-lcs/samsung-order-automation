@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const registry = require("../test-mapping/smb-qst.json");
+const registry = require("../governance/smb-qst.json");
 
 const SUPPORTED_MARKETS = Object.freeze(["MX", "PE", "CL", "CO"]);
 const DEFAULT_TEST_ROOT = path.resolve("tests/markets");
@@ -51,7 +51,7 @@ function collectTitlesFromFiles(files) {
 function collectMarketImplementation(market, { root = DEFAULT_TEST_ROOT } = {}) {
   const code = String(market).toUpperCase();
   if (!SUPPORTED_MARKETS.includes(code)) {
-    throw new Error(`Unsupported QST implementation market: ${market}`);
+    throw new Error(`Unsupported QST implementation market: ${market}.`);
   }
 
   const cases = [];
