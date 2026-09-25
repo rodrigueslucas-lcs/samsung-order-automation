@@ -5,17 +5,13 @@ const crypto = require("node:crypto");
 const root = path.resolve(__dirname, "..");
 const strict = process.argv.includes("--strict");
 
-// Temporary compatibility -> canonical pairs. Canonical ownership has already
-// moved to the right-hand trees. The old trees are frozen rollback material
-// until the runtime acceptance gate allows physical deletion; they are no
-// longer expected to evolve byte-for-byte with canonical implementation.
+// Remaining temporary compatibility -> canonical pairs. MX runtime acceptance
+// and canonical reporting/governance integrity are proven, so those accepted
+// compatibility roots are no longer mirrored here.
 const mirrors = [
-  ["tests/s1/mx", "tests/markets/mx"],
   ["tests/s1/pe", "tests/markets/pe"],
   ["tests/s1/smb", "tests/markets/shared"],
   ["tests/s2/pe", "tests/legacy/pe-s2"],
-  ["reporters", "reporting"],
-  ["test-mapping", "governance"],
 ];
 
 function filesUnder(relativeRoot) {

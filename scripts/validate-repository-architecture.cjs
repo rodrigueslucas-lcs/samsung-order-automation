@@ -39,13 +39,14 @@ const forbidden = [
   "fixtures/address.json",
   "fixtures/billingAddress.json",
   "fixtures/customer.json",
+  "tests/s1/mx",
+  "reporters",
+  "test-mapping",
 ];
 
 const compatibilityRoots = [
   "tests/s1",
   "tests/s2",
-  "reporters",
-  "test-mapping",
 ];
 
 const missing = required.filter((entry) => !exists(entry));
@@ -111,5 +112,5 @@ console.log("[repo-architecture] Historical PE S2 generation is explicit under t
 console.log("[repo-architecture] Reporting ownership is canonical under reporting/.");
 console.log("[repo-architecture] Governance ownership is canonical under governance/.");
 console.log("[repo-architecture] Active CI/runners no longer depend on s1/s2, reporters or test-mapping compatibility boundaries.");
-console.log("[repo-architecture] VS Code hides temporary compatibility roots from normal engineer navigation/search.");
-console.log("[repo-architecture] Hidden compatibility trees remain temporarily only for runtime acceptance and safe deletion.");
+console.log("[repo-architecture] Accepted MX/reporting/governance compatibility roots are physically removed.");
+console.log("[repo-architecture] VS Code hides only the remaining PE/shared compatibility roots from normal engineer navigation/search.");

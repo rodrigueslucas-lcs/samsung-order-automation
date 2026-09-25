@@ -10,16 +10,10 @@ const mxOfficialP1 = process.env.TEST_MARKET === 'MX' && process.env.TEST_SUITE 
 const { MX_BASE_P1_IDS } = mxQstScope;
 const mxActiveP1Pattern = new RegExp(`(?:${MX_BASE_P1_IDS.join('|')})\\b`);
 
-// Authenticated/registered scenarios are intentionally declared as the first
-// MX P1 project. During the controlled path migration both canonical and
-// compatibility locations are accepted so the stable runner cannot silently
-// lose the registered subset before cutover is runtime-proven.
+// Authenticated/registered scenarios run first for the official MX P1 campaign.
+// Runtime acceptance proved the canonical market-first paths, so no legacy MX
+// compatibility matching remains.
 const mxAuthenticatedPriorityFiles = [
-  '**/s1/mx/qst/base-store/authenticated-safe.spec.js',
-  '**/s1/mx/qst/base-store/cart-isolation-safe.spec.js',
-  '**/s1/mx/qst/base-store/profile-address-destructive.spec.js',
-  '**/s1/mx/qst/base-store/registered-address-safe.spec.js',
-  '**/s1/mx/qst/base-store/registered-order.spec.js',
   '**/markets/mx/qst/base-store/authenticated-safe.spec.js',
   '**/markets/mx/qst/base-store/cart-isolation-safe.spec.js',
   '**/markets/mx/qst/base-store/profile-address-destructive.spec.js',

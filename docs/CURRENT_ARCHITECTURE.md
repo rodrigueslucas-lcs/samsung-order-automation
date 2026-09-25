@@ -31,7 +31,7 @@ notRun=0
 
 The only expected current FAIL is `SAM-25010`: Track Order creates the guest order, obtains/accepts OTP, then the current BaseSite cannot resolve the new order.
 
-The structural cutover described below is **code-complete but still requires a post-refactor Jenkins acceptance run** before compatibility trees are physically deleted.
+Jenkins Build #52 runtime-validated the canonical MX cutover: 29 selected/executed, 28 PASS, and only the known `SAM-25010` product/environment failure. The accepted MX compatibility tree and the reporting/governance mirrors have therefore been physically removed.
 
 ## 3. Canonical engineer-facing repository
 
@@ -70,16 +70,15 @@ The navigation rule is **market -> suite -> store**. Environment is selected at 
 
 ## 4. Temporary compatibility layer
 
-Hidden compatibility roots remain only as rollback/runtime-acceptance safety nets:
+The remaining hidden compatibility roots are limited to PE/shared migration safety nets:
 
 ```text
-tests/s1/mx      <-> tests/markets/mx
 tests/s1/pe      <-> tests/markets/pe
 tests/s1/smb     <-> tests/markets/shared
 tests/s2/pe      <-> tests/legacy/pe-s2
-reporters/        <-> reporting/
-test-mapping/     <-> governance/
 ```
+
+The accepted `tests/s1/mx`, `reporters/` and `test-mapping/` compatibility roots have been physically removed.
 
 VS Code hides compatibility roots by default. The architecture gate checks mirrored pairs byte-for-byte:
 
@@ -105,9 +104,7 @@ Canonical paths are now used by the active execution surface:
 
 The architecture validator now rejects regressions where active CI/runners point back to `tests/s1`, `tests/s2`, `reporters/` or `test-mapping/`.
 
-Playwright auth-priority matching temporarily accepts both compatibility and canonical MX paths until the first official post-cutover campaign is proven. This protects the registered subset against accidental discovery loss during the migration window.
-
-After the acceptance run reproduces the 29-executed baseline with no new automation failures, the compatibility-only roots can be deleted and the dual Playwright match removed.
+Playwright auth-priority matching now targets only canonical `tests/markets/mx` paths. Jenkins Build #52 proved that the registered subset remains correctly discovered and executed after the cutover.
 
 ## 6. Reporting and governance ownership
 
@@ -118,7 +115,7 @@ reporting/
 governance/
 ```
 
-The hidden `reporters/` and `test-mapping/` trees are compatibility mirrors only. Root `reporter-tests/` and `mapping-tests/` were already removed; integrity tests live inside canonical ownership (`reporting/tests`, `governance/tests`).
+The old `reporters/`, `test-mapping/`, `reporter-tests/` and `mapping-tests/` compatibility roots are removed. Integrity tests live only inside canonical ownership (`reporting/tests`, `governance/tests`).
 
 Active package/reporting commands and the MX/PE runners are being resolved through the canonical ownership boundary. Runtime result, automation coverage, official scope and historical evidence remain separate dimensions.
 

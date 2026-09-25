@@ -45,7 +45,7 @@ The cleanup is being performed by ownership and consumer evidence, never by file
 - `docs/README.md` is the documentation index;
 - current architecture, Jenkins, scope and coverage docs were reconciled with the active runner.
 
-### Phase 2A — reporting canonicalization ✅ / compatibility retained
+### Phase 2A — reporting canonicalization ✅ / compatibility removed
 
 Canonical ownership is now:
 
@@ -58,9 +58,9 @@ reporting/
   tests/
 ```
 
-Root `reporter-tests/` was removed. `reporters/` remains temporarily as a byte-identical compatibility mirror only; package commands, Playwright reporting and active runners are being cut over to `reporting/`.
+Root `reporter-tests/` and the temporary `reporters/` mirror are removed. Package commands, Playwright reporting and active runners resolve only through `reporting/`.
 
-### Phase 2B — governance canonicalization ✅ / compatibility retained
+### Phase 2B — governance canonicalization ✅ / compatibility removed
 
 Canonical ownership is now:
 
@@ -70,7 +70,7 @@ governance/
   tests/
 ```
 
-Root `mapping-tests/` was removed. `test-mapping/` remains temporarily as a byte-identical compatibility mirror only; package commands and active runners are being cut over to `governance/`.
+Root `mapping-tests/` and the temporary `test-mapping/` mirror are removed. Package commands and active runners resolve only through `governance/`.
 
 ### Phase 2C — fixture cleanup ✅ / compatibility retained
 
@@ -99,13 +99,12 @@ tests/
 Compatibility mapping during runtime acceptance:
 
 ```text
-tests/s1/mx   <-> tests/markets/mx
 tests/s1/pe   <-> tests/markets/pe
 tests/s1/smb  <-> tests/markets/shared
 tests/s2/pe   <-> tests/legacy/pe-s2
 ```
 
-VS Code hides `tests/s1` and `tests/s2`, plus the compatibility reporting/governance roots. Engineers therefore see the intended architecture immediately.
+VS Code hides the remaining `tests/s1` and `tests/s2` PE/shared compatibility roots. Reporting and governance no longer require hidden compatibility roots.
 
 Canonical mirrors are protected by:
 
@@ -115,7 +114,7 @@ npm run repo:architecture:validate
 
 The guard performs repository-boundary validation and byte-for-byte mirror comparison while compatibility sources remain.
 
-### Phase 3B — official MX runtime path cutover ✅ CODE / ⏳ RUNTIME ACCEPTANCE
+### Phase 3B — official MX runtime path cutover ✅ RUNTIME ACCEPTED
 
 The active MX execution surface has been moved to canonical boundaries in code:
 
@@ -126,9 +125,9 @@ The active MX execution surface has been moved to canonical boundaries in code:
 - MX runner Executive generation resolves `reporting/` + `governance/`;
 - active architecture validation rejects regressions back to `tests/s1`, `tests/s2`, `reporters/` or `test-mapping/` in production entry points.
 
-Playwright auth-priority matching intentionally accepts both canonical and compatibility MX paths during this one acceptance window. That defensive overlap is removed only after the post-cutover official campaign proves test discovery did not lose the registered subset.
+Jenkins Build #52 proved the post-cutover contract: 29 selected, 29 executed, 28 PASS, 1 known FAIL (`SAM-25010`), 0 blocked and 0 not-run. The PreQA2 CDP preflight passed and all three previously session-blocked PreQA2 TCs passed.
 
-**Deletion gate:** run the official MX S2 29-TC campaign after pulling the refactor. It must reproduce 29 executed and introduce no new automation failure. Only then delete `tests/s1/mx` and remove compatibility matching.
+The accepted `tests/s1/mx` compatibility tree and dual Playwright matching are removed.
 
 ## Current classification
 
@@ -150,12 +149,9 @@ Playwright auth-priority matching intentionally accepts both canonical and compa
 
 ### TEMPORARY COMPATIBILITY — hidden; no new ownership allowed
 
-- `tests/s1/mx/**`
 - `tests/s1/pe/**`
 - `tests/s1/smb/**`
 - `tests/s2/pe/**`
-- `reporters/**`
-- `test-mapping/**`
 
 These exist only as rollback/mirror sources while runtime cutovers are accepted. Architecture validation prevents silent drift.
 
@@ -177,19 +173,9 @@ These exist only as rollback/mirror sources while runtime cutovers are accepted.
 
 ## Remaining controlled work
 
-### Acceptance checkpoint — mandatory before destructive compatibility deletion
+### Acceptance checkpoint — completed for MX
 
-Run the post-refactor MX S2 official P1. Expected architecture acceptance is:
-
-```text
-29 selected
-29 executed
-0 architecture-induced BLOCKED/NOT_RUN
-no new automation failures
-SAM-25010 may remain FAIL only if the known product defect reproduces
-```
-
-Until this checkpoint is proven, compatibility copies remain hidden rather than deleted. This is deliberate protection of the stabilized suite, not unfinished ownership design.
+Jenkins Build #52 completed the MX acceptance checkpoint with 29 selected/executed, 28 PASS, only the known `SAM-25010` FAIL, and zero blocked/not-run. MX compatibility deletion is therefore complete. Remaining compatibility work is PE/shared-specific and stays gated by its own consumer/runtime evidence.
 
 ### Phase 4 — PE reconciliation
 

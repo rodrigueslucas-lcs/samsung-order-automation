@@ -14,7 +14,7 @@ blocked=0
 notRun=0
 ```
 
-The baseline proves the behavior we must preserve. It does **not** runtime-validate the current refactor HEAD.
+The baseline defines the behavior to preserve. Jenkins Build #52 runtime-validated the canonical MX cutover on commit `359bedb`: 29 selected, 29 executed, 28 PASS, 1 known FAIL (`SAM-25010`), 0 blocked and 0 not-run.
 
 ## Rollback point
 
@@ -85,13 +85,12 @@ no new automation failures
 
 ## Physical deletion policy
 
-Physical deletion is deliberately a second gate, not part of the structural cutover itself.
+Physical deletion remains evidence-driven.
 
-1. `tests/s1/mx` is deletable only after the canonical-path MX S2 29-TC Jenkins acceptance passes and temporary Playwright compatibility matching is no longer needed.
-2. `tests/s1/pe`, `tests/s1/smb` and `tests/s2/pe` require their relevant consumer/runtime acceptance; do not delete PE legacy DST merely because its folder is old.
-3. `reporters/` is deletable only when `npm run repo:legacy:audit:strict` has no reporting compatibility consumers and reporting integrity tests pass from `reporting/`.
-4. `test-mapping/` is deletable only when the same strict audit has no governance compatibility consumers and governance/reporting tests read only from `governance/`.
-5. After physical deletion, remove obsolete mirror-validator pairs and VS Code hide rules that mention roots which no longer exist.
+1. `tests/s1/mx` was deleted after Jenkins Build #52 proved the canonical MX S2 29-TC runtime contract; temporary dual Playwright matching was removed with it.
+2. `reporters/` and `test-mapping/` were deleted after active consumers had already moved to `reporting/` and `governance/`, the strict consumer audit had no actionable compatibility consumers, and Build #52 successfully generated/published the canonical reports.
+3. `tests/s1/pe`, `tests/s1/smb` and `tests/s2/pe` remain protected until their relevant PE/shared consumer/runtime acceptance is complete; do not delete PE legacy DST merely because its folder is old.
+4. Mirror validation and VS Code exclusions now cover only compatibility roots that still physically exist.
 
 ## Non-negotiable behavior
 
