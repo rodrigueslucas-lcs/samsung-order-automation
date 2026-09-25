@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
-const { sanitize } = require("../reporters/evidence/sanitizer");
+const { sanitize } = require("../reporting/evidence/sanitizer");
 
 const TERMINAL_FAILURES = new Set(["failed", "timedOut", "interrupted"]);
 const BLOCKED_PATTERN = /SystemParking|maintenance|auth(?:enticated)? state|credentials? (?:are|is) required|EPERM|environment prerequisite/i;
