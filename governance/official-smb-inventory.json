@@ -10,7 +10,7 @@
   "sourceFormat": "Samsung Confluence Markdown export",
   "historicalInventories": [
     {
-      "path": "test-mapping/smb-qst.json",
+      "path": "governance/smb-qst.json",
       "kind": "LEGACY_EXECUTION_CAMPAIGN",
       "total": 144,
       "note": "Preserved for ID and runtime-evidence traceability. It is not the current P1/P2 source of truth."
