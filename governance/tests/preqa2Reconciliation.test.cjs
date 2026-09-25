@@ -38,10 +38,10 @@ test("reconciliation separates implemented pending TCs from automation gaps", ()
 test("reconciliation identifies official PASS without persisted automation", () => {
   const sourceLedger = emptyLedger();
   sourceLedger.markets.MX.status = "ACTIVE";
-  sourceLedger.markets.MX.results["SAM-24964"] = pass("/mx/smartphones/all-smartphones/");
+  sourceLedger.markets.MX.results["SAM-25020"] = pass("/mx/epp/");
   const mx = reconcileMarket("MX", { sourceLedger });
   assert.equal(mx.executedCount, 1);
-  assert.ok(mx.passAutomationGap.some((entry) => entry.id === "SAM-24964"));
+  assert.ok(mx.passAutomationGap.some((entry) => entry.id === "SAM-25020"));
 });
 
 test("all-market reconciliation preserves official totals and implementation inventory", () => {
