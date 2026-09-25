@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const ledger = require("../../test-mapping/preqa2-validation.json");
+const ledger = require("../../governance/preqa2-validation.json");
 const {
   buildPreqa2Model,
   generatePreqa2Html,
