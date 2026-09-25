@@ -19,7 +19,7 @@ function walkSpecFiles(root) {
 
 function testTitles(source) {
   const titles = [];
-  const expression = /\btest\s*\(\s*(["'`])([\s\S]*?)\1\s*,/g;
+  const expression = /\btest(?:\.skip)?\s*\(\s*(["'`])([\s\S]*?)\1\s*,/g;
   let match;
   while ((match = expression.exec(source))) titles.push(match[2]);
   return titles;
