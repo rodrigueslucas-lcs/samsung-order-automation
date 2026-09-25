@@ -11,18 +11,18 @@ const {
   getPeAuthState,
   hasPeAuthState,
 } = peAuthStateModule;
-const { getPeS1QstConfig } = peConfigModule;
+const { getPeQstConfig } = peConfigModule;
 const { recordBusinessEvidence } = evidenceContext;
 const { getPeQstEvidenceMetadata } = peEvidenceMetadata;
 
-test.describe("PE S1 QST - registered checkout safe reuse", () => {
+test.describe("PE QST - registered checkout safe reuse", () => {
   test.use({ storageState: hasPeAuthState() ? PE_AUTH_STATE_PATH : undefined });
 
   test.beforeEach(async ({ context }) => {
     test.skip(!process.env.PE_STOREFRONT_URL, "PE_STOREFRONT_URL is required.");
     test.skip(
       !hasPeAuthState(),
-      "Authenticated PE S1 state is required in the dedicated ignored PE auth artifacts."
+      "Authenticated PE state is required in the dedicated ignored PE auth artifacts."
     );
     const auth = getPeAuthState();
     await auth.applyAuthSessionStorage(context);
@@ -36,7 +36,7 @@ test.describe("PE S1 QST - registered checkout safe reuse", () => {
     await auth.validateAuthenticatedSession(page);
     await page.keyboard.press("Escape");
 
-    const config = getPeS1QstConfig();
+    const config = getPeQstConfig();
     const { checkout } = await reachPeRegisteredDelivery(page, config);
     const savedAddressMode = page.getByRole("radio", {
       name: "Dirección guardada",
@@ -44,7 +44,7 @@ test.describe("PE S1 QST - registered checkout safe reuse", () => {
     });
     test.skip(
       !(await savedAddressMode.isVisible().catch(() => false)),
-      "No saved address is available in the authenticated PE S1 account; do not create persistent data in this safe TC."
+      "No saved address is available in the authenticated PE account; do not create persistent data in this safe TC."
     );
 
     await checkout.selectSavedAddressAndValidate();
@@ -62,7 +62,7 @@ test.describe("PE S1 QST - registered checkout safe reuse", () => {
     await auth.validateAuthenticatedSession(page);
     await page.keyboard.press("Escape");
 
-    const config = getPeS1QstConfig();
+    const config = getPeQstConfig();
     await reachPeRegisteredDelivery(page, config);
 
     const newAddress = page.getByRole("radio", {
@@ -92,7 +92,7 @@ test.describe("PE S1 QST - registered checkout safe reuse", () => {
     await auth.validateAuthenticatedSession(page);
     await page.keyboard.press("Escape");
 
-    const config = getPeS1QstConfig();
+    const config = getPeQstConfig();
     const { checkout } = await reachPeRegisteredDelivery(page, config);
     const newAddress = page.getByRole("radio", {
       name: "Nueva dirección",
