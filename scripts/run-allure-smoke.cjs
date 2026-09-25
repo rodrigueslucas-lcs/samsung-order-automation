@@ -15,7 +15,7 @@ fs.rmSync(baseDir, { recursive: true, force: true });
 fs.mkdirSync(baseDir, { recursive: true });
 
 console.log("[allure-smoke] Isolated fixture only; no Samsung URL, auth, order or payment.");
-execFileSync(process.execPath, [playwrightCli, "test", "--config=reporter-tests/playwright.allure-smoke.config.cjs"], {
+execFileSync(process.execPath, [playwrightCli, "test", "--config=reporters/tests/playwright.allure-smoke.config.cjs"], {
   cwd: root,
   env: { ...process.env, ALLURE_RESULTS_DIR: resultsDir },
   stdio: "inherit",
