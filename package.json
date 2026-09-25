@@ -9,6 +9,7 @@
     "repo:pe:audit": "node scripts/audit-pe-generations.cjs",
     "repo:pe:audit:strict": "node scripts/audit-pe-generations.cjs --strict",
     "repo:refactor:gate": "node scripts/run-refactor-static-gate.cjs",
+    "refactor:static:gate": "npm run repo:refactor:gate",
     "auth:open-profile": "node scripts/auth-open-profile.cjs",
     "auth:export": "node scripts/auth-bootstrap.cjs",
     "auth:verify": "node scripts/auth-verify.cjs",
