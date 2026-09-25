@@ -1,5 +1,5 @@
 import { chromium } from "@playwright/test";
-import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
+import evidenceContext from "../../../../../reporting/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import { test, expect } from "./mxQst.fixture";
 import { reachMxGuestDelivery } from "../../dst/base-store/mxFlows";
@@ -41,9 +41,6 @@ test("SAM-24964 @qst @mx @base-store @safe - Store GNB matches Samsung.com", asy
     }
     await expect(page).toHaveURL(new RegExp("p6-pre-qa2\\.samsung\\.com/mx/?", "i"), { timeout: 30000 });
 
-    // Jira SAM-24964 asks to verify the GNB and prove that a user can navigate
-    // to a BC page through it. Use the real global-navigation link instead of
-    // navigating directly to the PLP, so the TC validates the requested path.
     const gnb = page.locator("nav, [role='navigation'], [class*='gnb']").filter({ visible: true }).first();
     await expect(gnb, "Samsung global navigation must be displayed on the Base Store home page.").toBeVisible({ timeout: 60000 });
 
@@ -98,8 +95,6 @@ test("SAM-24968 @qst @mx @base-store @safe - PLP facets are displayed and filter
     const initialCount = Number(initialResultText.match(/\d+/)?.[0]);
     expect(initialCount, "The unfiltered PLP must show a numeric result count.").toBeGreaterThan(0);
 
-    // Use the facet proven on the MX PreQA PLP. Jira SAM-24968 requires that a
-    // displayed facet can be selected and that the PLP reflects the selection.
     const productRange = page.getByRole("button", { name: "Gama de productos" });
     await expect(productRange, "The PLP must display its product-range facet.").toBeVisible({ timeout: 60000 });
     await productRange.click();
