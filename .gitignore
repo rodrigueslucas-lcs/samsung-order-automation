@@ -1,15 +1,22 @@
-
-# Playwright
+# Dependencies
 node_modules/
+
+# Playwright generated output
 /test-results/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
 /playwright/profiles/
-.env
-.env*.local
 
-# Playwright runtime evidence
+# Allure generated output
+/allure-report/
+/allure-results/
+
+# Runtime evidence / local tooling
 /evidence/screenshots/
 .playwright-mcp/
+
+# Local environment
+.env
+.env*.local
