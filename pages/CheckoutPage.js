@@ -848,41 +848,35 @@ export default class CheckoutPage extends BasePage {
   }
 
   async fillAddress(address) {
-  await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, { timeout: 30000 });
+    await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, { timeout: 30000 });
 
-  const deliveryPanel = this.page.getByRole("tabpanel", {
-    name: "Envío",
-    exact: true,
-  });
+    const deliveryPanel = this.page.getByRole("tabpanel", {
+      name: "Envío",
+      exact: true,
+    });
+    const addressScope = (await deliveryPanel.isVisible().catch(() => false))
+      ? deliveryPanel
+      : this.page.locator("app-delivery-address-v2:visible, app-shipping-address:visible, main").first();
 
-  const departamentoSelect = deliveryPanel.getByRole("combobox", {
-    name: /departamento/i,
-  });
+    const departamentoSelect = addressScope.getByRole("combobox", {
+      name: /departamento/i,
+    }).filter({ visible: true }).first();
 
-  await departamentoSelect.waitFor({
-    state: "visible",
-    timeout: 60000,
-  });
+    await departamentoSelect.waitFor({ state: "visible", timeout: 60000 });
+    await this.screenshot("05-delivery-section-loaded");
 
-  await this.screenshot("05-delivery-section-loaded");
+    await this.selectMaterialOption(departamentoSelect, address.department);
+    await this.selectMaterialOption(
+      addressScope.getByRole("combobox", { name: /provincia/i }).filter({ visible: true }).first(),
+      address.province
+    );
+    await this.selectMaterialOption(
+      addressScope.getByRole("combobox", { name: /distrito/i }).filter({ visible: true }).first(),
+      address.district
+    );
 
-  await departamentoSelect.click();
-    await this.page
-      .getByRole("option", { name: address.department, exact: true })
-      .click();
-
-    await deliveryPanel.getByRole("combobox", { name: /provincia/i }).click();
-    await this.page
-      .getByRole("option", { name: address.province, exact: true })
-      .click();
-
-    await deliveryPanel.getByRole("combobox", { name: /distrito/i }).click();
-    await this.page
-      .getByRole("option", { name: address.district, exact: true })
-      .click();
-
-    await deliveryPanel.getByRole("textbox", { name: "line1" }).fill(address.street);
-    await deliveryPanel.getByRole("textbox", { name: "line2" }).fill(address.number);
+    await addressScope.getByRole("textbox", { name: "line1" }).filter({ visible: true }).first().fill(address.street);
+    await addressScope.getByRole("textbox", { name: "line2" }).filter({ visible: true }).first().fill(address.number);
 
     await this.screenshot("06-delivery-address");
   }
