@@ -4,11 +4,16 @@ const crypto = require("node:crypto");
 
 const root = path.resolve(__dirname, "..");
 
+// Temporary compatibility -> canonical pairs. These mirrors exist only while
+// callers are migrated incrementally. They must stay byte-identical until the
+// compatibility side can be deleted after runtime validation.
 const mirrors = [
   ["tests/s1/mx", "tests/markets/mx"],
   ["tests/s1/pe", "tests/markets/pe"],
   ["tests/s1/smb", "tests/markets/shared"],
   ["tests/s2/pe", "tests/legacy/pe-s2"],
+  ["reporters", "reporting"],
+  ["test-mapping", "governance"],
 ];
 
 function filesUnder(relativeRoot) {
@@ -57,10 +62,10 @@ for (const [compatibility, canonical] of mirrors) {
 }
 
 if (failures.length) {
-  console.error("[test-mirrors] FAIL");
+  console.error("[architecture-mirrors] FAIL");
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log("[test-mirrors] PASS");
-console.log("[test-mirrors] Canonical market-first trees match their temporary compatibility sources byte-for-byte.");
+console.log("[architecture-mirrors] PASS");
+console.log("[architecture-mirrors] Canonical trees match temporary compatibility sources byte-for-byte.");
