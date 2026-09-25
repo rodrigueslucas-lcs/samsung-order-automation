@@ -6,6 +6,8 @@
     "repo:architecture:validate": "node scripts/validate-repository-architecture.cjs && node scripts/validate-test-mirrors.cjs",
     "repo:legacy:audit": "node scripts/audit-legacy-boundaries.cjs",
     "repo:legacy:audit:strict": "node scripts/audit-legacy-boundaries.cjs --strict",
+    "repo:pe:audit": "node scripts/audit-pe-generations.cjs",
+    "repo:pe:audit:strict": "node scripts/audit-pe-generations.cjs --strict",
     "auth:open-profile": "node scripts/auth-open-profile.cjs",
     "auth:export": "node scripts/auth-bootstrap.cjs",
     "auth:verify": "node scripts/auth-verify.cjs",
