@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import MyOrdersPage from "../../../../../pages/MyOrdersPage";
 import peAuthStateModule from "../../../../../utils/peAuthState";
 import peConfigModule from "../../../../../config/markets/pe";
-import evidenceContext from "../../../../../reporters/evidence/evidenceContext";
+import evidenceContext from "../../../../../reporting/evidence/evidenceContext";
 import peEvidenceMetadata from "../../../../../utils/qstPeEvidenceMetadata";
 
 const {
