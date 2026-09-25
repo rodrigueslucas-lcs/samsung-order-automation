@@ -18,7 +18,7 @@ function getPeAuthState(environment = process.env) {
     authStatePath: PE_AUTH_STATE_PATH,
     sessionStoragePath: PE_AUTH_SESSION_STORAGE_PATH,
     hostname: config.baseUrl.hostname,
-    setupUrl: null,
+    setupUrl: config.setupUrl?.href || null,
     validationUrl: config.baseUrl.href,
     label: `${config.environment} PE`,
     refreshInstruction:
