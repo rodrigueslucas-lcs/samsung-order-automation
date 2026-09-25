@@ -5,7 +5,14 @@ import CheckoutPage from "../../../../../pages/CheckoutPage";
 import PaymentPage from "../../../../../pages/PaymentPage";
 import { testData } from "../../../../../utils/testData";
 
+async function bootstrapPeStorefront(page, config) {
+  if (!config.setupUrl) return;
+  await page.goto(config.setupUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await page.getByText(/you can access pages now/i).waitFor({ state: "visible", timeout: 20000 });
+}
+
 export async function addConfiguredProductToPeCart(page, config) {
+  await bootstrapPeStorefront(page, config);
   const product = new ProductPage(page, {
     setupUrl: config.setupUrl?.href || null,
     sku: config.sku,
