@@ -12,7 +12,7 @@ import {
   reachPeGuestDelivery,
 } from "./peQstFlows";
 
-const { getPeS1QstConfig } = peConfigModule;
+const { getPeQstConfig } = peConfigModule;
 const { openStorefront } = storefrontAccess;
 const { inspectAvailableServices, validateCartItemPresentation } = cartPresentation;
 const { recordBusinessEvidence } = evidenceContext;
@@ -21,9 +21,9 @@ const { getPeQstEvidenceMetadata } = peEvidenceMetadata;
 function requirePeStorefront() {
   test.skip(
     !process.env.PE_STOREFRONT_URL,
-    "Set PE_STOREFRONT_URL to the verified PE S1 storefront root, for example an https URL ending in /pe/."
+    "Set PE_STOREFRONT_URL to the verified PE storefront root, for example an https URL ending in /pe/."
   );
-  return getPeS1QstConfig();
+  return getPeQstConfig();
 }
 
 function requirePeProductConfig() {
@@ -75,7 +75,7 @@ test("SAM-25061 @qst @pe @base-store @safe @reuse - Able to add to Cart from PDP
 
   testInfo.annotations.push({
     type: "qst-reuse-note",
-    description: "Uses the proven PE ST2 QST SKU by default and exercises the S1 PDP add-to-cart path; live S1 proof is still required before coverage promotion.",
+    description: "Uses the proven PE ST2 QST SKU by default and exercises the configured PE PDP add-to-cart path; live target-environment proof is still required before coverage promotion.",
   });
 });
 
@@ -119,7 +119,7 @@ test("SAM-25064 @qst @pe @base-store @safe @reuse - Order Summary on cart page b
 
   testInfo.annotations.push({
     type: "qst-reuse-note",
-    description: "Subtotal/Total baseline only; coupon, savings and info text still require official S1 assertions.",
+    description: "Subtotal/Total baseline only; coupon, savings and info text still require official target-environment assertions.",
   });
 });
 
