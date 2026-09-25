@@ -13,7 +13,7 @@ if (store && !validStores.has(store)) {
   throw new Error(`Unsupported QST store: ${store}`);
 }
 
-const testPath = store ? `tests/s2/pe/qst/${store}` : "tests/s2/pe/qst";
+const testPath = store ? `tests/legacy/pe/qst/${store}` : "tests/legacy/pe/qst";
 const grep = store ? "@qst" : `@qst-${type}`;
 const playwrightCli = path.join(
   path.dirname(require.resolve("@playwright/test")),
