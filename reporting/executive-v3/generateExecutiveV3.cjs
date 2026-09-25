@@ -181,7 +181,7 @@ ${detail('Coverage by Feature + Gap Queue',`Current ${mx.official}-TC active run
 }
 function main() {
   const root = path.resolve(__dirname, '../..');
-  const ledgerPath = process.argv[2] ? path.resolve(process.argv[2]) : path.join(root, 'test-mapping/preqa2-validation.json');
+  const ledgerPath = process.argv[2] ? path.resolve(process.argv[2]) : path.join(root, 'governance/preqa2-validation.json');
   const output = process.argv[3] ? path.resolve(process.argv[3]) : path.join(root, 'test-results/executive-v3/index.html');
   const historyPath = process.argv[4] ? path.resolve(process.argv[4]) : path.join(root, 'test-results/executive-v3/history.json');
   const executionPath = process.argv[5] ? path.resolve(process.argv[5]) : null;
