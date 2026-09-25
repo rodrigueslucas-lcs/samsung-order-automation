@@ -9,7 +9,8 @@ const targetEnvironment = String(process.env.MX_QST_ENVIRONMENT || "S1").toUpper
 if (!["S1", "S2"].includes(targetEnvironment)) throw new Error(`Unsupported MX QST environment: ${targetEnvironment}.`);
 const environmentLabel = targetEnvironment === "S2" ? "S2/STG2" : "S1/STG";
 const headless = process.env.MX_QST_HEADLESS === "1";
-const root = path.resolve("tests/s1/mx/qst/base-store");
+const qstPath = "tests/markets/mx/qst/base-store";
+const root = path.resolve(qstPath);
 const playwrightCli = path.resolve("node_modules/@playwright/test/cli.js");
 const fastArtifactDir = path.resolve(process.env.MX_FAST_ARTIFACT_DIR || "test-results/jenkins/mx-fast");
 const reportFile = path.join(fastArtifactDir, "mx-fast-results.json");
@@ -20,8 +21,7 @@ const executiveDir = path.join(fastArtifactDir, "executive");
 
 // Fast, non-destructive MX Base Store campaign.
 // These are official P1 cases that do not require the registered storefront
-// session and are intended for quick validation while S1 registered auth is blocked.
-// Keep this suite separate from the official 30-case denominator.
+// session and are intended for quick validation while registered auth is blocked.
 const MX_FAST_GUEST_IDS = Object.freeze([
   "SAM-24971", "SAM-24972", "SAM-24975", "SAM-24981", "SAM-24982",
   "SAM-24988", "SAM-24989", "SAM-24990", "SAM-24995", "SAM-24999",
@@ -56,7 +56,7 @@ console.log(`[mx-fast] MX ${targetEnvironment} Base Store fast guest selection: 
 console.log(`[mx-fast] IDs: ${MX_FAST_GUEST_IDS.join(", ")}`);
 
 const args = [
-  playwrightCli, "test", "tests/s1/mx/qst/base-store",
+  playwrightCli, "test", qstPath,
   "--project=chromium", "--workers=1", "--retries=0",
   "--grep", pattern,
   "--grep-invert", "@registered|@destructive",
