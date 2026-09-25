@@ -5,6 +5,7 @@ Use this page as the documentation entry point. Current runtime contracts are li
 ## Current contracts
 
 - [Repository architecture audit](REPOSITORY_AUDIT.md) — active cleanup/refactor contract and migration rules.
+- [Refactor acceptance gate](REFACTOR_ACCEPTANCE.md) — exact static/runtime checkpoint required before compatibility deletion.
 - [Current SMB architecture](CURRENT_ARCHITECTURE.md) — canonical market-first tree, compatibility layer and remaining cutover work.
 - [Official SMB priority model](OFFICIAL_SMB_PRIORITY_MODEL.md) — source model for P1/P2 and Base Store/EPP.
 - [Environment validation policy](ENVIRONMENT_VALIDATION_POLICY.md) — PreQA2/Staging/Production applicability.
@@ -95,4 +96,4 @@ Before moving/deleting legacy-looking code:
 6. validate the structural guard;
 7. runtime-validate the affected official runner before deleting compatibility sources.
 
-See [Repository architecture audit](REPOSITORY_AUDIT.md) for completed phases and remaining migration work.
+See [Repository architecture audit](REPOSITORY_AUDIT.md) for completed phases and remaining migration work, and [Refactor acceptance gate](REFACTOR_ACCEPTANCE.md) for the exact deletion checkpoint.
