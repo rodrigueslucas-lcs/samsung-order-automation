@@ -1,4 +1,4 @@
-import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
+import evidenceContext from "../../../../../reporting/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import { test, expect } from "../../dst/base-store/mx.auth.fixture";
 import { reachMxRegisteredPayment } from "../../dst/base-store/mxFlows";
