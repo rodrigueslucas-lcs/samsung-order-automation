@@ -19,7 +19,7 @@ const configEnv = {
 };
 const config = getPeQstConfig(configEnv);
 const environmentLabel = config.environmentLabel;
-const root = path.resolve("tests/s1/pe/qst/base-store");
+const root = path.resolve("tests/markets/pe/qst/base-store");
 const playwrightCli = path.resolve("node_modules/@playwright/test/cli.js");
 const artifactDir = path.resolve(process.env.PE_QST_ARTIFACT_DIR || process.env.MX_QST_ARTIFACT_DIR || "test-results/jenkins/pe-qst");
 const reportFile = path.join(artifactDir, "results.json");
@@ -57,7 +57,7 @@ if (duplicateIds.length) {
 }
 
 const args = [
-  playwrightCli, "test", "tests/s1/pe/qst/base-store",
+  playwrightCli, "test", "tests/markets/pe/qst/base-store",
   "--project=chromium", "--workers=1", "--retries=0",
   "--grep", p1Pattern,
   "--output", path.join(artifactDir, "playwright"),
