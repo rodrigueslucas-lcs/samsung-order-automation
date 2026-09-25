@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import BackOfficePage from "../../../../../pages/BackOfficePage";
 import BackOfficeSearchPage from "../../../../../pages/BackOfficeSearchPage";
-import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
+import evidenceContext from "../../../../../reporting/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import backofficeCredentials from "../../../../../utils/backofficeAdminCredentials.js";
 import mxConfigModule from "../../../../../utils/mxConfig.js";
