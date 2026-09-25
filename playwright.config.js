@@ -16,11 +16,11 @@ const mxActiveP1Pattern = new RegExp(`(?:${MX_BASE_P1_IDS.join('|')})\\b`);
 // is intentionally NOT a dependency: failures in auth-priority must be reported
 // without preventing the other official P1 scenarios from running.
 const mxAuthenticatedPriorityFiles = [
-  '**/s1/mx/qst/base-store/authenticated-safe.spec.js',
-  '**/s1/mx/qst/base-store/cart-isolation-safe.spec.js',
-  '**/s1/mx/qst/base-store/profile-address-destructive.spec.js',
-  '**/s1/mx/qst/base-store/registered-address-safe.spec.js',
-  '**/s1/mx/qst/base-store/registered-order.spec.js',
+  '**/markets/mx/qst/base-store/authenticated-safe.spec.js',
+  '**/markets/mx/qst/base-store/cart-isolation-safe.spec.js',
+  '**/markets/mx/qst/base-store/profile-address-destructive.spec.js',
+  '**/markets/mx/qst/base-store/registered-address-safe.spec.js',
+  '**/markets/mx/qst/base-store/registered-order.spec.js',
 ];
 
 const chromiumUse = { ...devices['Desktop Chrome'] };
