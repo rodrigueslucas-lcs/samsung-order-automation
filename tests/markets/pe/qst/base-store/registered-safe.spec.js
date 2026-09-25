@@ -70,7 +70,8 @@ test.describe("PE QST - registered checkout safe reuse", () => {
       exact: true,
     });
     if (await newAddress.isVisible().catch(() => false)) {
-      await newAddress.check();
+      await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
+      await expect(newAddress).toBeChecked({ timeout: 30000 });
     }
 
     const saveAddress = page.getByRole("checkbox", {
@@ -99,7 +100,8 @@ test.describe("PE QST - registered checkout safe reuse", () => {
       exact: true,
     });
     if (await newAddress.isVisible().catch(() => false)) {
-      await newAddress.check();
+      await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
+      await expect(newAddress).toBeChecked({ timeout: 30000 });
     }
 
     await checkout.fillAddress(testData.address);
