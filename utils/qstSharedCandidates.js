@@ -1,4 +1,4 @@
-const sharedCore = require("../test-mapping/smb-shared-core-families.json");
+const sharedCore = require("../governance/smb-shared-core-families.json");
 
 function getSharedCandidatesByMarket(market) {
   const code = String(market || "").trim().toUpperCase();
