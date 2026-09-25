@@ -18,7 +18,7 @@ P1 runs in QST + DST; P2 runs in DST only. Base Store and EPP remain independent
 
 ## 2. Proven MX runtime contract
 
-The active MX Base Store runner selects 29 TCs because `SAM-25006` is preserved as an audited exclusion. The stabilized S2 baseline is:
+The active MX Base Store runner selects 29 TCs because `SAM-25006` is preserved as an audited exclusion. Stabilized S2 baseline:
 
 ```text
 selected=29
@@ -45,86 +45,95 @@ tests/
   legacy/
     pe-s2/
 
-config/                 runtime/market configuration
-fixtures/               test-data compatibility
-flows/                  reusable business flows
-pages/                  Page Objects
-reporters/
+reporting/
   evidence/
   executive/
   executive-v3/
   preqa2/
   tests/
-test-mapping/
+
+governance/
   *.json
   tests/
-scripts/                 executable CLIs, still flat
-utils/                   runtime/governance helpers
+
+config/                 runtime/market configuration
+fixtures/               test-data compatibility
+flows/                  reusable business flows
+pages/                  Page Objects
+scripts/                executable CLIs, still flat
+utils/                  runtime/governance helpers
 ```
 
 The navigation rule is **market -> suite -> store**. Environment is selected at runtime.
 
 ## 4. Temporary compatibility layer
 
-`tests/s1/**` and `tests/s2/**` still exist physically because some stable runners, Jenkins commands and relative imports reference them directly. They are hidden from the default VS Code Explorer/search so engineers see the canonical structure first.
-
-Current mirror mapping:
+Hidden compatibility roots still exist because some stable runners/Jenkins commands/imports reference them directly:
 
 ```text
-tests/s1/mx   <-> tests/markets/mx
-tests/s1/pe   <-> tests/markets/pe
-tests/s1/smb  <-> tests/markets/shared
-tests/s2/pe   <-> tests/legacy/pe-s2
+tests/s1/mx      <-> tests/markets/mx
+tests/s1/pe      <-> tests/markets/pe
+tests/s1/smb     <-> tests/markets/shared
+tests/s2/pe      <-> tests/legacy/pe-s2
+reporters/        <-> reporting/
+test-mapping/     <-> governance/
 ```
 
-The repository guard checks these mirrors byte-for-byte until runtime cutover is complete:
+VS Code hides compatibility roots by default. The architecture gate checks all mirrored pairs byte-for-byte:
 
 ```bash
 npm run repo:architecture:validate
 ```
 
-This transitional duplication is deliberate: it gives a clean tree immediately while avoiding a risky big-bang change to the official P1 runtime.
+The duplication is transitional and deliberate: clean navigation now, deletion only after consumer cutover and runtime proof.
 
 ## 5. Runtime cutover status
 
-Already using canonical paths:
+Already using canonical paths in active consumers:
 
 - MX DST package commands;
 - MX fast-guest runner;
+- PE current P1 runner;
+- PE/shared direct package commands;
+- package reporting/governance integrity commands;
+- Playwright evidence reporter;
 - normal VS Code navigation.
 
-Still intentionally using compatibility paths until an atomic migration is runtime-proven:
+Still intentionally using compatibility paths where a risky big-bang edit would threaten the proven MX runner:
 
-- MX official P1 runner;
-- MX auth-priority project matching;
-- some Jenkins direct test commands;
-- PE current/legacy runners;
-- shared BackOffice/direct SMB commands.
+- MX official P1 runner path;
+- some Jenkins direct MX safe-lane paths;
+- selected scripts/utilities that still resolve `reporters/` or `test-mapping/`.
+
+Playwright auth-priority matching accepts both old and canonical MX paths during cutover so the registered subset cannot silently disappear.
 
 No compatibility tree is deleted until every consumer has moved and the official runner has reproduced the established baseline.
 
 ## 6. Reporting and governance ownership
 
-Completed consolidation:
+Canonical boundaries are now:
 
-- reporting integrity tests live in `reporters/tests/`;
-- governance integrity tests live in `test-mapping/tests/`;
-- old root `reporter-tests/` and `mapping-tests/` boundaries are forbidden by the architecture guard.
+```text
+reporting/
+governance/
+```
 
-Renaming `reporters` to `reporting` or `test-mapping` to `governance` is lower priority than runtime-safe test cutover because ownership is already unambiguous.
+The hidden `reporters/` and `test-mapping/` trees are compatibility mirrors only. Root `reporter-tests/` and `mapping-tests/` were already removed; integrity tests are inside the canonical ownership boundary (`reporting/tests`, `governance/tests`).
+
+Runtime result, automation coverage, official scope and historical evidence remain separate dimensions.
 
 ## 7. PE dual-generation problem
 
 PE still has two generations:
 
-- canonical current view `tests/markets/pe` mirrors the newer `tests/s1/pe` generation;
-- `tests/legacy/pe-s2` mirrors the older ST2 generation currently under `tests/s2/pe`.
+- `tests/markets/pe` — canonical current/newer PE QST stabilization generation;
+- `tests/legacy/pe-s2` — explicit older ST2 generation containing older QST plus established DST coverage.
 
-The older tree contains established DST coverage and an older QST implementation, so it cannot be deleted based on age alone. Reconciliation must be per TC and per runtime consumer.
+The older tree cannot be deleted based on age. Reconciliation is per TC and per runtime consumer.
 
 ## 8. Page Object / flow strategy
 
-Current `pages/` remains flat because MX and PE generations share imports. Target ownership remains:
+`pages/` remains flat because MX and PE generations share imports. Target ownership:
 
 ```text
 pages/shared
@@ -137,11 +146,11 @@ flows/mx
 flows/pe
 ```
 
-Move by responsibility/consumer boundary, not file size. This phase comes after test-path cutover so relative imports are not churned twice.
+Move by responsibility/consumer boundary, not file size. Do this after test-path cutover so imports are not churned twice.
 
 ## 9. Script strategy
 
-`scripts/` still mixes auth, CI, reporting and governance commands. Target groups:
+`scripts/` still mixes auth, execution, reporting and governance commands. Target:
 
 ```text
 scripts/auth
@@ -150,7 +159,7 @@ scripts/reporting
 scripts/governance
 ```
 
-Unlike the test-tree mirror, scripts cannot be copied blindly into one-level-deeper folders because many use `../utils` and sibling-relative imports. Script migration must therefore be an executable move with import/package/Jenkins updates, not a cosmetic duplicate.
+Scripts cannot be cosmetically mirrored into deeper folders because many use `../utils` and sibling-relative paths. Their migration must update every executable caller atomically.
 
 ## 10. Authentication and payment boundaries
 
