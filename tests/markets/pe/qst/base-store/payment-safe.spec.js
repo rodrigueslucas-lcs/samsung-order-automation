@@ -4,7 +4,7 @@ import evidenceContext from "../../../../../reporting/evidence/evidenceContext";
 import peEvidenceMetadata from "../../../../../utils/qstPeEvidenceMetadata";
 import { reachPeGuestPayment } from "./peQstFlows";
 
-const { getPeS1QstConfig } = peConfigModule;
+const { getPeQstConfig } = peConfigModule;
 const { recordBusinessEvidence } = evidenceContext;
 const { getPeQstEvidenceMetadata } = peEvidenceMetadata;
 
@@ -13,7 +13,7 @@ test("SAM-25097 @qst @pe @base-store @safe @guest - Payment using Internet Banki
   test.skip(!process.env.PE_STOREFRONT_URL, "PE_STOREFRONT_URL is required.");
   recordBusinessEvidence(testInfo, getPeQstEvidenceMetadata("SAM-25097"));
 
-  const config = getPeS1QstConfig();
+  const config = getPeQstConfig();
   const { payment } = await reachPeGuestPayment(page, config, {
     expectedPaymentMode: /^Banca por Internet\b/i,
   });
