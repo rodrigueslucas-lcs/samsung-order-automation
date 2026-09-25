@@ -1,8 +1,8 @@
-const legacy = require("../test-mapping/smb-qst.json");
-const architecture = require("../test-mapping/smb-qst-architecture.json");
-const mxCoverage = require("../test-mapping/mx-qst-coverage.json");
-const peReuse = require("../test-mapping/pe-qst-reuse-plan.json");
-const sharedFamilies = require("../test-mapping/smb-shared-core-families.json");
+const legacy = require("../governance/smb-qst.json");
+const architecture = require("../governance/smb-qst-architecture.json");
+const mxCoverage = require("../governance/mx-qst-coverage.json");
+const peReuse = require("../governance/pe-qst-reuse-plan.json");
+const sharedFamilies = require("../governance/smb-shared-core-families.json");
 const { loadOfficialInventory } = require("./officialSmbInventory");
 const { MX_P1_LEGACY_LINKS } = require("./officialRowEvidence");
 
@@ -54,7 +54,7 @@ function buildLegacyReconciliation() {
   });
   const statuses = ["CONFIDENT_MATCH", "LIKELY_MATCH", "AMBIGUOUS", "NO_CURRENT_MATCH", "DUPLICATE_VARIANT"];
   const counts = Object.fromEntries(statuses.map((status) => [status, Object.values(markets).flat().filter((row) => row.classification === status).length]));
-  return { generatedFrom: "test-mapping/smb-qst.json", sourceStatus: "READY", historicalTotal: legacy.total, counts, markets };
+  return { generatedFrom: "governance/smb-qst.json", sourceStatus: "READY", historicalTotal: legacy.total, counts, markets };
 }
 
 module.exports = { normalize, similarity, legacyDetails, matchLegacyCase, buildLegacyReconciliation };
