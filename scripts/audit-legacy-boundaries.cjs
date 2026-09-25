@@ -67,8 +67,12 @@ for (const { absolute, relative } of walk(root)) {
   });
 }
 
+// Markdown is architectural/history documentation, not an executable consumer.
+// Keep it visible in the report so migration debt is searchable, but do not let
+// intentionally documented old paths block deletion readiness. Strict mode is
+// reserved for code/config/data that can actually keep a compatibility root alive.
 const actionable = findings.filter(({ file }) =>
-  !file.startsWith("docs/") &&
+  path.extname(file).toLowerCase() !== ".md" &&
   !file.endsWith("audit-legacy-boundaries.cjs") &&
   !file.endsWith("validate-test-mirrors.cjs") &&
   !file.endsWith("validate-repository-architecture.cjs")
@@ -92,8 +96,8 @@ if (!findings.length) {
 
 console.log(`\n[legacy-boundary-audit] total=${findings.length} actionable=${actionable.length}`);
 if (actionable.length) {
-  console.log("[legacy-boundary-audit] Actionable runtime/code references remain; migrate before physical compatibility deletion.");
+  console.log("[legacy-boundary-audit] Actionable runtime/code/data references remain; migrate before physical compatibility deletion.");
   if (strict) process.exitCode = 1;
 } else {
-  console.log("[legacy-boundary-audit] No actionable runtime/code references remain. Documentation/migration guards may still mention compatibility paths intentionally.");
+  console.log("[legacy-boundary-audit] No actionable runtime/code/data references remain. Documentation may still mention compatibility paths intentionally.");
 }
