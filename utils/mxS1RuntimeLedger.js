@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const LEDGER_PATH = path.resolve("test-mapping/mx-s1-qst-runtime.json");
+const LEDGER_PATH = path.resolve("governance/mx-s1-qst-runtime.json");
 const STATUSES = new Set(["PASS", "FAIL", "BLOCKED"]);
 
 function loadMxS1RuntimeLedger() {
