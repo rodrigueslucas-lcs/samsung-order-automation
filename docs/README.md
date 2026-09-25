@@ -4,8 +4,8 @@ Use this page as the documentation entry point. Current runtime contracts are li
 
 ## Current contracts
 
-- [Repository architecture audit](REPOSITORY_AUDIT.md) — active cleanup/refactor contract and migration rules.
-- [Current SMB architecture](CURRENT_ARCHITECTURE.md) — current hybrid tree, target market-first architecture and runtime boundaries.
+- [Repository architecture audit](REPOSITORY_AUDIT.md) — cleanup/refactor contract, completed phases and migration rules.
+- [Current SMB architecture](CURRENT_ARCHITECTURE.md) — current market-first executable tree and runtime boundaries.
 - [Official SMB priority model](OFFICIAL_SMB_PRIORITY_MODEL.md) — source model for P1/P2 and Base Store/EPP.
 - [Environment validation policy](ENVIRONMENT_VALIDATION_POLICY.md) — PreQA2/Staging/Production applicability.
 - [Jenkins setup](JENKINS_SETUP.md) — CI orchestration, credentials and targeted P1 execution.
@@ -18,9 +18,9 @@ The historical MX Base Store source has 30 P1 rows, but `SAM-25006` is excluded 
 
 `test-mapping/smb-qst.json` is preserved historical Zephyr traceability data. Its 144 IDs happen to equal the current P1 total, but it is not the current priority source of truth.
 
-## Current runtime baseline
+## Runtime baseline vs refactor status
 
-Latest stabilized MX S2 official Base Store P1 baseline:
+Last runtime-proven MX S2 official Base Store P1 baseline:
 
 ```text
 29 selected
@@ -31,7 +31,28 @@ Latest stabilized MX S2 official Base Store P1 baseline:
 0 NOT_RUN
 ```
 
+That baseline belongs to the stabilized pre-refactor runtime. The `agent/market-first-layout` branch is **CODE COMMITTED / pending runtime validation** until its static/list gates and Jenkins campaign are executed.
+
 Runtime result, implementation coverage, official scope and historical ledger state remain separate dimensions.
+
+## Executable test ownership
+
+Canonical automation is now physically organized by market rather than environment:
+
+```text
+tests/
+  markets/
+    mx/{qst,dst}/
+    pe/{qst,dst}/
+  shared/
+    smb/qst/
+  legacy/
+    pe/qst/
+```
+
+S1/S2 are runtime configuration. New tests must not create new environment-owned `tests/s1` / `tests/s2` trees.
+
+The older PE QST generation is deliberately visible under `tests/legacy/pe/qst`; the canonical PE stabilization generation is under `tests/markets/pe/qst`. Do not delete legacy PE specs until per-TC reconciliation proves they are superseded.
 
 ## Coverage / compatibility documentation
 
@@ -44,8 +65,6 @@ These documents remain active while PE generations are reconciled:
 - [DST automation structure](DST_AUTOMATION_STRUCTURE.md)
 - [QST coverage matrix](QST_COVERAGE_MATRIX.md)
 - [EPP external dependencies](EPP_EXTERNAL_DEPENDENCIES.md)
-
-Physical paths under `tests/s2/pe` are compatibility/runtime assets today, not the target architecture. They must not be deleted merely because newer PE QST work also exists under `tests/s1/pe`.
 
 ## Removed discovery material
 
@@ -64,27 +83,20 @@ They remain recoverable in Git history. Current behavior must be derived from th
 3. **Playwright** — low-level execution and trace investigation.
 4. **Jenkins** — orchestration, gates, secrets, execution and publication.
 
-Reporting implementation and reporting tests now live together under `reporters/`.
+Reporting implementation and reporting tests live together under `reporters/`.
 
 ## Governance stack
 
-Governance data and integrity tests now live together under `test-mapping/`. The old root `mapping-tests/` folder was removed during consolidation.
+Governance data and integrity tests live together under `test-mapping/`. The old root `mapping-tests/` folder was removed during consolidation.
 
-## Repository cleanup policy
+## Structural guard
 
-Before moving or deleting a legacy-looking file:
-
-1. check imports and runtime callers;
-2. check `package.json` scripts;
-3. check Jenkins references;
-4. check reporting/governance consumers;
-5. preserve current runtime evidence;
-6. validate the affected runner after the change.
-
-Run the structural guard after architecture edits:
+Run after architecture edits:
 
 ```bash
 npm run repo:architecture:validate
 ```
 
-See [Repository architecture audit](REPOSITORY_AUDIT.md) for the active migration plan.
+The guard rejects resurrected `tests/s1` / `tests/s2` ownership and stale environment-first runtime path references.
+
+See [Repository architecture audit](REPOSITORY_AUDIT.md) for the full classification and remaining work.
