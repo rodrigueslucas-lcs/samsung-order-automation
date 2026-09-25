@@ -18,7 +18,7 @@ P1 runs in QST + DST; P2 runs in DST only. Base Store and EPP remain independent
 
 ## 2. Proven MX runtime contract
 
-The active MX Base Store runner selects 29 TCs because `SAM-25006` is preserved as an audited exclusion. Stabilized S2 baseline:
+The active MX Base Store runner selects 29 TCs because `SAM-25006` is preserved as an audited exclusion. Last proven pre-cutover S2 baseline:
 
 ```text
 selected=29
@@ -30,6 +30,8 @@ notRun=0
 ```
 
 The only expected current FAIL is `SAM-25010`: Track Order creates the guest order, obtains/accepts OTP, then the current BaseSite cannot resolve the new order.
+
+The structural cutover described below is **code-complete but still requires a post-refactor Jenkins acceptance run** before compatibility trees are physically deleted.
 
 ## 3. Canonical engineer-facing repository
 
@@ -60,15 +62,15 @@ config/                 runtime/market configuration
 fixtures/               test-data compatibility
 flows/                  reusable business flows
 pages/                  Page Objects
-scripts/                executable CLIs, still flat
+scripts/                executable CLIs, staged for responsibility split
 utils/                  runtime/governance helpers
 ```
 
-The navigation rule is **market -> suite -> store**. Environment is selected at runtime.
+The navigation rule is **market -> suite -> store**. Environment is selected at runtime and is no longer an engineer-facing test taxonomy.
 
 ## 4. Temporary compatibility layer
 
-Hidden compatibility roots still exist because some stable runners/Jenkins commands/imports reference them directly:
+Hidden compatibility roots remain only as rollback/runtime-acceptance safety nets:
 
 ```text
 tests/s1/mx      <-> tests/markets/mx
@@ -79,48 +81,46 @@ reporters/        <-> reporting/
 test-mapping/     <-> governance/
 ```
 
-VS Code hides compatibility roots by default. The architecture gate checks all mirrored pairs byte-for-byte:
+VS Code hides compatibility roots by default. The architecture gate checks mirrored pairs byte-for-byte:
 
 ```bash
 npm run repo:architecture:validate
 ```
 
-The duplication is transitional and deliberate: clean navigation now, deletion only after consumer cutover and runtime proof.
+The duplication is transitional and deliberate: active consumers have moved to canonical boundaries, but physical deletion waits for runtime acceptance.
 
 ## 5. Runtime cutover status
 
-Already using canonical paths in active consumers:
+Canonical paths are now used by the active execution surface:
 
-- MX DST package commands;
+- MX official P1 runner;
 - MX fast-guest runner;
+- MX DST package commands;
+- Jenkins direct MX authenticated-safe and BackOffice-safe lanes;
 - PE current P1 runner;
 - PE/shared direct package commands;
 - package reporting/governance integrity commands;
 - Playwright evidence reporter;
 - normal VS Code navigation.
 
-Still intentionally using compatibility paths where a risky big-bang edit would threaten the proven MX runner:
+The architecture validator now rejects regressions where active CI/runners point back to `tests/s1`, `tests/s2`, `reporters/` or `test-mapping/`.
 
-- MX official P1 runner path;
-- some Jenkins direct MX safe-lane paths;
-- selected scripts/utilities that still resolve `reporters/` or `test-mapping/`.
+Playwright auth-priority matching temporarily accepts both compatibility and canonical MX paths until the first official post-cutover campaign is proven. This protects the registered subset against accidental discovery loss during the migration window.
 
-Playwright auth-priority matching accepts both old and canonical MX paths during cutover so the registered subset cannot silently disappear.
-
-No compatibility tree is deleted until every consumer has moved and the official runner has reproduced the established baseline.
+After the acceptance run reproduces the 29-executed baseline with no new automation failures, the compatibility-only roots can be deleted and the dual Playwright match removed.
 
 ## 6. Reporting and governance ownership
 
-Canonical boundaries are now:
+Canonical boundaries are:
 
 ```text
 reporting/
 governance/
 ```
 
-The hidden `reporters/` and `test-mapping/` trees are compatibility mirrors only. Root `reporter-tests/` and `mapping-tests/` were already removed; integrity tests are inside the canonical ownership boundary (`reporting/tests`, `governance/tests`).
+The hidden `reporters/` and `test-mapping/` trees are compatibility mirrors only. Root `reporter-tests/` and `mapping-tests/` were already removed; integrity tests live inside canonical ownership (`reporting/tests`, `governance/tests`).
 
-Runtime result, automation coverage, official scope and historical evidence remain separate dimensions.
+Active package/reporting commands and the MX/PE runners are being resolved through the canonical ownership boundary. Runtime result, automation coverage, official scope and historical evidence remain separate dimensions.
 
 ## 7. PE dual-generation problem
 
@@ -133,7 +133,7 @@ The older tree cannot be deleted based on age. Reconciliation is per TC and per 
 
 ## 8. Page Object / flow strategy
 
-`pages/` remains flat because MX and PE generations share imports. Target ownership:
+`pages/` remains flat while MX and PE generations share imports. Target ownership:
 
 ```text
 pages/shared
@@ -146,7 +146,7 @@ flows/mx
 flows/pe
 ```
 
-Move by responsibility/consumer boundary, not file size. Do this after test-path cutover so imports are not churned twice.
+Move by responsibility/consumer boundary after the test-path acceptance checkpoint so import churn does not overlap the highest-risk runner cutover.
 
 ## 9. Script strategy
 
@@ -159,7 +159,7 @@ scripts/reporting
 scripts/governance
 ```
 
-Scripts cannot be cosmetically mirrored into deeper folders because many use `../utils` and sibling-relative paths. Their migration must update every executable caller atomically.
+Script decomposition is the next structural phase after runtime acceptance. Current executable paths remain stable so auth and Jenkins behavior are not simultaneously changed with the test-tree cutover.
 
 ## 10. Authentication and payment boundaries
 
@@ -183,6 +183,6 @@ Every phase must preserve:
 - Executive / Allure / Playwright reporting;
 - current MX runtime behavior.
 
-For MX-affecting cutovers the acceptance contract is the official 29-TC campaign. A new automation failure introduced by refactor blocks deletion of the compatibility source.
+For the MX path cutover, acceptance is the official S2 29-TC campaign reproducing the established baseline: 29 executed, no blocked/not-run caused by architecture, and no new automation failure beyond the known product defect while it remains reproducible.
 
-See `REPOSITORY_AUDIT.md` for completed phases and remaining work.
+See `REPOSITORY_AUDIT.md` for completed phases and deletion gates.
