@@ -30,6 +30,8 @@ The active MX Base Store runner therefore selects **29 TCs** on S1/STG or S2/STG
 
 ## Proven MX S2 baseline
 
+The last runtime-proven baseline before the architecture cutover is:
+
 ```text
 29 selected
 29 executed
@@ -40,6 +42,8 @@ The active MX Base Store runner therefore selects **29 TCs** on S1/STG or S2/STG
 ```
 
 `SAM-25010` creates a guest order, requests and accepts OTP successfully, then the current BaseSite cannot resolve the newly created order. The automation intentionally preserves that product/environment defect.
+
+The canonical-path refactor is **code-complete but requires one post-refactor Jenkins acceptance run** before compatibility mirrors are physically deleted.
 
 ## Repository navigation
 
@@ -62,14 +66,14 @@ governance/             official scope, mappings, runtime ledgers and governance
 config/                 market/runtime configuration
 fixtures/               compatibility test data; PE data namespaced under fixtures/pe
 flows/                  reusable business/presentation flows
-pages/                  Page Objects; market decomposition still pending
-scripts/                executable CLIs; categorization is a later executable move
+pages/                  Page Objects; responsibility decomposition is a later phase
+scripts/                executable CLIs; responsibility decomposition follows MX acceptance
 utils/                  runtime/governance helpers
 ```
 
 Rule: **market -> suite -> store**. S1/S2 are runtime environments, not permanent test taxonomy.
 
-During the controlled migration, hidden compatibility roots still exist for callers not yet cut over:
+Temporary compatibility mirrors still exist only as rollback/acceptance safety nets:
 
 ```text
 tests/s1/**       -> tests/markets/**
@@ -78,15 +82,16 @@ reporters/        -> reporting/
 test-mapping/     -> governance/
 ```
 
-VS Code hides those compatibility roots by default. Structural guards verify canonical mirrors cannot drift:
+VS Code hides those compatibility roots by default. Active CI/runners now use canonical boundaries, and structural guards prevent regression back to the old paths. Mirror parity is also checked while the compatibility copies remain.
 
 ```bash
 npm run repo:architecture:validate
+npm run repo:legacy:audit
 ```
 
 The old root `reporter-tests/` and `mapping-tests/` boundaries were removed and must not return.
 
-Read `docs/REPOSITORY_AUDIT.md` before deleting anything that merely looks old.
+Read `docs/REPOSITORY_AUDIT.md` before deleting compatibility or historical material.
 
 ## MX official runner
 
@@ -138,7 +143,7 @@ Active MX payment data is runtime-only:
 playwright/.auth/mx-test-card.json
 ```
 
-Do not merge/delete those mechanisms until PE reconciliation proves the legacy dependency is gone.
+Do not merge/delete those mechanisms until PE reconciliation proves the compatibility dependency is gone.
 
 ## Reporting model
 
@@ -185,17 +190,31 @@ Useful gates:
 
 ```bash
 npm run repo:architecture:validate
+npm run repo:legacy:audit
 npm run qst:official:gate
 npm run qst:mx:list
 npm run reporting:mx-runtime:test
 npm run reporting:preqa2:test
 ```
 
+## Architecture acceptance checkpoint
+
+Before physically deleting compatibility mirrors, run the post-refactor MX S2 official P1 from Jenkins. The required acceptance contract is:
+
+```text
+29 selected
+29 executed
+0 architecture-induced BLOCKED/NOT_RUN
+no new automation failures
+```
+
+`SAM-25010` may remain the single FAIL only while the already-proven Samsung Track Order defect continues to reproduce.
+
 ## Documentation
 
 - `docs/README.md` — documentation index
-- `docs/REPOSITORY_AUDIT.md` — refactor/cleanup contract
-- `docs/CURRENT_ARCHITECTURE.md` — current and target architecture
+- `docs/REPOSITORY_AUDIT.md` — refactor/cleanup contract and deletion gates
+- `docs/CURRENT_ARCHITECTURE.md` — executable architecture
 - `docs/OFFICIAL_SMB_PRIORITY_MODEL.md` — scope/priority source model
 - `docs/ENVIRONMENT_VALIDATION_POLICY.md` — environment rules
 - `docs/JENKINS_SETUP.md` — CI setup
