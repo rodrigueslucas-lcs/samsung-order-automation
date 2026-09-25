@@ -1,28 +1,25 @@
 # Documentation Index
 
-Use this page as the documentation entry point. Current runtime contracts are listed first; historical discovery material that no longer represents the repository has been removed from the active tree and remains available in Git history.
+Use this page as the documentation entry point. Current runtime contracts are listed first; historical discovery material that no longer represents the repository is kept in Git history rather than mixed into active guidance.
 
 ## Current contracts
 
 - [Repository architecture audit](REPOSITORY_AUDIT.md) — active cleanup/refactor contract and migration rules.
-- [Current SMB architecture](CURRENT_ARCHITECTURE.md) — current hybrid tree, target market-first architecture and runtime boundaries.
+- [Current SMB architecture](CURRENT_ARCHITECTURE.md) — canonical market-first tree, compatibility layer and remaining cutover work.
 - [Official SMB priority model](OFFICIAL_SMB_PRIORITY_MODEL.md) — source model for P1/P2 and Base Store/EPP.
 - [Environment validation policy](ENVIRONMENT_VALIDATION_POLICY.md) — PreQA2/Staging/Production applicability.
 - [Jenkins setup](JENKINS_SETUP.md) — CI orchestration, credentials and targeted P1 execution.
 - [Executive Report V3](EXECUTIVE_REPORT_V3.md) — Executive Dashboard contract.
 - [MX QST coverage and runner](MX_QST_COVERAGE_MATRIX.md) — active MX Base Store automation scope.
 
-The current official Samsung priority model contains **362 DST rows: 144 P1/QST + 218 P2/DST-only** across MX, PE, CL and CO.
+Official Samsung priority model: **362 DST rows = 144 P1/QST + 218 P2/DST-only** across MX, PE, CL and CO.
 
-The historical MX Base Store source has 30 P1 rows, but `SAM-25006` is excluded from active MX execution because the inherited PSE path is Colombia-specific. The active MX Base Store runner therefore selects **29 TCs** on S1/STG or S2/STG2. The exclusion remains preserved in governance history rather than being silently removed.
-
-`test-mapping/smb-qst.json` is preserved historical Zephyr traceability data. Its 144 IDs happen to equal the current P1 total, but it is not the current priority source of truth.
+The historical MX Base Store source has 30 P1 rows. `SAM-25006` is an audited exclusion because the inherited PSE path is Colombia-specific, so the active MX Base Store runner selects **29 TCs**.
 
 ## Current runtime baseline
 
-Latest stabilized MX S2 official Base Store P1 baseline:
-
 ```text
+MX S2 official Base Store P1
 29 selected
 29 executed
 28 PASS
@@ -33,9 +30,28 @@ Latest stabilized MX S2 official Base Store P1 baseline:
 
 Runtime result, implementation coverage, official scope and historical ledger state remain separate dimensions.
 
-## Coverage / compatibility documentation
+## Test navigation
 
-These documents remain active while PE generations are reconciled:
+Canonical engineer-facing structure:
+
+```text
+tests/markets/mx
+tests/markets/pe
+tests/markets/shared
+tests/legacy/pe-s2
+```
+
+`tests/s1/**` and `tests/s2/**` are temporary hidden compatibility sources while stable runners/Jenkins paths finish migration. They are not the architecture engineers should use for new navigation.
+
+Run after structural changes:
+
+```bash
+npm run repo:architecture:validate
+```
+
+The gate also checks canonical/compatibility mirrors for byte-level drift during cutover.
+
+## Coverage / compatibility documentation
 
 - [PE QST compatibility guide](PE_QST_COMPATIBILITY_GUIDE.md)
 - [PE Base Store coverage](COVERAGE_MATRIX.md)
@@ -45,46 +61,33 @@ These documents remain active while PE generations are reconciled:
 - [QST coverage matrix](QST_COVERAGE_MATRIX.md)
 - [EPP external dependencies](EPP_EXTERNAL_DEPENDENCIES.md)
 
-Physical paths under `tests/s2/pe` are compatibility/runtime assets today, not the target architecture. They must not be deleted merely because newer PE QST work also exists under `tests/s1/pe`.
-
-## Removed discovery material
-
-Old BackOffice discovery notes, PreQA2 investigation notes, ST2 handoff/context documents, office handoff notes, the old QST guide and health-audit snapshots were removed from the active tree during the repository audit because they duplicated or contradicted current contracts.
-
-They remain recoverable in Git history. Current behavior must be derived from the contracts above, governance data and actual runtime output.
-
-## Source templates
-
-`docs/smb_priority_templates/` contains Samsung regional priority templates for MX, PE, CL and CO. They are governance inputs, not executable Playwright specs.
+`tests/legacy/pe-s2` explicitly marks the older PE/ST2 generation. It is retained because it still contains established DST/current compatibility consumers, not because S2 should be a permanent taxonomy.
 
 ## Reporting stack
 
-1. **Executive Dashboard** — current build/release health and presentation view.
+1. **Executive Dashboard** — current build/release health.
 2. **Allure** — SAM/Jira-oriented technical drilldown and attachments.
-3. **Playwright** — low-level execution and trace investigation.
-4. **Jenkins** — orchestration, gates, secrets, execution and publication.
+3. **Playwright** — execution and trace investigation.
+4. **Jenkins** — orchestration, gates, secrets and publication.
 
-Reporting implementation and reporting tests now live together under `reporters/`.
+Reporting implementation and integrity tests live together under `reporters/`.
 
 ## Governance stack
 
-Governance data and integrity tests now live together under `test-mapping/`. The old root `mapping-tests/` folder was removed during consolidation.
+Governance data and integrity tests live together under `test-mapping/`. The old root `mapping-tests/` folder must not return.
+
+`test-mapping/smb-qst.json` is preserved historical Zephyr traceability; it is not the current priority source of truth.
 
 ## Repository cleanup policy
 
-Before moving or deleting a legacy-looking file:
+Before moving/deleting legacy-looking code:
 
-1. check imports and runtime callers;
-2. check `package.json` scripts;
+1. check imports/runtime callers;
+2. check package scripts;
 3. check Jenkins references;
 4. check reporting/governance consumers;
 5. preserve current runtime evidence;
-6. validate the affected runner after the change.
+6. validate the structural guard;
+7. runtime-validate the affected official runner before deleting compatibility sources.
 
-Run the structural guard after architecture edits:
-
-```bash
-npm run repo:architecture:validate
-```
-
-See [Repository architecture audit](REPOSITORY_AUDIT.md) for the active migration plan.
+See [Repository architecture audit](REPOSITORY_AUDIT.md) for completed phases and remaining migration work.
