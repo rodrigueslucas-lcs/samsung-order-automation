@@ -10,6 +10,11 @@ const required = [
   "docs/REPOSITORY_AUDIT.md",
   "docs/CURRENT_ARCHITECTURE.md",
   "tests/README.md",
+  "tests/markets/mx/qst/base-store",
+  "tests/markets/mx/dst/base-store",
+  "tests/markets/pe",
+  "tests/markets/shared",
+  "tests/legacy/pe-s2",
   "reporters/README.md",
   "reporters/tests",
   "test-mapping/README.md",
@@ -20,8 +25,6 @@ const required = [
   "scripts/README.md",
   "utils/README.md",
   "config/README.md",
-  "tests/s1/mx/qst/base-store",
-  "tests/s1/mx/dst/base-store",
 ];
 
 const forbidden = [
@@ -49,7 +52,8 @@ if (missing.length || resurrected.length) {
 }
 
 console.log("[repo-architecture] PASS");
+console.log("[repo-architecture] Canonical navigation is market-first under tests/markets.");
+console.log("[repo-architecture] Historical PE S2 generation is explicitly isolated under tests/legacy/pe-s2.");
 console.log("[repo-architecture] Reporting tests are consolidated under reporters/tests.");
 console.log("[repo-architecture] Governance tests are consolidated under test-mapping/tests.");
-console.log("[repo-architecture] PE non-payment fixtures are namespaced under fixtures/pe.");
-console.log("[repo-architecture] MX physical test paths remain environment-first only as a controlled compatibility layer.");
+console.log("[repo-architecture] Compatibility tests/s1 and tests/s2 trees may remain temporarily for runtime-safe migration, but are hidden from the default VS Code explorer.");

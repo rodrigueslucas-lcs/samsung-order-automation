@@ -10,7 +10,9 @@
     "**/playwright-report": true,
     "**/allure-report": true,
     "**/allure-results": true,
-    "**/playwright/.auth": true
+    "**/playwright/.auth": true,
+    "tests/s1": true,
+    "tests/s2": true
   },
   "search.exclude": {
     "**/node_modules": true,
@@ -18,6 +20,8 @@
     "**/playwright-report": true,
     "**/allure-report": true,
     "**/allure-results": true,
-    "**/playwright/.auth": true
+    "**/playwright/.auth": true,
+    "tests/s1": true,
+    "tests/s2": true
   }
 }
