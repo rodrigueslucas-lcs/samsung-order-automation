@@ -1,10 +1,10 @@
 # Current SMB QA Automation Architecture
 
-This document describes the current repository architecture after the Samsung SMB scope, MX S1/S2 execution, Jenkins reporting and executive presentation layers were reconciled.
+This document describes the **current executable architecture** and the **target physical architecture**. The repository is in a controlled migration: runtime behavior is stabilized, but some paths still expose historical S1/S2 organization.
 
 ## 1. Authoritative business scope
 
-The current business source of truth is the Samsung priority-template model under `docs/smb_priority_templates/`, represented by the official inventory contract.
+The business source of truth is the Samsung priority-template model under `docs/smb_priority_templates/`, represented by the official inventory contract.
 
 | Market | Base Store | EPP | P1 / QST | P2 / DST only | DST total |
 |---|---:|---:|---:|---:|---:|
@@ -16,171 +16,246 @@ The current business source of truth is the Samsung priority-template model unde
 
 Priority and store are independent dimensions:
 
-- **P1 runs in QST + DST**.
-- **P2 runs in DST only**.
-- Base Store and EPP remain distinct store contexts.
+- P1 runs in QST + DST;
+- P2 runs in DST only;
+- Base Store and EPP remain distinct contexts.
 
-The preserved `test-mapping/smb-qst.json` file is a historical 144-ID Zephyr campaign. Its total must not be confused with the current 144 P1 total.
+`test-mapping/smb-qst.json` is a preserved historical 144-ID Zephyr campaign and is not the current P1 denominator.
 
 ## 2. Active MX execution model
 
-MX has **38 P1 rows overall**:
+MX has 38 P1 rows overall.
 
-- 30 Base Store P1;
-- 8 EPP P1.
+The historical Base Store source has 30 P1 rows, but `SAM-25006` is excluded from active MX execution because the PSE path in the inherited test data is Colombia-specific and not a valid MX payment path.
 
-The active MX Base Store runner executes the same official **30 P1 TCs** on either:
+Therefore the active MX Base Store runner executes **29 TCs** on either:
 
 - S1 / `stg.shop.samsung.com`;
 - S2 / `stg2.shop.samsung.com`.
 
-Environment selection changes configuration and endpoints, not the selected Base Store P1 inventory.
+The exclusion is preserved for audit. Environment selection changes configuration/endpoints, not the active TC inventory.
 
-## 3. Runtime, coverage and history are separate
+## 3. Proven runtime baseline
+
+The stabilized MX S2 baseline is:
+
+```text
+selected=29
+executed=29
+passed=28
+failed=1
+blocked=0
+notRun=0
+```
+
+The only current FAIL is `SAM-25010`, where guest Track Order accepts OTP but cannot find the newly created order in the current BaseSite. This is treated as a real functional/environment defect rather than an automation problem.
+
+## 4. Runtime, coverage, scope and history stay separate
 
 The architecture deliberately separates:
 
-- **Runtime result**: PASS / FAIL / BLOCKED / NOT_RUN in a specific build/environment.
-- **Automation coverage**: Full / Partial / Missing implementation maturity.
-- **Historical campaign state**: preserved Zephyr/PreQA2 evidence and ledgers.
-- **Official scope**: current Samsung P1/P2 priority inventory.
+- **Runtime result**: PASS / FAIL / BLOCKED / NOT_RUN for one execution;
+- **Automation coverage**: implementation maturity;
+- **Official scope**: current Samsung inventory;
+- **Historical evidence**: Zephyr/PreQA2/runtime ledgers and previous campaigns.
 
 No reporting layer may infer PASS from coverage or from the absence of an execution result.
 
-## 4. Environment routing
+## 5. Environment routing
 
-The real business flow decides the validation environment.
+PreQA2 may validate supported storefront/catalog behavior. Cart, Checkout, Orders, Payment and BackOffice use the applicable staging environment where the complete journey exists.
 
-PreQA2 may be used for supported storefront/catalog validation. Cart, Checkout, Orders, Payment and BackOffice flows are validated in the applicable Staging environment when PreQA2 does not host the complete journey.
+A PreQA2 `NOT_APPLICABLE` result creates a staging validation obligation; it is not PASS.
 
-A PreQA2 `NOT_APPLICABLE` result creates a Staging validation obligation; it is not an automatic PASS.
+Production is never a fallback target.
 
-Production is never used as a fallback target.
-
-See [Environment Validation Policy](ENVIRONMENT_VALIDATION_POLICY.md).
-
-## 5. Executable architecture
+## 6. Current physical repository
 
 ```text
-Official business scope
-  docs/smb_priority_templates/              Samsung priority templates
-  test-mapping/official-smb-inventory.json  current official inventory contract
+tests/
+  s1/
+    mx/
+      qst/
+      dst/
+    pe/
+      qst/
+    smb/
+      qst/
+  s2/
+    pe/
+      qst/
+      dst/
 
-Historical / compatibility sources
-  test-mapping/smb-qst.json                 preserved 144-ID Zephyr campaign
-  test-mapping/preqa2-validation.json       PreQA2 validation ledger
-  test-mapping/*-qst-*                      market coverage/reuse/runtime metadata
-
-Executable Playwright
-  tests/<environment>/<market>/<suite>/<area>/
-  pages/
-  utils/
-
-Authentication / guards
-  utils/mxAuthState*
-  tests/s1/mx/dst/base-store/mx.auth.fixture.js
-  utils/mxStagingGuard*
-  scripts/auth-login-mx.cjs
-
-Execution / reconciliation / reporting
-  scripts/
-  reporters/evidence/
-  reporters/executive-v3/
-  reporters/preqa2/
-  reporter-tests/
-
-CI
-  Jenkinsfile
+pages/          Page Objects, currently shared + market-specific mixed
+flows/          reusable SMB flows
+utils/          runtime helpers + governance helpers mixed
+scripts/        auth + CI + reporting + governance CLIs mixed
+reporters/      reporting implementation
+reporter-tests/ reporting integrity tests
+test-mapping/   scope/mapping/runtime data
+mapping-tests/  governance integrity tests
 ```
 
-## 6. Authentication model
+This layout is functional but not the desired final taxonomy.
+
+## 7. Target physical architecture
+
+```text
+tests/
+  mx/
+    qst/{base-store,epp,backoffice}/
+    dst/{base-store,epp,backoffice}/
+  pe/
+    qst/{base-store,epp,backoffice}/
+    dst/{base-store,epp,backoffice}/
+  cl/
+  co/
+  shared/
+
+pages/
+  shared/
+  mx/
+  pe/
+  backoffice/
+
+flows/
+  shared/
+  mx/
+  pe/
+
+reporting/
+  executive/
+  allure/
+  evidence/
+  tests/
+
+governance/
+  scope/
+  mapping/
+  reconciliation/
+  tests/
+
+scripts/
+  auth/
+  ci/
+  reporting/
+  governance/
+```
+
+The key rule is that **market is a physical taxonomy; S1/S2 is runtime configuration**.
+
+## 8. Why S1/S2 stays in paths temporarily
+
+The active MX runner, Playwright project matching, package scripts, relative imports, reporting source paths and Jenkins commands currently reference `tests/s1/mx/...` directly.
+
+Moving the directory is therefore not a harmless rename. It must be performed atomically across:
+
+- Playwright config;
+- MX runners;
+- package scripts;
+- Jenkinsfile;
+- relative imports;
+- reporter/governance source-path assumptions;
+- docs;
+- targeted commands.
+
+Until that migration can be validated, the current path remains a compatibility layer.
+
+## 9. PE dual-generation problem
+
+PE exists in both `tests/s1/pe` and `tests/s2/pe`.
+
+They are not safe to merge/delete by folder age:
+
+- `tests/s2/pe/dst` is the established ST2/DST generation;
+- `tests/s2/pe/qst` is an older QST generation;
+- `tests/s1/pe/qst` is the newer regional QST stabilization generation.
+
+The PE migration must reconcile per-TC ownership before deleting either tree.
+
+## 10. Page Object strategy
+
+Current Page Objects are intentionally not split during the first architecture pass because many are shared by PE DST and MX QST.
+
+Future decomposition should follow stable responsibility:
+
+- `pages/shared`: genuinely cross-market components;
+- `pages/mx`: MX-specific checkout/tracking behavior;
+- `pages/pe`: PE-specific behavior;
+- `pages/backoffice`: BackOffice-only objects.
+
+Large file size alone is not a reason to split a Page Object.
+
+## 11. Authentication model
 
 WMC/PreQA2 authentication and Samsung Account authentication are separate concerns.
 
-MX registered-user execution uses environment-specific persisted auth state. Before a registered TC continues, the authenticated fixture proves that the session is still usable.
-
-For recoverable setup failures such as an expired Samsung Account session, unusable auth state or expired setup cookie, the fixture can perform **one controlled renewal** using the approved MX login flow, load the refreshed browser state into the current Playwright context, validate authentication again and then continue.
+MX registered execution uses environment-specific persisted state under ignored `playwright/.auth/`.
 
 Policy:
 
-- local auto-renew is enabled unless `MX_AUTH_AUTO_RENEW=0`;
-- CI/Jenkins auto-renew is disabled unless `MX_AUTH_AUTO_RENEW=1`;
-- MFA/CAPTCHA remains human verification and is never bypassed;
-- failed renewal remains a failure/blocker.
+- local auto-renew enabled unless `MX_AUTH_AUTO_RENEW=0`;
+- Jenkins auto-renew disabled unless explicitly enabled;
+- MFA/CAPTCHA is never bypassed;
+- failed renewal stays a failure/blocker;
+- second-account state is validated only when `SAM-24986` is selected.
 
-Credentials, cookies and storage state are runtime-only and must never be committed.
+## 12. Payment data boundary
 
-## 7. Safety boundaries
+Two card-data mechanisms currently coexist for valid reasons:
 
-Production is read-only.
+- `fixtures/card.json` belongs to the older PE/DST test-data bundle through `utils/testData.js`;
+- `playwright/.auth/mx-test-card.json` is the runtime-only MX credential consumed by `utils/mxTestCard.js`.
 
-Destructive non-Production actions remain explicitly guarded, including:
+They must not be collapsed until PE is migrated away from the generic fixture bundle.
 
-- payment/order submit;
-- customer/profile writes;
-- CronJob execution;
-- other state-changing operations.
-
-Payment/order execution must not use blind retries after an ambiguous submit. A backend/environment defect must not be hidden by weakening assertions simply to produce a green build.
-
-## 8. Reporting architecture
-
-The reporting stack has four layers.
+## 13. Reporting architecture
 
 ### Executive Dashboard
 
-Outcome-first presentation view. Final order:
-
-1. Build Health
-2. Execution at a glance
-3. Needs Attention only when necessary
-4. Test Execution
-5. MX Automation Coverage
-6. Official SMB Scope
-7. Coverage by Feature + Gap Queue
-8. Technical Governance, collapsed by default
-
-Technical Governance contains:
-
-- Regional Validation Matrix;
-- Data Integrity;
-- Historical TC Inventory.
+Outcome-first presentation and release-health view.
 
 ### Allure
 
-Technical TC-level investigation organized around Samsung business hierarchy, SAM/Jira IDs, runtime status, categories, steps and attachments.
+Technical TC-level drilldown, attachments and categories.
 
-### Playwright report / Trace Viewer
+### Playwright
 
-Low-level Playwright execution and trace investigation.
+Execution detail and trace investigation.
 
 ### Jenkins
 
-Orchestration, coverage gates, environment selection, test execution, report finalization and publication. Pipeline Stage View exposes the operational sequence for presentation and troubleshooting.
+Orchestration, gates, credentials, execution and publication.
 
-## 9. Evidence model
+The current `reporters/` + `reporter-tests/` split is a naming/placement debt. It should eventually become one `reporting/` boundary, but only after scripts/config imports are changed together.
 
-Runtime evidence can include:
+## 14. Governance architecture
 
-- screenshots;
-- traces;
-- videos when enabled;
-- error context;
-- business metadata;
-- order/payment identifiers when safely recorded.
+Current governance is distributed across:
 
-Evidence and runtime status are reconciled from the actual execution. Historical mapping data must not overwrite current build evidence.
+- `test-mapping/`;
+- `mapping-tests/`;
+- governance-oriented `utils/`;
+- `print-*` / `validate-*` scripts.
 
-## 10. Trace access from Jenkins
+The target is one `governance/` boundary with scope, mapping, reconciliation and tests clearly separated from runtime browser automation.
 
-Trace links may use `trace.playwright.dev` with an archived Jenkins trace URL.
+## 15. Safety boundaries
 
-The browser must be able to reach the Jenkins artifact. Jenkins authentication/CORS and browser local-network policy can block that fetch even when the ZIP is valid.
+Production is read-only.
 
-When Jenkins runs on localhost, Chromium-based browsers may require Local Network Access permission for the Trace Viewer origin.
+Destructive non-Production actions remain explicitly guarded. Payment/order submission uses zero retries in the controlled campaign. Backend/environment defects must not be hidden by weakened assertions.
 
-## 11. Integration discipline
+## 16. Refactor acceptance
 
-Do not resolve runtime-ledger conflicts with blanket `ours` or `theirs` choices. Preserve real execution evidence first, reconcile case state deliberately, then run the official gates/reporting validation before treating the integration as canonical.
+Every architecture phase must preserve:
 
-The final architecture is designed around one rule: **official scope, current runtime, implementation coverage and historical governance must remain independently auditable.**
+- official scope gates;
+- runner selection correctness;
+- secret/runtime-only artifact handling;
+- reporting generation;
+- current MX behavior.
+
+For MX-affecting changes, the acceptance baseline is the official 29-TC campaign. A new automation failure introduced by a refactor blocks the next migration phase.
+
+See `REPOSITORY_AUDIT.md` for the detailed KEEP / RELOCATE / LEGACY / DELETE classification.
