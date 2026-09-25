@@ -1,4 +1,4 @@
-const defaultLedger = require("../test-mapping/preqa2-validation.json");
+const defaultLedger = require("../governance/preqa2-validation.json");
 const { getPreqa2CampaignPlan, MARKET_ORDER } = require("./preqa2CampaignPlan");
 const { validatePreqa2ValidationLedger } = require("./preqa2ValidationLedger");
 
