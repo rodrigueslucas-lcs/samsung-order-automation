@@ -1,5 +1,5 @@
-const mxCoverage = require("../test-mapping/mx-qst-coverage.json");
-const mxPartialPlan = require("../test-mapping/mx-qst-partial-plan.json");
+const mxCoverage = require("../governance/mx-qst-coverage.json");
+const mxPartialPlan = require("../governance/mx-qst-partial-plan.json");
 
 const GROUPS = Object.freeze([
   "quickAssertion",
