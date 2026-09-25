@@ -1,6 +1,6 @@
-const defaultLedger = require("../test-mapping/preqa2-validation.json");
-const mxCoverage = require("../test-mapping/mx-qst-coverage.json");
-const peReuse = require("../test-mapping/pe-qst-reuse-plan.json");
+const defaultLedger = require("../governance/preqa2-validation.json");
+const mxCoverage = require("../governance/mx-qst-coverage.json");
+const peReuse = require("../governance/pe-qst-reuse-plan.json");
 
 function resultFor(market, id, sourceLedger = defaultLedger) {
   return sourceLedger.markets?.[market]?.results?.[id] || null;
