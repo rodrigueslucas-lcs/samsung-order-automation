@@ -1,8 +1,8 @@
 const pePlan = require("../test-mapping/pe-qst-reuse-plan.json");
-const { validateS1OfficialImplementation } = require("./qstS1Implementation");
+const { validateOfficialImplementation } = require("./qstImplementation");
 
-function getPeS1ImplementationProgress() {
-  const inventory = validateS1OfficialImplementation().PE;
+function getPeImplementationProgress() {
+  const inventory = validateOfficialImplementation().PE;
   const implemented = new Set(inventory.implementedIds);
   const progress = {
     officialTotal: pePlan.officialTotal,
@@ -13,12 +13,7 @@ function getPeS1ImplementationProgress() {
     byReuse: {},
   };
 
-  for (const reuse of [
-    "directCandidate",
-    "extensionCandidate",
-    "destructiveCandidate",
-    "missing",
-  ]) {
+  for (const reuse of ["directCandidate", "extensionCandidate", "destructiveCandidate", "missing"]) {
     progress.byReuse[reuse] = { implemented: 0, pending: 0, implementedIds: [], pendingIds: [] };
   }
 
@@ -43,4 +38,8 @@ function getPeS1ImplementationProgress() {
   return progress;
 }
 
-module.exports = { getPeS1ImplementationProgress };
+// Temporary compatibility export for any external caller that still uses the
+// old environment-specific function name.
+const getPeS1ImplementationProgress = getPeImplementationProgress;
+
+module.exports = { getPeImplementationProgress, getPeS1ImplementationProgress };
