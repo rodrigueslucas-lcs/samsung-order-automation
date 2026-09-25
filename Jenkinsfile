@@ -25,7 +25,6 @@ pipeline {
     MX_QST_USE_EXISTING_AUTH = '1'
     MX_AUTH_AUTO_RENEW = '0'
     ENABLE_ALLURE = '1'
-    PLAYWRIGHT_BROWSERS_PATH = '0'
     NATIVE_ALLURE_PUBLISHED = '0'
   }
 
@@ -71,9 +70,9 @@ pipeline {
           env.MX_QST_TARGET_IDS = params.P1_TARGET_IDS?.trim() ?: ''
           env.PE_STOREFRONT_URL = params.ENVIRONMENT == 'S2' ? 'https://stg2.shop.samsung.com/pe/' : 'https://stg.shop.samsung.com/pe/'
 
-          // Keep Playwright browsers outside node_modules so npm ci does not
-          // force a ~300 MB Chromium/FFmpeg download on every Jenkins build.
-          // First build seeds the cache; following builds reuse it.
+          // Cache Playwright browsers outside node_modules. The previous global
+          // PLAYWRIGHT_BROWSERS_PATH=0 forced every npm ci build to redownload
+          // Chromium/FFmpeg into the disposable workspace.
           env.PLAYWRIGHT_BROWSERS_PATH = isUnix()
             ? "${env.HOME}/.cache/ms-playwright"
             : "${env.JENKINS_HOME}\\playwright-browsers"
@@ -234,7 +233,7 @@ pipeline {
                   chmod 600 playwright/.auth/mx-${MX_AUTH_SUFFIX}-user.json playwright/.auth/mx-${MX_AUTH_SUFFIX}-session-storage.json || true
                   EXTRA=""
                   if [ "${BROWSER_MODE}" = "headed" ]; then EXTRA="--headed"; fi
-                  npx playwright test tests/s1/mx/qst/base-store/authenticated-safe.spec.js --project=chromium --workers=1 --retries=0 --output "$JENKINS_ARTIFACT_DIR/playwright" $EXTRA
+                  npx playwright test tests/markets/mx/qst/base-store/authenticated-safe.spec.js --project=chromium --workers=1 --retries=0 --output "$JENKINS_ARTIFACT_DIR/playwright" $EXTRA
                 '''
               } else {
                 bat '''@echo off
@@ -242,9 +241,9 @@ pipeline {
                   copy /Y "%MX_AUTH_STATE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-user.json" >nul || exit /b 2
                   copy /Y "%MX_SESSION_STORAGE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-session-storage.json" >nul || exit /b 2
                   if /I "%BROWSER_MODE%"=="headed" (
-                    call npx playwright test tests/s1/mx/qst/base-store/authenticated-safe.spec.js --project=chromium --workers=1 --retries=0 --output "%JENKINS_ARTIFACT_DIR%\\playwright" --headed
+                    call npx playwright test tests/markets/mx/qst/base-store/authenticated-safe.spec.js --project=chromium --workers=1 --retries=0 --output "%JENKINS_ARTIFACT_DIR%\\playwright" --headed
                   ) else (
-                    call npx playwright test tests/s1/mx/qst/base-store/authenticated-safe.spec.js --project=chromium --workers=1 --retries=0 --output "%JENKINS_ARTIFACT_DIR%\\playwright"
+                    call npx playwright test tests/markets/mx/qst/base-store/authenticated-safe.spec.js --project=chromium --workers=1 --retries=0 --output "%JENKINS_ARTIFACT_DIR%\\playwright"
                   )
                 '''
               }
@@ -277,19 +276,19 @@ pipeline {
                     mkdir -p playwright/.auth
                     cp "$MX_BACKOFFICE_ADMIN_SECRET" playwright/.auth/backoffice-admin-s2.json
                     chmod 600 playwright/.auth/backoffice-admin-s2.json || true
-                    npx playwright test tests/s1/smb/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "$JENKINS_ARTIFACT_DIR/playwright"
+                    npx playwright test tests/shared/smb/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "$JENKINS_ARTIFACT_DIR/playwright"
                   '''
                 } else {
                   bat '''@echo off
                     if not exist playwright\\.auth mkdir playwright\\.auth
                     copy /Y "%MX_BACKOFFICE_ADMIN_SECRET%" "playwright\\.auth\\backoffice-admin-s2.json" >nul || exit /b 2
-                    call npx playwright test tests/s1/smb/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "%JENKINS_ARTIFACT_DIR%\\playwright"
+                    call npx playwright test tests/shared/smb/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "%JENKINS_ARTIFACT_DIR%\\playwright"
                   '''
                 }
               }
             } else {
-              if (isUnix()) sh 'npx playwright test tests/s1/smb/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "$JENKINS_ARTIFACT_DIR/playwright"'
-              else bat '@call npx playwright test tests/s1/smb/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "%JENKINS_ARTIFACT_DIR%\\playwright"'
+              if (isUnix()) sh 'npx playwright test tests/shared/smb/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "$JENKINS_ARTIFACT_DIR/playwright"'
+              else bat '@call npx playwright test tests/shared/smb/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "%JENKINS_ARTIFACT_DIR%\\playwright"'
             }
           }
         }
