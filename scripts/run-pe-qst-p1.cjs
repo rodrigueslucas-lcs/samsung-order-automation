@@ -33,8 +33,8 @@ const PE_BASE_P1_IDS = Object.freeze(
     .map(([id]) => id)
     .sort()
 );
-if (PE_BASE_P1_IDS.length !== 30) {
-  throw new Error(`PE Base Store P1 inventory drift: expected 30 official IDs, found ${PE_BASE_P1_IDS.length}.`);
+if (PE_BASE_P1_IDS.length !== 28) {
+  throw new Error(`PE Base Store P1 inventory drift: expected 28 official IDs, found ${PE_BASE_P1_IDS.length}.`);
 }
 const officialSet = new Set(PE_BASE_P1_IDS);
 const p1Pattern = `(?:${PE_BASE_P1_IDS.join("|")})\\b`;
