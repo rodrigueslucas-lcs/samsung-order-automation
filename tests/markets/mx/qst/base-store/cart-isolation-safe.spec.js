@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process";
 import authStateModule from "../../../../../utils/authState";
 import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
-import { test, expect } from "../../dst/base-store/mx.auth.fixture";
+import { test, expect } from "../../support/base-store/mx.auth.fixture";
 import { prepareMxQstCart } from "./mxQstFlows";
 
 const { createAuthState } = authStateModule;
