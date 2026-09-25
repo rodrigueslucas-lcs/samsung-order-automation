@@ -1,7 +1,7 @@
 {
   "$schemaVersion": 1,
   "market": "MX",
-  "source": "test-mapping/mx-qst-coverage.json",
+  "source": "governance/mx-qst-coverage.json",
   "policy": "Expected-result-first. This file is an implementation plan only; coverage remains partial until the official Expected Result is proven in the intended store/business path.",
   "summary": {
     "partialTotal": 14,
