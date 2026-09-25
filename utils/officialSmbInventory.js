@@ -1,4 +1,4 @@
-const inventoryMetadata = require("../test-mapping/official-smb-inventory.json");
+const inventoryMetadata = require("../governance/official-smb-inventory.json");
 const { loadOfficialTemplates } = require("./officialTemplateParser");
 const { attachKnownEvidence } = require("./officialRowEvidence");
 
