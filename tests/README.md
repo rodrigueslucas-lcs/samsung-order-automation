@@ -1,43 +1,48 @@
 # Tests
 
-This directory is executable Playwright automation.
+This directory contains executable Playwright automation plus a temporary compatibility layer used during the architecture migration.
 
-## Current compatibility layout
+## Canonical navigation
 
-The repository still contains an environment-first physical structure:
-
-```text
-tests/s1/mx/...
-tests/s1/pe/...
-tests/s1/smb/...
-tests/s2/pe/...
-```
-
-That structure reflects project history, not the desired final architecture.
-
-## Target rule
-
-New architecture should converge to:
+Engineers should navigate tests through the market-first tree:
 
 ```text
-tests/<market>/<qst|dst>/<store>/
+tests/
+  markets/
+    mx/
+      qst/base-store/
+      dst/base-store/
+      dst/backoffice/
+    pe/
+      qst/...
+    shared/
+      qst/...
+  legacy/
+    pe-s2/
 ```
 
-S1/S2 are runtime environments and should ultimately be selected by configuration rather than duplicated top-level directories.
+The rule is **market -> suite -> store**. S1/S2 are runtime environments, not permanent physical taxonomy.
 
-Do **not** create a new test in both S1 and S2 merely to support both environments. Reuse one spec and route endpoints/config at runtime whenever the business flow is equivalent.
+## Compatibility paths
 
-## Current ownership
+`tests/s1/**` and `tests/s2/**` are temporarily retained so the already-stabilized official runners/Jenkins paths can be migrated without a big-bang regression. VS Code hides those compatibility roots by default, so day-to-day navigation stays clean.
 
-- `s1/mx/qst/base-store` — active MX QST implementation and official Base Store P1 runner.
-- `s1/mx/dst` — MX DST generation and shared MX auth/flow compatibility used by current QST imports.
-- `s1/pe/qst` — newer PE QST stabilization generation.
-- `s2/pe/qst` — older PE/ST2 QST generation; migration candidate, not safe to delete yet.
-- `s2/pe/dst` — established PE DST generation and still referenced by package scripts.
-- `s1/smb/qst` — shared/regional candidates.
+Canonical trees are currently mirrored byte-for-byte from their compatibility sources and protected by:
 
-## Migration safety
+```bash
+npm run repo:architecture:validate
+```
 
-Moving test folders affects relative imports, Playwright project matching, runners, Jenkins commands, package scripts and reporting source paths. Perform those moves atomically and validate the affected official runner before deleting the old path.
+The guard fails if the canonical and compatibility copies drift before runtime cutover.
 
-For MX-affecting changes, the regression baseline is the active 29-TC Base Store P1 campaign documented in `docs/REPOSITORY_AUDIT.md`.
+## Ownership
+
+- `markets/mx/qst/base-store` — stabilized active MX QST implementation and official Base Store P1 source.
+- `markets/mx/dst` — MX DST plus auth/flow compatibility used by current QST imports.
+- `markets/pe` — newer PE QST stabilization generation.
+- `markets/shared` — cross-market SMB candidates.
+- `legacy/pe-s2` — older PE/ST2 QST + established DST generation kept until PE reconciliation is complete.
+
+Do not create separate S1/S2 copies of the same business scenario. Route environment-specific endpoints/configuration at runtime.
+
+For MX-affecting structural changes, the acceptance baseline remains 29 selected / 29 executed / 28 PASS / 1 known functional FAIL (`SAM-25010`) / 0 BLOCKED / 0 NOT_RUN.
