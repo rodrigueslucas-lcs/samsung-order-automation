@@ -1,8 +1,8 @@
-const registry = require("../test-mapping/smb-qst.json");
+const registry = require("../governance/smb-qst.json");
 const { metadataFor, normalizeMarket } = require("./preqa2CampaignPlan");
 const { createValidationEntry } = require("./preqa2Validation");
 const { validatePreqa2ValidationLedger, validateResult } = require("./preqa2ValidationLedger");
-const { sanitizeString } = require("../reporters/evidence/sanitizer");
+const { sanitizeString } = require("../reporting/evidence/sanitizer");
 
 function cleanOptional(value) {
   const text = value == null ? null : sanitizeString(String(value)).trim();
