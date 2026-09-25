@@ -4,6 +4,7 @@ const path = require("node:path");
 const registry = require("../test-mapping/smb-qst.json");
 
 const SUPPORTED_MARKETS = Object.freeze(["MX", "PE", "CL", "CO"]);
+const DEFAULT_TEST_ROOT = path.resolve("tests/markets");
 
 function walkSpecFiles(root) {
   if (!fs.existsSync(root)) return [];
@@ -47,10 +48,10 @@ function collectTitlesFromFiles(files) {
   return entries;
 }
 
-function collectMarketImplementation(market, { root = path.resolve("tests/s1") } = {}) {
+function collectMarketImplementation(market, { root = DEFAULT_TEST_ROOT } = {}) {
   const code = String(market).toUpperCase();
   if (!SUPPORTED_MARKETS.includes(code)) {
-    throw new Error(`Unsupported S1 QST implementation market: ${market}`);
+    throw new Error(`Unsupported QST implementation market: ${market}`);
   }
 
   const cases = [];
@@ -61,7 +62,7 @@ function collectMarketImplementation(market, { root = path.resolve("tests/s1") }
     }
   }
 
-  const sharedRoot = path.join(root, "smb", "qst");
+  const sharedRoot = path.join(root, "shared", "qst");
   for (const entry of collectTitlesFromFiles(walkSpecFiles(sharedRoot))) {
     const tags = marketTagsFromTitle(entry.title);
     if (!tags.includes(code)) continue;
@@ -73,9 +74,9 @@ function collectMarketImplementation(market, { root = path.resolve("tests/s1") }
   return cases;
 }
 
-function validateSharedSpecMarketTags({ root = path.resolve("tests/s1") } = {}) {
+function validateSharedSpecMarketTags({ root = DEFAULT_TEST_ROOT } = {}) {
   const errors = [];
-  const sharedRoot = path.join(root, "smb", "qst");
+  const sharedRoot = path.join(root, "shared", "qst");
   for (const entry of collectTitlesFromFiles(walkSpecFiles(sharedRoot))) {
     const ids = officialIdsFromTitle(entry.title);
     if (!ids.length) continue;
@@ -100,7 +101,7 @@ function validateS1OfficialImplementation() {
 
     for (const entry of cases) {
       if (!official.has(entry.id)) {
-        errors.push(`${market}: ${entry.id} appears in an S1 QST test title but is not an official ${market} ID (${entry.spec}).`);
+        errors.push(`${market}: ${entry.id} appears in a QST test title but is not an official ${market} ID (${entry.spec}).`);
       }
       const previous = byId.get(entry.id) || [];
       previous.push(entry);
@@ -109,7 +110,7 @@ function validateS1OfficialImplementation() {
 
     for (const [id, entries] of byId) {
       if (entries.length > 1) {
-        errors.push(`${market}: official ID ${id} appears in multiple S1 QST test titles: ${entries.map(({ spec }) => spec).join(", ")}.`);
+        errors.push(`${market}: official ID ${id} appears in multiple QST test titles: ${entries.map(({ spec }) => spec).join(", ")}.`);
       }
     }
 
@@ -122,7 +123,7 @@ function validateS1OfficialImplementation() {
   }
 
   if (errors.length) {
-    throw new Error(`Invalid S1 official QST implementation inventory:\n${errors.join("\n")}`);
+    throw new Error(`Invalid official QST implementation inventory:\n${errors.join("\n")}`);
   }
 
   return inventory;
