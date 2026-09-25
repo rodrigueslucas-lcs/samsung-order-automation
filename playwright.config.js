@@ -50,7 +50,7 @@ export default defineConfig({
           suiteTitle: false
         }]]
       : []),
-    ['./reporters/evidence/SmbEvidenceReporter.js', {
+    ['./reporting/evidence/SmbEvidenceReporter.js', {
       outputDir: process.env.SMB_EVIDENCE_DIR || 'test-results/evidence'
     }]
   ],
