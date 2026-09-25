@@ -19,7 +19,7 @@ const configEnv = {
 };
 const config = getPeQstConfig(configEnv);
 const environmentLabel = config.environmentLabel;
-const root = path.resolve("tests/markets/pe/qst/base-store");
+const root = path.resolve("tests/markets/pe/qst");
 const playwrightCli = path.resolve("node_modules/@playwright/test/cli.js");
 const artifactDir = path.resolve(process.env.PE_QST_ARTIFACT_DIR || process.env.MX_QST_ARTIFACT_DIR || "test-results/jenkins/pe-qst");
 const reportFile = path.join(artifactDir, "results.json");
@@ -27,27 +27,29 @@ const runtimeSummaryFile = path.join(artifactDir, "runtime-summary.json");
 const allureResultsDir = path.join(artifactDir, "allure-results");
 const executiveDir = path.join(artifactDir, "executive");
 
-const PE_BASE_P1_IDS = Object.freeze(
-  Object.entries(reusePlan.cases)
-    .filter(([, entry]) => entry.store === "BS")
-    .map(([id]) => id)
-    .sort()
-);
-if (PE_BASE_P1_IDS.length !== 28) {
-  throw new Error(`PE Base Store P1 inventory drift: expected 28 official IDs, found ${PE_BASE_P1_IDS.length}.`);
+const PE_P1_IDS = Object.freeze(Object.keys(reusePlan.cases).sort());
+if (PE_P1_IDS.length !== 34) {
+  throw new Error(`PE P1 inventory drift: expected 34 official IDs, found ${PE_P1_IDS.length}.`);
 }
-const officialSet = new Set(PE_BASE_P1_IDS);
-const p1Pattern = `(?:${PE_BASE_P1_IDS.join("|")})\\b`;
+const officialSet = new Set(PE_P1_IDS);
+const p1Pattern = `(?:${PE_P1_IDS.join("|")})\\b`;
 
-const specFiles = fs.readdirSync(root).filter((name) => name.endsWith(".spec.js"));
-const allTitles = specFiles.flatMap((name) => testTitles(fs.readFileSync(path.join(root, name), "utf8")));
+function specFilesUnder(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const target = path.join(directory, entry.name);
+    if (entry.isDirectory()) return specFilesUnder(target);
+    return entry.isFile() && entry.name.endsWith(".spec.js") ? [target] : [];
+  });
+}
+const specFiles = specFilesUnder(root);
+const allTitles = specFiles.flatMap((file) => testTitles(fs.readFileSync(file, "utf8")));
 const implementedTitles = allTitles.filter((title) => officialSet.has(title.match(/SAM-\d+/)?.[0]));
 const implementedIds = new Set(implementedTitles.map((title) => title.match(/SAM-\d+/)?.[0]));
-const missingIds = PE_BASE_P1_IDS.filter((id) => !implementedIds.has(id));
-const duplicateIds = PE_BASE_P1_IDS.filter((id) => implementedTitles.filter((title) => title.includes(id)).length > 1);
+const missingIds = PE_P1_IDS.filter((id) => !implementedIds.has(id));
+const duplicateIds = PE_P1_IDS.filter((id) => implementedTitles.filter((title) => title.includes(id)).length > 1);
 
-console.log(`[pe-qst] Official PE ${targetEnvironment} Base P1 scope: ${PE_BASE_P1_IDS.length} TCs.`);
-console.log(`[pe-qst] Implemented in current branch: ${implementedIds.size}/${PE_BASE_P1_IDS.length}.`);
+console.log(`[pe-qst] Official PE ${targetEnvironment} P1 scope: ${PE_P1_IDS.length} TCs (Base Store + EPP).`);
+console.log(`[pe-qst] Implemented in current branch: ${implementedIds.size}/${PE_P1_IDS.length}.`);
 if (missingIds.length) console.log(`[pe-qst] NOT_RUN implementation gaps: ${missingIds.join(", ")}`);
 if (duplicateIds.length) {
   console.error(`[pe-qst] Duplicate official PE IDs detected: ${duplicateIds.join(", ")}`);
@@ -55,7 +57,7 @@ if (duplicateIds.length) {
 }
 
 const args = [
-  playwrightCli, "test", "tests/markets/pe/qst/base-store",
+  playwrightCli, "test", "tests/markets/pe/qst",
   "--project=chromium", "--workers=1", "--retries=0",
   "--grep", p1Pattern,
   "--output", path.join(artifactDir, "playwright"),
@@ -83,7 +85,7 @@ const executionEnv = {
   ...configEnv,
   TEST_ENV: environmentLabel,
   TEST_MARKET: "PE",
-  TEST_STORE: "BASE_STORE",
+  TEST_STORE: "MIXED",
   TEST_SUITE: "P1/QST",
   PE_QST_ENVIRONMENT: targetEnvironment,
   PE_STOREFRONT_URL: config.baseUrl.href,
@@ -101,10 +103,10 @@ if (fs.existsSync(reportFile)) {
   const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
   const titles = Object.fromEntries(implementedTitles.map((title) => [title.match(/SAM-\d+/)?.[0], title]));
   const runtimeSummary = buildMxQstRuntimeSummary(report, {
-    officialIds: PE_BASE_P1_IDS,
+    officialIds: PE_P1_IDS,
     titles,
     market: "PE",
-    store: "BASE_STORE",
+    store: "MIXED",
     environment: environmentLabel,
     suite: "P1/QST",
   });
@@ -119,7 +121,7 @@ if (fs.existsSync(reportFile)) {
   ], { stdio: "inherit", env: executionEnv });
   if (executive.status !== 0) console.error("[pe-qst] Executive dashboard generation failed; raw runtime summary was preserved.");
 
-  console.log(`\nPE ${targetEnvironment} BASE STORE P1 SUMMARY`);
+  console.log(`\nPE ${targetEnvironment} P1 SUMMARY`);
   console.log(`Official=${runtimeSummary.summary.official} Executed=${runtimeSummary.summary.executed} Passed=${runtimeSummary.summary.passed} Failed=${runtimeSummary.summary.failed} Blocked=${runtimeSummary.summary.blocked} NotRun=${runtimeSummary.summary.notRun}`);
 
   if (runtimeSummary.summary.notRun > 0 || runtimeSummary.summary.blocked > 0 || runtimeSummary.summary.failed > 0) {
