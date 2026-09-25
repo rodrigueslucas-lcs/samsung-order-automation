@@ -30,7 +30,7 @@ function assertAddressApi(url) {
   return url;
 }
 
-const PROVEN_PE_QST_ST2_SKU = "RB45DG6300B1PE";
+const PROVEN_PE_QST_ST2_SKU = "SM-F741BLBKPEO";
 
 function getPeQstConfig(environment = process.env) {
   const envName = targetEnvironment(environment);
