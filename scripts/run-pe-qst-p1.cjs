@@ -2,9 +2,10 @@ const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const reusePlan = require("../test-mapping/pe-qst-reuse-plan.json");
-const { testTitles } = require("../utils/qstS1Implementation");
+const { testTitles } = require("../utils/qstImplementation");
 const { buildMxQstRuntimeSummary, writeRuntimeSummary } = require("../utils/mxQstRuntimeSummary.cjs");
 const { getPeQstConfig } = require("../config/markets/pe");
+const { TEST_PATHS, resolveTestPath } = require("../config/testPaths.cjs");
 
 const listOnly = process.argv.includes("--list");
 const targetEnvironment = String(process.env.PE_QST_ENVIRONMENT || process.env.ENVIRONMENT || "S2").toUpperCase();
@@ -19,7 +20,8 @@ const configEnv = {
 };
 const config = getPeQstConfig(configEnv);
 const environmentLabel = config.environmentLabel;
-const root = path.resolve("tests/s1/pe/qst/base-store");
+const qstPath = TEST_PATHS.pe.qstBaseStore;
+const root = resolveTestPath(qstPath);
 const playwrightCli = path.resolve("node_modules/@playwright/test/cli.js");
 const artifactDir = path.resolve(process.env.PE_QST_ARTIFACT_DIR || process.env.MX_QST_ARTIFACT_DIR || "test-results/jenkins/pe-qst");
 const reportFile = path.join(artifactDir, "results.json");
@@ -27,8 +29,6 @@ const runtimeSummaryFile = path.join(artifactDir, "runtime-summary.json");
 const allureResultsDir = path.join(artifactDir, "allure-results");
 const executiveDir = path.join(artifactDir, "executive");
 
-// PE official P1 includes Base Store + EPP. This runner is intentionally Base Store only,
-// matching the current MX Base Store P1 campaign semantics. EPP remains a separate scope.
 const PE_BASE_P1_IDS = Object.freeze(
   Object.entries(reusePlan.cases)
     .filter(([, entry]) => entry.store === "BS")
@@ -57,7 +57,7 @@ if (duplicateIds.length) {
 }
 
 const args = [
-  playwrightCli, "test", "tests/s1/pe/qst/base-store",
+  playwrightCli, "test", qstPath,
   "--project=chromium", "--workers=1", "--retries=0",
   "--grep", p1Pattern,
   "--output", path.join(artifactDir, "playwright"),
@@ -124,7 +124,6 @@ if (fs.existsSync(reportFile)) {
   console.log(`\nPE ${targetEnvironment} BASE STORE P1 SUMMARY`);
   console.log(`Official=${runtimeSummary.summary.official} Executed=${runtimeSummary.summary.executed} Passed=${runtimeSummary.summary.passed} Failed=${runtimeSummary.summary.failed} Blocked=${runtimeSummary.summary.blocked} NotRun=${runtimeSummary.summary.notRun}`);
 
-  // A partial PE stabilization campaign must never be reported as an official full PASS.
   if (runtimeSummary.summary.notRun > 0 || runtimeSummary.summary.blocked > 0 || runtimeSummary.summary.failed > 0) {
     process.exitCode = result.status || 1;
   } else {
