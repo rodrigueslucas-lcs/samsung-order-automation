@@ -1,6 +1,6 @@
 # Scripts
 
-This folder currently contains CLIs from several concerns that accumulated during the project evolution.
+This folder contains executable CLIs from several concerns that accumulated during the project evolution. The file names remain flat for the current MX runtime-acceptance checkpoint so authentication/Jenkins entry points are not churned at the same time as test discovery.
 
 ## Current categories
 
@@ -20,7 +20,23 @@ Allure enrichment/deduplication, dashboard preview and reporting smoke scripts s
 
 `print-*`, `validate-*`, PreQA2 planning/reconciliation and ledger scripts expose scope, mapping and campaign governance.
 
+## Architecture controls
+
+```bash
+npm run repo:architecture:validate
+npm run repo:legacy:audit
+npm run repo:legacy:audit:strict
+```
+
+- `repo:architecture:validate` checks required/forbidden boundaries and temporary mirror parity.
+- `repo:legacy:audit` prints any compatibility-boundary references that remain outside the hidden mirror trees.
+- `repo:legacy:audit:strict` exits non-zero when actionable runtime/code references remain.
+
+The active Jenkins/MX/PE runners are guarded against regressing to `tests/s1`, `tests/s2`, `reporters/` or `test-mapping/`.
+
 ## Target structure
+
+After the canonical MX runtime acceptance checkpoint, executable scripts can be moved atomically to:
 
 ```text
 scripts/
@@ -30,6 +46,6 @@ scripts/
   governance/
 ```
 
-The current flat paths remain a compatibility contract because `package.json`, Jenkins and scripts call one another by explicit path. Move them only as an atomic migration with every caller updated in the same change.
+This must be an executable move, not a cosmetic copy, because scripts use relative `../utils`, sibling script calls and explicit package/Jenkins entry points.
 
-A script that looks small or historical is not automatically dead. Governance wrapper scripts can intentionally be thin entry points over utilities.
+A script that looks small or historical is not automatically dead. Governance wrappers can intentionally be thin CLI entry points over utilities. Deletion requires both reference audit and runtime/contract evidence.
