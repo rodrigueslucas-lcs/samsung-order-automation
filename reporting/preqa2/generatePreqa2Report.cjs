@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
-const registry = require("../../test-mapping/smb-qst.json");
-const ledger = require("../../test-mapping/preqa2-validation.json");
-const mxCoverage = require("../../test-mapping/mx-qst-coverage.json");
-const peReuse = require("../../test-mapping/pe-qst-reuse-plan.json");
+const registry = require("../../governance/smb-qst.json");
+const ledger = require("../../governance/preqa2-validation.json");
+const mxCoverage = require("../../governance/mx-qst-coverage.json");
+const peReuse = require("../../governance/pe-qst-reuse-plan.json");
 const { validatePreqa2ValidationLedger } = require("../../utils/preqa2ValidationLedger");
 const { validateS1OfficialImplementation } = require("../../utils/qstS1Implementation");
 const { sanitizeString } = require("../evidence/sanitizer");
