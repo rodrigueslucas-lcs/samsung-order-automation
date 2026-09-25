@@ -62,6 +62,16 @@ test.describe("PE QST - official safe gap reconciliation", () => {
     await cart.validateTradeInSummaryAmount();
   });
 
+  test.skip("SAM-25076 @qst @pe @base-store @not-run - Verify Trade-up on cart page", async ({}, testInfo) => {
+    evidence(testInfo, "SAM-25076");
+    testInfo.annotations.push({ type: "qst-not-run-reason", description: "Current PE Trade-up semantics and UI are not yet proven in S2; keep explicit in official scope instead of inventing selectors or behavior." });
+  });
+
+  test.skip("SAM-25099 @qst @pe @base-store @not-run - Verify Order Confirmation page", async ({}, testInfo) => {
+    evidence(testInfo, "SAM-25099");
+    testInfo.annotations.push({ type: "qst-not-run-reason", description: "Order Confirmation requires an authorized order-placement prerequisite and current PE confirmation-page proof; keep explicit in official scope until that runtime path is validated." });
+  });
+
   test("SAM-25094 @qst @pe @base-store @safe - Verify Back to Top", async ({ page }, testInfo) => {
     evidence(testInfo, "SAM-25094");
     const cfg = config();
