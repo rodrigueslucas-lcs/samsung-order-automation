@@ -1,6 +1,6 @@
-const registry = require("../test-mapping/smb-qst.json");
-const mxCoverage = require("../test-mapping/mx-qst-coverage.json");
-const peReuse = require("../test-mapping/pe-qst-reuse-plan.json");
+const registry = require("../governance/smb-qst.json");
+const mxCoverage = require("../governance/mx-qst-coverage.json");
+const peReuse = require("../governance/pe-qst-reuse-plan.json");
 
 const REGISTERED = new Set([
   // MX official titles/coverage notes explicitly require registered/account state.
