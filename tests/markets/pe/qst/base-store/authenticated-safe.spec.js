@@ -10,18 +10,18 @@ const {
   getPeAuthState,
   hasPeAuthState,
 } = peAuthStateModule;
-const { getPeS1QstConfig } = peConfigModule;
+const { getPeQstConfig } = peConfigModule;
 const { recordBusinessEvidence } = evidenceContext;
 const { getPeQstEvidenceMetadata } = peEvidenceMetadata;
 
-test.describe("PE S1 QST - authenticated safe reuse", () => {
+test.describe("PE QST - authenticated safe reuse", () => {
   test.use({ storageState: hasPeAuthState() ? PE_AUTH_STATE_PATH : undefined });
 
   test.beforeEach(async ({ context }) => {
-    test.skip(!process.env.PE_STOREFRONT_URL, "PE_STOREFRONT_URL is required for PE S1 authenticated QSTs.");
+    test.skip(!process.env.PE_STOREFRONT_URL, "PE_STOREFRONT_URL is required for PE authenticated QSTs.");
     test.skip(
       !hasPeAuthState(),
-      "Authenticated PE S1 state is required in the dedicated ignored PE auth artifacts."
+      "Authenticated PE state is required in the dedicated ignored PE auth artifacts."
     );
     const auth = getPeAuthState();
     await auth.applyAuthSessionStorage(context);
@@ -34,14 +34,14 @@ test.describe("PE S1 QST - authenticated safe reuse", () => {
     const auth = getPeAuthState();
     await auth.validateAuthenticatedSession(page);
 
-    const config = getPeS1QstConfig();
+    const config = getPeQstConfig();
     const finalUrl = new URL(page.url());
     expect(finalUrl.hostname).toBe(config.baseUrl.hostname);
     expect(finalUrl.pathname.toLowerCase()).toBe("/pe/");
 
     testInfo.annotations.push({
       type: "qst-reuse-note",
-      description: "Restored authenticated S1 PE session is validated on Home. This reuses the proven ST2 auth-state pattern; refresh/export remains a legitimate human-auth bootstrap, not an SSO bypass.",
+      description: "Restored authenticated PE session is validated on Home. This reuses the proven ST2 auth-state pattern; refresh/export remains a legitimate human-auth bootstrap, not an SSO bypass.",
     });
   });
 
@@ -52,7 +52,7 @@ test.describe("PE S1 QST - authenticated safe reuse", () => {
     const auth = getPeAuthState();
     await auth.validateAuthenticatedSession(page);
 
-    const config = getPeS1QstConfig();
+    const config = getPeQstConfig();
     const myOrders = new MyOrdersPage(page, {
       origin: config.baseUrl.origin,
       market: "pe",
