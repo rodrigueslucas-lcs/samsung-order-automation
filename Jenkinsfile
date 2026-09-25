@@ -296,7 +296,22 @@ pipeline {
       }
     }
 
-    stage('07 · Official P1') {
+    stage('07 · PreQA2 CDP Preflight') {
+      when { expression { return params.MARKET == 'MX' && params.TEST_SUITE == 'official-p1' } }
+      steps {
+        script {
+          def preflightStatus = isUnix()
+            ? sh(script: 'node scripts/preqa2-cdp-preflight.cjs', returnStatus: true)
+            : bat(script: '@node scripts/preqa2-cdp-preflight.cjs', returnStatus: true)
+          if (preflightStatus != 0) {
+            env.PREQA2_PREFLIGHT_FAILED = '1'
+            error('PREQA2 PREFLIGHT FAILURE: Official P1 was not started. Restore WMC -> Samsung Employees -> AD SSO Login -> QA / PreQA2 on the Chrome CDP endpoint, then rerun.')
+          }
+        }
+      }
+    }
+
+    stage('08 · Official P1') {
       when { expression { return params.TEST_SUITE == 'official-p1' } }
       steps {
         script {
@@ -381,7 +396,7 @@ pipeline {
       }
     }
 
-    stage('08 · Finalize Reports') {
+    stage('09 · Finalize Reports') {
       when { expression { return params.TEST_SUITE != 'allure-smoke' } }
       steps {
         script {
@@ -407,7 +422,7 @@ pipeline {
       }
     }
 
-    stage('09 · Quality Summary') {
+    stage('10 · Quality Summary') {
       steps {
         script {
           def suiteLabel = env.JENKINS_SUITE_LABEL ?: params.TEST_SUITE.toUpperCase()
@@ -433,36 +448,39 @@ pipeline {
         else bat '@if exist playwright\\.auth rmdir /S /Q playwright\\.auth'
       }
 
-      archiveArtifacts artifacts: 'test-results/**/*, playwright-report/**/*', allowEmptyArchive: true, fingerprint: true
-
       script {
-        if (params.TEST_SUITE == 'allure-smoke') {
-          publishHTML(target: [
-            allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
-            reportDir: 'test-results/reporter-tests/allure-smoke/allure-report',
-            reportFiles: 'index.html',
-            reportName: 'Samsung Reporting · Allure Smoke'
-          ])
+        if (env.PREQA2_PREFLIGHT_FAILED == '1') {
+          echo 'PREQA2 PREFLIGHT FAILURE: no Official P1 runtime/report artifacts published because no TCs were executed.'
         } else {
-          publishHTML(target: [
-            allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
-            reportDir: "${env.JENKINS_ARTIFACT_DIR}/executive",
-            reportFiles: 'index.html',
-            reportName: "01 · Samsung ${params.MARKET} ${params.ENVIRONMENT} ${env.JENKINS_SUITE_LABEL} · Executive Dashboard"
-          ])
-          publishHTML(target: [
-            allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
-            reportDir: params.MARKET == 'MX' && params.TEST_SUITE == 'official-p1' ? 'playwright-report' : "${env.JENKINS_ARTIFACT_DIR}/playwright-report",
-            reportFiles: 'index.html',
-            reportName: "02 · Samsung ${params.MARKET} ${params.ENVIRONMENT} ${env.JENKINS_SUITE_LABEL} · Playwright"
-          ])
-          if (env.NATIVE_ALLURE_PUBLISHED != '1') {
+          archiveArtifacts artifacts: 'test-results/**/*, playwright-report/**/*', allowEmptyArchive: true, fingerprint: true
+          if (params.TEST_SUITE == 'allure-smoke') {
             publishHTML(target: [
               allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
-              reportDir: "${env.JENKINS_ARTIFACT_DIR}/allure-report",
+              reportDir: 'test-results/reporter-tests/allure-smoke/allure-report',
               reportFiles: 'index.html',
-              reportName: "03 · Samsung ${params.MARKET} ${params.ENVIRONMENT} ${env.JENKINS_SUITE_LABEL} · Allure HTML"
+              reportName: 'Samsung Reporting · Allure Smoke'
             ])
+          } else {
+            publishHTML(target: [
+              allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
+              reportDir: "${env.JENKINS_ARTIFACT_DIR}/executive",
+              reportFiles: 'index.html',
+              reportName: "01 · Samsung ${params.MARKET} ${params.ENVIRONMENT} ${env.JENKINS_SUITE_LABEL} · Executive Dashboard"
+            ])
+            publishHTML(target: [
+              allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
+              reportDir: params.MARKET == 'MX' && params.TEST_SUITE == 'official-p1' ? 'playwright-report' : "${env.JENKINS_ARTIFACT_DIR}/playwright-report",
+              reportFiles: 'index.html',
+              reportName: "02 · Samsung ${params.MARKET} ${params.ENVIRONMENT} ${env.JENKINS_SUITE_LABEL} · Playwright"
+            ])
+            if (env.NATIVE_ALLURE_PUBLISHED != '1') {
+              publishHTML(target: [
+                allowMissing: true, alwaysLinkToLastBuild: true, keepAll: true,
+                reportDir: "${env.JENKINS_ARTIFACT_DIR}/allure-report",
+                reportFiles: 'index.html',
+                reportName: "03 · Samsung ${params.MARKET} ${params.ENVIRONMENT} ${env.JENKINS_SUITE_LABEL} · Allure HTML"
+              ])
+            }
           }
         }
       }
@@ -480,9 +498,15 @@ pipeline {
     unsuccessful {
       script {
         def suiteLabel = env.JENKINS_SUITE_LABEL ?: params.TEST_SUITE.toUpperCase()
-        currentBuild.displayName = "#${env.BUILD_NUMBER} · ${params.MARKET} · ${params.ENVIRONMENT} · ${suiteLabel} · ${currentBuild.currentResult}"
-        currentBuild.description = "${currentBuild.currentResult} | Samsung SMB | ${params.MARKET} ${params.ENVIRONMENT} | ${suiteLabel} | Review Executive Dashboard / Playwright / Allure"
-        echo "${currentBuild.currentResult} · Samsung SMB automation build did not complete successfully. Review the Executive Dashboard and archived Playwright/Allure evidence."
+        if (env.PREQA2_PREFLIGHT_FAILED == '1') {
+          currentBuild.displayName = "#${env.BUILD_NUMBER} · ${params.MARKET} · ${params.ENVIRONMENT} · ${suiteLabel} · PREQA2 PREFLIGHT FAILURE"
+          currentBuild.description = 'PREQA2 PREFLIGHT FAILURE | Official P1 not started; restore WMC/PreQA2 CDP session.'
+          echo 'PREQA2 PREFLIGHT FAILURE · Official P1 did not run. No test result was produced.'
+        } else {
+          currentBuild.displayName = "#${env.BUILD_NUMBER} · ${params.MARKET} · ${params.ENVIRONMENT} · ${suiteLabel} · ${currentBuild.currentResult}"
+          currentBuild.description = "${currentBuild.currentResult} | Samsung SMB | ${params.MARKET} ${params.ENVIRONMENT} | ${suiteLabel} | Review Executive Dashboard / Playwright / Allure"
+          echo "${currentBuild.currentResult} · Samsung SMB automation build did not complete successfully. Review the Executive Dashboard and archived Playwright/Allure evidence."
+        }
       }
     }
   }
