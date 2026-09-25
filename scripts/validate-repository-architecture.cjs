@@ -15,7 +15,7 @@ const required = [
   "tests/legacy/README.md",
   "tests/markets/mx/qst/base-store",
   "tests/markets/mx/dst/base-store",
-  "tests/markets/pe",
+  "tests/markets/pe/qst/base-store",
   "tests/markets/shared",
   "tests/legacy/pe-s2",
   "reporting/README.md",
@@ -28,6 +28,7 @@ const required = [
   "scripts/README.md",
   "utils/README.md",
   "config/README.md",
+  ".vscode/settings.json",
 ];
 
 const forbidden = [
@@ -38,6 +39,13 @@ const forbidden = [
   "fixtures/address.json",
   "fixtures/billingAddress.json",
   "fixtures/customer.json",
+];
+
+const compatibilityRoots = [
+  "tests/s1",
+  "tests/s2",
+  "reporters",
+  "test-mapping",
 ];
 
 const missing = required.filter((entry) => !exists(entry));
@@ -57,6 +65,26 @@ function forbidLiteral(file, literals) {
   }
 }
 
+function validateVsCodeCompatibilityHiding() {
+  if (!exists(".vscode/settings.json")) return;
+  let settings;
+  try {
+    settings = JSON.parse(read(".vscode/settings.json"));
+  } catch (error) {
+    boundaryFailures.push(`.vscode/settings.json: invalid JSON (${error.message})`);
+    return;
+  }
+
+  for (const rootName of compatibilityRoots) {
+    if (settings["files.exclude"]?.[rootName] !== true) {
+      boundaryFailures.push(`.vscode/settings.json: files.exclude must hide temporary compatibility root ${rootName}`);
+    }
+    if (settings["search.exclude"]?.[rootName] !== true) {
+      boundaryFailures.push(`.vscode/settings.json: search.exclude must hide temporary compatibility root ${rootName}`);
+    }
+  }
+}
+
 // These are production entry points, not compatibility mirrors. Once cut over,
 // they must stay on the canonical market/reporting/governance boundaries.
 forbidLiteral("Jenkinsfile", ["tests/s1/", "tests/s2/", "reporters/", "test-mapping/"]);
@@ -67,6 +95,7 @@ forbidLiteral("scripts/run-pe-qst-p1.cjs", ["tests/s1/", "tests/s2/", "reporters
 // package.json may intentionally expose commands named "legacy", but executable
 // paths must point at tests/legacy or canonical boundaries rather than s1/s2.
 forbidLiteral("package.json", ["tests/s1/", "tests/s2/", "reporters/", "test-mapping/"]);
+validateVsCodeCompatibilityHiding();
 
 if (missing.length || resurrected.length || boundaryFailures.length) {
   console.error("[repo-architecture] FAIL");
@@ -82,4 +111,5 @@ console.log("[repo-architecture] Historical PE S2 generation is explicit under t
 console.log("[repo-architecture] Reporting ownership is canonical under reporting/.");
 console.log("[repo-architecture] Governance ownership is canonical under governance/.");
 console.log("[repo-architecture] Active CI/runners no longer depend on s1/s2, reporters or test-mapping compatibility boundaries.");
+console.log("[repo-architecture] VS Code hides temporary compatibility roots from normal engineer navigation/search.");
 console.log("[repo-architecture] Hidden compatibility trees remain temporarily only for runtime acceptance and safe deletion.");
