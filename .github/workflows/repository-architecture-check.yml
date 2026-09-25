@@ -1,0 +1,55 @@
+name: Repository Architecture Check
+
+on:
+  push:
+    branches:
+      - agent/market-first-layout
+  pull_request:
+    paths:
+      - 'tests/**'
+      - 'scripts/**'
+      - 'utils/**'
+      - 'reporters/**'
+      - 'test-mapping/**'
+      - 'config/**'
+      - 'Jenkinsfile'
+      - 'playwright.config.js'
+      - 'package.json'
+      - '.github/workflows/repository-architecture-check.yml'
+
+jobs:
+  static-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate repository architecture
+        run: npm run repo:architecture:validate
+
+      - name: Validate official SMB scope
+        run: npm run qst:official:gate
+
+      - name: Validate QST governance mappings
+        run: npm run qst:mapping:validate
+
+      - name: List active MX S2 official P1
+        env:
+          MX_QST_ENVIRONMENT: S2
+        run: npm run qst:mx:list
+
+      - name: Validate runtime reporting contracts
+        run: npm run reporting:mx-runtime:test
+
+      - name: Validate PreQA2 reporting contracts
+        run: npm run reporting:preqa2:test
