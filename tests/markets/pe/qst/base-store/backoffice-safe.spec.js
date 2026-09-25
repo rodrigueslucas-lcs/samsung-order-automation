@@ -2,32 +2,27 @@ import { expect, test } from "@playwright/test";
 import BackOfficeOrderPage from "../../../../../pages/BackOfficeOrderPage";
 import evidenceContext from "../../../../../reporting/evidence/evidenceContext";
 import peEvidenceMetadata from "../../../../../utils/qstPeEvidenceMetadata";
+import backofficeCredentials from "../../../../../utils/backofficeAdminCredentials.js";
 
 const { recordBusinessEvidence } = evidenceContext;
 const { getPeQstEvidenceMetadata } = peEvidenceMetadata;
+const { getBackOfficeAdminCredentials } = backofficeCredentials;
 
-const credentials = {
-  username: process.env.BACKOFFICE_USERNAME,
-  password: process.env.BACKOFFICE_PASSWORD,
-};
-
-function requirePeS1BackOffice(testInfo, zephyrId) {
-  test.skip(
-    (process.env.BACKOFFICE_ENV || "").toLowerCase() !== "s1",
-    "Set BACKOFFICE_ENV=s1 for PE S1 BackOffice validation."
-  );
-  test.skip(
-    !credentials.username || !credentials.password,
-    "BACKOFFICE_USERNAME and BACKOFFICE_PASSWORD are required at runtime."
-  );
+function requirePeBackOffice(testInfo, zephyrId) {
+  const target = (process.env.PE_QST_ENVIRONMENT || "S2").toLowerCase();
+  process.env.BACKOFFICE_ENV = target;
+  const credentials = getBackOfficeAdminCredentials();
+  test.skip(!credentials.password, `PE BackOffice ${target.toUpperCase()} Admin credentials are required via the shared environment-specific ignored auth file or runtime env.`);
+  expect(credentials.environment).toBe(target);
   recordBusinessEvidence(testInfo, getPeQstEvidenceMetadata(zephyrId));
+  return credentials;
 }
 
 test.use({ screenshot: "off", video: "off", trace: "off" });
 
 test("SAM-25103 @qst @pe @base-store @backoffice @safe @reuse - Backoffice search baseline", async ({ page }, testInfo) => {
   test.setTimeout(300000);
-  requirePeS1BackOffice(testInfo, "SAM-25103");
+  const credentials = requirePeBackOffice(testInfo, "SAM-25103");
 
   const orders = new BackOfficeOrderPage(page);
   await orders.login({ ...credentials, authority: "admin" });
@@ -42,18 +37,18 @@ test("SAM-25103 @qst @pe @base-store @backoffice @safe @reuse - Backoffice searc
   });
   testInfo.annotations.push({
     type: "qst-reuse-note",
-    description: "S1 Admin order search/read baseline is proven by this test when it passes. Official SAM-25103 still requires product search plus basic/advanced search coverage before Full.",
+    description: "S2 Admin order search/read baseline is proven by this test when it passes. Official SAM-25103 still requires product search plus basic/advanced search coverage before Full.",
   });
 });
 
 test("SAM-25104 @qst @pe @base-store @backoffice @safe @reuse - Order Process Shipping Requested baseline", async ({ page }, testInfo) => {
   test.setTimeout(300000);
-  requirePeS1BackOffice(testInfo, "SAM-25104");
+  const credentials = requirePeBackOffice(testInfo, "SAM-25104");
 
   const orderCode = String(process.env.PE_QST_ORDER_CODE || "").trim();
   test.skip(
     !orderCode,
-    "Set PE_QST_ORDER_CODE to the specific PE order whose S1 fulfillment status is being verified."
+    "Set PE_QST_ORDER_CODE to the specific PE order whose S2 fulfillment status is being verified."
   );
 
   const orders = new BackOfficeOrderPage(page);
