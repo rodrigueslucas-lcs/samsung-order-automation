@@ -2,11 +2,15 @@ import { test, expect } from "@playwright/test";
 import peConfigModule from "../../../../../config/markets/pe";
 import evidenceContext from "../../../../../reporting/evidence/evidenceContext";
 import peEvidenceMetadata from "../../../../../utils/qstPeEvidenceMetadata";
+import destructiveGuards from "../../../../../utils/destructiveGuards";
+import PaymentPage from "../../../../../pages/PaymentPage";
+import OrderConfirmationPage from "../../../../../pages/OrderConfirmationPage";
 import { addConfiguredProductToPeCart, reachPeGuestPayment } from "./peQstFlows";
 
 const { getPeQstConfig } = peConfigModule;
 const { recordBusinessEvidence } = evidenceContext;
 const { getPeQstEvidenceMetadata } = peEvidenceMetadata;
+const { requirePaymentSubmitOptIn } = destructiveGuards;
 
 function config() {
   test.skip(!process.env.PE_STOREFRONT_URL, "PE_STOREFRONT_URL is required.");
@@ -62,14 +66,57 @@ test.describe("PE QST - official safe gap reconciliation", () => {
     await cart.validateTradeInSummaryAmount();
   });
 
-  test.skip("SAM-25076 @qst @pe @base-store @not-run - Verify Trade-up on cart page", async ({}, testInfo) => {
+  test("SAM-25076 @qst @pe @base-store @safe - Verify Trade-up on cart page", async ({ page }, testInfo) => {
     evidence(testInfo, "SAM-25076");
-    testInfo.annotations.push({ type: "qst-not-run-reason", description: "Current PE Trade-up semantics and UI are not yet proven in S2; keep explicit in official scope instead of inventing selectors or behavior." });
+    const cfg = config();
+    const cart = await addConfiguredProductToPeCart(page, cfg);
+    await cart.validateControlledSingleSku(cfg.sku);
+
+    const tradeUp = page
+      .getByText(/Plan Canje Galaxy|Plan Renueva|Canje Galaxy|Trade[- ]?up/i)
+      .filter({ visible: true })
+      .first();
+    await expect(tradeUp, "The validated PE Flip6 cart should expose the Trade-up/Plan Canje surface.").toBeVisible({ timeout: 30000 });
+
+    const serviceCard = tradeUp.locator("xpath=ancestor::*[.//*[normalize-space()='Añadir']][1]");
+    const add = serviceCard.getByText(/Añadir|Agregar/i, { exact: true }).filter({ visible: true }).first();
+    await expect(add).toBeVisible({ timeout: 30000 });
+    await add.click();
+
+    await expect(
+      page.getByText(/Selecciona el dispositivo|Recibe una oferta|dispositivo actual|Plan Canje/i)
+        .filter({ visible: true })
+        .last()
+    ).toBeVisible({ timeout: 30000 });
+
+    await page.keyboard.press("Escape");
+    await expect(page).toHaveURL(/\/pe\/cart/i);
+    await cart.validateControlledSingleSku(cfg.sku);
+    recordBusinessEvidence(testInfo, { tradeUpSurfaceOpened: true, controlledSkuPreserved: cfg.sku });
   });
 
-  test.skip("SAM-25099 @qst @pe @base-store @not-run - Verify Order Confirmation page", async ({}, testInfo) => {
+  test("SAM-25099 @destructive @qst @pe @base-store - Verify Order Confirmation page", async ({ page }, testInfo) => {
+    test.setTimeout(600000);
+    requirePaymentSubmitOptIn();
     evidence(testInfo, "SAM-25099");
-    testInfo.annotations.push({ type: "qst-not-run-reason", description: "Order Confirmation requires an authorized order-placement prerequisite and current PE confirmation-page proof; keep explicit in official scope until that runtime path is validated." });
+    const cfg = config();
+    const { payment } = await reachPeGuestPayment(page, cfg, { expectedPaymentMode: /^Banca por Internet\b/i });
+    await payment.selectBancaPorInternet();
+    const result = await payment.submitSelectedPaymentMode();
+    expect(result.orderCode, `Authorized PE order submit produced no observable order code. Outcome: ${result.type}`).toMatch(/^PE\d{6}-\d{8}(?:_\d+)?$/i);
+
+    if (/confirmation|confirmacion|order-confirmation|checkout\/order|success/i.test(page.url())) {
+      const confirmation = new OrderConfirmationPage(page);
+      const confirmationOrder = await confirmation.validateOrderCreated();
+      expect(confirmationOrder).toContain(result.orderCode.replace(/^PE/i, ""));
+    }
+
+    recordBusinessEvidence(testInfo, {
+      orderCode: result.orderCode,
+      outcome: result.type,
+      paymentMode: "Banca por Internet",
+      authorizedSubmit: true,
+    });
   });
 
   test("SAM-25094 @qst @pe @base-store @safe - Verify Back to Top", async ({ page }, testInfo) => {
