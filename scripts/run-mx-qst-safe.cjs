@@ -21,7 +21,8 @@ const allureResultsDir = path.join(artifactDir, "allure-results");
 const allureReportDir = path.join(artifactDir, "allure-report");
 fs.mkdirSync(path.dirname(reportFile), { recursive: true });
 const playwrightCli = path.resolve("node_modules/@playwright/test/cli.js");
-const qstRoot = path.resolve("tests/s1/mx/qst/base-store");
+const qstPath = "tests/markets/mx/qst/base-store";
+const qstRoot = path.resolve(qstPath);
 
 const executionArtifacts = [
   path.resolve("playwright-report"),
@@ -100,7 +101,7 @@ for (const exclusion of Object.values(MX_BASE_P1_EXCLUSIONS)) {
 
 if (listOnly) {
   const listed = spawnSync(process.execPath, [
-    playwrightCli, "test", "tests/s1/mx/qst/base-store",
+    playwrightCli, "test", qstPath,
     "--project=chromium", "--grep", p1Pattern, "--list", "--reporter=list",
   ], { stdio: "inherit" });
   process.exit(listed.status ?? 1);
@@ -206,7 +207,7 @@ for (const target of executionArtifacts) fs.rmSync(target, { recursive: true, fo
 // until an isolated multi-worker lane is runtime-proven. Targeted execution is
 // the safe speed-up for stabilization work.
 const playwrightArgs = [
-  playwrightCli, "test", "tests/s1/mx/qst/base-store",
+  playwrightCli, "test", qstPath,
   "--project=mx-auth-priority", "--project=chromium",
   "--workers=1", "--retries=0",
   "--grep", p1Pattern, "--output", path.join(artifactDir, "playwright"),
