@@ -19,7 +19,8 @@ const configEnv = {
 };
 const config = getPeQstConfig(configEnv);
 const environmentLabel = config.environmentLabel;
-const root = path.resolve("tests/s1/pe/qst/base-store");
+const qstPath = "tests/markets/pe/qst/base-store";
+const root = path.resolve(qstPath);
 const playwrightCli = path.resolve("node_modules/@playwright/test/cli.js");
 const artifactDir = path.resolve(process.env.PE_QST_ARTIFACT_DIR || process.env.MX_QST_ARTIFACT_DIR || "test-results/jenkins/pe-qst");
 const reportFile = path.join(artifactDir, "results.json");
@@ -57,7 +58,7 @@ if (duplicateIds.length) {
 }
 
 const args = [
-  playwrightCli, "test", "tests/s1/pe/qst/base-store",
+  playwrightCli, "test", qstPath,
   "--project=chromium", "--workers=1", "--retries=0",
   "--grep", p1Pattern,
   "--output", path.join(artifactDir, "playwright"),
@@ -124,7 +125,6 @@ if (fs.existsSync(reportFile)) {
   console.log(`\nPE ${targetEnvironment} BASE STORE P1 SUMMARY`);
   console.log(`Official=${runtimeSummary.summary.official} Executed=${runtimeSummary.summary.executed} Passed=${runtimeSummary.summary.passed} Failed=${runtimeSummary.summary.failed} Blocked=${runtimeSummary.summary.blocked} NotRun=${runtimeSummary.summary.notRun}`);
 
-  // A partial PE stabilization campaign must never be reported as an official full PASS.
   if (runtimeSummary.summary.notRun > 0 || runtimeSummary.summary.blocked > 0 || runtimeSummary.summary.failed > 0) {
     process.exitCode = result.status || 1;
   } else {
