@@ -1,5 +1,5 @@
-const registry = require("../test-mapping/smb-qst.json");
-const defaultLedger = require("../test-mapping/preqa2-validation.json");
+const registry = require("../governance/smb-qst.json");
+const defaultLedger = require("../governance/preqa2-validation.json");
 const { getPreqa2CampaignPlan, MARKET_ORDER } = require("./preqa2CampaignPlan");
 const { validateS1OfficialImplementation } = require("./qstS1Implementation");
 
