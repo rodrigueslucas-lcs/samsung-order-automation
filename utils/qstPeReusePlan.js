@@ -75,8 +75,8 @@ function validatePeQstReusePlan({
       if (entry.candidate !== null) {
         throw new Error(`${id} is missing and must not point to a candidate spec.`);
       }
-    } else if (!entry.candidate || !String(entry.candidate).startsWith("tests/s2/pe/qst/")) {
-      throw new Error(`${id} reuse candidate must point to existing PE ST2 QST architecture.`);
+    } else if (!entry.candidate || !String(entry.candidate).startsWith("tests/legacy/pe-s2/qst/")) {
+      throw new Error(`${id} reuse candidate must point to the explicit PE S2 legacy QST tree.`);
     }
     counts[entry.reuse] += 1;
   }
