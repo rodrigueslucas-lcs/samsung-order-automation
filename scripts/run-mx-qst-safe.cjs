@@ -4,9 +4,10 @@ const path = require("node:path");
 const { hasAuthState, hasVerifiedAuthState } = require("../utils/mxAuthState");
 const preqa2Ledger = require("../test-mapping/preqa2-validation.json");
 const { writeMxS1RuntimeResults } = require("../utils/mxS1RuntimeLedger");
-const { testTitles } = require("../utils/qstS1Implementation");
+const { testTitles } = require("../utils/qstImplementation");
 const { buildMxQstRuntimeSummary, writeRuntimeSummary } = require("../utils/mxQstRuntimeSummary.cjs");
 const { MX_BASE_P1_IDS, MX_BASE_P1_EXCLUSIONS } = require("../utils/mxQstScope.cjs");
+const { TEST_PATHS, resolveTestPath } = require("../config/testPaths.cjs");
 
 const listOnly = process.argv.includes("--list");
 const targetEnvironment = String(process.env.MX_QST_ENVIRONMENT || "S1").toUpperCase();
@@ -21,7 +22,8 @@ const allureResultsDir = path.join(artifactDir, "allure-results");
 const allureReportDir = path.join(artifactDir, "allure-report");
 fs.mkdirSync(path.dirname(reportFile), { recursive: true });
 const playwrightCli = path.resolve("node_modules/@playwright/test/cli.js");
-const qstRoot = path.resolve("tests/s1/mx/qst/base-store");
+const qstPath = TEST_PATHS.mx.qstBaseStore;
+const qstRoot = resolveTestPath(qstPath);
 
 const executionArtifacts = [
   path.resolve("playwright-report"),
@@ -100,7 +102,7 @@ for (const exclusion of Object.values(MX_BASE_P1_EXCLUSIONS)) {
 
 if (listOnly) {
   const listed = spawnSync(process.execPath, [
-    playwrightCli, "test", "tests/s1/mx/qst/base-store",
+    playwrightCli, "test", qstPath,
     "--project=chromium", "--grep", p1Pattern, "--list", "--reporter=list",
   ], { stdio: "inherit" });
   process.exit(listed.status ?? 1);
@@ -157,9 +159,6 @@ if (authVerification.status !== 0) {
   }
 }
 
-// SAM-24986 is the only active P1 case that requires the dedicated second
-// authenticated account. Do not spend time validating that credential when a
-// targeted lane does not execute this scenario.
 if (targetEnvironment === "S2" && selectedP1Set.has("SAM-24986")) {
   const suffix = targetEnvironment.toLowerCase();
   const secondAuthPath = path.resolve(`playwright/.auth/mx-${suffix}-second-user.json`);
@@ -201,12 +200,8 @@ console.log(`[mx-qst] PreQA2 CDP endpoint for SAM-24969: ${qstExecutionEnv.PREQA
 
 for (const target of executionArtifacts) fs.rmSync(target, { recursive: true, force: true });
 
-// Keep the established one-worker full-P1 behavior. Registered/account/cart
-// scenarios share state, so broad parallelism is intentionally not enabled
-// until an isolated multi-worker lane is runtime-proven. Targeted execution is
-// the safe speed-up for stabilization work.
 const playwrightArgs = [
-  playwrightCli, "test", "tests/s1/mx/qst/base-store",
+  playwrightCli, "test", qstPath,
   "--project=mx-auth-priority", "--project=chromium",
   "--workers=1", "--retries=0",
   "--grep", p1Pattern, "--output", path.join(artifactDir, "playwright"),
@@ -219,9 +214,6 @@ const result = spawnSync(process.execPath, playwrightArgs, {
   stdio: "inherit",
 });
 
-// Jenkins finalization already generates/publishes Allure HTML from the raw
-// results. Avoid generating the same HTML twice in CI; local runs keep the
-// convenience report exactly as before. Video capture is untouched.
 if (!process.env.CI && process.env.ENABLE_ALLURE === "1" && fs.existsSync(allureResultsDir)) {
   const allureCli = process.platform === "win32"
     ? path.resolve("node_modules/.bin/allure.cmd")
