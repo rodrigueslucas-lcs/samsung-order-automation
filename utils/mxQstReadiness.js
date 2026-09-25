@@ -1,9 +1,9 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const registry = require("../test-mapping/smb-qst.json");
-const coverage = require("../test-mapping/mx-qst-coverage.json");
-const ledger = require("../test-mapping/preqa2-validation.json");
+const registry = require("../governance/smb-qst.json");
+const coverage = require("../governance/mx-qst-coverage.json");
+const ledger = require("../governance/preqa2-validation.json");
 const { collectMarketImplementation } = require("./qstS1Implementation");
 
 const PREQA_SAFE_RUNNER = path.resolve("scripts/preqa2-safe-validation.cjs");
