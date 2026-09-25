@@ -1,4 +1,4 @@
-import sanitizer from "../reporters/evidence/sanitizer.js";
+import sanitizer from "../reporting/evidence/sanitizer.js";
 
 const { sanitize } = sanitizer;
 const BODY_PREVIEW_LIMIT = 20000;
