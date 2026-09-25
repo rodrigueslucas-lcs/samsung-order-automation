@@ -7,7 +7,7 @@ import { testData } from "../../../../../utils/testData";
 
 export async function addConfiguredProductToPeCart(page, config) {
   const product = new ProductPage(page, {
-    setupUrl: null,
+    setupUrl: config.setupUrl?.href || null,
     sku: config.sku,
     pdpUrl: config.pdpUrl.href,
     cartUrl: config.cartUrl.href,
