@@ -11,6 +11,7 @@ Use this page as the documentation entry point. Current runtime contracts are li
 - [Jenkins setup](JENKINS_SETUP.md) — CI orchestration, credentials and targeted P1 execution.
 - [Executive Report V3](EXECUTIVE_REPORT_V3.md) — Executive Dashboard contract.
 - [MX QST coverage and runner](MX_QST_COVERAGE_MATRIX.md) — active MX Base Store automation scope.
+- [PE canonical market ownership](../tests/markets/pe/README.md) — current PE destination and dual-generation reconciliation rule.
 
 Official Samsung priority model: **362 DST rows = 144 P1/QST + 218 P2/DST-only** across MX, PE, CL and CO.
 
@@ -28,6 +29,8 @@ MX S2 official Base Store P1
 0 NOT_RUN
 ```
 
+This baseline proves the pre-canonical-path runtime behavior. The current refactor branch still requires a post-cutover official MX acceptance run before temporary compatibility mirrors are physically deleted.
+
 Runtime result, implementation coverage, official scope and historical ledger state remain separate dimensions.
 
 ## Test navigation
@@ -41,15 +44,17 @@ tests/markets/shared
 tests/legacy/pe-s2
 ```
 
-`tests/s1/**` and `tests/s2/**` are temporary hidden compatibility sources while stable runners/Jenkins paths finish migration. They are not the architecture engineers should use for new navigation.
+`tests/s1/**` and `tests/s2/**` are temporary hidden compatibility mirrors during migration. They are not sources of truth and must not receive new feature work.
 
 Run after structural changes:
 
 ```bash
 npm run repo:architecture:validate
+npm run repo:legacy:audit
+npm run repo:pe:audit
 ```
 
-The gate also checks canonical/compatibility mirrors for byte-level drift during cutover.
+The architecture gate also checks canonical/compatibility mirrors for byte-level drift during the acceptance window.
 
 ## Coverage / compatibility documentation
 
@@ -61,7 +66,7 @@ The gate also checks canonical/compatibility mirrors for byte-level drift during
 - [QST coverage matrix](QST_COVERAGE_MATRIX.md)
 - [EPP external dependencies](EPP_EXTERNAL_DEPENDENCIES.md)
 
-`tests/legacy/pe-s2` explicitly marks the older PE/ST2 generation. It is retained because it still contains established DST/current compatibility consumers, not because S2 should be a permanent taxonomy.
+`tests/legacy/pe-s2` explicitly marks the older PE/ST2 generation. It is retained because it still contains established DST and legacy QST migration inputs, not because S2 should be a permanent taxonomy.
 
 ## Reporting stack
 
@@ -70,13 +75,13 @@ The gate also checks canonical/compatibility mirrors for byte-level drift during
 3. **Playwright** — execution and trace investigation.
 4. **Jenkins** — orchestration, gates, secrets and publication.
 
-Reporting implementation and integrity tests live together under `reporters/`.
+Canonical reporting implementation and integrity tests live under `reporting/`. The root `reporters/` tree is a temporary hidden compatibility mirror only and must not receive new code.
 
 ## Governance stack
 
-Governance data and integrity tests live together under `test-mapping/`. The old root `mapping-tests/` folder must not return.
+Canonical scope/mapping/runtime ledgers and integrity tests live under `governance/`. The root `test-mapping/` tree is a temporary hidden compatibility mirror only; the old `mapping-tests/` root must not return.
 
-`test-mapping/smb-qst.json` is preserved historical Zephyr traceability; it is not the current priority source of truth.
+`governance/smb-qst.json` is preserved historical Zephyr traceability; it is not the current priority source of truth.
 
 ## Repository cleanup policy
 
