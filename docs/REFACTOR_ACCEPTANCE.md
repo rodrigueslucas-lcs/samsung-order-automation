@@ -29,17 +29,23 @@ If the final canonical-only cleanup introduces a structural regression, restore 
 
 ## Static gate
 
-After pulling the branch, run:
+After pulling the branch and installing dependencies, the full structural acceptance is one command:
 
 ```bash
 npm ci
-npm run repo:architecture:validate
-npm run repo:legacy:audit:strict
-npm run repo:pe:audit
-npm run qst:official:gate
-MX_QST_ENVIRONMENT=S2 npm run qst:mx:list
-npm run reporting:mx-runtime:test
+npm run repo:refactor:gate
 ```
+
+`repo:refactor:gate` stops on the first failure and executes, in order:
+
+1. repository architecture validation;
+2. strict legacy-consumer audit;
+3. PE generation audit;
+4. official SMB scope gate;
+5. MX S2 official P1 discovery;
+6. governance integrity tests;
+7. Executive V2 reporting integrity tests;
+8. MX runtime / Executive V3 reporting integrity tests.
 
 Expected properties:
 
