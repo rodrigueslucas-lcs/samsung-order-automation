@@ -1,4 +1,4 @@
-const mxCoverage = require("../test-mapping/mx-qst-coverage.json");
+const mxCoverage = require("../governance/mx-qst-coverage.json");
 
 function getMxQstEvidenceMetadata(id, options = {}) {
   const current = mxCoverage.cases?.[id];
