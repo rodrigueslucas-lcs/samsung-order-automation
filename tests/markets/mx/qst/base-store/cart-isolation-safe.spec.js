@@ -3,7 +3,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
 import authStateModule from "../../../../../utils/authState";
-import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
+import evidenceContext from "../../../../../reporting/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import { test, expect } from "../../dst/base-store/mx.auth.fixture";
 import { prepareMxQstCart } from "./mxQstFlows";
