@@ -1,8 +1,8 @@
-const registry = require("../test-mapping/smb-qst.json");
-const mxCoverage = require("../test-mapping/mx-qst-coverage.json");
-const mxPartialPlan = require("../test-mapping/mx-qst-partial-plan.json");
-const peReusePlan = require("../test-mapping/pe-qst-reuse-plan.json");
-const defaultLedger = require("../test-mapping/preqa2-validation.json");
+const registry = require("../governance/smb-qst.json");
+const mxCoverage = require("../governance/mx-qst-coverage.json");
+const mxPartialPlan = require("../governance/mx-qst-partial-plan.json");
+const peReusePlan = require("../governance/pe-qst-reuse-plan.json");
+const defaultLedger = require("../governance/preqa2-validation.json");
 const { getSharedCandidatesByMarket } = require("./qstSharedCandidates");
 const { validateS1OfficialImplementation } = require("./qstS1Implementation");
 const { getExecutionRequirement } = require("./preqa2ExecutionRequirements");
