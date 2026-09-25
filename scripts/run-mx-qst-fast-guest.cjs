@@ -1,15 +1,17 @@
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
-const { testTitles } = require("../utils/qstS1Implementation");
+const { testTitles } = require("../utils/qstImplementation");
 const { buildMxQstRuntimeSummary, writeRuntimeSummary } = require("../utils/mxQstRuntimeSummary.cjs");
+const { TEST_PATHS, resolveTestPath } = require("../config/testPaths.cjs");
 
 const listOnly = process.argv.includes("--list");
 const targetEnvironment = String(process.env.MX_QST_ENVIRONMENT || "S1").toUpperCase();
 if (!["S1", "S2"].includes(targetEnvironment)) throw new Error(`Unsupported MX QST environment: ${targetEnvironment}.`);
 const environmentLabel = targetEnvironment === "S2" ? "S2/STG2" : "S1/STG";
 const headless = process.env.MX_QST_HEADLESS === "1";
-const root = path.resolve("tests/s1/mx/qst/base-store");
+const qstPath = TEST_PATHS.mx.qstBaseStore;
+const root = resolveTestPath(qstPath);
 const playwrightCli = path.resolve("node_modules/@playwright/test/cli.js");
 const fastArtifactDir = path.resolve(process.env.MX_FAST_ARTIFACT_DIR || "test-results/jenkins/mx-fast");
 const reportFile = path.join(fastArtifactDir, "mx-fast-results.json");
@@ -18,10 +20,7 @@ const allureResultsDir = path.join(fastArtifactDir, "allure-results");
 const allureReportDir = path.join(fastArtifactDir, "allure-report");
 const executiveDir = path.join(fastArtifactDir, "executive");
 
-// Fast, non-destructive MX Base Store campaign.
-// These are official P1 cases that do not require the registered storefront
-// session and are intended for quick validation while S1 registered auth is blocked.
-// Keep this suite separate from the official 30-case denominator.
+// Fast, non-destructive subset of the active 29-TC MX Base Store P1 campaign.
 const MX_FAST_GUEST_IDS = Object.freeze([
   "SAM-24971", "SAM-24972", "SAM-24975", "SAM-24981", "SAM-24982",
   "SAM-24988", "SAM-24989", "SAM-24990", "SAM-24995", "SAM-24999",
@@ -56,17 +55,14 @@ console.log(`[mx-fast] MX ${targetEnvironment} Base Store fast guest selection: 
 console.log(`[mx-fast] IDs: ${MX_FAST_GUEST_IDS.join(", ")}`);
 
 const args = [
-  playwrightCli, "test", "tests/s1/mx/qst/base-store",
+  playwrightCli, "test", qstPath,
   "--project=chromium", "--workers=1", "--retries=0",
   "--grep", pattern,
   "--grep-invert", "@registered|@destructive",
   "--output", path.resolve(process.env.MX_FAST_ARTIFACT_DIR || "test-results/jenkins/mx-fast", "playwright"),
 ];
-if (listOnly) {
-  args.push("--list", "--reporter=list");
-} else if (!headless) {
-  args.splice(4, 0, "--headed");
-}
+if (listOnly) args.push("--list", "--reporter=list");
+else if (!headless) args.splice(4, 0, "--headed");
 
 if (!listOnly) {
   for (const target of [reportFile, runtimeSummaryFile, allureResultsDir, allureReportDir, executiveDir, path.join(fastArtifactDir, "playwright-report"), path.join(fastArtifactDir, "playwright"), path.join(fastArtifactDir, "evidence")]) {
