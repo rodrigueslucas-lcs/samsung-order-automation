@@ -1,5 +1,5 @@
-const ledger = require("../test-mapping/preqa2-validation.json");
-const registry = require("../test-mapping/smb-qst.json");
+const ledger = require("../governance/preqa2-validation.json");
+const registry = require("../governance/smb-qst.json");
 const {
   PREQA2_CONTEXTS,
   PREQA2_VALIDATION_STATUSES,
