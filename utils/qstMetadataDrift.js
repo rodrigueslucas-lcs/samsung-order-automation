@@ -1,5 +1,5 @@
-const architecture = require("../test-mapping/smb-qst-architecture.json");
-const coverage = require("../test-mapping/mx-qst-coverage.json");
+const architecture = require("../governance/smb-qst-architecture.json");
+const coverage = require("../governance/mx-qst-coverage.json");
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
