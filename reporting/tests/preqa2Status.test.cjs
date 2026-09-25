@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const defaultLedger = require("../../test-mapping/preqa2-validation.json");
+const defaultLedger = require("../../governance/preqa2-validation.json");
 const {
   buildStatusModel,
   generatePreqa2Status,
