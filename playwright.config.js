@@ -11,11 +11,15 @@ const { MX_BASE_P1_IDS } = mxQstScope;
 const mxActiveP1Pattern = new RegExp(`(?:${MX_BASE_P1_IDS.join('|')})\\b`);
 
 // Authenticated/registered scenarios are intentionally declared as the first
-// MX P1 project. With workers=1 Playwright executes this project first, keeping
-// session-sensitive cases at the front of the campaign. The remaining project
-// is intentionally NOT a dependency: failures in auth-priority must be reported
-// without preventing the other official P1 scenarios from running.
+// MX P1 project. During the controlled path migration both canonical and
+// compatibility locations are accepted so the stable runner cannot silently
+// lose the registered subset before cutover is runtime-proven.
 const mxAuthenticatedPriorityFiles = [
+  '**/s1/mx/qst/base-store/authenticated-safe.spec.js',
+  '**/s1/mx/qst/base-store/cart-isolation-safe.spec.js',
+  '**/s1/mx/qst/base-store/profile-address-destructive.spec.js',
+  '**/s1/mx/qst/base-store/registered-address-safe.spec.js',
+  '**/s1/mx/qst/base-store/registered-order.spec.js',
   '**/markets/mx/qst/base-store/authenticated-safe.spec.js',
   '**/markets/mx/qst/base-store/cart-isolation-safe.spec.js',
   '**/markets/mx/qst/base-store/profile-address-destructive.spec.js',
@@ -27,15 +31,10 @@ const chromiumUse = { ...devices['Desktop Chrome'] };
 
 export default defineConfig({
   testDir: './tests',
-
   fullyParallel: false,
-
   forbidOnly: !!process.env.CI,
-
   retries: process.env.CI ? 2 : 0,
-
   workers: 1,
-
   captureGitInfo: { commit: false, diff: false },
 
   reporter: [
@@ -57,31 +56,15 @@ export default defineConfig({
   ],
 
   use: {
-    // Jenkins runs as a Windows service and must not rely on an interactive
-    // desktop. Respect the pipeline's headless flag; CI defaults to headless
-    // unless MX_QST_HEADLESS=0/--headed explicitly opts out.
     headless,
-
-    // Chrome-for-Testing produced blank video frames on the Windows service.
-    // When video is requested use Playwright's bundled Chromium/headless-shell,
-    // installed by the pipeline together with its matching FFmpeg build.
     channel: videoEnabled ? undefined : 'chrome',
-
-    viewport: {
-      width: 1440,
-      height: 900
-    },
-
+    viewport: { width: 1440, height: 900 },
     screenshot: 'on',
-
     video: videoEnabled
       ? { mode: 'on', size: { width: 1280, height: 800 } }
       : 'off',
-
     trace: 'retain-on-failure',
-
     actionTimeout: 15000,
-
     navigationTimeout: 60000
   },
 
