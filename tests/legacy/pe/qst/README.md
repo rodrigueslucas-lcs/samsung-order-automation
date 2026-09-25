@@ -1,17 +1,16 @@
 # PE QST — Legacy Compatibility Generation
 
-This tree is the **older PE/ST2 QST generation**.
+This is the older PE/ST2 QST generation.
 
-It is still reachable through legacy npm commands implemented by `scripts/qst-run.cjs` (`qst:normal`, `qst:modified`, `qst:sanity`, `qst:base-store`, `qst:epp`), so it is not safe to delete yet.
+It remains reachable through explicit `qst:pe:legacy:*` npm commands (and the temporary compatibility aliases `qst:normal`, `qst:modified`, `qst:sanity`, `qst:base-store`, `qst:epp`).
 
-It is **not** the current Jenkins PE official-p1 stabilization source. The current regional PE P1 runner uses `tests/s1/pe/qst/base-store`.
+It is **not** the current Jenkins PE official-p1 source. Current PE P1 lives in `tests/markets/pe/qst`.
 
 Migration plan:
 
-1. reconcile unique TC/behavior coverage against `tests/s1/pe/qst`;
-2. migrate any still-needed coverage;
-3. retire/rename legacy npm entry points;
-4. delete this tree only after consumers are gone;
-5. converge on `tests/pe/qst/...`.
+1. reconcile unique TC/behavior coverage against `tests/markets/pe/qst`;
+2. migrate anything still required;
+3. retire the compatibility npm aliases/callers;
+4. delete this legacy tree only after consumers are gone.
 
-Do not add new regional QST coverage here unless explicitly maintaining a legacy execution path.
+Do not add new regional QST coverage here unless explicitly maintaining the legacy execution contract.
