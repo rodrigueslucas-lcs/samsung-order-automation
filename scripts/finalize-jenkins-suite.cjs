@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { sanitizeString } = require('../reporters/evidence/sanitizer');
+const { sanitizeString } = require('../reporting/evidence/sanitizer');
 
 const artifactDir = path.resolve(process.env.JENKINS_ARTIFACT_DIR || process.env.MX_JENKINS_ARTIFACT_DIR || process.env.MX_QST_ARTIFACT_DIR || 'test-results/jenkins/smb-suite');
 const jsonFile = path.resolve(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE || path.join(artifactDir, 'results.json'));
