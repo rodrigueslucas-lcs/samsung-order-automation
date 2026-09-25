@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
-const defaultLedger = require("../../test-mapping/preqa2-validation.json");
+const defaultLedger = require("../../governance/preqa2-validation.json");
 const { getCampaignSummary } = require("../../utils/preqa2CampaignPlan");
 const { reconciliationSummary } = require("../../utils/preqa2Reconciliation");
 const { getPreqa2PromotionSummary } = require("../../utils/preqa2PromotionPlan");
