@@ -1,7 +1,7 @@
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
-const reusePlan = require("../test-mapping/pe-qst-reuse-plan.json");
+const reusePlan = require("../governance/pe-qst-reuse-plan.json");
 const { testTitles } = require("../utils/qstS1Implementation");
 const { buildMxQstRuntimeSummary, writeRuntimeSummary } = require("../utils/mxQstRuntimeSummary.cjs");
 const { getPeQstConfig } = require("../config/markets/pe");
@@ -27,8 +27,6 @@ const runtimeSummaryFile = path.join(artifactDir, "runtime-summary.json");
 const allureResultsDir = path.join(artifactDir, "allure-results");
 const executiveDir = path.join(artifactDir, "executive");
 
-// PE official P1 includes Base Store + EPP. This runner is intentionally Base Store only,
-// matching the current MX Base Store P1 campaign semantics. EPP remains a separate scope.
 const PE_BASE_P1_IDS = Object.freeze(
   Object.entries(reusePlan.cases)
     .filter(([, entry]) => entry.store === "BS")
@@ -113,8 +111,8 @@ if (fs.existsSync(reportFile)) {
   writeRuntimeSummary(runtimeSummaryFile, runtimeSummary);
 
   const executive = spawnSync(process.execPath, [
-    path.resolve("reporters/executive-v3/generateExecutiveV3.cjs"),
-    path.resolve("test-mapping/preqa2-validation.json"),
+    path.resolve("reporting/executive-v3/generateExecutiveV3.cjs"),
+    path.resolve("governance/preqa2-validation.json"),
     path.join(executiveDir, "index.html"),
     path.join(executiveDir, "history.json"),
     runtimeSummaryFile,
@@ -124,7 +122,6 @@ if (fs.existsSync(reportFile)) {
   console.log(`\nPE ${targetEnvironment} BASE STORE P1 SUMMARY`);
   console.log(`Official=${runtimeSummary.summary.official} Executed=${runtimeSummary.summary.executed} Passed=${runtimeSummary.summary.passed} Failed=${runtimeSummary.summary.failed} Blocked=${runtimeSummary.summary.blocked} NotRun=${runtimeSummary.summary.notRun}`);
 
-  // A partial PE stabilization campaign must never be reported as an official full PASS.
   if (runtimeSummary.summary.notRun > 0 || runtimeSummary.summary.blocked > 0 || runtimeSummary.summary.failed > 0) {
     process.exitCode = result.status || 1;
   } else {
