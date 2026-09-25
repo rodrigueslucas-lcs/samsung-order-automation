@@ -16,6 +16,17 @@ notRun=0
 
 The baseline proves the behavior we must preserve. It does **not** runtime-validate the current refactor HEAD.
 
+## Rollback point
+
+Before the final compatibility cleanup, the branch was snapshotted at:
+
+```text
+backup/pre-final-architecture-cleanup-20260925
+1c4887046430c8841fe335ca3f9ae9cb31ff2273
+```
+
+If the final canonical-only cleanup introduces a structural regression, restore from that branch or revert the individual cleanup commits. Do not patch business tests merely to recover a green build.
+
 ## Static gate
 
 After pulling the branch, run:
@@ -23,18 +34,20 @@ After pulling the branch, run:
 ```bash
 npm ci
 npm run repo:architecture:validate
-npm run repo:legacy:audit
+npm run repo:legacy:audit:strict
 npm run repo:pe:audit
 npm run qst:official:gate
-npm run qst:mx:list
+MX_QST_ENVIRONMENT=S2 npm run qst:mx:list
 npm run reporting:mx-runtime:test
 ```
 
 Expected properties:
 
 - canonical test navigation is `tests/markets/...`;
-- compatibility mirrors have zero drift;
+- historical PE S2 automation is explicit under `tests/legacy/pe-s2/...`;
 - active production entry points do not depend on `tests/s1`, `tests/s2`, `reporters/` or `test-mapping/`;
+- `repo:legacy:audit:strict` reports zero actionable runtime/code/data consumers before any compatibility root is physically deleted;
+- compatibility drift is diagnostic while rollback copies remain frozen; canonical trees are authoritative and are not expected to remain byte-identical to frozen copies;
 - MX discovery still selects exactly 29 active Base Store P1 TCs;
 - official SMB gate remains 362 = 144 P1/QST + 218 P2/DST-only.
 
@@ -64,14 +77,19 @@ no new automation failures
 
 `SAM-25010` may remain the single FAIL only if the already-proven flow still creates the guest order, obtains/accepts OTP and then the current BaseSite cannot resolve the order.
 
-## What becomes deletable after PASS
+## Physical deletion policy
 
-Only after the runtime gate passes:
+Physical deletion is deliberately a second gate, not part of the structural cutover itself.
 
-1. delete `tests/s1/mx` after removing the temporary dual Playwright auth-priority match;
-2. delete other hidden test mirrors only when their own active consumers are canonical and their relevant runtime has been accepted;
-3. delete `reporters/` only after `npm run repo:legacy:audit:strict` shows no runtime/code consumers and reporting acceptance is intact;
-4. delete `test-mapping/` under the same consumer/acceptance rule;
-5. then decompose `scripts/`, `pages/` and `flows/` by responsibility so import churn does not overlap this highest-risk discovery cutover.
+1. `tests/s1/mx` is deletable only after the canonical-path MX S2 29-TC Jenkins acceptance passes and temporary Playwright compatibility matching is no longer needed.
+2. `tests/s1/pe`, `tests/s1/smb` and `tests/s2/pe` require their relevant consumer/runtime acceptance; do not delete PE legacy DST merely because its folder is old.
+3. `reporters/` is deletable only when `npm run repo:legacy:audit:strict` has no reporting compatibility consumers and reporting integrity tests pass from `reporting/`.
+4. `test-mapping/` is deletable only when the same strict audit has no governance compatibility consumers and governance/reporting tests read only from `governance/`.
+5. After physical deletion, remove obsolete mirror-validator pairs and VS Code hide rules that mention roots which no longer exist.
 
-Do not convert the known Track Order defect into a PASS, and do not delete PE legacy DST merely because its folder is old.
+## Non-negotiable behavior
+
+- Do not convert the known Track Order defect into a PASS.
+- Do not weaken business assertions merely to survive the refactor.
+- Do not create a second environment-specific MX tree; S1/S2 remain runtime configuration.
+- Prefer small reversible commits. If a structural step changes runtime behavior, stop and roll back before proceeding.
