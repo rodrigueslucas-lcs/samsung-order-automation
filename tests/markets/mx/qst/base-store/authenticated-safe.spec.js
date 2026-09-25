@@ -1,6 +1,6 @@
 import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
-import { test, expect } from "../../dst/base-store/mx.auth.fixture";
+import { test, expect } from "../../support/base-store/mx.auth.fixture";
 
 const { recordBusinessEvidence } = evidenceContext;
 const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
@@ -40,8 +40,6 @@ test("SAM-24963 @qst @mx @base-store @safe @registered - Validate My account men
 
   let menu = await openAuthenticatedMenu(page);
 
-  // MX may expose only the compact Home dropdown initially.
-  // If account options are not present, enter My Account and reopen the menu.
   if (!(await menu.getByText(/My page|Mi p[aá]gina|My Account|Mi cuenta/i).count())) {
     await page.goto(new URL("/mx/mypage/", page.url()).toString(), {
       waitUntil: "domcontentloaded",
