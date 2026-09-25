@@ -47,7 +47,7 @@ function writeLedgerAtomically(ledgerPath, next) {
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
-  const ledgerPath = path.resolve("test-mapping/preqa2-validation.json");
+  const ledgerPath = path.resolve("governance/preqa2-validation.json");
   const source = JSON.parse(fs.readFileSync(ledgerPath, "utf8"));
   const result = buildRecordedResult(options);
   const next = applyResultToLedger(source, options.market, options.id, result, {
