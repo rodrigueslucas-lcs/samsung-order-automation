@@ -10,16 +10,16 @@ const {
   getPeAuthState,
   hasPeAuthState,
 } = peAuthStateModule;
-const { getPeS1QstConfig } = peConfigModule;
+const { getPeQstConfig } = peConfigModule;
 const { recordBusinessEvidence } = evidenceContext;
 const { getPeQstEvidenceMetadata } = peEvidenceMetadata;
 
-test.describe("PE S1 QST - registered payment safe checkpoints", () => {
+test.describe("PE QST - registered payment safe checkpoints", () => {
   test.use({ storageState: hasPeAuthState() ? PE_AUTH_STATE_PATH : undefined });
 
   test.beforeEach(async ({ context }) => {
     test.skip(!process.env.PE_STOREFRONT_URL, "PE_STOREFRONT_URL is required.");
-    test.skip(!hasPeAuthState(), "Authenticated PE S1 state is required.");
+    test.skip(!hasPeAuthState(), "Authenticated PE state is required.");
     const auth = getPeAuthState();
     await auth.applyAuthSessionStorage(context);
   });
@@ -32,7 +32,7 @@ test.describe("PE S1 QST - registered payment safe checkpoints", () => {
     await auth.validateAuthenticatedSession(page);
     await page.keyboard.press("Escape");
 
-    const config = getPeS1QstConfig();
+    const config = getPeQstConfig();
     const { payment } = await reachPeRegisteredPayment(page, config, {
       expectedPaymentMode: /Tarjeta de Crédito \/ Débito/i,
     });
@@ -53,7 +53,7 @@ test.describe("PE S1 QST - registered payment safe checkpoints", () => {
     await auth.validateAuthenticatedSession(page);
     await page.keyboard.press("Escape");
 
-    const config = getPeS1QstConfig();
+    const config = getPeQstConfig();
     const { payment } = await reachPeRegisteredPayment(page, config, {
       expectedPaymentMode: /^Pago Efectivo\b/i,
     });
