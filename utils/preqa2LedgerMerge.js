@@ -1,4 +1,4 @@
-const registry = require("../test-mapping/smb-qst.json");
+const registry = require("../governance/smb-qst.json");
 const { validatePreqa2ValidationLedger } = require("./preqa2ValidationLedger");
 
 const MARKET_ORDER = Object.freeze(["MX", "CL", "CO", "PE"]);
