@@ -20,7 +20,7 @@ Priority and execution context are independent:
 | CO | 54 | 35 | 34 | 55 | 89 |
 | **SMB** | **218** | **144** | **144** | **218** | **362** |
 
-`test-mapping/smb-qst.json` is preserved historical Zephyr traceability, not the current denominator.
+`governance/smb-qst.json` is preserved historical Zephyr traceability, not the current denominator.
 
 ### Active MX Base Store P1
 
@@ -43,7 +43,7 @@ The active MX Base Store runner therefore selects **29 TCs** on S1/STG or S2/STG
 
 ## Repository navigation
 
-The **canonical engineer-facing test tree is market-first**:
+Canonical engineer-facing structure:
 
 ```text
 tests/
@@ -56,32 +56,35 @@ tests/
     shared/
   legacy/
     pe-s2/
+
+reporting/              Executive, evidence, PreQA2 and reporting integrity tests
+governance/             official scope, mappings, runtime ledgers and governance tests
+config/                 market/runtime configuration
+fixtures/               compatibility test data; PE data namespaced under fixtures/pe
+flows/                  reusable business/presentation flows
+pages/                  Page Objects; market decomposition still pending
+scripts/                executable CLIs; categorization is a later executable move
+utils/                  runtime/governance helpers
 ```
 
 Rule: **market -> suite -> store**. S1/S2 are runtime environments, not permanent test taxonomy.
 
-During the controlled migration, `tests/s1/**` and `tests/s2/**` remain as hidden compatibility sources for runners that have not yet completed runtime cutover. VS Code hides those roots by default so normal navigation stays clean. A repository guard verifies that canonical mirrors cannot drift from compatibility sources:
+During the controlled migration, hidden compatibility roots still exist for callers not yet cut over:
+
+```text
+tests/s1/**       -> tests/markets/**
+tests/s2/pe       -> tests/legacy/pe-s2
+reporters/        -> reporting/
+test-mapping/     -> governance/
+```
+
+VS Code hides those compatibility roots by default. Structural guards verify canonical mirrors cannot drift:
 
 ```bash
 npm run repo:architecture:validate
 ```
 
-Do not add new work to the hidden compatibility tree without keeping the canonical path synchronized.
-
-Other ownership boundaries:
-
-```text
-config/                 market/runtime configuration
-fixtures/               compatibility test data; PE data namespaced under fixtures/pe
-flows/                  reusable business/presentation flows
-pages/                  Page Objects; market decomposition still pending
-reporters/              Executive, evidence, PreQA2 and reporting integrity tests
-test-mapping/           scope/mapping/runtime data + governance integrity tests
-scripts/                executable CLIs; categorization is the next structural phase
-utils/                  runtime/governance helpers
-```
-
-The removed root `reporter-tests/` and `mapping-tests/` boundaries must not return; those tests now live under `reporters/tests/` and `test-mapping/tests/` respectively.
+The old root `reporter-tests/` and `mapping-tests/` boundaries were removed and must not return.
 
 Read `docs/REPOSITORY_AUDIT.md` before deleting anything that merely looks old.
 
