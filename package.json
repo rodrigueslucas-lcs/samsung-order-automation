@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Samsung LATAM SMB QA automation, governance and CI reporting platform",
   "scripts": {
+    "repo:architecture:validate": "node scripts/validate-repository-architecture.cjs",
     "auth:open-profile": "node scripts/auth-open-profile.cjs",
     "auth:export": "node scripts/auth-bootstrap.cjs",
     "auth:verify": "node scripts/auth-verify.cjs",
