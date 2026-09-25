@@ -11,7 +11,6 @@ Use this page as the documentation entry point. Current runtime contracts are li
 - [Jenkins setup](JENKINS_SETUP.md) — CI orchestration and credentials.
 - [Executive Report V3](EXECUTIVE_REPORT_V3.md) — Executive Dashboard contract.
 - [MX QST coverage and runner](MX_QST_COVERAGE_MATRIX.md) — active MX Base Store automation scope.
-- [QST automation guide](QST_AUTOMATION_GUIDE.md) — QST operator/runtime guidance.
 
 The current official Samsung priority model contains **362 DST rows: 144 P1/QST + 218 P2/DST-only** across MX, PE, CL and CO.
 
@@ -38,6 +37,7 @@ Runtime result, implementation coverage, official scope and historical ledger st
 
 These documents remain relevant while PE generations are reconciled:
 
+- [PE QST compatibility guide](PE_QST_COMPATIBILITY_GUIDE.md)
 - [PE Base Store coverage](COVERAGE_MATRIX.md)
 - [MX DST Base Store coverage](DST_MX_BASE_STORE_COVERAGE_MATRIX.md)
 - [PE EPP coverage](DST_EPP_COVERAGE_MATRIX.md)
