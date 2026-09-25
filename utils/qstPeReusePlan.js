@@ -1,8 +1,8 @@
 const path = require("node:path");
 const fs = require("node:fs");
 
-const DEFAULT_REGISTRY_PATH = path.resolve("test-mapping/smb-qst.json");
-const DEFAULT_PLAN_PATH = path.resolve("test-mapping/pe-qst-reuse-plan.json");
+const DEFAULT_REGISTRY_PATH = path.resolve("governance/smb-qst.json");
+const DEFAULT_PLAN_PATH = path.resolve("governance/pe-qst-reuse-plan.json");
 const ALLOWED_REUSE = new Set([
   "directCandidate",
   "extensionCandidate",
