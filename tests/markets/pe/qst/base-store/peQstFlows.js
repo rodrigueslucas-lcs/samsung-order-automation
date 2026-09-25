@@ -68,7 +68,8 @@ export async function reachPeRegisteredPayment(page, config, options = {}) {
     exact: true,
   });
   if (await newAddress.isVisible().catch(() => false)) {
-    await newAddress.check();
+    await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
+    await newAddress.waitFor({ state: "visible", timeout: 30000 });
   }
   await checkout.fillAddress(options.address || testData.address);
 
