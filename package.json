@@ -33,7 +33,7 @@
     "qst:mx:fast:list": "node scripts/run-mx-qst-fast-guest.cjs --list",
     "qst:pe:p1": "node scripts/run-pe-qst-p1.cjs",
     "qst:pe:p1:list": "node scripts/run-pe-qst-p1.cjs --list",
-    "qst:pe:base-store": "playwright test tests/markets/pe/qst/base-store --project=chromium --workers=1 --grep-invert @destructive",
+    "qst:pe:base-store": "node scripts/run-pe-qst-p1.cjs",
     "qst:pe:list": "node scripts/run-pe-qst-p1.cjs --list",
     "qst:pe:progress": "node scripts/print-pe-qst-progress.cjs",
     "qst:pe:legacy:normal": "node scripts/qst-run.cjs normal",
@@ -86,7 +86,8 @@
     "reporting:preqa2:test": "node --test reporting/tests/preqa2Executive.test.cjs reporting/tests/preqa2Status.test.cjs",
     "reporting:all": "npm run reporting:evidence:test && npm run reporting:executive:test && npm run reporting:preqa2:test && npm run reporting:executive && npm run reporting:preqa2 && npm run reporting:preqa2:status",
     "preqa2:validate:safe": "node scripts/preqa2-safe-validation.cjs",
-    "qst:pe:epp": "playwright test tests/markets/pe/qst/epp --project=chromium --workers=1 --grep-invert @destructive"
+    "qst:pe:epp": "playwright test tests/markets/pe/qst/epp --project=chromium --workers=1 --grep-invert @destructive",
+    "auth:login:pe": "node scripts/auth-login-pe.cjs"
   },
   "keywords": [
     "playwright",
