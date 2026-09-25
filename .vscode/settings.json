@@ -1,8 +1,8 @@
 {
+  "explorer.compactFolders": false,
   "explorer.fileNesting.enabled": true,
   "explorer.fileNesting.patterns": {
-    "package.json": "package-lock.json",
-    "README.md": "docs/README.md"
+    "package.json": "package-lock.json"
   },
   "files.exclude": {
     "**/node_modules": true,
