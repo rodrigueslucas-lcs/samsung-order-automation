@@ -1,7 +1,7 @@
 const path = require("node:path");
 const fs = require("node:fs");
 
-const DEFAULT_PLAN_PATH = path.resolve("test-mapping/pe-qst-reuse-plan.json");
+const DEFAULT_PLAN_PATH = path.resolve("governance/pe-qst-reuse-plan.json");
 
 function readPlan(planPath = DEFAULT_PLAN_PATH) {
   return JSON.parse(fs.readFileSync(planPath, "utf8"));
