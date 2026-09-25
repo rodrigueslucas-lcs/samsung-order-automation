@@ -1,4 +1,4 @@
-const registry = require("../test-mapping/smb-qst.json");
+const registry = require("../governance/smb-qst.json");
 const { PREQA2_HOST } = require("./preqa2Config");
 
 const PREQA2_VALIDATION_STATUSES = Object.freeze([
