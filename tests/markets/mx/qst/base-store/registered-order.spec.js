@@ -1,7 +1,7 @@
 import MarketPaymentPage from "../../../../../pages/MarketPaymentPage";
 import MxCheckoutPage from "../../../../../pages/MxCheckoutPage";
 import destructiveGuards from "../../../../../utils/destructiveGuards";
-import evidenceContext from "../../../../../reporters/evidence/evidenceContext.js";
+import evidenceContext from "../../../../../reporting/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import mxTestCard from "../../../../../utils/mxTestCard.js";
 import { test, expect } from "../../dst/base-store/mx.auth.fixture";
