@@ -12,20 +12,20 @@ const {
   getPeAuthState,
   hasPeAuthState,
 } = peAuthStateModule;
-const { getPeS1QstConfig } = peConfigModule;
+const { getPeQstConfig } = peConfigModule;
 const { recordBusinessEvidence } = evidenceContext;
 const { getPeQstEvidenceMetadata } = peEvidenceMetadata;
 
-test.describe("PE S1 QST - guarded profile writes", () => {
+test.describe("PE QST - guarded profile writes", () => {
   test.describe.configure({ mode: "serial" });
   test.use({ storageState: hasPeAuthState() ? PE_AUTH_STATE_PATH : undefined });
 
   test.beforeEach(async ({ context }) => {
     test.skip(!process.env.PE_STOREFRONT_URL, "PE_STOREFRONT_URL is required.");
-    test.skip(!hasPeAuthState(), "Authenticated PE S1 state is required.");
+    test.skip(!hasPeAuthState(), "Authenticated PE state is required.");
     test.skip(
       process.env.ALLOW_PROFILE_WRITE !== "1",
-      "Set ALLOW_PROFILE_WRITE=1 only for an explicitly authorized PE S1 QA profile-address lifecycle run."
+      "Set ALLOW_PROFILE_WRITE=1 only for an explicitly authorized PE QA profile-address lifecycle run."
     );
     test.skip(
       !process.env.PE_ADDRESS_API_URL,
@@ -43,7 +43,7 @@ test.describe("PE S1 QST - guarded profile writes", () => {
     await auth.validateAuthenticatedSession(page);
     await page.keyboard.press("Escape");
 
-    const config = getPeS1QstConfig();
+    const config = getPeQstConfig();
     const profile = new ProfilePage(page, {
       origin: config.baseUrl.origin,
       market: "pe",
@@ -69,7 +69,7 @@ test.describe("PE S1 QST - guarded profile writes", () => {
 
       testInfo.annotations.push({
         type: "qst-reuse-note",
-        description: "Creates, edits and deletes only QA AUTOMATION-marked PE profile addresses; cleanup is restricted to the same QA marker via the configured S1 address API.",
+        description: "Creates, edits and deletes only QA AUTOMATION-marked PE profile addresses; cleanup is restricted to the same QA marker via the configured configured address API.",
       });
     } finally {
       await profile.deleteQaAddressesViaApi(created.street).catch(() => {});
@@ -85,7 +85,7 @@ test.describe("PE S1 QST - guarded profile writes", () => {
     await auth.validateAuthenticatedSession(page);
     await page.keyboard.press("Escape");
 
-    const config = getPeS1QstConfig();
+    const config = getPeQstConfig();
     const profile = new ProfilePage(page, {
       origin: config.baseUrl.origin,
       market: "pe",
