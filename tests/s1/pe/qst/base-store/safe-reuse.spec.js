@@ -4,7 +4,7 @@ import GuestLoginPage from "../../../../../pages/GuestLoginPage";
 import peConfigModule from "../../../../../config/markets/pe";
 import storefrontAccess from "../../../../../flows/smb/storefrontAccess";
 import cartPresentation from "../../../../../flows/smb/cartPresentation";
-import evidenceContext from "../../../../../reporters/evidence/evidenceContext";
+import evidenceContext from "../../../../../reporting/evidence/evidenceContext";
 import peEvidenceMetadata from "../../../../../utils/qstPeEvidenceMetadata";
 import { testData } from "../../../../../utils/testData";
 import {
