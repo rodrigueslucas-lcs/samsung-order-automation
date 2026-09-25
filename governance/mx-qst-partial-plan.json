@@ -4,103 +4,55 @@
   "source": "governance/mx-qst-coverage.json",
   "policy": "Expected-result-first. This file is an implementation plan only; coverage remains partial until the official Expected Result is proven in the intended store/business path.",
   "summary": {
-    "partialTotal": 14,
-    "quickAssertion": 3,
-    "existingFlowExtension": 3,
-    "newBusinessFlow": 4,
+    "partialTotal": 18,
+    "quickAssertion": 4,
+    "existingFlowExtension": 7,
+    "newBusinessFlow": 3,
     "eppContext": 4
   },
   "groups": {
     "quickAssertion": [
-      {
-        "id": "SAM-24971",
-        "title": "Cart page UI",
-        "reason": "The controlled cart now asserts SKU, price, thumbnail, available services, order summary and footer. Info-icon coverage and live verification remain."
-      },
-      {
-        "id": "SAM-24989",
-        "title": "Order Summary on checkout page",
-        "reason": "The guest checkout already reaches Payment and now validates positive subtotal/total price details. Remaining work is live verification and any source-supported detail still not observed."
-      },
-      {
-        "id": "SAM-25016",
-        "title": "Sticky checkout button on mobile",
-        "reason": "The dedicated mobile test passed in S1 and proves the sticky cart CTA. Add an explicit checkout-page sticky assertion only if the updated official Expected Result requires both surfaces."
-      }
+      {"id":"SAM-24971","title":"Cart page UI","reason":"Core cart UI is proven; remaining work is limited to the still-unproven official presentation details."},
+      {"id":"SAM-24975","title":"Rewards text on cart/checkout/payment","reason":"Rewards copy is already asserted across the journey; tooltip/detail behavior remains the documented assertion gap."},
+      {"id":"SAM-24989","title":"Order Summary on checkout page","reason":"Checkout summary values are proven; only deeper official presentation detail remains."},
+      {"id":"SAM-25016","title":"Sticky checkout button on mobile","reason":"Sticky cart CTA is proven on mobile; deeper checkout sticky behavior remains a bounded refinement."}
     ],
     "existingFlowExtension": [
-      {
-        "id": "SAM-24982",
-        "title": "Verify trade-up cart page",
-        "reason": "Trade-in UI is already opened. The existing safe storefront flow must complete the add action and verify resulting cart/delete state with MX-specific data before this can be Full."
-      },
-      {
-        "id": "SAM-25011",
-        "title": "Backoffice",
-        "reason": "Exact order search/open is proven. Product search and basic/advanced search coverage should extend the existing BackOffice page object rather than create a separate architecture."
-      },
-      {
-        "id": "SAM-24968",
-        "title": "Facets/Filter",
-        "reason": "The PreQA2 runner implements real facet selection and observable result comparison. Investigate the live FAIL; do not misclassify it as missing automation."
-      }
+      {"id":"SAM-24968","title":"Facets/Filter","reason":"Real facet interaction exists; finish proving the expected result-change behavior in target runtime."},
+      {"id":"SAM-24982","title":"Verify trade-up cart page","reason":"Trade-up interaction exists; extend it through the remaining resulting-cart/delete assertions."},
+      {"id":"SAM-24986","title":"Cart value on logout","reason":"Second-account cart isolation is proven; explicit logout semantics remain to match the official wording exactly."},
+      {"id":"SAM-25000","title":"Switching delivery modes or saved/new address","reason":"Saved/new address switching is proven; delivery-mode switching remains the missing branch."},
+      {"id":"SAM-25004","title":"Paypal","reason":"Availability and selection are proven safely; order submission is intentionally not yet claimed."},
+      {"id":"SAM-25005","title":"Pay in Cash","reason":"Availability and selection are proven safely; order submission is intentionally not yet claimed."},
+      {"id":"SAM-25010","title":"Track Order","reason":"OTP request/read/submit is implemented; S2 still reproduces order-not-found after accepted OTP, so keep implementation coverage separate from runtime defect status."}
     ],
     "newBusinessFlow": [
-      {
-        "id": "SAM-24969",
-        "title": "Add product from BC Page",
-        "reason": "Current path starts from PDP. Official BC-page-origin behavior needs a distinct route/context and should not be simulated by renaming the existing PDP flow."
-      },
-      {
-        "id": "SAM-24981",
-        "title": "Add SC+ from BC/PDP Page",
-        "reason": "SC+ add itself is proven, but the official BC/PDP-origin journey still needs the WMC/PreQA storefront context."
-      },
-      {
-        "id": "SAM-24991",
-        "title": "Able to add/edit new/saved address",
-        "reason": "Registered checkout exists, but save/edit/change of persisted addresses requires stateful registered-address behavior not currently exercised."
-      },
-      {
-        "id": "SAM-24994",
-        "title": "Able to checkout with a New address",
-        "reason": "Current flow proves a new shipping address only. Shipping plus billing-address behavior must be exercised explicitly."
-      }
+      {"id":"SAM-24981","title":"Add SC+ from BC/PDP Page","reason":"SC+ cart behavior is proven, but the exact official BC/PDP-origin journey still needs to be demonstrated."},
+      {"id":"SAM-24991","title":"Able to add/edit new/saved address","reason":"Registered new-address behavior exists; full edit/change semantics for persisted addresses still require explicit coverage."},
+      {"id":"SAM-25006","title":"Rewards","reason":"Historical implementation is retained for traceability only. The copied Colombia PSE path is excluded from active MX scope until Samsung provides a valid MX-specific Rewards execution path."}
     ],
     "eppContext": [
-      {
-        "id": "SAM-25021",
-        "title": "Able to add to Cart from PDP",
-        "reason": "Base Store PDP behavior is proven, but the official case belongs to EPP and cannot be promoted without running in EPP context."
-      },
-      {
-        "id": "SAM-25022",
-        "title": "Cart page UI",
-        "reason": "Core cart behavior exists in Base Store, but this official case requires EPP execution plus complete official cart UI assertions."
-      },
-      {
-        "id": "SAM-25034",
-        "title": "Step 1: Contact information",
-        "reason": "Contact information is proven in Base Store, but the official case is EPP and needs EPP store context."
-      },
-      {
-        "id": "SAM-25045",
-        "title": "Payment using credit card with reg user",
-        "reason": "Registered credit-card order is proven in Base Store, but the official case is EPP and needs EPP order placement."
-      }
+      {"id":"SAM-25021","title":"Able to add to Cart from PDP","reason":"Base Store behavior is proven, but this official case belongs to EPP and needs EPP execution."},
+      {"id":"SAM-25022","title":"Cart page UI","reason":"Core Base Store cart assertions exist, but this official case requires EPP execution and complete EPP UI assertions."},
+      {"id":"SAM-25034","title":"Step 1: Contact information","reason":"Contact information is proven in Base Store, but the official case requires EPP context."},
+      {"id":"SAM-25045","title":"Payment using credit card with reg user","reason":"Registered card order is proven in Base Store, but the official case requires EPP order placement."}
     ]
   },
   "priority": [
     "SAM-24971",
+    "SAM-24975",
     "SAM-24989",
     "SAM-25016",
     "SAM-24968",
     "SAM-24982",
-    "SAM-25011",
-    "SAM-24969",
+    "SAM-24986",
+    "SAM-25000",
+    "SAM-25004",
+    "SAM-25005",
+    "SAM-25010",
     "SAM-24981",
     "SAM-24991",
-    "SAM-24994",
+    "SAM-25006",
     "SAM-25021",
     "SAM-25022",
     "SAM-25034",
