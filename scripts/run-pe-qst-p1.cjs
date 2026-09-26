@@ -37,7 +37,14 @@ if (PE_BASE_P1_IDS.length !== 28) {
   throw new Error(`PE Base Store P1 inventory drift: expected 28 official IDs, found ${PE_BASE_P1_IDS.length}.`);
 }
 const officialSet = new Set(PE_BASE_P1_IDS);
-const p1Pattern = `(?:${PE_BASE_P1_IDS.join("|")})\\b`;
+const requestedTargetIds = String(process.env.PE_QST_TARGET_IDS || "")
+  .split(",")
+  .map((value) => value.trim().toUpperCase())
+  .filter(Boolean);
+const unknownTargetIds = requestedTargetIds.filter((id) => !officialSet.has(id));
+if (unknownTargetIds.length) throw new Error(`Unknown PE_QST_TARGET_IDS: ${unknownTargetIds.join(", ")}.`);
+const executionIds = requestedTargetIds.length ? requestedTargetIds : PE_BASE_P1_IDS;
+const p1Pattern = `(?:${executionIds.join("|")})\\b`;
 
 function specFilesUnder(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -60,6 +67,7 @@ const explicitNotRunIds = officialTitles
 const duplicateIds = PE_BASE_P1_IDS.filter((id) => implementedTitles.filter((title) => title.includes(id)).length > 1);
 
 console.log(`[pe-qst] Official PE ${targetEnvironment} Base Store P1 scope: ${PE_BASE_P1_IDS.length} TCs.`);
+if (requestedTargetIds.length) console.log(`[pe-qst] Targeted execution: ${executionIds.join(", ")}.`);
 console.log(`[pe-qst] Represented in canonical Base Store scope: ${representedIds.size}/${PE_BASE_P1_IDS.length}.`);
 console.log(`[pe-qst] Executable implementations: ${implementedIds.size}/${PE_BASE_P1_IDS.length}.`);
 console.log(`[pe-qst] Explicit NOT_RUN: ${explicitNotRunIds.join(", ") || "none"}.`);
