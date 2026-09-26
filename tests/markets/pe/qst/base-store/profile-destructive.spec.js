@@ -27,10 +27,6 @@ test.describe("PE QST - guarded profile writes", () => {
       process.env.ALLOW_PROFILE_WRITE !== "1",
       "Set ALLOW_PROFILE_WRITE=1 only for an explicitly authorized PE QA profile-address lifecycle run."
     );
-    test.skip(
-      !process.env.PE_ADDRESS_API_URL,
-      "PE_ADDRESS_API_URL is required so QA-marked addresses can be verified and cleaned up safely."
-    );
     const auth = getPeAuthState();
     await auth.applyAuthSessionStorage(context);
   });
