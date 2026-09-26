@@ -5,7 +5,7 @@ const DEFAULT_USERNAME = "admin.lucas.afonso";
 const DEFAULT_FILE = path.resolve("playwright/.auth/backoffice-admin.json");
 
 function resolveBackOfficeEnvironment(environment = process.env) {
-  return String(environment.BACKOFFICE_ENV || environment.MX_QST_ENVIRONMENT || "s1").toLowerCase();
+  return String(environment.BACKOFFICE_ENV || environment.MX_QST_ENVIRONMENT || environment.PE_QST_ENVIRONMENT || "s1").toLowerCase();
 }
 
 function resolveCredentialsFile(environment = process.env) {
@@ -15,11 +15,9 @@ function resolveCredentialsFile(environment = process.env) {
   if (environment.BACKOFFICE_ADMIN_CREDENTIALS_FILE) {
     return path.resolve(environment.BACKOFFICE_ADMIN_CREDENTIALS_FILE);
   }
-  // Keep the existing ignored file as the S1 default. Other environments must
-  // opt into their own file so S1 credentials are never reused silently.
-  return target === "s1"
-    ? DEFAULT_FILE
-    : path.resolve(`playwright/.auth/backoffice-admin-${target}.json`);
+  const targetFile = path.resolve(`playwright/.auth/backoffice-admin-${target}.json`);
+  if (fs.existsSync(targetFile)) return targetFile;
+  return DEFAULT_FILE;
 }
 
 function readLocalCredentials(filePath = DEFAULT_FILE) {
