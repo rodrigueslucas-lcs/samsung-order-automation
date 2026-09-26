@@ -21,7 +21,11 @@ const devToolsActivePortFile = path.join(profileDir, "DevToolsActivePort");
 const interactiveTimeout = Number(process.env.PE_AUTH_INTERACTIVE_TIMEOUT_MS || 600000);
 const manualLogin = process.env.PE_AUTH_MANUAL === "1";
 
-const localCredentialsFile = path.join(authDir, "pe-storefront-user.json");
+const localCredentialsFile = [
+  path.join(authDir, "samsung-storefront-user.json"),
+  path.join(authDir, "mx-storefront-user.json"),
+  path.join(authDir, "pe-storefront-user.json"),
+].find((candidate) => fs.existsSync(candidate)) || path.join(authDir, "samsung-storefront-user.json");
 
 function readLocalCredentials() {
   if (!fs.existsSync(localCredentialsFile)) return {};
@@ -34,11 +38,11 @@ function readLocalCredentials() {
 
 function resolveRuntimeCredentials() {
   const local = readLocalCredentials();
-  const email = process.env.PE_SAMSUNG_EMAIL?.trim() || local.email;
-  const password = process.env.PE_SAMSUNG_PASSWORD || local.password;
+  const email = process.env.SAMSUNG_ACCOUNT_EMAIL?.trim() || process.env.PE_SAMSUNG_EMAIL?.trim() || local.email;
+  const password = process.env.SAMSUNG_ACCOUNT_PASSWORD || process.env.PE_SAMSUNG_PASSWORD || local.password;
   if (!email || !password) {
     throw new Error(
-      "PE Samsung credentials were not found. Set PE_SAMSUNG_EMAIL/PE_SAMSUNG_PASSWORD or create playwright/.auth/pe-storefront-user.json."
+      "Global Samsung Account credentials were not found. Configure SAMSUNG_ACCOUNT_EMAIL/SAMSUNG_ACCOUNT_PASSWORD or the ignored playwright/.auth/samsung-storefront-user.json once."
     );
   }
   return { email, password };
