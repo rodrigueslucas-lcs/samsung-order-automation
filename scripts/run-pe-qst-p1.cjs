@@ -110,7 +110,9 @@ const executionEnv = {
   SMB_EVIDENCE_DIR: path.join(artifactDir, "evidence"),
   ENABLE_ALLURE: process.env.ENABLE_ALLURE || "0",
   ALLURE_RESULTS_DIR: allureResultsDir,
-  ALLOW_PAYMENT_SUBMIT: process.env.EXECUTION_MODE === "authorized-destructive" ? "1" : "0",
+  ALLOW_PAYMENT_SUBMIT: process.env.ALLOW_PAYMENT_SUBMIT ?? "1",
+  ALLOW_PROFILE_WRITE: process.env.ALLOW_PROFILE_WRITE ?? "1",
+  BACKOFFICE_ENV: targetEnvironment.toLowerCase(),
 };
 
 const result = spawnSync(process.execPath, args, { env: executionEnv, stdio: "inherit" });
