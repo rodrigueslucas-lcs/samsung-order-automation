@@ -65,8 +65,10 @@ function getPeQstConfig(environment = process.env) {
     throw new Error("PE_QST_PDP_URL must stay inside the /pe/ storefront route.");
   }
 
+  const defaultAddressApiUrl =
+    `https://${envName.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/pe/users/current/addresses`;
   const addressApiUrl = assertAddressApi(
-    optionalHttpsUrl(environment.PE_ADDRESS_API_URL, "PE_ADDRESS_API_URL", envName)
+    optionalHttpsUrl(environment.PE_ADDRESS_API_URL || defaultAddressApiUrl, "PE_ADDRESS_API_URL", envName)
   );
 
   return Object.freeze({
