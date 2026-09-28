@@ -24,7 +24,5 @@ if (process.env.MX_AUTH_REFRESH_SECOND === "1") {
   run(`Verifying second Samsung Account session for ${environment}`, "scripts/auth-verify-mx.cjs", { MX_AUTH_SLOT: "second" });
 }
 
-run(`Packaging verified MX ${environment} session for CI handoff`, "scripts/auth-package-mx.cjs");
-
-console.log(`\n[auth:refresh:mx] READY · MX ${environment} authenticated session refreshed, verified and packaged.`);
+run(`Packaging verified MX ${environment} session for CI handoff`, "scripts/auth-package-mx.cjs");\n\nif (process.env.JENKINS_AUTH_PUBLISH === "1") {\n  run(`Publishing MX ${environment} session bundle to Jenkins`, "scripts/auth-publish-jenkins.cjs");\n}\n\nconsole.log(`\n[auth:refresh:mx] READY · MX ${environment} authenticated session refreshed, verified and packaged.`);
 console.log("[auth:refresh:mx] CAPTCHA/MFA remains a human security gate when Samsung Account requests it.");
