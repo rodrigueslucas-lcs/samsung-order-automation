@@ -17,6 +17,8 @@
     "auth:login:mx": "node scripts/auth-login-mx.cjs",
     "auth:export:mx": "node scripts/auth-bootstrap-mx.cjs",
     "auth:verify:mx": "node scripts/auth-verify-mx.cjs",
+    "auth:refresh:mx": "node scripts/auth-refresh-mx.cjs",
+    "auth:doctor:mx": "node scripts/auth-doctor-mx.cjs",
     "auth:open-profile:pe": "node scripts/auth-open-profile-pe.cjs",
     "auth:export:pe": "node scripts/auth-bootstrap-pe.cjs",
     "auth:verify:pe": "node scripts/auth-verify-pe.cjs",
