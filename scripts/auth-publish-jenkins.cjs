@@ -18,69 +18,77 @@ if (parsed.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(parsed.
 const suffix = environment.toLowerCase();
 const bundlePath = path.resolve("playwright/.session-packages", `mx-${suffix}-session-bundle.json`);
 if (!fs.existsSync(bundlePath)) throw new Error("Session bundle missing. Run auth:refresh:mx first.");
-const payload = fs.readFileSync(bundlePath);
 const credentialId = process.env.JENKINS_MX_SESSION_BUNDLE_CREDENTIAL || `samsung-mx-${suffix}-session-bundle`;
 const fileName = path.basename(bundlePath);
 const auth = `Basic ${Buffer.from(`${user}:${token}`).toString("base64")}`;
+const credentialBase = `/manage/credentials/store/system/domain/_/credential/${encodeURIComponent(credentialId)}`;
 
 async function request(relative, options = {}) {
-  const response = await fetch(`${baseUrl}${relative}`, {
-    redirect: "error",
+  return fetch(`${baseUrl}${relative}`, {
+    redirect: "manual",
     ...options,
     headers: { Authorization: auth, ...(options.headers || {}) },
   });
-  return response;
+}
+
+async function getCrumb() {
+  const response = await request("/crumbIssuer/api/json");
+  if (!response.ok) throw new Error(`Jenkins crumb request failed (HTTP ${response.status}).`);
+  const crumb = await response.json();
+  return { [crumb.crumbRequestField]: crumb.crumb };
+}
+
+async function credentialExists() {
+  const response = await request(`${credentialBase}/api/json`);
+  if (response.status === 404) return false;
+  if (!response.ok) throw new Error(`Unable to inspect Jenkins credential '${credentialId}' (HTTP ${response.status}).`);
+  return true;
+}
+
+function credentialJson() {
+  return JSON.stringify({
+    scope: "GLOBAL",
+    id: credentialId,
+    description: `Managed by samsung-order-automation auth refresh; ephemeral MX ${environment} session bundle`,
+    $class: "org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl",
+  });
+}
+
+async function submitCredential(relative, crumbHeader) {
+  const bytes = fs.readFileSync(bundlePath);
+  const form = new FormData();
+  form.append("json", credentialJson());
+  form.append("file", new Blob([bytes], { type: "application/json" }), fileName);
+
+  const response = await request(relative, {
+    method: "POST",
+    headers: crumbHeader,
+    body: form,
+  });
+  if (response.status >= 200 && response.status < 400) return;
+
+  const hint = response.status === 403
+    ? " Jenkins API user does not have permission to manage this credential through the Credentials UI endpoint."
+    : "";
+  throw new Error(`Jenkins credential publish failed (HTTP ${response.status}).${hint}`);
 }
 
 async function main() {
-  let crumbHeader = {};
-  const crumbResponse = await request("/crumbIssuer/api/json").catch(() => null);
-  if (crumbResponse?.ok) {
-    const crumb = await crumbResponse.json();
-    crumbHeader = { [crumb.crumbRequestField]: crumb.crumb };
+  const crumbHeader = await getCrumb();
+  const exists = await credentialExists();
+
+  if (exists) {
+    await submitCredential(`${credentialBase}/updateSubmit`, crumbHeader);
+  } else {
+    await submitCredential("/manage/credentials/store/system/domain/_/createCredentials", crumbHeader);
   }
 
-  const encoded = payload.toString("base64");
-  const groovy = `
-import jenkins.model.Jenkins
-import com.cloudbees.plugins.credentials.CredentialsScope
-import com.cloudbees.plugins.credentials.domains.Domain
-import com.cloudbees.plugins.credentials.impl.FileCredentialsImpl
-import com.cloudbees.plugins.credentials.SystemCredentialsProvider
-import hudson.util.SecretBytes
-
-def store = SystemCredentialsProvider.getInstance().getStore()
-def domain = Domain.global()
-def id = ${JSON.stringify(credentialId)}
-def bytes = java.util.Base64.decoder.decode(${JSON.stringify(encoded)})
-def replacement = new FileCredentialsImpl(
-  CredentialsScope.GLOBAL,
-  id,
-  "Managed by samsung-order-automation auth refresh; ephemeral MX ${environment} session bundle",
-  ${JSON.stringify(fileName)},
-  SecretBytes.fromBytes(bytes)
-)
-def existing = store.getCredentials(domain).find { it.id == id }
-def changed = existing ? store.updateCredentials(domain, existing, replacement) : store.addCredentials(domain, replacement)
-if (!changed) throw new RuntimeException("Jenkins credential store rejected the session bundle update")
-println("SESSION_BUNDLE_UPDATED")
-`;
-
-  const body = new URLSearchParams({ script: groovy });
-  const response = await request("/scriptText", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", ...crumbHeader },
-    body,
-  });
-  const result = await response.text();
-  if (!response.ok || !result.includes("SESSION_BUNDLE_UPDATED")) {
-    const hint = response.status === 403
-      ? " Jenkins API user needs permission to run the approved credential-update script."
-      : "";
-    throw new Error(`Jenkins session publish failed (HTTP ${response.status}).${hint}`);
+  if (!(await credentialExists())) {
+    throw new Error(`Jenkins did not expose credential '${credentialId}' after publish.`);
   }
 
-  console.log(`[auth:publish:jenkins] READY · MX ${environment} session bundle updated in Jenkins credential '${credentialId}'.`);
+  console.log(`[auth:publish:jenkins] READY · MX ${environment} session bundle ${exists ? "updated" : "created"} in Jenkins credential '${credentialId}'.`);
+  console.log("[auth:publish:jenkins] Used the Credentials UI endpoint; Script Console access is not required.");
   console.log("[auth:publish:jenkins] No session contents were logged.");
 }
 
