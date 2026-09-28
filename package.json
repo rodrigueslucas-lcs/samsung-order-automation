@@ -76,7 +76,8 @@
     "preqa2:validate:safe": "node scripts/preqa2-safe-validation.cjs",
     "auth:login:pe": "node scripts/auth-login-pe.cjs",
     "auth:package:mx": "node scripts/auth-package-mx.cjs",
-    "auth:install:mx": "node scripts/auth-install-mx-package.cjs"
+    "auth:install:mx": "node scripts/auth-install-mx-package.cjs",
+    "auth:publish:jenkins": "node scripts/auth-publish-jenkins.cjs"
   },
   "keywords": [
     "playwright",
