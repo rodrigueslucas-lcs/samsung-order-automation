@@ -24,5 +24,5 @@ if (process.env.MX_AUTH_REFRESH_SECOND === "1") {
   run(`Verifying second Samsung Account session for ${environment}`, "scripts/auth-verify-mx.cjs", { MX_AUTH_SLOT: "second" });
 }
 
-console.log(`\n[auth:refresh:mx] READY · MX ${environment} authenticated session refreshed and verified.`);
+run(`Packaging verified MX ${environment} session for CI handoff`, "scripts/auth-package-mx.cjs");\n\nconsole.log(`\\n[auth:refresh:mx] READY · MX ${environment} authenticated session refreshed, verified and packaged.`);
 console.log("[auth:refresh:mx] CAPTCHA/MFA remains a human security gate when Samsung Account requests it.");
