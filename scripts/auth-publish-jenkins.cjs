@@ -18,10 +18,12 @@ if (parsed.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(parsed.
 const suffix = environment.toLowerCase();
 const bundlePath = path.resolve("playwright/.session-packages", `mx-${suffix}-session-bundle.json`);
 if (!fs.existsSync(bundlePath)) throw new Error("Session bundle missing. Run auth:refresh:mx first.");
+
 const credentialId = process.env.JENKINS_MX_SESSION_BUNDLE_CREDENTIAL || `samsung-mx-${suffix}-session-bundle`;
 const fileName = path.basename(bundlePath);
 const auth = `Basic ${Buffer.from(`${user}:${token}`).toString("base64")}`;
-const credentialBase = `/manage/credentials/store/system/domain/_/credential/${encodeURIComponent(credentialId)}`;
+const domainBase = "/manage/credentials/store/system/domain/_";
+const credentialBase = `${domainBase}/credential/${encodeURIComponent(credentialId)}`;
 
 async function request(relative, options = {}) {
   return fetch(`${baseUrl}${relative}`, {
@@ -45,19 +47,23 @@ async function credentialExists() {
   return true;
 }
 
-function credentialJson() {
-  return JSON.stringify({
+function credentialPayload() {
+  return {
     scope: "GLOBAL",
     id: credentialId,
     description: `Managed by samsung-order-automation auth refresh; ephemeral MX ${environment} session bundle`,
     $class: "org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl",
-  });
+  };
 }
 
-async function submitCredential(relative, crumbHeader) {
+async function submitCredential(relative, crumbHeader, mode) {
   const bytes = fs.readFileSync(bundlePath);
   const form = new FormData();
-  form.append("json", credentialJson());
+
+  // Jenkins Credentials uses a hetero-list named "credentials" in its
+  // create/update dialogs. The previous flat JSON payload was accepted by
+  // Stapler with a redirect but did not create a credential.
+  form.append("json", JSON.stringify({ credentials: credentialPayload() }));
   form.append("file", new Blob([bytes], { type: "application/json" }), fileName);
 
   const response = await request(relative, {
@@ -65,12 +71,23 @@ async function submitCredential(relative, crumbHeader) {
     headers: crumbHeader,
     body: form,
   });
-  if (response.status >= 200 && response.status < 400) return;
 
-  const hint = response.status === 403
-    ? " Jenkins API user does not have permission to manage this credential through the Credentials UI endpoint."
-    : "";
-  throw new Error(`Jenkins credential publish failed (HTTP ${response.status}).${hint}`);
+  if (response.status === 403) {
+    throw new Error("Jenkins credential publish failed (HTTP 403). Jenkins API user cannot manage credentials through this endpoint.");
+  }
+  if (response.status >= 400) {
+    throw new Error(`Jenkins credential publish failed (HTTP ${response.status}).`);
+  }
+
+  const location = response.headers.get("location") || "";
+  if (response.status >= 300) {
+    const normalized = location.replace(baseUrl, "");
+    const expectedParent = `${domainBase}/`;
+    const expectedCredential = `${credentialBase}/`;
+    if (normalized && normalized !== expectedParent && normalized !== domainBase && normalized !== expectedCredential && normalized !== credentialBase) {
+      throw new Error(`Jenkins ${mode} redirected unexpectedly (HTTP ${response.status}, Location: ${normalized}).`);
+    }
+  }
 }
 
 async function main() {
@@ -78,13 +95,13 @@ async function main() {
   const exists = await credentialExists();
 
   if (exists) {
-    await submitCredential(`${credentialBase}/updateSubmit`, crumbHeader);
+    await submitCredential(`${credentialBase}/updateSubmit`, crumbHeader, "update");
   } else {
-    await submitCredential("/manage/credentials/store/system/domain/_/createCredentials", crumbHeader);
+    await submitCredential(`${domainBase}/createCredentials`, crumbHeader, "create");
   }
 
   if (!(await credentialExists())) {
-    throw new Error(`Jenkins did not expose credential '${credentialId}' after publish.`);
+    throw new Error(`Jenkins accepted the ${exists ? "update" : "create"} request but credential '${credentialId}' is still absent. No legacy credential was changed.`);
   }
 
   console.log(`[auth:publish:jenkins] READY · MX ${environment} session bundle ${exists ? "updated" : "created"} in Jenkins credential '${credentialId}'.`);
