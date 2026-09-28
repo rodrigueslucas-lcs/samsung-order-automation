@@ -346,6 +346,7 @@ pipeline {
                       cp "$MX_BACKOFFICE_ADMIN_SECRET" playwright/.auth/backoffice-admin-s2.json
                       chmod 600 playwright/.auth/*.json || true
                       CI=1 npm run auth:doctor:mx
+                      CI=1 MX_AUTH_SLOT=second npm run auth:doctor:mx
                       rm -f /tmp/samsung-mx-session-bundle.json
                       npx -y node@22 scripts/run-mx-qst-safe.cjs
                     '''
@@ -359,6 +360,9 @@ pipeline {
                       copy /Y "%MX_BACKOFFICE_ADMIN_SECRET%" "playwright\\.auth\\backoffice-admin-s2.json" >nul || exit /b 2
                       set CI=1
                       call npm run auth:doctor:mx || exit /b 20
+                      set MX_AUTH_SLOT=second
+                      call npm run auth:doctor:mx || exit /b 20
+                      set MX_AUTH_SLOT=
                       del /Q "%TEMP%\\samsung-mx-session-bundle.json" 2>nul
                       call npx -y node@22 scripts/run-mx-qst-safe.cjs
                     '''
