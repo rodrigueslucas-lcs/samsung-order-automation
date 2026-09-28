@@ -36,5 +36,5 @@ if (verify.status !== 0) {
   process.exit(20);
 }
 
-status("Samsung Account", true, `MX ${environment} live session verified`);
+status("Samsung Account", true, `MX ${environment} ${slot} live session verified`);
 console.log("AUTH_READY");
