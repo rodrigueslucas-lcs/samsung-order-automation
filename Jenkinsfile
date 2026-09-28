@@ -16,7 +16,7 @@ pipeline {
     choice(name: 'TEST_SUITE', choices: ['fast-guest', 'authenticated-safe', 'official-p1', 'backoffice-safe', 'allure-smoke'], description: 'Execution profile. Functional suites use the shared Executive Dashboard + Playwright + Allure reporting standard.')
     choice(name: 'EXECUTION_MODE', choices: ['safe', 'authorized-destructive'], description: 'Safety mode. Full official-p1 payment/order execution requires authorized-destructive.')
     choice(name: 'BROWSER_MODE', choices: ['headless', 'headed'], description: 'Browser mode. Headless is recommended on Jenkins.')
-    choice(name: 'EVIDENCE_MODE', choices: ['screenshots-trace', 'screenshots-trace-video'], description: 'Evidence capture. Video requires FFmpeg on the Jenkins agent.')
+    choice(name: 'EVIDENCE_MODE', choices: ['screenshots-trace', 'screenshots-trace-video'], description: 'Evidence capture. Video requires FFmpeg on the Jenkins agent.')\n    choice(name: 'AUTH_SOURCE', choices: ['legacy-files', 'session-bundle'], description: 'MX authenticated session source. legacy-files preserves the proven credentials flow; session-bundle consumes the single ephemeral bundle managed by auth:refresh:mx + auth:publish:jenkins.')
     string(name: 'P1_TARGET_IDS', defaultValue: '', description: 'Optional MX official-p1 stabilization filter. Comma/space separated active SAM IDs, e.g. SAM-24969,SAM-24991,SAM-25002. Leave empty for the full 29-TC P1.')
   }
 
@@ -328,7 +328,42 @@ pipeline {
               env.MX_SESSION_CREDENTIAL = params.ENVIRONMENT == 'S2' ? 'samsung-mx-s2-session-storage' : 'samsung-mx-s1-session-storage'
               env.MX_AUTH_SUFFIX = params.ENVIRONMENT.toLowerCase()
 
-              if (params.ENVIRONMENT == 'S2') {
+              if (params.ENVIRONMENT == 'S2' && params.AUTH_SOURCE == 'session-bundle') {
+                withCredentials([
+                  file(credentialsId: 'samsung-mx-s2-session-bundle', variable: 'MX_SESSION_BUNDLE_SECRET'),
+                  file(credentialsId: 'samsung-mx-test-card', variable: 'MX_TEST_CARD_SECRET'),
+                  file(credentialsId: 'samsung-mx-s2-backoffice-admin', variable: 'MX_BACKOFFICE_ADMIN_SECRET')
+                ]) {
+                  if (isUnix()) {
+                    sh '''
+                      set -eu
+                      mkdir -p playwright/.auth
+                      cp "$MX_SESSION_BUNDLE_SECRET" /tmp/samsung-mx-session-bundle.json
+                      chmod 600 /tmp/samsung-mx-session-bundle.json || true
+                      MX_SESSION_BUNDLE=/tmp/samsung-mx-session-bundle.json node scripts/auth-install-mx-package.cjs
+                      cp "$MX_TEST_CARD_SECRET" playwright/.auth/mx-test-card.json
+                      cp "$MX_BACKOFFICE_ADMIN_SECRET" playwright/.auth/backoffice-admin-s2.json
+                      chmod 600 playwright/.auth/*.json || true
+                      CI=1 npm run auth:doctor:mx
+                      rm -f /tmp/samsung-mx-session-bundle.json
+                      npx -y node@22 scripts/run-mx-qst-safe.cjs
+                    '''
+                  } else {
+                    bat '''@echo off
+                      if not exist playwright\\.auth mkdir playwright\\.auth
+                      copy /Y "%MX_SESSION_BUNDLE_SECRET%" "%TEMP%\\samsung-mx-session-bundle.json" >nul || exit /b 2
+                      set "MX_SESSION_BUNDLE=%TEMP%\\samsung-mx-session-bundle.json"
+                      call node scripts/auth-install-mx-package.cjs || exit /b 20
+                      copy /Y "%MX_TEST_CARD_SECRET%" "playwright\\.auth\\mx-test-card.json" >nul || exit /b 2
+                      copy /Y "%MX_BACKOFFICE_ADMIN_SECRET%" "playwright\\.auth\\backoffice-admin-s2.json" >nul || exit /b 2
+                      set CI=1
+                      call npm run auth:doctor:mx || exit /b 20
+                      del /Q "%TEMP%\\samsung-mx-session-bundle.json" 2>nul
+                      call npx -y node@22 scripts/run-mx-qst-safe.cjs
+                    '''
+                  }
+                }
+              } else if (params.ENVIRONMENT == 'S2') {
                 withCredentials([
                   file(credentialsId: env.MX_AUTH_STATE_CREDENTIAL, variable: 'MX_AUTH_STATE_SECRET'),
                   file(credentialsId: env.MX_SESSION_CREDENTIAL, variable: 'MX_SESSION_STORAGE_SECRET'),
