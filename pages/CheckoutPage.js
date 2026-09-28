@@ -132,22 +132,19 @@ export default class CheckoutPage extends BasePage {
   }
 
   async saveNewAuthenticatedAddress(address) {
-    await this.page.getByRole("tabpanel", {
-      name: "Envío",
-      exact: true,
-    }).waitFor({ state: "visible", timeout: 60000 });
-    const newAddress = this.page.getByRole("radio", {
-      name: "Nueva dirección",
-      exact: true,
-    });
-    if (await newAddress.isVisible()) {
-      await newAddress.check();
-    }
-    await this.fillAddress(address);
     const deliveryPanel = this.page.getByRole("tabpanel", {
       name: "Envío",
       exact: true,
     });
+    await deliveryPanel.waitFor({ state: "visible", timeout: 60000 });
+    const newAddress = deliveryPanel.getByRole("radio", {
+      name: "Nueva dirección",
+      exact: true,
+    });
+    await newAddress.waitFor({ state: "visible", timeout: 30000 });
+    await newAddress.check();
+    await expect(newAddress).toBeChecked();
+    await this.fillAddress(address);
     const saveAddress = deliveryPanel.getByRole("checkbox", {
       name: /Guardar datos de env[ií]o en Mi cuenta/i,
     });
@@ -900,8 +897,7 @@ export default class CheckoutPage extends BasePage {
         .locator(`input[type="radio"][name="${groupName}"]`)
         .first();
       const label = option.locator("xpath=ancestor::label[1]");
-      await label.scrollIntoViewIfNeeded();
-      await label.click();
+      await label.click({ timeout: 30000 });
       if (!(await option.isChecked())) {
         throw new Error(`Delivery option did not remain selected for ${groupName}.`);
       }

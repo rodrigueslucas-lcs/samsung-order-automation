@@ -1,4 +1,5 @@
 import BasePage from './BasePage';
+import { expect } from '@playwright/test';
 
 export default class CartPage extends BasePage {
   constructor(page, options = {}) {
@@ -34,6 +35,34 @@ export default class CartPage extends BasePage {
   async openCart() {
     await this.page.goto(this.cartUrl, { waitUntil: 'domcontentloaded' });
     await this.screenshot('02-cart-page');
+  }
+
+  async clearPeCartAndConfirmEmpty() {
+    const target = new URL(this.cartUrl);
+    if (!['stg.shop.samsung.com', 'stg2.shop.samsung.com'].includes(target.hostname) || target.pathname !== '/pe/cart') {
+      throw new Error('PE cart cleanup is restricted to the PE S1/S2 staging cart.');
+    }
+    await this.openCart();
+    const main = this.page.getByRole('main');
+    await main.getByRole('heading', { name: 'Cart', exact: true })
+      .waitFor({ state: 'visible', timeout: 60000 });
+
+    for (let removed = 0; removed < 10; removed += 1) {
+      const removeButtons = main.getByRole('button', { name: /^Remove$/i });
+      const count = await removeButtons.count();
+      if (!count) {
+        await main.getByText(/carrito.*vac[ií]o|no hay productos/i).first()
+          .waitFor({ state: 'visible', timeout: 30000 });
+        return;
+      }
+      await removeButtons.first().click();
+      const dialog = this.page.getByRole('dialog').or(this.page.getByRole('alertdialog'))
+        .filter({ hasText: /Eliminar del carrito/i });
+      await dialog.waitFor({ state: 'visible', timeout: 30000 });
+      await dialog.getByRole('button', { name: /^S[ií]$/i }).click();
+      await expect(removeButtons).toHaveCount(count - 1, { timeout: 30000 });
+    }
+    throw new Error('PE cart cleanup exceeded the 10-row safety limit.');
   }
 
   async loadMxCartState() {

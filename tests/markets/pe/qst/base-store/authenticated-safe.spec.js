@@ -58,9 +58,11 @@ test.describe("PE QST - authenticated safe reuse", () => {
       market: "pe",
     });
     await myOrders.openMyOrders();
+    await expect.poll(() => myOrders.visibleOrderCodes().then((codes) => codes.length), {
+      timeout: 60000,
+      message: "The authenticated PE My Orders page must list an order after loading.",
+    }).toBeGreaterThan(0);
     const orderCodes = await myOrders.visibleOrderCodes();
-
-    expect(orderCodes.length).toBeGreaterThan(0);
     testInfo.annotations.push({
       type: "qst-order-history-count",
       description: String(orderCodes.length),

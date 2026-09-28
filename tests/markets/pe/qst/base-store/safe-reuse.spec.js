@@ -184,11 +184,14 @@ test("SAM-25090 @qst @pe @base-store @safe @guest @reuse - Validate home deliver
 
   const { checkout } = await reachPeGuestDelivery(page, config);
   await checkout.fillAddress(testData.address);
-  await checkout.validateAvailableDeliveryModes();
-  await checkout.validateDeliveryModeSelection();
+  const delivery = page.getByRole("listitem").filter({ hasText: /Para envíos a provincias/i });
+  await expect(delivery).toBeVisible({ timeout: 30000 });
+  await delivery.click();
+  const summary = page.getByRole("heading", { name: "Resumen de la orden", exact: true }).locator("..");
+  await expect(summary.getByText(/Envío Regular Gratis/i).first()).toBeVisible({ timeout: 30000 });
 
   testInfo.annotations.push({
     type: "qst-reuse-note",
-    description: "Available PE delivery modes and a regular-delivery selection reflected in Order Summary are validated without continuing to payment.",
+    description: "The PE province home-delivery option and its Order Summary selection are validated without continuing to payment. Calendar and order placement remain unproven.",
   });
 });

@@ -43,7 +43,7 @@ test.describe("PE QST - registered checkout safe reuse", () => {
       exact: true,
     });
     test.skip(
-      !(await savedAddressMode.isVisible().catch(() => false)),
+      !(await savedAddressMode.waitFor({ state: "visible", timeout: 30000 }).then(() => true, () => false)),
       "No saved address is available in the authenticated PE account; do not create persistent data in this safe TC."
     );
 
@@ -65,14 +65,13 @@ test.describe("PE QST - registered checkout safe reuse", () => {
     const config = getPeQstConfig();
     await reachPeRegisteredDelivery(page, config);
 
-    const newAddress = page.getByRole("radio", {
+    const newAddress = page.getByRole("tabpanel", { name: "Envío", exact: true }).getByRole("radio", {
       name: "Nueva dirección",
       exact: true,
     });
-    if (await newAddress.isVisible().catch(() => false)) {
-      await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
-      await expect(newAddress).toBeChecked({ timeout: 30000 });
-    }
+    await newAddress.waitFor({ state: "visible", timeout: 30000 });
+    await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
+    await expect(newAddress).toBeChecked({ timeout: 30000 });
 
     const saveAddress = page.getByRole("checkbox", {
       name: /Guardar datos de env[ií]o en Mi cuenta/i,
@@ -95,14 +94,13 @@ test.describe("PE QST - registered checkout safe reuse", () => {
 
     const config = getPeQstConfig();
     const { checkout } = await reachPeRegisteredDelivery(page, config);
-    const newAddress = page.getByRole("radio", {
+    const newAddress = page.getByRole("tabpanel", { name: "Envío", exact: true }).getByRole("radio", {
       name: "Nueva dirección",
       exact: true,
     });
-    if (await newAddress.isVisible().catch(() => false)) {
-      await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
-      await expect(newAddress).toBeChecked({ timeout: 30000 });
-    }
+    await newAddress.waitFor({ state: "visible", timeout: 30000 });
+    await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
+    await expect(newAddress).toBeChecked({ timeout: 30000 });
 
     await checkout.fillAddress(testData.address);
     await checkout.validateAddressValues(testData.address);
@@ -111,6 +109,9 @@ test.describe("PE QST - registered checkout safe reuse", () => {
       name: /Guardar datos de env[ií]o en Mi cuenta/i,
     });
     if (await saveAddress.isVisible().catch(() => false)) {
+      if (await saveAddress.isChecked()) {
+        await saveAddress.uncheck();
+      }
       await expect(saveAddress).not.toBeChecked();
     }
 

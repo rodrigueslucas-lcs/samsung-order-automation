@@ -3,10 +3,12 @@ import BackOfficeOrderPage from "../../../../../pages/BackOfficeOrderPage";
 import evidenceContext from "../../../../../reporting/evidence/evidenceContext";
 import peEvidenceMetadata from "../../../../../utils/qstPeEvidenceMetadata";
 import backofficeCredentials from "../../../../../utils/backofficeAdminCredentials.js";
+import peBackofficeTestData from "../../../../../utils/peBackofficeTestData.js";
 
 const { recordBusinessEvidence } = evidenceContext;
 const { getPeQstEvidenceMetadata } = peEvidenceMetadata;
 const { getBackOfficeAdminCredentials } = backofficeCredentials;
+const { getPeBackofficeOrderCode } = peBackofficeTestData;
 
 function requirePeBackOffice(testInfo, zephyrId) {
   const target = (process.env.PE_QST_ENVIRONMENT || "S2").toLowerCase();
@@ -45,7 +47,7 @@ test("SAM-25104 @qst @pe @base-store @backoffice @safe @reuse - Order Process Sh
   test.setTimeout(300000);
   const credentials = requirePeBackOffice(testInfo, "SAM-25104");
 
-  const orderCode = String(process.env.PE_QST_ORDER_CODE || "").trim();
+  const orderCode = getPeBackofficeOrderCode();
   test.skip(
     !orderCode,
     "Set PE_QST_ORDER_CODE to the specific PE order whose S2 fulfillment status is being verified."

@@ -53,6 +53,8 @@ export async function reachPeGuestPayment(page, config, options = {}) {
 }
 
 export async function reachPeRegisteredDelivery(page, config) {
+  const cleanCart = new CartPage(page, { cartUrl: config.cartUrl.href });
+  await cleanCart.clearPeCartAndConfirmEmpty();
   const cart = await addConfiguredProductToPeCart(page, config);
   await cart.proceedToAuthenticatedCheckout();
 
@@ -63,14 +65,13 @@ export async function reachPeRegisteredDelivery(page, config) {
 
 export async function reachPeRegisteredPayment(page, config, options = {}) {
   const { cart, checkout } = await reachPeRegisteredDelivery(page, config);
-  const newAddress = page.getByRole("radio", {
+  const newAddress = page.getByRole("tabpanel", { name: "Envío", exact: true }).getByRole("radio", {
     name: "Nueva dirección",
     exact: true,
   });
-  if (await newAddress.isVisible().catch(() => false)) {
-    await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
-    await newAddress.waitFor({ state: "visible", timeout: 30000 });
-  }
+  await newAddress.waitFor({ state: "visible", timeout: 30000 });
+  await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
+  if (!(await newAddress.isChecked())) throw new Error("PE delivery did not switch to the new-address mode.");
   await checkout.fillAddress(options.address || testData.address);
 
   const saveAddress = page.getByRole("checkbox", {

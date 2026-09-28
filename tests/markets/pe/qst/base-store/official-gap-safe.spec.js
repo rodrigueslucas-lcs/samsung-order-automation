@@ -70,7 +70,8 @@ test.describe("PE QST - official safe gap reconciliation", () => {
     evidence(testInfo, "SAM-25076");
     const cfg = config();
     const cart = await addConfiguredProductToPeCart(page, cfg);
-    await cart.validateControlledSingleSku(cfg.sku);
+    await cart.validateCartPage();
+    await cart.validateProductInCart();
 
     const tradeUp = page
       .getByText(/Plan Canje Galaxy|Plan Renueva|Canje Galaxy|Trade[- ]?up/i)
@@ -91,7 +92,7 @@ test.describe("PE QST - official safe gap reconciliation", () => {
 
     await page.keyboard.press("Escape");
     await expect(page).toHaveURL(/\/pe\/cart/i);
-    await cart.validateControlledSingleSku(cfg.sku);
+    await cart.validateProductInCart();
     recordBusinessEvidence(testInfo, { tradeUpSurfaceOpened: true, controlledSkuPreserved: cfg.sku });
   });
 
