@@ -47,46 +47,38 @@ async function credentialExists() {
   return true;
 }
 
-function credentialPayload() {
-  return {
-    scope: "GLOBAL",
-    id: credentialId,
-    description: `Managed by samsung-order-automation auth refresh; ephemeral MX ${environment} session bundle`,
-    $class: "org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl",
-  };
+function xmlEscape(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function credentialXml() {
+  const encodedFile = fs.readFileSync(bundlePath).toString("base64");
+  return [
+    "<org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl>",
+    "  <scope>GLOBAL</scope>",
+    `  <id>${xmlEscape(credentialId)}</id>`,
+    `  <description>${xmlEscape(`Managed by samsung-order-automation auth refresh; ephemeral MX ${environment} session bundle`)}</description>`,
+    `  <fileName>${xmlEscape(fileName)}</fileName>`,
+    `  <secretBytes>${encodedFile}</secretBytes>`,
+    "</org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl>",
+  ].join("\\n");
 }
 
 async function submitCredential(relative, crumbHeader, mode) {
-  const bytes = fs.readFileSync(bundlePath);
-  const form = new FormData();
-
-  // Jenkins Credentials uses a hetero-list named "credentials" in its
-  // create/update dialogs. The previous flat JSON payload was accepted by
-  // Stapler with a redirect but did not create a credential.
-  form.append("json", JSON.stringify({ credentials: credentialPayload() }));
-  form.append("file", new Blob([bytes], { type: "application/json" }), fileName);
-
   const response = await request(relative, {
     method: "POST",
-    headers: crumbHeader,
-    body: form,
+    headers: { ...crumbHeader, "Content-Type": "application/xml" },
+    body: credentialXml(),
   });
 
   if (response.status === 403) {
-    throw new Error("Jenkins credential publish failed (HTTP 403). Jenkins API user cannot manage credentials through this endpoint.");
+    throw new Error("Jenkins credential publish failed (HTTP 403). Jenkins API user cannot manage credentials through the Credentials REST API.");
   }
-  if (response.status >= 400) {
-    throw new Error(`Jenkins credential publish failed (HTTP ${response.status}).`);
-  }
-
-  const location = response.headers.get("location") || "";
-  if (response.status >= 300) {
-    const normalized = location.replace(baseUrl, "");
-    const expectedParent = `${domainBase}/`;
-    const expectedCredential = `${credentialBase}/`;
-    if (normalized && normalized !== expectedParent && normalized !== domainBase && normalized !== expectedCredential && normalized !== credentialBase) {
-      throw new Error(`Jenkins ${mode} redirected unexpectedly (HTTP ${response.status}, Location: ${normalized}).`);
-    }
+  if (!response.ok) {
+    throw new Error(`Jenkins credential ${mode} failed (HTTP ${response.status}).`);
   }
 }
 
@@ -95,7 +87,7 @@ async function main() {
   const exists = await credentialExists();
 
   if (exists) {
-    await submitCredential(`${credentialBase}/updateSubmit`, crumbHeader, "update");
+    await submitCredential(`${credentialBase}/config.xml`, crumbHeader, "update");
   } else {
     await submitCredential(`${domainBase}/createCredentials`, crumbHeader, "create");
   }
@@ -105,7 +97,7 @@ async function main() {
   }
 
   console.log(`[auth:publish:jenkins] READY · MX ${environment} session bundle ${exists ? "updated" : "created"} in Jenkins credential '${credentialId}'.`);
-  console.log("[auth:publish:jenkins] Used the Credentials UI endpoint; Script Console access is not required.");
+  console.log("[auth:publish:jenkins] Used the Jenkins Credentials REST XML API; Script Console access is not required.");
   console.log("[auth:publish:jenkins] No session contents were logged.");
 }
 
