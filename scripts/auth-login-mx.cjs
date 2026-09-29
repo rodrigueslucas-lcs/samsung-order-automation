@@ -182,6 +182,18 @@ function writeJsonSecurely(destination, value) {
   writeJsonAtomically(destination, value);
 }
 
+function safeStateSummary(state) {
+  return {
+    cookies: (state.cookies || []).map(({ name, domain, path, expires, httpOnly, secure, sameSite }) => ({
+      name, domain, path, expires, httpOnly, secure, sameSite,
+    })).sort((a, b) => `${a.domain}|${a.name}|${a.path}`.localeCompare(`${b.domain}|${b.name}|${b.path}`)),
+    origins: (state.origins || []).map(({ origin, localStorage = [] }) => ({
+      origin,
+      localStorageKeys: localStorage.map(({ name }) => name).sort(),
+    })).sort((a, b) => a.origin.localeCompare(b.origin)),
+  };
+}
+
 async function exportAuthenticatedState(context, page) {
   const fullState = await context.storageState({ indexedDB: true });
   const mxState = {
@@ -203,6 +215,16 @@ async function exportAuthenticatedState(context, page) {
       return [key, window.sessionStorage.getItem(key)];
     }).filter(([key]) => key !== null)
   ));
+  if (process.env.MX_AUTH_DIAGNOSTIC === "1") {
+    const kept = new Set(mxState.cookies.map((cookie) => `${cookie.domain}|${cookie.path}|${cookie.name}`));
+    const dropped = fullState.cookies.filter((cookie) => !kept.has(`${cookie.domain}|${cookie.path}|${cookie.name}`));
+    const summary = safeStateSummary(fullState);
+    console.log(`[auth:diagnostic:mx] persistent profile: cookies=${summary.cookies.length}, origins=${summary.origins.length}, sessionKeys=${Object.keys(sessionStorage).length}`);
+    console.log(`[auth:diagnostic:mx] exported state: cookies=${mxState.cookies.length}, origins=${mxState.origins.length}, sessionKeys=${Object.keys(sessionStorage).length}`);
+    console.log(`[auth:diagnostic:mx] dropped cookie metadata: ${dropped.length ? dropped.map(({ name, domain, path }) => `${domain}${path} :: ${name}`).sort().join("; ") : "none"}`);
+    console.log(`[auth:diagnostic:mx] profile origin/key metadata: ${summary.origins.length ? summary.origins.map(({ origin, localStorageKeys }) => `${origin} [${localStorageKeys.join(", ")}]`).join("; ") : "none"}`);
+    console.log("[auth:diagnostic:mx] values are intentionally redacted.");
+  }
   fs.mkdirSync(authDir, { recursive: true });
   writeJsonSecurely(authFile, mxState);
   writeJsonSecurely(sessionStorageFile, sessionStorage);
