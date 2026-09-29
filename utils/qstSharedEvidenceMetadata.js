@@ -1,6 +1,12 @@
 const sharedCore = require("../governance/smb-shared-core-families.json");
 
-function getSharedQstEvidenceMetadata(market, zephyrId) {
+function runtimeEnvironment(code, explicit) {
+  const marketEnv = process.env[`${code}_QST_ENVIRONMENT`];
+  const value = String(explicit || marketEnv || process.env.TEST_ENV || "S1").toUpperCase();
+  return value.includes("S2") || value.includes("STG2") ? "S2" : "S1";
+}
+
+function getSharedQstEvidenceMetadata(market, zephyrId, options = {}) {
   const code = String(market || "").trim().toUpperCase();
   const matches = [];
 
@@ -22,7 +28,7 @@ function getSharedQstEvidenceMetadata(market, zephyrId) {
     market: code,
     suite: "QST",
     feature: family.feature,
-    environment: "S1",
+    environment: runtimeEnvironment(code, options.environment),
     sharedFamily: family.family,
   };
 }
