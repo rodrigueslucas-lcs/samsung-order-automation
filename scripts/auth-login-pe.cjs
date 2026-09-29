@@ -313,11 +313,23 @@ async function loginPeSamsungAccount() {
     }
 
     console.log("[auth:login:pe] validating authenticated storefront after return");
-    page = await openPeHome(page, context);
-    page = await openPeHome(page, context);
-    ({ menu } = await waitForProfileMenu(page));
-    if (!/Cerrar Sesi[oó]n/i.test(await menu.innerText())) {
-      throw new Error(`PE ${ENV_NAME} returned from Samsung Account without an authenticated profile menu.`);
+    let authenticatedMenu = null;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      page = await openPeHome(page, context);
+      const menuResult = await waitForProfileMenu(page).catch(() => null);
+      if (menuResult && /Cerrar Sesi[oó]n/i.test(await menuResult.menu.innerText())) {
+        menu = menuResult.menu;
+        authenticatedMenu = menuResult;
+        break;
+      }
+      if (attempt < 3) {
+        console.log(`[auth:login:pe] authenticated menu not propagated yet; retrying storefront validation (${attempt}/3)`);
+        await page.waitForTimeout(3000);
+        await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+      }
+    }
+    if (!authenticatedMenu) {
+      throw new Error(`PE ${ENV_NAME} returned from Samsung Account but the authenticated profile menu did not propagate after 3 storefront checks.`);
     }
     console.log("[auth:login:pe] authenticated PE profile menu validated");
     await exportAuthenticatedState(context, page);
