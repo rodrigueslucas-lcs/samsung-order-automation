@@ -21,14 +21,13 @@ async function verifyMxAuthentication() {
   const launchOptions = {
     headless,
     args: headless ? [] : ["--start-maximized"],
+    channel: "chrome",
   };
 
-  // Local auth verification intentionally uses installed Chrome because the
-  // human bootstrap/login is completed there. Jenkins must validate with the
-  // same bundled Chromium/headless runtime used by the actual Playwright QSTs;
-  // forcing headed Chrome from a Windows service can produce a false auth
-  // failure even when the credential is reusable by the test runtime.
-  if (!ci) launchOptions.channel = "chrome";
+  // The QST runtime uses the installed Chrome channel unless video capture is
+  // enabled. Verify the transported session in that same browser family so the
+  // readiness gate does not reject a valid Chrome session only because bundled
+  // Chromium has different Samsung session behavior.
 
   const browser = await chromium.launch(launchOptions);
 
@@ -42,7 +41,7 @@ async function verifyMxAuthentication() {
 
     console.log(`[auth:verify:mx] fresh ${target.name} MX browser context created`);
     console.log(`[auth:verify:mx] target: ${target.name} | MX | ${target.hostname}`);
-    console.log(`[auth:verify:mx] runtime: ${ci ? "CI bundled Chromium" : "local Chrome"} | ${headless ? "headless" : "headed"}`);
+    console.log(`[auth:verify:mx] runtime: ${ci ? "CI Chrome" : "local Chrome"} | ${headless ? "headless" : "headed"}`);
 
     try {
       await validateAuthenticatedSession(page);
