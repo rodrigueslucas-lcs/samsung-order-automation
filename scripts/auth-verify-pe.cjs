@@ -29,7 +29,8 @@ async function verifyPeAuthentication() {
     const page = await context.newPage();
 
     console.log(`[auth:verify:pe] fresh ${config.environment} PE browser context created`);
-    console.log(`[auth:verify:pe] target: ${config.environment} | PE | ${config.baseUrl.hostname}`);\n    console.log(`[auth:verify:pe] runtime: ${ci ? "CI Chrome | headless" : "local Chrome | headed"}`);
+    console.log(`[auth:verify:pe] target: ${config.environment} | PE | ${config.baseUrl.hostname}`);
+    console.log(`[auth:verify:pe] runtime: ${ci ? "CI Chrome | headless" : "local Chrome | headed"}`);
     await auth.validateAuthenticatedSession(page);
     console.log(`[auth:verify:pe] authenticated profile action validated in a fresh ${config.environment} PE context`);
 
