@@ -1,5 +1,10 @@
 const mxCoverage = require("../governance/mx-qst-coverage.json");
 
+function runtimeEnvironment(explicit) {
+  const value = String(explicit || process.env.MX_QST_ENVIRONMENT || process.env.TEST_ENV || "S1").toUpperCase();
+  return value.includes("S2") || value.includes("STG2") ? "S2" : "S1";
+}
+
 function getMxQstEvidenceMetadata(id, options = {}) {
   const current = mxCoverage.cases?.[id];
   if (!current) {
@@ -12,7 +17,7 @@ function getMxQstEvidenceMetadata(id, options = {}) {
     store: current.store,
     suite: options.suite || "QST",
     feature: current.feature,
-    environment: options.environment || "S1",
+    environment: runtimeEnvironment(options.environment),
     coverage: current.coverage,
     officialTitle: current.title,
   };
