@@ -130,13 +130,22 @@ if (useExistingAuth) {
   console.log(`[mx-qst] Fresh MX ${targetEnvironment} authentication state exported by the login bootstrap.`);
 }
 
-let authVerification = spawnSync(process.execPath, [path.resolve("scripts/auth-verify-mx.cjs")], {
-  env: { ...process.env, MX_QST_ENVIRONMENT: targetEnvironment },
-  stdio: "inherit",
-});
-if (authVerification.status !== 0) {
+let authVerification = null;
+if (useExistingAuth && hasVerifiedAuthState()) {
+  // Jenkins session-bundle lane already performs mandatory live verification
+  // immediately before invoking this runner. Repeating the network-heavy
+  // getcookie/storefront verification here can fail transiently and falsely
+  // label a session as expired after AUTH_READY.
+  console.log(`[mx-qst] Reusing MX ${targetEnvironment} primary session just live-verified by the CI auth gate.`);
+} else {
+  authVerification = spawnSync(process.execPath, [path.resolve("scripts/auth-verify-mx.cjs")], {
+    env: { ...process.env, MX_QST_ENVIRONMENT: targetEnvironment },
+    stdio: "inherit",
+  });
+}
+if (authVerification && authVerification.status !== 0) {
   if (useExistingAuth) {
-    console.error(`[mx-qst] Pre-provisioned MX ${targetEnvironment} auth state is expired; QST execution was not started.`);
+    console.error(`[mx-qst] Pre-provisioned MX ${targetEnvironment} auth state failed live verification; QST execution was not started.`);
     process.exit(authVerification.status || 1);
   }
   const login = spawnSync(process.execPath, [path.resolve("scripts/auth-login-mx.cjs")], {
@@ -168,14 +177,24 @@ if (targetEnvironment === "S2" && selectedP1Set.has("SAM-24986")) {
     console.error(`[mx-qst] MX ${targetEnvironment} second-account auth/session files are missing; QST execution was not started.`);
     process.exit(2);
   }
-  console.log(`[mx-qst] Verifying pre-provisioned MX ${targetEnvironment} second-account session for SAM-24986.`);
-  const secondVerification = spawnSync(process.execPath, [path.resolve("scripts/auth-verify-mx.cjs")], {
-    env: { ...process.env, MX_QST_ENVIRONMENT: targetEnvironment, MX_AUTH_SLOT: "second" },
-    stdio: "inherit",
-  });
-  if (secondVerification.status !== 0) {
-    console.error(`[mx-qst] Pre-provisioned MX ${targetEnvironment} second-account auth state is expired; QST execution was not started.`);
-    process.exit(secondVerification.status || 1);
+  const { hasVerifiedAuthState: hasVerifiedSecondAuthState } = require("../utils/mxAuthState");
+  const previousSlot = process.env.MX_AUTH_SLOT;
+  process.env.MX_AUTH_SLOT = "second";
+  const secondAlreadyVerified = useExistingAuth && hasVerifiedSecondAuthState();
+  if (previousSlot == null) delete process.env.MX_AUTH_SLOT;
+  else process.env.MX_AUTH_SLOT = previousSlot;
+  if (secondAlreadyVerified) {
+    console.log(`[mx-qst] Reusing MX ${targetEnvironment} second-account session just live-verified by the CI auth gate for SAM-24986.`);
+  } else {
+    console.log(`[mx-qst] Verifying pre-provisioned MX ${targetEnvironment} second-account session for SAM-24986.`);
+    const secondVerification = spawnSync(process.execPath, [path.resolve("scripts/auth-verify-mx.cjs")], {
+      env: { ...process.env, MX_QST_ENVIRONMENT: targetEnvironment, MX_AUTH_SLOT: "second" },
+      stdio: "inherit",
+    });
+    if (secondVerification.status !== 0) {
+      console.error(`[mx-qst] Pre-provisioned MX ${targetEnvironment} second-account auth state failed live verification; QST execution was not started.`);
+      process.exit(secondVerification.status || 1);
+    }
   }
 }
 
