@@ -47,6 +47,8 @@ const unknownTargetIds = requestedTargetIds.filter((id) => !officialSet.has(id))
 if (unknownTargetIds.length) throw new Error(`Unknown PE_QST_TARGET_IDS: ${unknownTargetIds.join(", ")}.`);
 const executionIds = requestedTargetIds.length ? requestedTargetIds : PE_BASE_P1_IDS;
 process.env.PE_QST_TARGET_IDS = requestedTargetIds.join(",");
+configEnv.PE_QST_TARGET_IDS = requestedTargetIds.join(",");
+configEnv.PE_QST_FULL_P1_COUNT = String(PE_BASE_P1_IDS.length);
 const p1Pattern = `(?:${executionIds.join("|")})\\b`;
 
 function specFilesUnder(directory) {
