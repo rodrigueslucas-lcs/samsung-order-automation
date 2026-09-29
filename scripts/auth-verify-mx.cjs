@@ -23,6 +23,7 @@ async function verifyMxAuthentication() {
     args: headless ? [] : ["--start-maximized"],
     channel: "chrome",
   };
+  const navigationTimeout = ci ? 120000 : 60000;
 
   // The QST runtime uses the installed Chrome channel unless video capture is
   // enabled. Verify the transported session in that same browser family so the
@@ -38,6 +39,8 @@ async function verifyMxAuthentication() {
     });
     await applyAuthSessionStorage(context);
     const page = await context.newPage();
+    page.setDefaultNavigationTimeout(navigationTimeout);
+    page.setDefaultTimeout(ci ? 90000 : 60000);
 
     console.log(`[auth:verify:mx] fresh ${target.name} MX browser context created`);
     console.log(`[auth:verify:mx] target: ${target.name} | MX | ${target.hostname}`);
@@ -53,8 +56,31 @@ async function verifyMxAuthentication() {
         safeUrl = `${current.origin}${current.pathname}`;
       } catch {}
       try { safeTitle = (await page.title()).slice(0, 120); } catch {}
+      let readyState = "unavailable";
+      let bodyChars = "unavailable";
+      let profileButtons = "unavailable";
+      try {
+        const safeDom = await page.evaluate(() => ({
+          readyState: document.readyState,
+          bodyChars: document.body?.innerText?.length || 0,
+        }));
+        readyState = safeDom.readyState;
+        bodyChars = safeDom.bodyChars;
+        profileButtons = await page.getByRole("button", { name: "My Profile", exact: true }).count();
+      } catch {}
       console.error(`[auth:verify:mx] diagnostic url: ${safeUrl}`);
       console.error(`[auth:verify:mx] diagnostic title: ${safeTitle}`);
+      console.error(`[auth:verify:mx] diagnostic document: readyState=${readyState} bodyChars=${bodyChars} myProfileButtons=${profileButtons}`);
+
+      const message = String(error?.message || error);
+      const storefrontDidNotRender = /storefront did not render My Profile/i.test(message);
+      if (ci && storefrontDidNotRender && Number(bodyChars) < 100) {
+        const runtimeError = new Error(
+          `MX ${target.name} storefront did not render usable content in Jenkins CI Chrome; authentication could not be evaluated. This is a CI/storefront runtime failure, not proof that the saved Samsung session expired.`
+        );
+        runtimeError.name = "MxStorefrontRuntimeError";
+        throw runtimeError;
+      }
       throw error;
     }
 
