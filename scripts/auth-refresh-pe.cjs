@@ -9,5 +9,6 @@ function run(label, script) {
 }
 run(`Refreshing Samsung Account session for ${environment}`, "scripts/auth-login-pe.cjs");
 run(`Verifying Samsung Account session for ${environment}`, "scripts/auth-verify-pe.cjs");
-console.log(`\n[auth:refresh:pe] READY · PE ${environment} authenticated session refreshed and verified.`);
+run(`Packaging verified PE ${environment} session for CI handoff`, "scripts/auth-package-pe.cjs");
+console.log(`\n[auth:refresh:pe] READY · PE ${environment} authenticated session refreshed, verified and packaged.`);
 console.log("[auth:refresh:pe] CAPTCHA/MFA remains a human security gate when Samsung Account requests it.");
