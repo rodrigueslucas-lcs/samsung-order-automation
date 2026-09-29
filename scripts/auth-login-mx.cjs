@@ -325,6 +325,13 @@ async function loginMxSamsungAccount() {
     }
 
     console.log("[auth:login:mx] validating authenticated storefront after return");
+    // After Samsung Account returns, an older MX tab can still be rendered but
+    // hold stale anonymous DOM. Prefer the actual callback page and force one
+    // storefront navigation before considering sibling tabs.
+    if (isMxStorefront(page)) {
+      await page.goto(homeUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+      await hasRenderedStorefront(page, 30000);
+    }
     page = await openMxHome(page, context);
     await warmSecondCartSession(context);
     page = await openMxHome(page, context);
