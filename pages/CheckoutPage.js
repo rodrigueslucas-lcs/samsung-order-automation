@@ -142,8 +142,10 @@ export default class CheckoutPage extends BasePage {
       exact: true,
     });
     await newAddress.waitFor({ state: "visible", timeout: 30000 });
-    await newAddress.check();
-    await expect(newAddress).toBeChecked();
+    await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
+    if (!(await newAddress.isChecked())) {
+      throw new Error("New shipping address did not remain selected.");
+    }
     await this.fillAddress(address);
     const saveAddress = deliveryPanel.getByRole("checkbox", {
       name: /Guardar datos de env[ií]o en Mi cuenta/i,
