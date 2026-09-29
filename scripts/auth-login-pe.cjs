@@ -240,12 +240,36 @@ async function loginPeSamsungAccount() {
     if (menuState === "signed-out") {
       if (!existingAccountPage) {
         console.log("[auth:login:pe] opening Samsung Account sign-in");
+        const pagesBeforeLogin = new Set(context.pages());
         await login.click();
-        await page.waitForURL((url) => url.hostname === ACCOUNT_HOSTNAME, { timeout: 60000 });
+        const accountPage = await Promise.race([
+          page.waitForURL((url) => url.hostname === ACCOUNT_HOSTNAME, { timeout: 60000 }).then(() => page).catch(() => null),
+          context.waitForEvent("page", { timeout: 60000 }).then(async (candidate) => {
+            await candidate.waitForLoadState("domcontentloaded", { timeout: 60000 }).catch(() => {});
+            return candidate;
+          }).catch(() => null),
+        ]);
+        const accountCandidate = accountPage && (() => {
+          try { return new URL(accountPage.url()).hostname === ACCOUNT_HOSTNAME; } catch { return false; }
+        })() ? accountPage : context.pages().find((candidate) => {
+          if (pagesBeforeLogin.has(candidate)) return false;
+          try { return new URL(candidate.url()).hostname === ACCOUNT_HOSTNAME; } catch { return false; }
+        });
+        if (!accountCandidate) {
+          const currentMenu = await waitForProfileMenu(page).catch(() => null);
+          if (currentMenu && /Cerrar Sesi[oó]n/i.test(await currentMenu.menu.innerText())) {
+            console.log("[auth:login:pe] storefront became authenticated without an account-page navigation");
+            menuState = "authenticated";
+          } else {
+            throw new Error("Samsung Account sign-in did not open in the current tab or a new tab within 60 seconds.");
+          }
+        } else {
+          page = accountCandidate;
+        }
       }
-      assertAllowedHost(page, [ACCOUNT_HOSTNAME], "Samsung Account login");
+      if (menuState === "signed-out") assertAllowedHost(page, [ACCOUNT_HOSTNAME], "Samsung Account login");
 
-      if (manualLogin) {
+      if (menuState === "signed-out" && manualLogin) {
         console.log(`[auth:login:pe] Samsung Account login is ready in the visible Chrome. Complete login/CAPTCHA/MFA manually; automation will resume after the authenticated PE ${ENV_NAME} return.`);
         const returnedPage = await Promise.race([
           page.waitForURL((url) => url.hostname === HOSTNAME, { timeout: interactiveTimeout }).then(() => page),
@@ -255,7 +279,7 @@ async function loginPeSamsungAccount() {
           }),
         ]);
         page = returnedPage;
-      } else {
+      } else if (menuState === "signed-out") {
         const emailInput = page.locator('input#account');
         const passwordInput = page.locator('input[type="password"]').first();
         let emailStepComplete = false;
