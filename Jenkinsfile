@@ -18,7 +18,7 @@ pipeline {
     choice(name: 'BROWSER_MODE', choices: ['headless', 'headed'], description: 'Browser mode. Headless is recommended on Jenkins.')
     choice(name: 'EVIDENCE_MODE', choices: ['screenshots-trace', 'screenshots-trace-video'], description: 'Evidence capture. Video requires FFmpeg on the Jenkins agent.')
     choice(name: 'AUTH_SOURCE', choices: ['session-bundle', 'legacy-files'], description: 'MX authenticated session source. session-bundle is the default and consumes the single ephemeral bundle managed by auth:refresh:mx + auth:publish:jenkins; legacy-files remains available only as a fallback.')
-    string(name: 'P1_TARGET_IDS', defaultValue: '', description: 'Optional MX official-p1 stabilization filter. Comma/space separated active SAM IDs, e.g. SAM-24969,SAM-24991,SAM-25002. Leave empty for the full 29-TC P1.')
+    string(name: 'P1_TARGET_IDS', defaultValue: '', description: 'Optional MX/PE official-p1 stabilization filter. Comma/space separated active SAM IDs, e.g. SAM-24969,SAM-24991,SAM-25002. Leave empty for the full 29-TC P1.')
   }
 
   environment {
@@ -72,6 +72,7 @@ pipeline {
           env.BACKOFFICE_ENV = params.ENVIRONMENT.toLowerCase()
           env.MX_QST_HEADLESS = params.BROWSER_MODE == 'headless' ? '1' : '0'
           env.MX_QST_TARGET_IDS = params.P1_TARGET_IDS?.trim() ?: ''
+          env.PE_QST_TARGET_IDS = params.P1_TARGET_IDS?.trim() ?: ''
           env.PE_STOREFRONT_URL = params.ENVIRONMENT == 'S2' ? 'https://stg2.shop.samsung.com/pe/' : 'https://stg.shop.samsung.com/pe/'
 
           // Keep Playwright browsers outside node_modules so npm ci does not
@@ -133,8 +134,8 @@ pipeline {
           if (params.MARKET == 'PE' && params.TEST_SUITE != 'official-p1') {
             error('PE phase 1 currently exposes the coverage-aware official-p1 stabilization lane only. FAST/AUTH/BACKOFFICE lanes will be enabled after PE S2 credentials and runtime baselines are proven.')
           }
-          if (params.P1_TARGET_IDS?.trim() && (params.MARKET != 'MX' || params.TEST_SUITE != 'official-p1')) {
-            error('P1_TARGET_IDS is supported only for MX official-p1. Clear the field for other suites/markets.')
+          if (params.P1_TARGET_IDS?.trim() && (!['MX', 'PE'].contains(params.MARKET) || params.TEST_SUITE != 'official-p1')) {
+            error('P1_TARGET_IDS is supported only for MX/PE official-p1. Clear the field for other suites/markets.')
           }
           if (params.TEST_SUITE == 'official-p1' && params.EXECUTION_MODE != 'authorized-destructive') {
             error("${params.MARKET} official P1 contains payment/order scenarios. Select EXECUTION_MODE=authorized-destructive for the campaign.")
@@ -333,8 +334,31 @@ pipeline {
         catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
           script {
             if (params.MARKET == 'PE') {
-              if (isUnix()) sh 'npx -y node@22 scripts/run-pe-qst-p1.cjs'
-              else bat '@call npx -y node@22 scripts/run-pe-qst-p1.cjs'
+              withCredentials([
+                file(credentialsId: 'samsung-pe-s2-auth-state', variable: 'PE_AUTH_STATE_SECRET'),
+                file(credentialsId: 'samsung-pe-s2-session-storage', variable: 'PE_SESSION_STORAGE_SECRET')
+              ]) {
+                if (isUnix()) {
+                  sh '''
+                    set -eu
+                    mkdir -p playwright/.auth
+                    cp "$PE_AUTH_STATE_SECRET" playwright/.auth/pe-s2-user.json
+                    cp "$PE_SESSION_STORAGE_SECRET" playwright/.auth/pe-s2-session-storage.json
+                    chmod 600 playwright/.auth/pe-s2-user.json playwright/.auth/pe-s2-session-storage.json || true
+                    CI=1 npm run auth:verify:pe
+                    npx -y node@22 scripts/run-pe-qst-p1.cjs
+                  '''
+                } else {
+                  bat '''@echo off
+                    if not exist playwright\\.auth mkdir playwright\\.auth
+                    copy /Y "%PE_AUTH_STATE_SECRET%" "playwright\\.auth\\pe-s2-user.json" >nul || exit /b 2
+                    copy /Y "%PE_SESSION_STORAGE_SECRET%" "playwright\\.auth\\pe-s2-session-storage.json" >nul || exit /b 2
+                    set CI=1
+                    call npm run auth:verify:pe || exit /b 20
+                    call npx -y node@22 scripts/run-pe-qst-p1.cjs
+                  '''
+                }
+              }
             } else {
               env.MX_AUTH_STATE_CREDENTIAL = params.ENVIRONMENT == 'S2' ? 'samsung-mx-s2-auth-state' : 'samsung-mx-s1-auth-state'
               env.MX_SESSION_CREDENTIAL = params.ENVIRONMENT == 'S2' ? 'samsung-mx-s2-session-storage' : 'samsung-mx-s1-session-storage'
