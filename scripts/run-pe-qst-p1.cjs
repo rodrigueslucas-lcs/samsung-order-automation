@@ -13,6 +13,8 @@ if (!["S1", "S2"].includes(targetEnvironment)) throw new Error(`Unsupported PE Q
 const configEnv = {
   ...process.env,
   PE_QST_ENVIRONMENT: targetEnvironment,
+  PE_QST_TARGET_IDS: requestedTargetIds.join(","),
+  PE_QST_FULL_P1_COUNT: String(PE_BASE_P1_IDS.length),
   PE_STOREFRONT_URL: process.env.PE_STOREFRONT_URL || (targetEnvironment === "S2"
     ? "https://stg2.shop.samsung.com/pe/"
     : "https://stg.shop.samsung.com/pe/"),
@@ -44,6 +46,7 @@ const requestedTargetIds = String(process.env.PE_QST_TARGET_IDS || "")
 const unknownTargetIds = requestedTargetIds.filter((id) => !officialSet.has(id));
 if (unknownTargetIds.length) throw new Error(`Unknown PE_QST_TARGET_IDS: ${unknownTargetIds.join(", ")}.`);
 const executionIds = requestedTargetIds.length ? requestedTargetIds : PE_BASE_P1_IDS;
+process.env.PE_QST_TARGET_IDS = requestedTargetIds.join(",");
 const p1Pattern = `(?:${executionIds.join("|")})\\b`;
 
 function specFilesUnder(directory) {
