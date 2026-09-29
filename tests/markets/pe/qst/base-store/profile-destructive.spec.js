@@ -17,7 +17,6 @@ const { recordBusinessEvidence } = evidenceContext;
 const { getPeQstEvidenceMetadata } = peEvidenceMetadata;
 
 test.describe("PE QST - guarded profile writes", () => {
-  test.describe.configure({ mode: "serial" });
   test.use({ storageState: hasPeAuthState() ? PE_AUTH_STATE_PATH : undefined });
 
   test.beforeEach(async ({ context }) => {

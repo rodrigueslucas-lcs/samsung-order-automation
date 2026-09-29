@@ -8,9 +8,11 @@ const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
 
 const PRE_QA_ORIGIN = "https://p6-pre-qa2.samsung.com";
 const PRE_QA_PLP = `${PRE_QA_ORIGIN}/mx/smartphones/all-smartphones/`;
-const PRE_QA_MODEL_CODE = "SM-S938BZBMLTM";
-const PRE_QA_PDP_PATH = "/mx/smartphones/galaxy-s25-ultra/buy/";
+const PRE_QA_MODEL_CODE = "SM-F766BLGKLTM";
+const PRE_QA_PRODUCT_NAME = "Galaxy Z Flip7";
+const PRE_QA_PDP_PATH = "/mx/smartphones/galaxy-z-flip7/buy/";
 const PRE_QA_CDP_URL = process.env.PREQA2_CDP_URL || "http://127.0.0.1:9223";
+const PRE_QA_PDP_URL = new RegExp("p6-pre-qa2\\.samsung\\.com/mx/smartphones/galaxy-z-flip7/buy", "i");
 
 async function dismissLocationBanner(page) {
   const continueButton = page.getByRole("button", { name: /Continuar/i }).filter({ visible: true });
@@ -64,7 +66,7 @@ async function getAuthenticatedPreQaPage() {
 }
 
 async function returnToPreQaPdp(page) {
-  const expected = new RegExp("p6-pre-qa2\\.samsung\\.com/mx/smartphones/galaxy-s25-ultra/buy", "i");
+  const expected = PRE_QA_PDP_URL;
   if (expected.test(page.url())) {
     await page.waitForLoadState("domcontentloaded", { timeout: 15000 }).catch(() => {});
     await dismissLocationBanner(page);
@@ -89,6 +91,35 @@ async function returnToPreQaPdp(page) {
   await dismissLocationBanner(page);
 }
 
+async function waitForPreQaAddToCart(page, testInfo) {
+  const addToCart = page.getByRole("button", {
+    name: /Añadir al carrito|Agregar al carrito|Add to cart|Add to bag/i,
+  }).filter({ visible: true }).first();
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (!PRE_QA_PDP_URL.test(page.url())) await returnToPreQaPdp(page);
+    await expect(page.getByText(PRE_QA_PRODUCT_NAME, { exact: true }).filter({ visible: true }).first())
+      .toBeVisible({ timeout: 30000 });
+    if (await addToCart.waitFor({ state: "visible", timeout: 15000 }).then(() => true, () => false)) {
+      return addToCart;
+    }
+    if (attempt === 0) {
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 30000 });
+      await dismissLocationBanner(page);
+    }
+  }
+
+  const url = page.url();
+  const title = await page.title().catch(() => "unavailable");
+  const buttons = await page.getByRole("button").filter({ visible: true }).allTextContents()
+    .then((values) => values.map((value) => value.trim()).filter(Boolean).slice(0, 20), () => []);
+  await testInfo.attach("preqa-cdp-add-to-cart-missing", {
+    body: await page.screenshot({ fullPage: false }),
+    contentType: "image/png",
+  }).catch(() => {});
+  throw new Error(`PreQA Add to Cart is absent after one pre-submit PDP reload. URL=${url}; title=${title}; visibleButtons=${JSON.stringify(buttons)}`);
+}
+
 test.describe.configure({ timeout: 420000 });
 
 test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({}, testInfo) => {
@@ -110,23 +141,23 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
       await expect(page).toHaveURL(new RegExp("p6-pre-qa2\\.samsung\\.com/mx/smartphones/all-smartphones", "i"), { timeout: 30000 });
     });
 
-    await test.step("Open the configured Galaxy S25 Ultra PDP from the BC catalog", async () => {
+    await test.step("Open the configured Galaxy Z Flip7 PDP from the BC catalog", async () => {
       await page.getByText("Filtros", { exact: true }).first().scrollIntoViewIfNeeded();
       await expect(page.getByText(/\d+\s*Resultado/i).first()).toBeVisible({ timeout: 90000 });
-      const s25Card = page.locator("[role='listitem'].pd21-product-card__item")
+      const productCard = page.locator("[role='listitem'].pd21-product-card__item")
         .filter({ has: page.locator(`a.pd21-product-card__name[data-modelcode='${PRE_QA_MODEL_CODE}']`) })
         .first();
-      await s25Card.evaluate((card) => card.scrollIntoView({ block: "center" }));
-      await expect(s25Card, "The PreQA BC catalog must render the configured Galaxy S25 Ultra product card.")
+      await productCard.evaluate((card) => card.scrollIntoView({ block: "center" }));
+      await expect(productCard, "The PreQA BC catalog must render the configured Galaxy Z Flip7 product card.")
         .toBeVisible({ timeout: 60000 });
-      await s25Card.getByRole("link", { name: /^Comprar:Galaxy S25 Ultra$/i }).click();
+      await productCard.getByRole("link", { name: /^Comprar:Galaxy Z Flip7/i }).click();
 
       await page.waitForURL((url) =>
         url.hostname === "p6-pre-qa2.samsung.com" && url.pathname.includes(PRE_QA_PDP_PATH),
         { timeout: 60000 }
       );
       await dismissLocationBanner(page);
-      await expect(page.getByText("Galaxy S25 Ultra", { exact: true }).filter({ visible: true }).first()).toBeVisible({ timeout: 60000 });
+      await expect(page.getByText(PRE_QA_PRODUCT_NAME, { exact: true }).filter({ visible: true }).first()).toBeVisible({ timeout: 60000 });
     });
 
     const cartCountBefore = await readHeaderCartCount(page);
@@ -136,11 +167,11 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
     let addResponse;
 
     await test.step("Add the product and validate the minicart API mutation", async () => {
-      const addToCart = page
-        .getByRole("button", { name: /Añadir al carrito|Agregar al carrito|Add to cart|Add to bag/i })
-        .filter({ visible: true })
-        .first();
-      await expect(addToCart).toBeVisible({ timeout: 60000 });
+      await page.getByRole("button", { name: /No, gracias/i }).first().click();
+      await expect(page.locator('[canaddtocart="true"]').filter({ visible: true }).first(),
+        "The configured PreQA product must become purchasable after declining Galaxy Canje.")
+        .toBeVisible({ timeout: 30000 });
+      const addToCart = await waitForPreQaAddToCart(page, testInfo);
       const addResponsePromise = page.waitForResponse((response) =>
         response.request().method() === "POST" &&
         new URL(response.url()).pathname.endsWith("/addToCart/multi/"),
@@ -168,6 +199,9 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
       if (!badgeUpdated) {
         await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
         await dismissLocationBanner(page);
+        // A PDP reload can route through the S2 SystemParking storefront.
+        // Restore the CDP page to PreQA2 before checking its header again.
+        await returnToPreQaPdp(page);
       }
       await expect.poll(() => readHeaderCartCount(page), {
         timeout: 30000,
