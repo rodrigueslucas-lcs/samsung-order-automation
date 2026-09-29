@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { writeJsonAtomically } = require("./atomicJson");
 const { createAuthState } = require("./authState");
 const { resolveMxEnvironment } = require("./mxConfig");
 
@@ -29,11 +30,8 @@ const authState = createAuthState({
 });
 
 function writeJsonSecurely(destination, value) {
-  const temporary = `${destination}.tmp`;
   fs.mkdirSync(path.dirname(destination), { recursive: true });
-  fs.writeFileSync(temporary, JSON.stringify(value, null, 2), { mode: 0o600 });
-  fs.chmodSync(temporary, 0o600);
-  fs.renameSync(temporary, destination);
+  writeJsonAtomically(destination, value);
 }
 
 function markAuthStateVerified() {
