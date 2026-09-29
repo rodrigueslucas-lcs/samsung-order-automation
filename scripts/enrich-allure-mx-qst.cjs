@@ -15,6 +15,8 @@ const campaign = process.env.TEST_SUITE === "FAST/GUEST" ? "FAST / GUEST-SAFE" :
 const targetEnvironment = String(process.env.MX_QST_ENVIRONMENT || "S1").toUpperCase();
 const environmentLabel = targetEnvironment === "S2" ? "S2 / STG2" : "S1 / STG";
 const campaignLabel = process.env.TEST_SUITE === "FAST/GUEST" ? "MX Fast Guest · Safe" : "MX Official P1/QST";
+const executionMode = runtime.executionMode || ((runtime.targetIds || []).length && (runtime.targetIds || []).length < 29 ? "TARGETED" : "FULL");
+const targetIds = (runtime.targetIds || []).join(",") || "all";
 
 function upsertLabel(labels, name, value) {
   const next = (labels || []).filter((label) => label.name !== name);
@@ -269,6 +271,10 @@ const environment = [
   "MX_BaseStore_P1_Selected=30",
   `Branch=${process.env.BRANCH_NAME || process.env.GIT_BRANCH || "local"}`,
   `Build=${process.env.BUILD_NUMBER || "local"}`,
+  `Execution_Mode=${executionMode}`,
+  `Target_IDs=${targetIds}`,
+  `Execution_Policy=${runtime.executionPolicy || process.env.EXECUTION_MODE || "unknown"}`,
+  `GitCommit=${runtime.gitCommit || process.env.GIT_COMMIT || "unknown"}`,
 ].join("\n") + "\n";
 fs.writeFileSync(path.join(resultsDir, "environment.properties"), environment);
 
