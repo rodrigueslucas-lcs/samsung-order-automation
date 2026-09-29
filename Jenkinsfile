@@ -65,6 +65,8 @@ pipeline {
           env.PW_VIDEO = params.EVIDENCE_MODE == 'screenshots-trace-video' ? '1' : '0'
           env.TEST_MARKET = params.MARKET
           env.MARKET = params.MARKET
+          env.ENVIRONMENT = params.ENVIRONMENT
+          env.EXECUTION_MODE = params.EXECUTION_MODE
           env.MX_QST_ENVIRONMENT = params.ENVIRONMENT
           env.PE_QST_ENVIRONMENT = params.ENVIRONMENT
           env.BACKOFFICE_ENV = params.ENVIRONMENT.toLowerCase()
@@ -101,7 +103,16 @@ pipeline {
     }
 
     stage('02 · Checkout') {
-      steps { checkout scm }
+      steps {
+        checkout scm
+        script {
+          env.GIT_COMMIT = isUnix()
+            ? sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+            : bat(script: '@git rev-parse HEAD', returnStdout: true).trim()
+          env.GIT_BRANCH = env.BRANCH_NAME ?: 'agent/mx-qst-p1-finish'
+          echo " Runtime ref  : ${env.GIT_BRANCH} @ ${env.GIT_COMMIT.take(10)}"
+        }
+      }
     }
 
     stage('03 · Validate Request') {
