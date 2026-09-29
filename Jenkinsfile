@@ -17,7 +17,7 @@ pipeline {
     choice(name: 'EXECUTION_MODE', choices: ['safe', 'authorized-destructive'], description: 'Safety mode. Full official-p1 payment/order execution requires authorized-destructive.')
     choice(name: 'BROWSER_MODE', choices: ['headless', 'headed'], description: 'Browser mode. Headless is recommended on Jenkins.')
     choice(name: 'EVIDENCE_MODE', choices: ['screenshots-trace', 'screenshots-trace-video'], description: 'Evidence capture. Video requires FFmpeg on the Jenkins agent.')
-    choice(name: 'AUTH_SOURCE', choices: ['legacy-files', 'session-bundle'], description: 'MX authenticated session source. legacy-files preserves the proven credentials flow; session-bundle consumes the single ephemeral bundle managed by auth:refresh:mx + auth:publish:jenkins.')
+    choice(name: 'AUTH_SOURCE', choices: ['session-bundle', 'legacy-files'], description: 'MX authenticated session source. session-bundle is the default and consumes the single ephemeral bundle managed by auth:refresh:mx + auth:publish:jenkins; legacy-files remains available only as a fallback.')
     string(name: 'P1_TARGET_IDS', defaultValue: '', description: 'Optional MX official-p1 stabilization filter. Comma/space separated active SAM IDs, e.g. SAM-24969,SAM-24991,SAM-25002. Leave empty for the full 29-TC P1.')
   }
 
