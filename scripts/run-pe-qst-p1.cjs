@@ -115,6 +115,8 @@ const executionEnv = {
   TEST_STORE: "BASE_STORE",
   TEST_SUITE: "P1/QST",
   PE_QST_ENVIRONMENT: targetEnvironment,
+  PE_QST_TARGET_IDS: requestedTargetIds.join(","),
+  PE_QST_FULL_P1_COUNT: String(PE_BASE_P1_IDS.length),
   PE_STOREFRONT_URL: config.baseUrl.href,
   PLAYWRIGHT_JSON_OUTPUT_FILE: reportFile,
   PLAYWRIGHT_HTML_OUTPUT_DIR: path.join(artifactDir, "playwright-report"),
