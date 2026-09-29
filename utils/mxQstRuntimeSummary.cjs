@@ -5,6 +5,18 @@ const { sanitize } = require("../reporting/evidence/sanitizer");
 
 const TERMINAL_FAILURES = new Set(["failed", "timedOut", "interrupted"]);
 const BLOCKED_PATTERN = /SystemParking|maintenance|auth(?:enticated)? state|credentials? (?:are|is) required|EPERM|environment prerequisite/i;
+const AUTH_FAILURE_PATTERN = /auth|session|login|logged|credential|account/i;
+const ENVIRONMENT_FAILURE_PATTERN = /environment|backend|server|maintenance|unavailable|endpoint|cdp|network|(?:response body|request).*timed out|timeout.*(?:api|backend|delivery)|5\\d\\d\\b/i;
+const AUTOMATION_FAILURE_PATTERN = /locator|selector|strict mode|element.*(?:not found|not visible)|playwright|executable doesn.t exist|spawn (?:EPERM|ENOENT)|fixture|test timeout of \\d+ms exceeded/i;
+
+function classifyFailure(status, reason = "") {
+  if (status === "SKIPPED-BLOCKED") return "AUTH_BLOCKED";
+  if (status !== "FAIL") return null;
+  if (AUTH_FAILURE_PATTERN.test(reason)) return "AUTH_BLOCKED";
+  if (ENVIRONMENT_FAILURE_PATTERN.test(reason)) return "ENVIRONMENT_ERROR";
+  if (AUTOMATION_FAILURE_PATTERN.test(reason)) return "TEST_AUTOMATION_ERROR";
+  return "FUNCTIONAL_FAIL";
+}
 
 function safeArtifact(filePath, root) {
   if (!filePath) return null;
@@ -59,6 +71,7 @@ function buildMxQstRuntimeSummary(report, {
       })).filter((attachment) => attachment.path);
       for (const samId of samIds) found.set(samId, sanitize({
         samId, title: spec.title, market, store, suite, environment, status,
+        failureType: classifyFailure(status, reason),
         duration: results.reduce((sum, result) => sum + (result.duration || 0), 0),
         error: status === "FAIL" ? errors.join(" | ") || null : null,
         blockedReason: status === "SKIPPED-BLOCKED" ? reason || "Test was skipped by an explicit runtime prerequisite." : null,
@@ -71,7 +84,7 @@ function buildMxQstRuntimeSummary(report, {
   for (const suiteNode of report.suites || []) visit(suiteNode);
 
   const tests = official.map((samId) => found.get(samId) || {
-    samId, title: titles[samId] || null, market, store, suite, environment, status: "NOT_RUN", duration: 0,
+    samId, title: titles[samId] || null, market, store, suite, environment, status: "NOT_RUN", failureType: null, duration: 0,
     error: null, blockedReason: "Official TC was not present in this execution result.", testFile: null, attachments: [], startTime: null,
     buildNumber, gitCommit, timestamp,
   });
@@ -84,7 +97,13 @@ function buildMxQstRuntimeSummary(report, {
     duration: tests.reduce((sum, entry) => sum + entry.duration, 0),
   };
   if (summary.passed + summary.failed + summary.blocked + summary.notRun !== summary.official) throw new Error("MX QST runtime summary does not reconcile with official scope.");
-  return sanitize({ schemaVersion: 1, buildNumber, buildUrl, gitCommit, timestamp, market, store, suite, environment, summary, tests });
+  const targetIds = official;
+  const executionMode = targetIds.length < Number(process.env.MX_QST_FULL_P1_COUNT || 29) ? "TARGETED" : "FULL";
+  return sanitize({
+    schemaVersion: 1, buildNumber, buildUrl, gitCommit, timestamp, market, store, suite, environment,
+    executionMode, targetIds, branch: process.env.BRANCH_NAME || process.env.GIT_BRANCH || null,
+    executionPolicy: process.env.EXECUTION_MODE || null, summary, tests,
+  });
 }
 
 function writeRuntimeSummary(filePath, summary) {
