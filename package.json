@@ -22,6 +22,8 @@
     "auth:open-profile:pe": "node scripts/auth-open-profile-pe.cjs",
     "auth:export:pe": "node scripts/auth-bootstrap-pe.cjs",
     "auth:verify:pe": "node scripts/auth-verify-pe.cjs",
+    "auth:refresh:pe": "node scripts/auth-refresh-pe.cjs",
+    "auth:package:pe": "node scripts/auth-package-pe.cjs",
     "dst:base-store": "playwright test tests/legacy/pe-s2/dst/base-store --project=chromium --workers=1 --grep-invert @destructive",
     "dst:backoffice": "playwright test tests/legacy/pe-s2/dst/backoffice --project=chromium --workers=1 --grep-invert \"@destructive|TC73|TC75\"",
     "dst:epp": "playwright test tests/legacy/pe-s2/dst/epp --project=chromium --workers=1 --grep-invert @destructive",
