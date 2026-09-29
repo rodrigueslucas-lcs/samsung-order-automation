@@ -87,12 +87,18 @@ export default class CartPage extends BasePage {
     }
 
     let cart;
+    let bodyTimer;
     try {
-      cart = await response.json();
+      cart = await Promise.race([
+        response.json(),
+        new Promise((_, reject) => {
+          bodyTimer = setTimeout(() => reject(new Error('MX current-cart browser response body timed out.')), 15000);
+        }),
+      ]);
     } catch (error) {
       const message = String(error?.message || error);
       const bodyUnavailable =
-        /Network\.getResponseBody|No resource with given identifier/i.test(message);
+        /Network\.getResponseBody|No resource with given identifier|browser response body timed out/i.test(message);
 
       if (!bodyUnavailable) {
         throw error;
@@ -100,6 +106,7 @@ export default class CartPage extends BasePage {
 
       const fallbackResponse = await this.page.context().request.get(response.url(), {
         failOnStatusCode: false,
+        timeout: 15000,
       });
 
       if (!fallbackResponse.ok()) {
@@ -109,6 +116,8 @@ export default class CartPage extends BasePage {
       }
 
       cart = await fallbackResponse.json();
+    } finally {
+      clearTimeout(bodyTimer);
     }
 
     await this.page.getByRole('main').waitFor({ state: 'attached', timeout: 30000 });
