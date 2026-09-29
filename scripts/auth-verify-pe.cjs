@@ -16,7 +16,12 @@ function writeJsonSecurely(destination, value) {
 async function verifyPeAuthentication() {
   const config = getPeQstConfig();
   const auth = getPeAuthState();
-  const browser = await chromium.launch({ channel: "chrome", headless: false, args: ["--start-maximized"] });
+  const ci = process.env.CI === "1" || process.env.CI === "true";
+  const browser = await chromium.launch({
+    channel: "chrome",
+    headless: ci,
+    args: ci ? [] : ["--start-maximized"],
+  });
 
   try {
     const context = await browser.newContext({ storageState: auth.requireAuthState(), viewport: null });
@@ -24,7 +29,7 @@ async function verifyPeAuthentication() {
     const page = await context.newPage();
 
     console.log(`[auth:verify:pe] fresh ${config.environment} PE browser context created`);
-    console.log(`[auth:verify:pe] target: ${config.environment} | PE | ${config.baseUrl.hostname}`);
+    console.log(`[auth:verify:pe] target: ${config.environment} | PE | ${config.baseUrl.hostname}`);\n    console.log(`[auth:verify:pe] runtime: ${ci ? "CI Chrome | headless" : "local Chrome | headed"}`);
     await auth.validateAuthenticatedSession(page);
     console.log(`[auth:verify:pe] authenticated profile action validated in a fresh ${config.environment} PE context`);
 
