@@ -82,6 +82,7 @@ function renderAttachments(execution, attachments = []) {
   return links.join('') || '<span class="no-evidence">See reason</span>';
 }
 function blockerCategory(test) {
+  if (test?.failureType) return String(test.failureType).replaceAll("_", " ");
   const text = `${test?.blockedReason || ''} ${test?.error || ''}`;
   if (/executable doesn.t exist|browser.*executable|ms-playwright|ffmpeg|spawn (eperm|enoent)|playwright.*install/i.test(text)) return 'Infrastructure / Playwright';
   if (/auth|session|login|logged|account|credential/i.test(text)) return 'Authentication / Session';
@@ -99,7 +100,8 @@ function resultBar(s) {
   return `<div class="result-bar" aria-label="Execution result distribution">${segments.filter(([,v])=>v).map(([c,v,l]) => `<span class="${c}" style="width:${Number(v)/total*100}%" title="${l}: ${v}"></span>`).join('')}</div><div class="result-legend">${segments.map(([c,v,l]) => `<span><i class="${c}"></i><b>${v}</b> ${l}</span>`).join('')}</div>`;
 }
 function executionMeta(execution, reconciled) {
-  return `<div class="runtime-meta"><span><strong>Build</strong> #${esc(execution.buildNumber || 'local')}</span><span><strong>Environment</strong> ${esc(execution.environment || 'unavailable')}</span><span><strong>Scope</strong> ${esc(execution.market || 'MX')} · ${esc(execution.store || 'BASE_STORE')} · ${esc(execution.suite || 'P1/QST')}</span><span><strong>Commit</strong> ${esc(String(execution.gitCommit || 'unavailable').slice(0, 10))}</span><span><strong>Reconciliation</strong> ${reconciled ? 'OK' : 'CHECK'}</span></div>`;
+  const targets = Array.isArray(execution.targetIds) && execution.targetIds.length ? execution.targetIds.join(", ") : "all";
+  return `<div class="runtime-meta"><span><strong>Build</strong> #${esc(execution.buildNumber || 'local')}</span><span><strong>Environment</strong> ${esc(execution.environment || 'unavailable')}</span><span><strong>Scope</strong> ${esc(execution.market || 'MX')} · ${esc(execution.store || 'BASE_STORE')} · ${esc(execution.suite || 'P1/QST')}</span><span><strong>Commit</strong> ${esc(String(execution.gitCommit || 'unavailable').slice(0, 10))}</span><span><strong>Mode</strong> ${esc(execution.executionMode || 'FULL')}</span><span><strong>Targets</strong> ${esc(targets)}</span><span><strong>Branch</strong> ${esc(execution.branch || 'unavailable')}</span><span><strong>Policy</strong> ${esc(execution.executionPolicy || 'unavailable')}</span><span><strong>Reconciliation</strong> ${reconciled ? 'OK' : 'CHECK'}</span></div>`;
 }
 function renderAttention(execution) {
   if (!Array.isArray(execution?.tests)) return empty('No current runtime supplied.');
