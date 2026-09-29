@@ -6,6 +6,7 @@ if (!["S1", "S2"].includes(environment)) {
 }
 
 const baseEnv = { ...process.env, MX_QST_ENVIRONMENT: environment };
+const verificationEnv = { MX_QST_HEADLESS: process.env.MX_QST_HEADLESS ?? "0" };
 
 function run(label, command, args, extraEnv = {}) {
   console.log(`\n[auth:readiness:mx] CHECK · ${label}`);
@@ -28,8 +29,8 @@ console.log(`
  MX ${environment} · AUTHENTICATION & ENVIRONMENT READINESS
 ============================================================`);
 
-run("Samsung Account primary", process.execPath, ["scripts/auth-doctor-mx.cjs"], { CI: "1", MX_AUTH_SLOT: "primary" });
-run("Samsung Account second", process.execPath, ["scripts/auth-doctor-mx.cjs"], { CI: "1", MX_AUTH_SLOT: "second" });
+run("Samsung Account primary", process.execPath, ["scripts/auth-doctor-mx.cjs"], { ...verificationEnv, MX_AUTH_SLOT: "primary" });
+run("Samsung Account second", process.execPath, ["scripts/auth-doctor-mx.cjs"], { ...verificationEnv, MX_AUTH_SLOT: "second" });
 run("Verified session package", process.execPath, ["scripts/auth-package-mx.cjs"]);
 run("Jenkins session bundle", process.execPath, ["scripts/auth-publish-jenkins.cjs"]);
 
