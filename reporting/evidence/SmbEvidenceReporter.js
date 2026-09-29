@@ -69,7 +69,13 @@ class SmbEvidenceReporter {
     const execution = sanitize({
       timestamp: this.startedAt?.toISOString() || endedAt.toISOString(),
       completedAt: endedAt.toISOString(),
-      environment: process.env.TEST_ENV || process.env.BACKOFFICE_ENV || null,
+      environment: process.env.TEST_ENV || process.env.MX_QST_ENVIRONMENT || process.env.PE_QST_ENVIRONMENT || process.env.BACKOFFICE_ENV || null,
+      market: process.env.TEST_MARKET || process.env.MARKET || null,
+      executionMode: process.env.MX_QST_TARGET_IDS ? "TARGETED" : "FULL",
+      targetIds: String(process.env.MX_QST_TARGET_IDS || "").split(/[\\s,;]+/).filter(Boolean),
+      branch: process.env.BRANCH_NAME || process.env.GIT_BRANCH || null,
+      gitCommit: process.env.GIT_COMMIT || null,
+      executionPolicy: process.env.EXECUTION_MODE || null,
       release: process.env.TEST_RELEASE || null,
       cycle: process.env.TEST_CYCLE || null,
     });
