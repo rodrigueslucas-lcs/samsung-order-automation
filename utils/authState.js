@@ -15,6 +15,7 @@ function createAuthState({
   logoutLinkName = null,
   logoutTextName = "Cerrar sesión",
   authenticatedMenuSelector = null,
+  profileMenuReadySelector = null,
 }) {
   const AUTH_STATE_PATH = path.resolve(authStatePath);
   const AUTH_SESSION_STORAGE_PATH = path.resolve(sessionStoragePath);
@@ -178,34 +179,52 @@ function createAuthState({
     }
     await page.keyboard.press("Escape");
 
-    const logout = authenticatedMenuSelector
-      ? page
-          .locator(authenticatedMenuSelector)
-          .filter({ hasText: logoutTextName })
-          .filter({ visible: true })
-          .last()
+    const menuRoot = authenticatedMenuSelector
+      ? page.locator(authenticatedMenuSelector).filter({ visible: true }).last()
+      : null;
+    const logout = menuRoot
+      ? menuRoot.getByText(logoutTextName, { exact: false }).filter({ visible: true }).last()
       : logoutLinkName
         ? page.getByRole("link", { name: logoutLinkName }).filter({ visible: true })
-        : page.getByText(logoutTextName, { exact: true }).filter({ visible: true });
+        : page.getByText(logoutTextName, { exact: false }).filter({ visible: true }).last();
+
+    const menuReady = profileMenuReadySelector
+      ? page.locator(profileMenuReadySelector).filter({ visible: true }).last()
+      : menuRoot;
 
     if (profileMenuTrigger === "hover") {
       await profileButton.hover();
-      const openedFromHover = await logout
+      const openedFromHover = await (menuReady || logout)
         .waitFor({ state: "visible", timeout: authenticatedMenuSelector ? 10000 : 1000 })
         .then(() => true)
         .catch(() => false);
-      if (!openedFromHover) {
-        await profileButton.click();
-      }
+      if (!openedFromHover) await profileButton.click();
     } else {
       await profileButton.click();
     }
 
-    await logout.waitFor({ state: "visible", timeout: 30000 }).catch(() => {
+    if (menuReady) {
+      await menuReady.waitFor({ state: "visible", timeout: 30000 }).catch(() => {
+        throw new Error(
+          `The saved ${label} profile menu did not open. ${AUTH_REFRESH_INSTRUCTION}`
+        );
+      });
+    }
+
+    const authenticated = await logout
+      .waitFor({ state: "visible", timeout: 30000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!authenticated) {
+      const signedOut = menuRoot
+        ? await menuRoot.locator('a[data-an-la="login"]').filter({ visible: true }).count().catch(() => 0)
+        : 0;
       throw new Error(
-        `The saved Samsung storefront session is expired. ${AUTH_REFRESH_INSTRUCTION}`
+        signedOut
+          ? `The saved ${label} storefront session is signed out. ${AUTH_REFRESH_INSTRUCTION}`
+          : `The saved ${label} profile menu opened but authenticated logout control was not rendered. Authentication could not be proven. ${AUTH_REFRESH_INSTRUCTION}`
       );
-    });
+    }
   }
 
   async function validateAuthenticatedSession(page) {
