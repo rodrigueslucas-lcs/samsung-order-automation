@@ -83,7 +83,9 @@
     "auth:install:mx": "node scripts/auth-install-mx-package.cjs",
     "auth:publish:jenkins": "node scripts/auth-publish-jenkins.cjs",
     "auth:readiness:mx": "node scripts/auth-readiness-mx.cjs",
-    "auth:diagnostic:mx": "node scripts/auth-diagnostic-mx.cjs"
+    "auth:diagnostic:mx": "node scripts/auth-diagnostic-mx.cjs",
+    "qst:co:base-store": "node scripts/run-co-qst-p1.cjs",
+    "qst:co:list": "node scripts/run-co-qst-p1.cjs --list"
   },
   "keywords": [
     "playwright",
