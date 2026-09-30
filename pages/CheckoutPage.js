@@ -895,12 +895,24 @@ export default class CheckoutPage extends BasePage {
       );
       if (await selected.count()) continue;
 
-      const option = this.page
-        .locator(`input[type="radio"][name="${groupName}"]`)
-        .first();
+      const group = this.page.locator(
+        `input[type="radio"][name="${groupName}"]`
+      );
+      const option = group.filter({ visible: true }).first();
+      await option.waitFor({ state: "visible", timeout: 30000 });
+
       const label = option.locator("xpath=ancestor::label[1]");
       await label.click({ timeout: 30000 });
-      if (!(await option.isChecked())) {
+
+      await this.page.waitForFunction(
+        (name) =>
+          [...document.querySelectorAll(`input[type="radio"][name="${name}"]`)]
+            .some((input) => input.checked),
+        groupName,
+        { timeout: 10000 }
+      ).catch(() => {});
+
+      if (!(await group.evaluateAll((inputs) => inputs.some((input) => input.checked)))) {
         throw new Error(`Delivery option did not remain selected for ${groupName}.`);
       }
     }
