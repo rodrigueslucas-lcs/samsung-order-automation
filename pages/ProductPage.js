@@ -22,7 +22,10 @@ export default class ProductPage extends BasePage {
       request.method() === 'POST' &&
       /\/users\/current\/carts\/(?:current|[^/]+)\/entries(?:\?|$)/.test(request.url());
 
-    for (let attempt = 1; attempt <= 2; attempt++) {
+    // S2 occasionally returns an empty PDP shell for an otherwise valid SKU.
+    // Keep retries bounded, but allow one additional fresh navigation before failing.
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       await this.safeGoto(this.pdpUrl);
       if (configureProduct) await configureProduct(this.page);
 
@@ -39,7 +42,7 @@ export default class ProductPage extends BasePage {
 
       if (!buttonReady) {
         diagnostics?.push({ attempt, checkpoint: 'button-not-visible', url: this.page.url() });
-        if (attempt < 2) {
+        if (attempt < maxAttempts) {
           await this.page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
           continue;
         }
@@ -113,7 +116,7 @@ export default class ProductPage extends BasePage {
       diagnostics?.push({ attempt, checkpoint: 'cart-check', url: this.page.url(), cartContainsSku });
       if (cartContainsSku) return;
 
-      if (attempt === 2) {
+      if (attempt === maxAttempts) {
         const failure = outcome?.failedRequest?.failure()?.errorText || 'no successful cart mutation was observed';
         throw new Error(`Cart did not contain ${this.sku} after controlled PDP add-to-cart retry: ${failure}.`);
       }
