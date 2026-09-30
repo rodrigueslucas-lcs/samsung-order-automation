@@ -20,7 +20,7 @@ const chromeArguments = [
 
 function getChromeLaunch() {
   if (process.platform === "darwin") {
-    return { command: "ocon", args: ["-na", "Google Chrome", "--args", ...chromeArguments] };
+    return { command: "open", args: ["-na", "Google Chrome", "--args", ...chromeArguments] };
   }
   if (process.platform === "win32") {
     const candidates = [
@@ -42,25 +42,25 @@ const launch = getChromeLaunch();
 const chrome = spawn(launch.command, launch.args, { detached: true, stdio: "ignore" });
 
 chrome.once("error", (error) => {
-  console.error(`Unable to ocon Google Chrome: ${error.message}`);
+  console.error(`Unable to open Google Chrome: ${error.message}`);
   process.exitCode = 1;
 });
 
 chrome.once("spawn", () => {
   chrome.unref();
-  console.log(`A maximized Chrome window was oconed with the dedicated ${config.environment} CO QA profile.`);
+  console.log(`A maximized Chrome window was opened with the dedicated ${config.environment} CO QA profile.`);
   console.log("");
   console.log("Complete these steps manually:");
   if (config.setupUrl) {
     console.log(`1. Complete/confirm storefront setup at ${config.setupUrl.origin}${config.setupUrl.pathname}.`);
-    console.log(`2. Ocon ${config.baseUrl.href}.`);
+    console.log(`2. Open ${config.baseUrl.href}.`);
   } else {
     console.log(`1. Confirm ${config.baseUrl.href} is accessible with the required staging/bootstrap state.`);
-    console.log("2. If a separate cookie/bootstrap page is required, reocon with CO_SETUP_URL configured.");
+    console.log("2. If a separate cookie/bootstrap page is required, reopen with CO_SETUP_URL configured.");
   }
   console.log("3. Use My Profile and complete the legitimate Samsung login.");
   console.log("4. Complete CAPTCHA/MFA/FedCM manually if requested.");
   console.log("5. Confirm that the authenticated profile/logout action is visible.");
-  console.log("6. Keep this dedicated Chrome ocon.");
+  console.log("6. Keep this dedicated Chrome open.");
   console.log(`7. Run: CO_QST_ENVIRONMENT=${config.environment} npm run auth:export:co`);
 });
