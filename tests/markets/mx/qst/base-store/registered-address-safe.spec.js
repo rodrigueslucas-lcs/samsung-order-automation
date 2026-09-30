@@ -74,7 +74,41 @@ test("SAM-24993 @qst @mx @base-store @safe @registered - Save shipping and billi
 
 test("SAM-24994 @qst @mx @base-store @safe @registered - Checkout accepts a new unsaved address", async ({ page, mxConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24994"));
-  const { checkout } = await reachMxRegisteredDelivery(page, mxConfig);
+  const addToCartDiagnostics = [];
+  const observe = (event) => {
+    if (addToCartDiagnostics.length < 60) addToCartDiagnostics.push(event);
+  };
+  const onPageError = (error) => observe({ checkpoint: "pageerror", message: String(error.message).slice(0, 300) });
+  const onConsole = (message) => {
+    if (message.type() === "error") observe({ checkpoint: "console-error", message: message.text().slice(0, 300) });
+  };
+  const onRequest = (request) => {
+    if (request.method() === "POST" && /\/users\/current\/carts\/.*\/entries/.test(request.url())) {
+      observe({ checkpoint: "cart-post", path: new URL(request.url()).pathname });
+    }
+  };
+  const onRequestFailed = (request) => {
+    if (request.method() === "POST" && /\/users\/current\/carts\/.*\/entries/.test(request.url())) {
+      observe({ checkpoint: "cart-post-failed", path: new URL(request.url()).pathname, failure: request.failure()?.errorText });
+    }
+  };
+  page.on("pageerror", onPageError);
+  page.on("console", onConsole);
+  page.on("request", onRequest);
+  page.on("requestfailed", onRequestFailed);
+  let checkout;
+  try {
+    ({ checkout } = await reachMxRegisteredDelivery(page, mxConfig, { addToCartDiagnostics }));
+  } finally {
+    page.off("pageerror", onPageError);
+    page.off("console", onConsole);
+    page.off("request", onRequest);
+    page.off("requestfailed", onRequestFailed);
+    await testInfo.attach("sam-24994-add-to-cart-diagnostics", {
+      body: JSON.stringify(addToCartDiagnostics, null, 2),
+      contentType: "application/json",
+    });
+  }
   await openNewAddressMode(page);
   const address = await checkout.fillDelivery({ postalCode: "01000", street: "Avenida Revolucion", exteriorNumber: "1000" }, { registered: true });
   expect(address.lookupStatus).toBe(200);

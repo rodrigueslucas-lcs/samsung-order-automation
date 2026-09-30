@@ -16,7 +16,7 @@ export default class ProductPage extends BasePage {
     this.cartUrl = options.cartUrl || 'https://stg2.shop.samsung.com/pe/cart';
   }
 
-  async addConfiguredPdpToCart({ waitForCartMutation = false, configureProduct } = {}) {
+  async addConfiguredPdpToCart({ waitForCartMutation = false, configureProduct, diagnostics } = {}) {
     if (!this.pdpUrl) throw new Error('A configured PDP URL is required.');
     const isCartMutation = (request) =>
       request.method() === 'POST' &&
@@ -38,6 +38,7 @@ export default class ProductPage extends BasePage {
         .catch(() => false);
 
       if (!buttonReady) {
+        diagnostics?.push({ attempt, checkpoint: 'button-not-visible', url: this.page.url() });
         if (attempt < 2) {
           await this.page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
           continue;
@@ -67,6 +68,16 @@ export default class ProductPage extends BasePage {
           ])
         : Promise.resolve(null);
 
+      diagnostics?.push({
+        attempt,
+        checkpoint: 'before-click',
+        url: this.page.url(),
+        button: await addButton.evaluate((button) => ({
+          outerHTML: button.outerHTML.slice(0, 1200),
+          disabled: button.disabled,
+          ariaDisabled: button.getAttribute('aria-disabled'),
+        })).catch(() => null),
+      });
       await addButton.scrollIntoViewIfNeeded();
       try {
         await addButton.click({ timeout: 8000 });
@@ -81,8 +92,16 @@ export default class ProductPage extends BasePage {
         await addButton.focus();
         await addButton.press('Enter');
       }
+      diagnostics?.push({ attempt, checkpoint: 'after-click', url: this.page.url() });
 
       const outcome = await mutationOutcome;
+      diagnostics?.push({
+        attempt,
+        checkpoint: 'mutation-outcome',
+        url: this.page.url(),
+        status: outcome?.response?.status() ?? null,
+        failedRequest: outcome?.failedRequest?.failure()?.errorText ?? null,
+      });
       if (outcome?.response && !outcome.response.ok()) {
         throw new Error(`Configured PDP add-to-cart returned HTTP ${outcome.response.status()}.`);
       }
@@ -91,6 +110,7 @@ export default class ProductPage extends BasePage {
       const cartContainsSku = await this.waitForCartSkus([this.sku], { reloadAttempts: 1 })
         .then(() => true)
         .catch(() => false);
+      diagnostics?.push({ attempt, checkpoint: 'cart-check', url: this.page.url(), cartContainsSku });
       if (cartContainsSku) return;
 
       if (attempt === 2) {

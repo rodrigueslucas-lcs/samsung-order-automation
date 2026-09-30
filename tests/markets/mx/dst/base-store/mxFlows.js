@@ -105,12 +105,13 @@ export async function reachMxGuestPayment(page, config, email) {
   return { checkout, address };
 }
 
-export async function reachMxRegisteredDelivery(page, config) {
+export async function reachMxRegisteredDelivery(page, config, { addToCartDiagnostics } = {}) {
   await ensureMxBootstrapReady(page, config);
   const cart = configuredCart(page, config);
   await cart.clearMxCartAndConfirmEmpty();
   await configuredProduct(page, config).addConfiguredPdpToCart({
     waitForCartMutation: true,
+    diagnostics: addToCartDiagnostics,
   });
   await cart.validateControlledSingleSku(config.sku);
   await cart.proceedToAuthenticatedCheckout();
