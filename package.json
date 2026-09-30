@@ -85,7 +85,15 @@
     "auth:readiness:mx": "node scripts/auth-readiness-mx.cjs",
     "auth:diagnostic:mx": "node scripts/auth-diagnostic-mx.cjs",
     "qst:co:base-store": "node scripts/run-co-qst-p1.cjs",
-    "qst:co:list": "node scripts/run-co-qst-p1.cjs --list"
+    "qst:co:list": "node scripts/run-co-qst-p1.cjs --list",
+    "auth:open-profile:co": "node scripts/auth-open-profile-co.cjs",
+    "auth:login:co": "node scripts/auth-login-co.cjs",
+    "auth:export:co": "node scripts/auth-bootstrap-co.cjs",
+    "auth:verify:co": "node scripts/auth-verify-co.cjs",
+    "auth:refresh:co": "node scripts/auth-refresh-co.cjs",
+    "auth:package:co": "node scripts/auth-package-co.cjs",
+    "auth:install:co": "node scripts/auth-install-co-package.cjs",
+    "auth:publish:jenkins:co": "node scripts/auth-publish-jenkins-co.cjs"
   },
   "keywords": [
     "playwright",
