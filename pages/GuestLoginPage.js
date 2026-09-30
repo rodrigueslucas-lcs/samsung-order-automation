@@ -43,9 +43,17 @@ export default class GuestLoginPage extends BasePage {
 
     await this.guestCheckoutButton.click();
 
-    await this.page.waitForURL(/checkout\/one/i, {
-      timeout: 60000
-    });
+    const checkoutTarget = (url) =>
+      /\/checkout\/one(?:\?|$)|CHECKOUT_STEP_CONTACT_INFO/i.test(url.href);
+
+    // PE checkout is an SPA and can update history before waitForURL is armed.
+    // Accept an already-current checkout route instead of waiting for a second navigation.
+    if (!checkoutTarget(new URL(this.page.url()))) {
+      await this.page.waitForURL(checkoutTarget, {
+        waitUntil: 'domcontentloaded',
+        timeout: 60000
+      });
+    }
 
     await this.screenshot('04-checkout-contact-info');
   }
