@@ -490,7 +490,7 @@
         {
           "id": "SAM-24806",
           "title": "UI validation in desktop view",
-          "store": null,
+          "store": "BS",
           "feature": "UI/Other",
           "architecture": "Shared Core",
           "sameSummaryMarkets": [
@@ -938,7 +938,9 @@
           ],
           "marketCount": 4
         }
-      ]
+      ],
+      "baseStoreCount": 29,
+      "eppCount": 6
     },
     "PE": {
       "count": 34,
