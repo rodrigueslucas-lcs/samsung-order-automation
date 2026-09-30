@@ -44,11 +44,26 @@ export default class CartPage extends BasePage {
     }
     await this.openCart();
     const main = this.page.getByRole('main');
-    await main.getByRole('heading', { name: 'Cart', exact: true })
-      .waitFor({ state: 'visible', timeout: 60000 });
+    await main.waitFor({ state: 'visible', timeout: 60000 });
+
+    // Do not couple PE cleanup to the English "Cart" heading. S2 can render
+    // Spanish/localized headings while the actual cart controls are healthy.
+    const waitForCartSurface = async () => {
+      const remove = main.getByRole('button', { name: /^Remove$|^Eliminar$/i });
+      const empty = main.getByText(/carrito.*vac[ií]o|no hay productos|cart.*empty/i).first();
+      const sku = main.getByText(/[A-Z]{2}-?[A-Z0-9]{5,}/).first();
+      await Promise.race([
+        remove.first().waitFor({ state: 'visible', timeout: 60000 }),
+        empty.waitFor({ state: 'visible', timeout: 60000 }),
+        sku.waitFor({ state: 'visible', timeout: 60000 }),
+      ]).catch(() => {
+        throw new Error(`PE cart surface did not render after navigation. url=${this.page.url()}`);
+      });
+    };
+    await waitForCartSurface();
 
     for (let removed = 0; removed < 10; removed += 1) {
-      const removeButtons = main.getByRole('button', { name: /^Remove$/i });
+      const removeButtons = main.getByRole('button', { name: /^Remove$|^Eliminar$/i });
       const count = await removeButtons.count();
       if (!count) {
         await main.getByText(/carrito.*vac[ií]o|no hay productos/i).first()
@@ -69,8 +84,8 @@ export default class CartPage extends BasePage {
           // The PE storefront occasionally closes the confirmation without sending a cart mutation.
           // Reload once to distinguish a delayed update from a no-op before retrying via the UI.
           await this.page.reload({ waitUntil: 'domcontentloaded' });
-          await main.getByRole('heading', { name: 'Cart', exact: true })
-            .waitFor({ state: 'visible', timeout: 60000 });
+          await main.waitFor({ state: 'visible', timeout: 60000 });
+          await waitForCartSurface();
           removedFromCart = await removeButtons.count() === count - 1;
           if (!removedFromCart && attempt === 1) {
             throw new Error(`PE cart removal did not persist after two confirmed UI attempts (items: ${count}).`, { cause: error });
@@ -147,7 +162,7 @@ export default class CartPage extends BasePage {
     for (let removed = 0; removed < 20; removed += 1) {
       const { productEntries } = await this.loadMxCartState();
       const main = this.page.getByRole('main');
-      const removeButtons = main.getByRole('button', { name: /^Remove$/i });
+      const removeButtons = main.getByRole('button', { name: /^Remove$|^Eliminar$/i });
       const emptyCart = main.getByRole('heading', { name: /Su carrito esta vac[ií]o/i });
 
       if (!productEntries.length) {
@@ -219,7 +234,7 @@ export default class CartPage extends BasePage {
     const main = this.page.getByRole('main');
     const emptyCart = main.getByRole('heading', { name: /Su carrito esta vac[ií]o/i });
     if (await emptyCart.waitFor({ state: 'visible', timeout: 10000 }).then(() => true, () => false)) {
-      if (await main.getByRole('button', { name: /^Remove$/i }).count()) {
+      if (await main.getByRole('button', { name: /^Remove$|^Eliminar$/i }).count()) {
         throw new Error('MX cart rendered an empty state together with removable product rows.');
       }
       return;
@@ -261,7 +276,7 @@ export default class CartPage extends BasePage {
     if ((await quantity.inputValue()) !== '1' || (await remove.count()) !== 1) {
       throw new Error(`Rendered MX cart row for ${sku} is not exactly quantity 1.`);
     }
-    if ((await main.getByRole('button', { name: /^Remove$/i }).count()) !== 1) {
+    if ((await main.getByRole('button', { name: /^Remove$|^Eliminar$/i }).count()) !== 1) {
       throw new Error('Controlled MX cart rendered more than one product row.');
     }
   }
