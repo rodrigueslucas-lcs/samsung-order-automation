@@ -1,0 +1,15 @@
+{
+  "$schemaVersion": 1,
+  "source": "PE_QST_34.csv / Samsung SMB QST Master 144 supplied by QA",
+  "market": "CO",
+  "officialCount": 35,
+  "baseStoreCount": 28,
+  "eppCount": 6,
+  "unclassifiedCount": 1,
+  "policy": "Do not invent target-environment selectors, product data or payment behavior. Shared cases may reuse proven flows only after CO live proof.",
+  "notes": [
+    "SAM-24806 is unclassified in the source Store column.",
+    "SAM-24914 ADDI Pay is CO market-specific and requires CO payment proof before implementation.",
+    "EPP remains a separate six-case lane."
+  ]
+}
