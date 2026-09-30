@@ -70,12 +70,25 @@ export default class ProfilePage extends MyAccountPage {
 
   async openAddressManagement() {
     await this.openProfile();
-    const entry = this.page.getByRole("link", { name: /Mis direcciones|Direcciones|Address/i })
+
+    const addressEntry = () => this.page
+      .getByRole("link", { name: /Mis direcciones|Direcciones|Address/i })
       .or(this.page.getByRole("button", { name: /Mis direcciones|Direcciones|Address/i }))
+      .or(this.page.locator('a[href*="address" i], a[href*="direccion" i]'))
+      .filter({ visible: true })
       .first();
+
+    let entry = addressEntry();
+    if (!(await entry.isVisible().catch(() => false))) {
+      // Some PE S2 My Page variants expose address management only from the
+      // authenticated profile menu rather than directly in the page body.
+      await this.openProfileMenu();
+      entry = addressEntry();
+    }
+
     await entry.waitFor({ state: "visible", timeout: 30000 });
     await entry.click();
-    await this.page.getByText(/Direcciones|Address/i).first()
+    await this.page.getByText(/Mis direcciones|Direcciones|Address/i).first()
       .waitFor({ state: "visible", timeout: 30000 });
   }
 
