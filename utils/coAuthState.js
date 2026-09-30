@@ -24,7 +24,7 @@ function getCoAuthState(environment = process.env) {
     validationUrl: config.baseUrl.href,
     label: `${config.environment} CO`,
     refreshInstruction:
-      `Ocon the dedicated CO ${config.environment} browser/profile, complete legitimate Samsung login, then export CO auth state. Do not commit auth artifacts.`,
+      `Open the dedicated CO ${config.environment} browser/profile, complete legitimate Samsung login, then export CO auth state. Do not commit auth artifacts.`,
     profileMenuTrigger: "hover",
     logoutTextName: /Cerrar Sesi[oó]n/i,
     authenticatedMenuSelector: '[role="menu"].profile-menu',
