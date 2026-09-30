@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const {
   PE_AUTH_SESSION_STORAGE_PATH,
   getPeAuthState,
+  markPeAuthStateVerified,
 } = require("../utils/peAuthState");
 const { getPeQstConfig } = require("../config/markets/pe");
 
@@ -109,7 +110,8 @@ async function verifyPeAuthentication() {
       )
     );
     writeJsonSecurely(PE_AUTH_SESSION_STORAGE_PATH, sessionStorage);
-    console.log(`[auth:verify:pe] refreshed ${config.environment} PE session state preserved for the test fixture`);
+    markPeAuthStateVerified();
+    console.log(`[auth:verify:pe] refreshed ${config.environment} PE session state preserved and marked as verified for the test fixture`);
   } finally {
     await browser.close();
   }
