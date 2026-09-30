@@ -10,5 +10,9 @@ function run(label, script) {
 run(`Refreshing Samsung Account session for ${environment}`, "scripts/auth-login-pe.cjs");
 run(`Verifying Samsung Account session for ${environment}`, "scripts/auth-verify-pe.cjs");
 run(`Packaging verified PE ${environment} session for CI handoff`, "scripts/auth-package-pe.cjs");
+
+if (process.env.JENKINS_AUTH_PUBLISH === "1") {
+  run(`Publishing PE ${environment} session bundle to Jenkins`, "scripts/auth-publish-jenkins-pe.cjs");
+}
 console.log(`\n[auth:refresh:pe] READY · PE ${environment} authenticated session refreshed, verified and packaged.`);
 console.log("[auth:refresh:pe] CAPTCHA/MFA remains a human security gate when Samsung Account requests it.");
