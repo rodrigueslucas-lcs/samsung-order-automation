@@ -334,25 +334,20 @@ pipeline {
         catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
           script {
             if (params.MARKET == 'PE') {
+              env.PE_SESSION_BUNDLE_CREDENTIAL = "samsung-pe-${params.ENVIRONMENT.toLowerCase()}-session-bundle"
               withCredentials([
-                file(credentialsId: 'samsung-pe-s2-auth-state', variable: 'PE_AUTH_STATE_SECRET'),
-                file(credentialsId: 'samsung-pe-s2-session-storage', variable: 'PE_SESSION_STORAGE_SECRET')
+                file(credentialsId: env.PE_SESSION_BUNDLE_CREDENTIAL, variable: 'PE_SESSION_BUNDLE')
               ]) {
                 if (isUnix()) {
                   sh '''
                     set -eu
-                    mkdir -p playwright/.auth
-                    cp "$PE_AUTH_STATE_SECRET" playwright/.auth/pe-s2-user.json
-                    cp "$PE_SESSION_STORAGE_SECRET" playwright/.auth/pe-s2-session-storage.json
-                    chmod 600 playwright/.auth/pe-s2-user.json playwright/.auth/pe-s2-session-storage.json || true
+                    npm run auth:install:pe
                     CI=1 npm run auth:verify:pe
                     npx -y node@22 scripts/run-pe-qst-p1.cjs
                   '''
                 } else {
                   bat '''@echo off
-                    if not exist playwright\\.auth mkdir playwright\\.auth
-                    copy /Y "%PE_AUTH_STATE_SECRET%" "playwright\\.auth\\pe-s2-user.json" >nul || exit /b 2
-                    copy /Y "%PE_SESSION_STORAGE_SECRET%" "playwright\\.auth\\pe-s2-session-storage.json" >nul || exit /b 2
+                    call npm run auth:install:pe || exit /b 2
                     set CI=1
                     call npm run auth:verify:pe || exit /b 20
                     call npx -y node@22 scripts/run-pe-qst-p1.cjs
