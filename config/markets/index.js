@@ -1,8 +1,10 @@
 const mxConfigModule = require("../../utils/mxConfig");
 const peConfigModule = require("./pe");
+const coConfigModule = require("./co");
 
 const { getMxConfig } = mxConfigModule;
 const { getPeS1QstConfig } = peConfigModule;
+const { getCoQstConfig } = coConfigModule;
 
 const MARKET_DEFINITIONS = Object.freeze({
   MX: Object.freeze({ code: "MX", locale: "es-MX", currency: "MXN" }),
@@ -50,6 +52,10 @@ function getMarketConfig(value, environment = process.env) {
       ...definition,
       market: code,
     };
+  }
+
+  if (code === "CO") {
+    return { ...getCoQstConfig(environment), ...definition, market: code };
   }
 
   if (code === "PE") {
