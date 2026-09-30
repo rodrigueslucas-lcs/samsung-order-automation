@@ -37,7 +37,7 @@ pipeline {
           def targetedIds = params.P1_TARGET_IDS?.trim()
             ? params.P1_TARGET_IDS.split(/[\\s,;]+/).findAll { it?.trim() }
             : []
-          def p1Count = params.MARKET == 'MX' ? '29' : params.MARKET == 'PE' ? '28' : '—'
+          def p1Count = params.MARKET == 'MX' ? '29' : params.MARKET == 'PE' ? '28' : params.MARKET == 'CO' ? '29' : '—'
           def suiteLabel = [
             'fast-guest': 'FAST',
             'authenticated-safe': 'AUTH SAFE',
@@ -62,6 +62,7 @@ pipeline {
           env.MX_JENKINS_ARTIFACT_DIR = artifactDir
           env.MX_QST_ARTIFACT_DIR = artifactDir
           env.PE_QST_ARTIFACT_DIR = artifactDir
+          env.CO_QST_ARTIFACT_DIR = artifactDir
           env.PW_VIDEO = params.EVIDENCE_MODE == 'screenshots-trace-video' ? '1' : '0'
           env.TEST_MARKET = params.MARKET
           env.MARKET = params.MARKET
@@ -69,11 +70,14 @@ pipeline {
           env.EXECUTION_MODE = params.EXECUTION_MODE
           env.MX_QST_ENVIRONMENT = params.ENVIRONMENT
           env.PE_QST_ENVIRONMENT = params.ENVIRONMENT
+          env.CO_QST_ENVIRONMENT = params.ENVIRONMENT
           env.BACKOFFICE_ENV = params.ENVIRONMENT.toLowerCase()
           env.MX_QST_HEADLESS = params.BROWSER_MODE == 'headless' ? '1' : '0'
           env.MX_QST_TARGET_IDS = params.P1_TARGET_IDS?.trim() ?: ''
           env.PE_QST_TARGET_IDS = params.P1_TARGET_IDS?.trim() ?: ''
+          env.CO_QST_TARGET_IDS = params.P1_TARGET_IDS?.trim() ?: ''
           env.PE_STOREFRONT_URL = params.ENVIRONMENT == 'S2' ? 'https://stg2.shop.samsung.com/pe/' : 'https://stg.shop.samsung.com/pe/'
+          env.CO_STOREFRONT_URL = params.ENVIRONMENT == 'S2' ? 'https://stg2.shop.samsung.com/co/' : 'https://stg.shop.samsung.com/co/'
 
           // Keep Playwright browsers outside node_modules so npm ci does not
           // force a ~300 MB Chromium/FFmpeg download on every Jenkins build.
@@ -125,8 +129,8 @@ pipeline {
           if (!['S1', 'S2'].contains(params.ENVIRONMENT)) {
             error('Unsupported environment. Select S1 or S2.')
           }
-          if (['CL', 'CO'].contains(params.MARKET)) {
-            error("${params.MARKET} is exposed as a regional roadmap target but is not runtime-enabled yet. Stabilize PE first, then enable ${params.MARKET}.")
+          if (params.MARKET == 'CL') {
+            error('CL is exposed as a regional roadmap target but is not runtime-enabled yet.')
           }
           if (params.MARKET == 'PE' && params.ENVIRONMENT != 'S2') {
             error('PE phase 1 is intentionally limited to S2/STG2 while the existing PE QST automation is stabilized.')
@@ -134,8 +138,8 @@ pipeline {
           if (params.MARKET == 'PE' && params.TEST_SUITE != 'official-p1') {
             error('PE phase 1 currently exposes the coverage-aware official-p1 stabilization lane only. FAST/AUTH/BACKOFFICE lanes will be enabled after PE S2 credentials and runtime baselines are proven.')
           }
-          if (params.P1_TARGET_IDS?.trim() && (!['MX', 'PE'].contains(params.MARKET) || params.TEST_SUITE != 'official-p1')) {
-            error('P1_TARGET_IDS is supported only for MX/PE official-p1. Clear the field for other suites/markets.')
+          if (params.P1_TARGET_IDS?.trim() && (!['MX', 'PE', 'CO'].contains(params.MARKET) || params.TEST_SUITE != 'official-p1')) {
+            error('P1_TARGET_IDS is supported only for MX/PE/CO official-p1. Clear the field for other suites/markets.')
           }
           if (params.TEST_SUITE == 'official-p1' && params.EXECUTION_MODE != 'authorized-destructive') {
             error("${params.MARKET} official P1 contains payment/order scenarios. Select EXECUTION_MODE=authorized-destructive for the campaign.")
@@ -182,10 +186,12 @@ pipeline {
             sh 'npm run qst:official:gate'
             if (params.MARKET == 'MX') sh 'npm run qst:mx:list'
             else if (params.MARKET == 'PE') sh 'node scripts/run-pe-qst-p1.cjs --list'
+            else if (params.MARKET == 'CO') sh 'node scripts/run-co-qst-p1.cjs --list'
           } else {
             bat '@npm run qst:official:gate'
             if (params.MARKET == 'MX') bat '@npm run qst:mx:list'
             else if (params.MARKET == 'PE') bat '@call node scripts/run-pe-qst-p1.cjs --list'
+            else if (params.MARKET == 'CO') bat '@call node scripts/run-co-qst-p1.cjs --list'
           }
         }
       }
@@ -333,7 +339,28 @@ pipeline {
         }
         catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
           script {
-            if (params.MARKET == 'PE') {
+            if (params.MARKET == 'CO') {
+              env.CO_SESSION_BUNDLE_CREDENTIAL = "samsung-co-${params.ENVIRONMENT.toLowerCase()}-session-bundle"
+              withCredentials([
+                file(credentialsId: env.CO_SESSION_BUNDLE_CREDENTIAL, variable: 'CO_SESSION_BUNDLE')
+              ]) {
+                if (isUnix()) {
+                  sh '''
+                    set -eu
+                    npm run auth:install:co
+                    CI=1 npm run auth:verify:co
+                    npx -y node@22 scripts/run-co-qst-p1.cjs
+                  '''
+                } else {
+                  bat '''@echo off
+                    call npm run auth:install:co || exit /b 2
+                    set CI=1
+                    call npm run auth:verify:co || exit /b 20
+                    call npx -y node@22 scripts/run-co-qst-p1.cjs
+                  '''
+                }
+              }
+            } else if (params.MARKET == 'PE') {
               env.PE_SESSION_BUNDLE_CREDENTIAL = "samsung-pe-${params.ENVIRONMENT.toLowerCase()}-session-bundle"
               withCredentials([
                 file(credentialsId: env.PE_SESSION_BUNDLE_CREDENTIAL, variable: 'PE_SESSION_BUNDLE')
