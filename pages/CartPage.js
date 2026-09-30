@@ -55,12 +55,28 @@ export default class CartPage extends BasePage {
           .waitFor({ state: 'visible', timeout: 30000 });
         return;
       }
-      await removeButtons.first().click();
-      const dialog = this.page.getByRole('dialog').or(this.page.getByRole('alertdialog'))
-        .filter({ hasText: /Eliminar del carrito/i });
-      await dialog.waitFor({ state: 'visible', timeout: 30000 });
-      await dialog.getByRole('button', { name: /^S[ií]$/i }).click();
-      await expect(removeButtons).toHaveCount(count - 1, { timeout: 30000 });
+      let removedFromCart = false;
+      for (let attempt = 0; attempt < 2 && !removedFromCart; attempt += 1) {
+        await removeButtons.first().click();
+        const dialog = this.page.getByRole('dialog').or(this.page.getByRole('alertdialog'))
+          .filter({ hasText: /Eliminar del carrito/i });
+        await dialog.waitFor({ state: 'visible', timeout: 30000 });
+        await dialog.getByRole('button', { name: /^S[ií]$/i }).click();
+        try {
+          await expect(removeButtons).toHaveCount(count - 1, { timeout: 15000 });
+          removedFromCart = true;
+        } catch (error) {
+          // The PE storefront occasionally closes the confirmation without sending a cart mutation.
+          // Reload once to distinguish a delayed update from a no-op before retrying via the UI.
+          await this.page.reload({ waitUntil: 'domcontentloaded' });
+          await main.getByRole('heading', { name: 'Cart', exact: true })
+            .waitFor({ state: 'visible', timeout: 60000 });
+          removedFromCart = await removeButtons.count() === count - 1;
+          if (!removedFromCart && attempt === 1) {
+            throw new Error(`PE cart removal did not persist after two confirmed UI attempts (items: ${count}).`, { cause: error });
+          }
+        }
+      }
     }
     throw new Error('PE cart cleanup exceeded the 10-row safety limit.');
   }

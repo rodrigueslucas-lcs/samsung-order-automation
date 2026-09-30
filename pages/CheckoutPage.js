@@ -25,35 +25,44 @@ export default class CheckoutPage extends BasePage {
     await this.page.waitForURL(/CHECKOUT_STEP_CONTACT_INFO/, {
       timeout: 30000,
     });
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await this.firstNameInput.fill(customer.firstName);
+      await this.lastNameInput.fill(customer.lastName);
+      await this.phoneInput.fill(customer.phone);
 
-    await this.firstNameInput.fill(customer.firstName);
-    await this.lastNameInput.fill(customer.lastName);
-    await this.phoneInput.fill(customer.phone);
+      await this.documentTypeSelect.click();
+      await this.page
+        .getByRole("option", { name: customer.documentType, exact: true })
+        .click();
 
-    await this.documentTypeSelect.click();
-    await this.page
-      .getByRole("option", { name: customer.documentType, exact: true })
-      .click();
+      await this.documentNumberInput.fill(customer.documentNumber);
 
-    await this.documentNumberInput.fill(customer.documentNumber);
+      const documentNumber = await this.documentNumberInput.inputValue();
+      if (documentNumber !== customer.documentNumber) {
+        throw new Error(
+          `Document number was reset after selecting the document type. Expected: ${customer.documentNumber} | Actual: ${documentNumber}`
+        );
+      }
 
-    const documentNumber = await this.documentNumberInput.inputValue();
-    if (documentNumber !== customer.documentNumber) {
-      throw new Error(
-        `Document number was reset after selecting the document type. Expected: ${customer.documentNumber} | Actual: ${documentNumber}`
-      );
+      if (!(await this.customerContinueButton.isEnabled())) {
+        throw new Error("Customer Continue button remained disabled after valid Contact Info.");
+      }
+
+      await this.screenshot("04-customer-info");
+      await this.customerContinueButton.click();
+      try {
+        await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, { waitUntil: "domcontentloaded", timeout: 30000 });
+        break;
+      } catch (error) {
+        if (/CHECKOUT_STEP_DELIVERY/.test(this.page.url())) break;
+        if (attempt === 1 || !/CHECKOUT_STEP_CONTACT_INFO/.test(this.page.url())) {
+          throw new Error(`Checkout did not advance from Contact Info after ${attempt + 1} attempt(s); current URL: ${this.page.url()}.`, { cause: error });
+        }
+        // PE S2 can leave Continue spinning without navigating; reload once and retry the same validated data.
+        await this.page.reload({ waitUntil: "domcontentloaded" });
+        await this.firstNameInput.waitFor({ state: "visible", timeout: 60000 });
+      }
     }
-
-    if (!(await this.customerContinueButton.isEnabled())) {
-      throw new Error("Customer Continue button remained disabled after valid Contact Info.");
-    }
-
-    await this.screenshot("04-customer-info");
-
-    await Promise.all([
-      this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, { timeout: 30000 }),
-      this.customerContinueButton.click(),
-    ]);
 
     await this.page
       .getByRole("heading", { name: /Direcci[oó]n de entrega/i })
@@ -898,10 +907,12 @@ export default class CheckoutPage extends BasePage {
       const group = this.page.locator(
         `input[type="radio"][name="${groupName}"]`
       );
-      const option = group.filter({ visible: true }).first();
-      await option.waitFor({ state: "visible", timeout: 30000 });
+      const option = group.first();
+      await option.waitFor({ state: "attached", timeout: 30000 });
 
+      // PE renders the radio input hidden inside a visible, clickable delivery card.
       const label = option.locator("xpath=ancestor::label[1]");
+      await label.waitFor({ state: "visible", timeout: 30000 });
       await label.click({ timeout: 30000 });
 
       await this.page.waitForFunction(

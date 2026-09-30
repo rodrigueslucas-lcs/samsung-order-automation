@@ -7,7 +7,9 @@ const { getCoQstConfig } = require("../config/markets/co");
 
 const CONFIG = getCoQstConfig();
 const HOSTNAME = CONFIG.baseUrl.hostname;
-const API_HOSTNAME = "co-smb-api-cdn.ecom-stg.samsung.com";
+const API_HOSTNAME = CONFIG.environment === "S2"
+  ? "s2-smb-api-cdn.ecom-stg.samsung.com"
+  : "co-smb-api-cdn.ecom-stg.samsung.com";
 const ENV_NAME = CONFIG.environment;
 const ENV_SUFFIX = ENV_NAME.toLowerCase();
 const ACCOUNT_HOSTNAME = "account.samsung.com";

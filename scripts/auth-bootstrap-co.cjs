@@ -6,6 +6,9 @@ const { getCoQstConfig } = require("../config/markets/co");
 const config = getCoQstConfig();
 const envSuffix = config.environment.toLowerCase();
 const HOSTNAME = config.baseUrl.hostname;
+const API_HOSTNAME = config.environment === "S2"
+  ? "s2-smb-api-cdn.ecom-stg.samsung.com"
+  : "co-smb-api-cdn.ecom-stg.samsung.com";
 const profileDir = path.resolve(`playwright/profiles/${envSuffix}-co-qa`);
 const authDir = path.resolve("playwright/.auth");
 const authFile = path.join(authDir, `co-${envSuffix}-user.json`);
@@ -88,7 +91,7 @@ async function exportCoAuthentication() {
     const coState = {
       cookies: fullState.cookies.filter((cookie) => {
         const domain = cookie.domain.replace(/^\./, "");
-        return domain === HOSTNAME || cookie.domain === ".samsung.com";
+        return domain === HOSTNAME || domain === API_HOSTNAME || cookie.domain === ".samsung.com";
       }),
       origins: fullState.origins.filter(({ origin }) => new URL(origin).hostname === HOSTNAME),
     };

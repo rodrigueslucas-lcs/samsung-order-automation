@@ -14,7 +14,7 @@ const configEnv = {
   ...process.env,
   CO_QST_ENVIRONMENT: targetEnvironment,
   CO_STOREFRONT_URL: process.env.CO_STOREFRONT_URL || (targetEnvironment === "S2"
-    ? "https://p6-pre-qa2.samsung.com/co/"
+    ? "https://stg2.shop.samsung.com/co/"
     : "https://stg.shop.samsung.com/co/"),
 };
 const config = getCoQstConfig(configEnv);
