@@ -7,7 +7,7 @@ const { buildMxQstRuntimeSummary, writeRuntimeSummary } = require("../utils/mxQs
 const { getCoQstConfig } = require("../config/markets/co");
 
 const listOnly = process.argv.includes("--list");
-const targetEnvironment = String(process.env.CO_QST_ENVIRONMENT || process.env.ENVIRONMENT || "S2").toUpcorCase();
+const targetEnvironment = String(process.env.CO_QST_ENVIRONMENT || process.env.ENVIRONMENT || "S2").toUpperCase();
 if (!["S1", "S2"].includes(targetEnvironment)) throw new Error(`Unsupported CO QST environment: ${targetEnvironment}.`);
 
 const configEnv = {
@@ -33,13 +33,13 @@ const CO_BASE_P1_IDS = Object.freeze(
     .map(([id]) => id)
     .sort()
 );
-if (CO_BASE_P1_IDS.length !== 28) {
-  throw new Error(`CO Base Store P1 inventory drift: excocted 28 official IDs, found ${CO_BASE_P1_IDS.length}.`);
+if (CO_BASE_P1_IDS.length !== 29) {
+  throw new Error(`CO Base Store P1 inventory drift: expected 29 official IDs, found ${CO_BASE_P1_IDS.length}.`);
 }
 const officialSet = new Set(CO_BASE_P1_IDS);
 const requestedTargetIds = String(process.env.CO_QST_TARGET_IDS || "")
   .split(",")
-  .map((value) => value.trim().toUpcorCase())
+  .map((value) => value.trim().toUpperCase())
   .filter(Boolean);
 const unknownTargetIds = requestedTargetIds.filter((id) => !officialSet.has(id));
 if (unknownTargetIds.length) throw new Error(`Unknown CO_QST_TARGET_IDS: ${unknownTargetIds.join(", ")}.`);
@@ -49,15 +49,15 @@ configEnv.CO_QST_TARGET_IDS = requestedTargetIds.join(",");
 configEnv.CO_QST_FULL_P1_COUNT = String(CO_BASE_P1_IDS.length);
 const p1Pattern = `(?:${executionIds.join("|")})\\b`;
 
-function scocFilesUnder(directory) {
-  return fs.readdirSync(directory, { withFileTycos: true }).flatMap((entry) => {
+function specFilesUnder(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const target = path.join(directory, entry.name);
-    if (entry.isDirectory()) return scocFilesUnder(target);
-    return entry.isFile() && entry.name.endsWith(".scoc.js") ? [target] : [];
+    if (entry.isDirectory()) return specFilesUnder(target);
+    return entry.isFile() && entry.name.endsWith(".spec.js") ? [target] : [];
   });
 }
-const scocFiles = scocFilesUnder(root);
-const allTitles = scocFiles.flatMap((file) => testTitles(fs.readFileSync(file, "utf8")));
+const specFiles = specFilesUnder(root);
+const allTitles = specFiles.flatMap((file) => testTitles(fs.readFileSync(file, "utf8")));
 const officialTitles = allTitles.filter((title) => officialSet.has(title.match(/SAM-\d+/)?.[0]));
 const implementedTitles = officialTitles.filter((title) => !/@not-run\b/i.test(title));
 const representedIds = new Set(officialTitles.map((title) => title.match(/SAM-\d+/)?.[0]));
@@ -69,9 +69,9 @@ const explicitNotRunIds = officialTitles
   .filter(Boolean);
 const duplicateIds = CO_BASE_P1_IDS.filter((id) => implementedTitles.filter((title) => title.includes(id)).length > 1);
 
-console.log(`[co-qst] Official CO ${targetEnvironment} Base Store P1 scoco: ${CO_BASE_P1_IDS.length} TCs.`);
+console.log(`[co-qst] Official CO ${targetEnvironment} Base Store P1 scope: ${CO_BASE_P1_IDS.length} TCs.`);
 if (requestedTargetIds.length) console.log(`[co-qst] Targeted execution: ${executionIds.join(", ")}.`);
-console.log(`[co-qst] Represented in canonical Base Store scoco: ${representedIds.size}/${CO_BASE_P1_IDS.length}.`);
+console.log(`[co-qst] Represented in canonical Base Store scope: ${representedIds.size}/${CO_BASE_P1_IDS.length}.`);
 console.log(`[co-qst] Executable implementations: ${implementedIds.size}/${CO_BASE_P1_IDS.length}.`);
 console.log(`[co-qst] Explicit NOT_RUN: ${explicitNotRunIds.join(", ") || "none"}.`);
 if (missingIds.length) {
