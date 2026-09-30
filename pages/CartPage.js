@@ -413,10 +413,17 @@ export default class CartPage extends BasePage {
 
     const guestEmailInput = this.page.getByPlaceholder(/ingresa tu correo/i);
 
-    await this.page.waitForURL((url) =>
-      url.href !== beforeUrl &&
-      /\/checkout\/one(?:\?|$)|CHECKOUT_STEP_CONTACT_INFO|\/guestlogin\/checkout/i.test(url.href),
-    { waitUntil: 'domcontentloaded', timeout: 60000 });
+    const checkoutTarget = (url) =>
+      /\/checkout\/one(?:\?|$)|CHECKOUT_STEP_CONTACT_INFO|\/guestlogin\/checkout/i.test(url.href);
+
+    // The click may complete after the SPA has already changed history.
+    // Do not wait for a second navigation when checkout is already current.
+    if (!checkoutTarget(new URL(this.page.url()))) {
+      await this.page.waitForURL(checkoutTarget, {
+        waitUntil: 'domcontentloaded',
+        timeout: 60000,
+      });
+    }
 
     if (
       /\/guestlogin\/checkout/i.test(this.page.url()) ||
