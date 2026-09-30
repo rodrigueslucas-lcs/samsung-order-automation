@@ -408,14 +408,52 @@ export default class CartPage extends BasePage {
     await this.continueButton.waitFor({ state: 'visible', timeout: 30000 });
     await this.continueButton.scrollIntoViewIfNeeded();
 
-    await Promise.all([
+    const beforeUrl = this.page.url();
+    await this.continueButton.click();
+
+    const guestEmailInput = this.page.getByPlaceholder(/ingresa tu correo/i);
+    const checkoutSurface = this.page
+      .locator('input[type="radio"][name$="delivery_mode_option"], mat-radio-button')
+      .filter({ visible: true })
+      .first();
+    const contactSurface = this.page
+      .getByText(/datos de contacto|informaci[oó]n de contacto|contact details/i)
+      .filter({ visible: true })
+      .first();
+
+    const outcome = await Promise.race([
+      guestEmailInput.waitFor({ state: 'visible', timeout: 60000 }).then(() => 'guest').catch(() => null),
+      checkoutSurface.waitFor({ state: 'visible', timeout: 60000 }).then(() => 'checkout').catch(() => null),
+      contactSurface.waitFor({ state: 'visible', timeout: 60000 }).then(() => 'checkout').catch(() => null),
       this.page.waitForURL((url) =>
-        /CHECKOUT_STEP_CONTACT_INFO|\/guestlogin\/checkout/i.test(url.href),
-      { timeout: 60000 }),
-      this.continueButton.click()
+        url.href !== beforeUrl &&
+        /checkout|CHECKOUT_STEP_CONTACT_INFO/i.test(url.href),
+      { waitUntil: 'domcontentloaded', timeout: 60000 }).then(() => 'navigation').catch(() => null),
     ]);
-    if (/\/guestlogin\/checkout/i.test(this.page.url())) {
-      throw new Error('Registered MX checkout redirected to guest login; the Samsung Account session was not accepted. Refresh the authenticated state before rerunning registered cases.');
+
+    if (outcome === 'guest' || /\/guestlogin\/checkout/i.test(this.page.url())) {
+      throw new Error('Registered checkout redirected to guest login; the Samsung Account session was not accepted. Refresh the authenticated state before rerunning registered cases.');
+    }
+
+    if (!outcome) {
+      throw new Error(
+        `Registered checkout did not expose a checkout/contact/delivery state after Continue. URL=${this.page.url()}`
+      );
+    }
+
+    // SPA checkout routes can keep or rewrite the URL differently by market.
+    // Prove that the registered checkout UI actually rendered instead of
+    // requiring one historical route shape.
+    if (outcome === 'navigation') {
+      const rendered = await Promise.race([
+        checkoutSurface.waitFor({ state: 'visible', timeout: 30000 }).then(() => true).catch(() => false),
+        contactSurface.waitFor({ state: 'visible', timeout: 30000 }).then(() => true).catch(() => false),
+      ]);
+      if (!rendered) {
+        throw new Error(
+          `Registered checkout navigation completed but no checkout UI was rendered. URL=${this.page.url()}`
+        );
+      }
     }
   }
 
