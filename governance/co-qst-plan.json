@@ -1,15 +1,255 @@
 {
-  "$schemaVersion": 1,
-  "source": "PE_QST_34.csv / Samsung SMB QST Master 144 supplied by QA",
+  "schemaVersion": 1,
   "market": "CO",
+  "source": "Samsung SMB QST Master 144 / user-supplied PE_QST_34.csv",
   "officialCount": 35,
-  "baseStoreCount": 28,
+  "baseStoreCount": 29,
   "eppCount": 6,
-  "unclassifiedCount": 1,
-  "policy": "Do not invent target-environment selectors, product data or payment behavior. Shared cases may reuse proven flows only after CO live proof.",
-  "notes": [
-    "SAM-24806 is unclassified in the source Store column.",
-    "SAM-24914 ADDI Pay is CO market-specific and requires CO payment proof before implementation.",
-    "EPP remains a separate six-case lane."
-  ]
+  "cases": {
+    "SAM-24806": {
+      "title": "UI validation in desktop view",
+      "store": "BS",
+      "feature": "UI/Other",
+      "reuse": "Shared Core",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24873": {
+      "title": "Login Home page",
+      "store": "BS",
+      "feature": "Auth/Home",
+      "reuse": "Shared Core",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24874": {
+      "title": "Validate the My account menu",
+      "store": "BS",
+      "feature": "Auth/Home",
+      "reuse": "Shared + Market Config",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24875": {
+      "title": "GNB menu",
+      "store": "BS",
+      "feature": "Auth/Home",
+      "reuse": "Shared + Market Config",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24879": {
+      "title": "Facets/Filter on PLP",
+      "store": "BS",
+      "feature": "Product",
+      "reuse": "Shared + Market Config",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24880": {
+      "title": "Add product from BC Page",
+      "store": "BS",
+      "feature": "Cart",
+      "reuse": "Shared + Market Config",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24882": {
+      "title": "Cart page UI",
+      "store": "BS",
+      "feature": "Cart",
+      "reuse": "Shared Core",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24883": {
+      "title": "Increase/decrease/delete the quantity",
+      "store": "BS",
+      "feature": "UI/Other",
+      "reuse": "Shared + Market Config",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24886": {
+      "title": "Verify rewards text as a Guest User",
+      "store": "BS",
+      "feature": "Payment",
+      "reuse": "Shared Skeleton + Market Payment Config",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24892": {
+      "title": "Add SC+ from BC/PDP Page",
+      "store": "BS",
+      "feature": "Product",
+      "reuse": "Shared + Market Config",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24893": {
+      "title": "Verify trade-up cart page",
+      "store": "BS",
+      "feature": "Cart",
+      "reuse": "Shared + Market Config",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24896": {
+      "title": "Cart value when Reg user logs out",
+      "store": "BS",
+      "feature": "Cart",
+      "reuse": "Shared + Market Config",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24898": {
+      "title": "Checkout button on cart page",
+      "store": "BS",
+      "feature": "Checkout",
+      "reuse": "Shared Core",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24899": {
+      "title": "Order Summary on checkout page",
+      "store": "BS",
+      "feature": "Checkout",
+      "reuse": "Shared + Market Config",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24900": {
+      "title": "Step 1: Contact Details Section",
+      "store": "BS",
+      "feature": "Checkout",
+      "reuse": "Shared + Market Config",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24901": {
+      "title": "Add/Edit saved/new address on checkout page",
+      "store": "BS",
+      "feature": "Checkout",
+      "reuse": "Shared Core",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24902": {
+      "title": "Select saved address",
+      "store": "BS",
+      "feature": "Checkout",
+      "reuse": "Shared Core",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24903": {
+      "title": "Save option for reg user",
+      "store": "BS",
+      "feature": "Checkout",
+      "reuse": "Shared Core",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24904": {
+      "title": "Able to checkout with a New address",
+      "store": "BS",
+      "feature": "Checkout",
+      "reuse": "Shared Core",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24905": {
+      "title": "Save option not visible",
+      "store": "BS",
+      "feature": "Checkout",
+      "reuse": "Shared Core",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24909": {
+      "title": "Validate Invalid address details on checkout page",
+      "store": "BS",
+      "feature": "Checkout",
+      "reuse": "Shared + Market Config",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24910": {
+      "title": "Validate switching between delivery modes or saved/new address",
+      "store": "BS",
+      "feature": "Checkout",
+      "reuse": "Shared Core",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24911": {
+      "title": "Verifiy Back to Top",
+      "store": "BS",
+      "feature": "Cart",
+      "reuse": "Shared Core",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24912": {
+      "title": "Payment using credit card with reg user",
+      "store": "BS",
+      "feature": "Payment",
+      "reuse": "Shared Skeleton + Market Payment Config",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24914": {
+      "title": "Payment using ADDI pay",
+      "store": "BS",
+      "feature": "Payment",
+      "reuse": "Market Specific / Review",
+      "status": "BLOCKED_SOURCE"
+    },
+    "SAM-24915": {
+      "title": "Payment using Rewards",
+      "store": "BS",
+      "feature": "Payment",
+      "reuse": "Shared Skeleton + Market Payment Config",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24919": {
+      "title": "Track Order",
+      "store": "BS",
+      "feature": "Order/Backoffice",
+      "reuse": "Shared + Market Config",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24920": {
+      "title": "Backoffice",
+      "store": "BS",
+      "feature": "Order/Backoffice",
+      "reuse": "Shared Core",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24925": {
+      "title": "Mobile Sticky checkout",
+      "store": "BS",
+      "feature": "Checkout",
+      "reuse": "Shared + Market Config",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24929": {
+      "title": "Facets/Filter on PLP",
+      "store": "EPP",
+      "feature": "Product",
+      "reuse": "Shared + Market Config",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24930": {
+      "title": "Able to add to Cart from PDP",
+      "store": "EPP",
+      "feature": "Cart",
+      "reuse": "Shared Core",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24931": {
+      "title": "Cart page UI",
+      "store": "EPP",
+      "feature": "Cart",
+      "reuse": "Shared Core",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24942": {
+      "title": "Step 1: Contact Details Section",
+      "store": "EPP",
+      "feature": "Checkout",
+      "reuse": "Shared + Market Config",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24952": {
+      "title": "Verifiy Back to Top",
+      "store": "EPP",
+      "feature": "Cart",
+      "reuse": "Shared Core",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    },
+    "SAM-24953": {
+      "title": "Payment using credit card with reg user",
+      "store": "EPP",
+      "feature": "Payment",
+      "reuse": "Shared Skeleton + Market Payment Config",
+      "status": "IMPLEMENTATION_CANDIDATE"
+    }
+  }
 }
