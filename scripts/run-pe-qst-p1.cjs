@@ -85,7 +85,7 @@ if (duplicateIds.length) {
 
 const args = [
   playwrightCli, "test", "tests/markets/pe/qst/base-store",
-  "--project=pe-base-store-p1", "--workers=1", "--retries=0",
+  "--project=chromium", "--workers=1", "--retries=0",
   "--grep", p1Pattern,
   "--output", path.join(artifactDir, "playwright"),
 ];
