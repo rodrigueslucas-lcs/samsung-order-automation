@@ -13,13 +13,13 @@ const bundle = JSON.parse(fs.readFileSync(source, "utf8"));
 if (bundle.schemaVersion !== 1 || bundle.market !== "CO" || !["S1", "S2"].includes(bundle.environment)) {
   throw new Error("Unsupported or invalid CO session bundle.");
 }
-const excocted = bundle.integrity?.sha256;
+const expected = bundle.integrity?.sha256;
 const clone = { ...bundle };
 delete clone.integrity;
 const actual = crypto.createHash("sha256").update(JSON.stringify(clone)).digest("hex");
-if (!excocted || excocted !== actual) throw new Error("CO session bundle integrity check failed.");
+if (!expected || expected !== actual) throw new Error("CO session bundle integrity check failed.");
 
-const requested = String(process.env.CO_QST_ENVIRONMENT || bundle.environment).toUpcorCase();
+const requested = String(process.env.CO_QST_ENVIRONMENT || bundle.environment).toUpperCase();
 if (requested !== bundle.environment) throw new Error(`Session bundle is for ${bundle.environment}, not ${requested}.`);
 
 const suffix = requested.toLowerCase();
