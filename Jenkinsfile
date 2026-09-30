@@ -11,14 +11,14 @@ pipeline {
   }
 
   parameters {
-    choice(name: 'MARKET', choices: ['MX', 'PE', 'CL', 'CO'], description: 'SMB market / storefront target. MX is the reference lane; PE S2 is the next stabilization lane. CL/CO are visible roadmap targets and remain runtime-guarded until enabled.')
+    choice(name: 'MARKET', choices: ['MX', 'PE', 'CL', 'CO'], description: 'SMB market / storefront target. MX/PE/CO have official QST lanes. CL remains a roadmap target.')
     choice(name: 'ENVIRONMENT', choices: ['S1', 'S2'], description: 'Target staging environment. S1 = stg, S2 = stg2.')
     choice(name: 'TEST_SUITE', choices: ['fast-guest', 'authenticated-safe', 'official-p1', 'backoffice-safe', 'allure-smoke'], description: 'Execution profile. Functional suites use the shared Executive Dashboard + Playwright + Allure reporting standard.')
     choice(name: 'EXECUTION_MODE', choices: ['safe', 'authorized-destructive'], description: 'Safety mode. Full official-p1 payment/order execution requires authorized-destructive.')
     choice(name: 'BROWSER_MODE', choices: ['headless', 'headed'], description: 'Browser mode. Headless is recommended on Jenkins.')
     choice(name: 'EVIDENCE_MODE', choices: ['screenshots-trace', 'screenshots-trace-video'], description: 'Evidence capture. Video requires FFmpeg on the Jenkins agent.')
     choice(name: 'AUTH_SOURCE', choices: ['session-bundle', 'legacy-files'], description: 'MX authenticated session source. session-bundle is the default and consumes the single ephemeral bundle managed by auth:refresh:mx + auth:publish:jenkins; legacy-files remains available only as a fallback.')
-    string(name: 'P1_TARGET_IDS', defaultValue: '', description: 'Optional MX/PE official-p1 stabilization filter. Comma/space separated active SAM IDs, e.g. SAM-24969,SAM-24991,SAM-25002. Leave empty for the full 29-TC P1.')
+    string(name: 'P1_TARGET_IDS', defaultValue: '', description: 'Optional MX/PE/CO official-p1 stabilization filter. Comma/space separated active SAM IDs, e.g. SAM-24969,SAM-24991,SAM-25002. Leave empty for the full 29-TC P1.')
   }
 
   environment {
@@ -137,6 +137,9 @@ pipeline {
           }
           if (params.MARKET == 'PE' && params.TEST_SUITE != 'official-p1') {
             error('PE phase 1 currently exposes the coverage-aware official-p1 stabilization lane only. FAST/AUTH/BACKOFFICE lanes will be enabled after PE S2 credentials and runtime baselines are proven.')
+          }
+          if (params.MARKET == 'CO' && params.TEST_SUITE != 'official-p1') {
+            error('CO currently exposes the coverage-aware official-p1 lane; EPP remains available from the repository command.')
           }
           if (params.P1_TARGET_IDS?.trim() && (!['MX', 'PE', 'CO'].contains(params.MARKET) || params.TEST_SUITE != 'official-p1')) {
             error('P1_TARGET_IDS is supported only for MX/PE/CO official-p1. Clear the field for other suites/markets.')
