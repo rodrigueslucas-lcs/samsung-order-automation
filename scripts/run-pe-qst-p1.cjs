@@ -85,7 +85,7 @@ if (duplicateIds.length) {
 
 const args = [
   playwrightCli, "test", "tests/markets/pe/qst/base-store",
-  "--project=chromium", "--workers=1", "--retries=0",
+  "--project=pe-base-store-p1", "--workers=1", "--retries=0",
   "--grep", p1Pattern,
   "--output", path.join(artifactDir, "playwright"),
 ];
@@ -134,8 +134,8 @@ if (fs.existsSync(reportFile)) {
   const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
   const titles = Object.fromEntries(implementedTitles.map((title) => [title.match(/SAM-\d+/)?.[0], title]));
   const runtimeSummary = buildMxQstRuntimeSummary(report, {
-    officialIds: PE_BASE_P1_IDS,
-    titles,
+    officialIds: executionIds,
+    titles: Object.fromEntries(executionIds.map((id) => [id, titles[id]])),
     market: "PE",
     store: "BASE_STORE",
     environment: environmentLabel,
