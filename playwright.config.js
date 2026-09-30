@@ -7,7 +7,6 @@ const videoEnabled = process.env.PW_VIDEO === '1';
 const headless = process.env.MX_QST_HEADLESS === '1' ||
   (!!process.env.CI && process.env.MX_QST_HEADLESS !== '0');
 const mxOfficialP1 = process.env.TEST_MARKET === 'MX' && process.env.TEST_SUITE === 'P1/QST';
-const peOfficialP1 = process.env.TEST_MARKET === 'PE' && process.env.TEST_SUITE === 'P1/QST';
 const { MX_BASE_P1_IDS } = mxQstScope;
 const mxActiveP1Pattern = new RegExp(`(?:${MX_BASE_P1_IDS.join('|')})\\b`);
 
@@ -78,17 +77,10 @@ export default defineConfig({
           use: chromiumUse
         }
       ]
-    : peOfficialP1
-      ? [
-          {
-            name: 'pe-base-store-p1',
-            use: chromiumUse
-          }
-        ]
-      : [
-          {
-            name: 'chromium',
-            use: chromiumUse
-          }
-        ]
+    : [
+        {
+          name: 'chromium',
+          use: chromiumUse
+        }
+      ]
 });
