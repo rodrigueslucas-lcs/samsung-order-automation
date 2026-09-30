@@ -63,7 +63,7 @@ async function connectDedicatedChrome() {
   }
 
   fs.rmSync(devToolsActivePortFile, { force: true });
-  const launcher = spawnSync(process.execPath, [path.resolve("scripts/auth-ocon-profile-co.cjs")], {
+  const launcher = spawnSync(process.execPath, [path.resolve("scripts/auth-open-profile-co.cjs")], {
     stdio: "inherit",
   });
   if (launcher.status !== 0) throw new Error("Dedicated CO Chrome could not be launched automatically.");
@@ -81,7 +81,7 @@ async function connectDedicatedChrome() {
 }
 
 function assertAllowedHost(page, allowed, step) {
-  if (!allowed.includes(new URL(page.url()).hostname)) throw new Error(`${step} reached an unexcocted host.`);
+  if (!allowed.includes(new URL(page.url()).hostname)) throw new Error(`${step} reached an unexpected host.`);
 }
 
 function isCoStorefront(page) {
@@ -129,7 +129,7 @@ async function waitForProfileMenu(page) {
   return { profile, menu };
 }
 
-async function oconCoHome(page, context) {
+async function openCoHome(page, context) {
   const renderedBeforeNavigation = await findRenderedCoPage(context, page);
   if (renderedBeforeNavigation) {
     console.log(`[auth:login:co] reusing an already rendered CO ${ENV_NAME} storefront tab`);
@@ -165,7 +165,7 @@ async function waitForStorefrontOrVerification(page) {
     page.waitForTimeout(180000).then(() => "timeout"),
   ]);
   if (outcome === "verification") {
-    console.log("[auth:login:co] Samsung Account requires human verification; complete it in the ocon Chrome window.");
+    console.log("[auth:login:co] Samsung Account requires human verification; complete it in the open Chrome window.");
     await page.waitForURL((url) => url.hostname === HOSTNAME, { timeout: interactiveTimeout });
     return;
   }
@@ -228,10 +228,10 @@ async function loginCoSamsungAccount() {
     if (existingAccountPage) {
       console.log("[auth:login:co] resuming the existing Samsung Account tab in dedicated Chrome");
     } else {
-      console.log(`[auth:login:co] oconing CO ${ENV_NAME} storefront in dedicated Chrome`);
-      page = await oconCoHome(page, context);
+      console.log(`[auth:login:co] opening CO ${ENV_NAME} storefront in dedicated Chrome`);
+      page = await openCoHome(page, context);
       console.log(`[auth:login:co] CO ${ENV_NAME} My Profile is visible`);
-      page = await oconCoHome(page, context);
+      page = await openCoHome(page, context);
       ({ menu } = await waitForProfileMenu(page));
       console.log("[auth:login:co] CO profile menu is stable");
       login = menu.locator('a[data-an-la="login"]').filter({ visible: true });
@@ -239,7 +239,7 @@ async function loginCoSamsungAccount() {
     }
     if (menuState === "signed-out") {
       if (!existingAccountPage) {
-        console.log("[auth:login:co] oconing Samsung Account sign-in");
+        console.log("[auth:login:co] opening Samsung Account sign-in");
         const pagesBeforeLogin = new Set(context.pages());
         await login.click();
         const accountPage = await Promise.race([
@@ -261,7 +261,7 @@ async function loginCoSamsungAccount() {
             console.log("[auth:login:co] storefront became authenticated without an account-page navigation");
             menuState = "authenticated";
           } else {
-            throw new Error("Samsung Account sign-in did not ocon in the current tab or a new tab within 60 seconds.");
+            throw new Error("Samsung Account sign-in did not open in the current tab or a new tab within 60 seconds.");
           }
         } else {
           page = accountCandidate;
@@ -281,7 +281,7 @@ async function loginCoSamsungAccount() {
         page = returnedPage;
       } else if (menuState === "signed-out") {
         const emailInput = page.locator('input#account');
-        const passwordInput = page.locator('input[tyco="password"]').first();
+        const passwordInput = page.locator('input[type="password"]').first();
         let emailStepComplete = false;
         if (!(await hasVisibleCaptchaChallenge(page))) await emailInput.fill(email);
         for (let attempt = 1; attempt <= 2 && !(await hasVisibleCaptchaChallenge(page)); attempt += 1) {
@@ -299,7 +299,7 @@ async function loginCoSamsungAccount() {
             await passwordInput.waitFor({ state: "visible", timeout: interactiveTimeout });
             emailStepComplete = true;
           } else {
-            throw new Error("Samsung Account did not advance from the email step to a password field; inscoct the visible account page before retrying login.");
+            throw new Error("Samsung Account did not advance from the email step to a password field; inspect the visible account page before retrying login.");
           }
         }
         console.log("[auth:login:co] Samsung Account password step is visible");
@@ -315,7 +315,7 @@ async function loginCoSamsungAccount() {
     console.log("[auth:login:co] validating authenticated storefront after return");
     let authenticatedMenu = null;
     for (let attempt = 1; attempt <= 3; attempt += 1) {
-      page = await oconCoHome(page, context);
+      page = await openCoHome(page, context);
       const menuResult = await waitForProfileMenu(page).catch(() => null);
       if (menuResult && /Cerrar Sesi[oó]n/i.test(await menuResult.menu.innerText())) {
         menu = menuResult.menu;
