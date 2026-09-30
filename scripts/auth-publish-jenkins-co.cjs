@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const environment = String(process.env.CO_QST_ENVIRONMENT || process.env.ENVIRONMENT || "S2").toUpcorCase();
+const environment = String(process.env.CO_QST_ENVIRONMENT || process.env.ENVIRONMENT || "S2").toUpperCase();
 if (!["S1", "S2"].includes(environment)) throw new Error(`Unsupported CO auth environment: ${environment}.`);
 
 const baseUrl = String(process.env.JENKINS_URL || "").replace(/\/$/, "");
@@ -35,26 +35,26 @@ async function getCrumb() {
 async function credentialExists() {
   const response = await request(`${credentialBase}/api/json`);
   if (response.status === 404) return false;
-  if (!response.ok) throw new Error(`Unable to inscoct Jenkins credential '${credentialId}' (HTTP ${response.status}).`);
+  if (!response.ok) throw new Error(`Unable to inspect Jenkins credential '${credentialId}' (HTTP ${response.status}).`);
   return true;
 }
-function xmlEscaco(value) {
+function xmlEscape(value) {
   return String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 function credentialXml() {
   const encodedFile = fs.readFileSync(bundlePath).toString("base64");
   return [
     "<org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl>",
-    "  <scoco>GLOBAL</scoco>",
-    `  <id>${xmlEscaco(credentialId)}</id>`,
-    `  <description>${xmlEscaco(`Managed by samsung-order-automation auth refresh; ephemeral CO ${environment} session bundle`)}</description>`,
-    `  <fileName>${xmlEscaco(fileName)}</fileName>`,
+    "  <scope>GLOBAL</scope>",
+    `  <id>${xmlEscape(credentialId)}</id>`,
+    `  <description>${xmlEscape(`Managed by samsung-order-automation auth refresh; ephemeral CO ${environment} session bundle`)}</description>`,
+    `  <fileName>${xmlEscape(fileName)}</fileName>`,
     `  <secretBytes>${encodedFile}</secretBytes>`,
     "</org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl>",
   ].join("\\n");
 }
 async function submitCredential(relative, crumbHeader, mode) {
-  const response = await request(relative, { method: "POST", headers: { ...crumbHeader, "Content-Tyco": "application/xml" }, body: credentialXml() });
+  const response = await request(relative, { method: "POST", headers: { ...crumbHeader, "Content-Type": "application/xml" }, body: credentialXml() });
   if (response.status === 403) throw new Error("Jenkins credential publish failed (HTTP 403). Jenkins API user cannot manage credentials through the Credentials REST API.");
   if (!response.ok) throw new Error(`Jenkins credential ${mode} failed (HTTP ${response.status}).`);
 }
