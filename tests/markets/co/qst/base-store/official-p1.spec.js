@@ -4,11 +4,14 @@ import coConfigModule from "../../../../../config/markets/co";
 import evidenceContext from "../../../../../reporting/evidence/evidenceContext";
 import coEvidenceMetadata from "../../../../../utils/qstCoEvidenceMetadata";
 import coAuthStateModule from "../../../../../utils/coAuthState";
+import BackOfficeOrderPage from "../../../../../pages/BackOfficeOrderPage";
+import backofficeCredentials from "../../../../../utils/backofficeAdminCredentials.js";
 import { addConfiguredProductToCoCart, bootstrapCoStorefront } from "./coQstFlows";
 const {getCoQstConfig}=coConfigModule;
 const {recordBusinessEvidence}=evidenceContext;
 const {getCoQstEvidenceMetadata}=coEvidenceMetadata;
 const {CO_AUTH_STATE_PATH,getCoAuthState,hasCoAuthState}=coAuthStateModule;
+const {getBackOfficeAdminCredentials}=backofficeCredentials;
 const productCases=new Set(["SAM-24880","SAM-24882","SAM-24883","SAM-24886","SAM-24892","SAM-24893","SAM-24896","SAM-24898","SAM-24899","SAM-24900","SAM-24901","SAM-24902","SAM-24903","SAM-24904","SAM-24905","SAM-24909","SAM-24910","SAM-24911","SAM-24912","SAM-24915","SAM-24919","SAM-24920","SAM-24925"]);
 function evidence(info,id){recordBusinessEvidence(info,getCoQstEvidenceMetadata(id));}
 async function home(page,cfg){await bootstrapCoStorefront(page,cfg);await page.goto(cfg.baseUrl.href,{waitUntil:"domcontentloaded"});await expect(page.getByRole("button",{name:"My Profile",exact:true})).toBeVisible({timeout:60000});}
@@ -20,7 +23,9 @@ test("SAM-24873 @qst @co @base-store @registered - Login Home page",async({brows
 test("SAM-24874 @qst @co @base-store @registered - Validate My account menu",async({browser},i)=>{evidence(i,"SAM-24874");const c=getCoQstConfig();const {context,page}=await authenticatedPage(browser,c);await page.getByRole("button",{name:"My Profile",exact:true}).hover();for(const x of [/My page|Mi p[aá]gina/i,/My Orders|Mis pedidos/i,/Wishlist|Lista de deseos/i,/Cerrar Sesi[oó]n/i]) await expect(page.getByText(x).filter({visible:true}).first()).toBeVisible({timeout:30000});await context.close();});
 test("SAM-24875 @qst @co @base-store @safe - GNB menu",async({page},i)=>{evidence(i,"SAM-24875");const c=getCoQstConfig();await home(page,c);await expect(page.locator("header").first()).toBeVisible();await expect(page.locator("header a").first()).toBeVisible();});
 test("SAM-24879 @qst @co @base-store @safe - Facets Filter on PLP",async({page},i)=>{evidence(i,"SAM-24879");const c=getCoQstConfig();await home(page,c);const nav=page.getByRole("link",{name:/Galaxy|Smartphone|TV|Televisores/i}).filter({visible:true}).first();await nav.click();await expect(page.getByText(/Filtrar|Filtro|Filter/i).filter({visible:true}).first()).toBeVisible({timeout:60000});});
-async function runCanonicalCase(id,page,info){evidence(info,id);const cfg=getCoQstConfig();const c=await cart(page,cfg);
+async function runCanonicalCase(id,page,info){evidence(info,id);const cfg=getCoQstConfig();
+if(id==="SAM-24920"){process.env.BACKOFFICE_ENV=cfg.environment.toLowerCase();const credentials=getBackOfficeAdminCredentials();test.skip(!credentials.password,"Shared environment-scoped BackOffice credentials are required.");const orders=new BackOfficeOrderPage(page);await orders.login({...credentials,authority:"admin"});await orders.openAdminOrders();const order=await orders.openFirstAdminOrderAndReadStatus();expect(order.orderCode).toBeTruthy();expect(order.status).toBeTruthy();return;}
+const c=await cart(page,cfg);
 if(id==="SAM-24882"){await c.validateCartPage();await c.validateOrderSummary();await c.validateCartFooter();return;}
 if(id==="SAM-24883"){await c.validateQuantityCanChange();return;}
 if(id==="SAM-24886"){await expect(page.getByText(/Samsung Rewards|Rewards|puntos/i).filter({visible:true}).first()).toBeVisible({timeout:30000});return;}
