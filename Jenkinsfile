@@ -132,6 +132,9 @@ pipeline {
           if (params.MARKET == 'CL') {
             error('CL is exposed as a regional roadmap target but is not runtime-enabled yet.')
           }
+          if (params.MARKET == 'CO' && params.ENVIRONMENT != 'S2') {
+            error('CO official QST is currently limited to S2/STG2, matching the supplied Samsung QST source and WMC route.')
+          }
           if (params.MARKET == 'PE' && params.ENVIRONMENT != 'S2') {
             error('PE phase 1 is intentionally limited to S2/STG2 while the existing PE QST automation is stabilized.')
           }
@@ -345,18 +348,24 @@ pipeline {
             if (params.MARKET == 'CO') {
               env.CO_SESSION_BUNDLE_CREDENTIAL = "samsung-co-${params.ENVIRONMENT.toLowerCase()}-session-bundle"
               withCredentials([
-                file(credentialsId: env.CO_SESSION_BUNDLE_CREDENTIAL, variable: 'CO_SESSION_BUNDLE')
+                file(credentialsId: env.CO_SESSION_BUNDLE_CREDENTIAL, variable: 'CO_SESSION_BUNDLE'),
+                file(credentialsId: 'samsung-mx-s2-backoffice-admin', variable: 'CO_BACKOFFICE_ADMIN_SECRET')
               ]) {
                 if (isUnix()) {
                   sh '''
                     set -eu
                     npm run auth:install:co
+                    mkdir -p playwright/.auth
+                    cp "$CO_BACKOFFICE_ADMIN_SECRET" playwright/.auth/backoffice-admin-s2.json
+                    chmod 600 playwright/.auth/backoffice-admin-s2.json || true
                     CI=1 npm run auth:verify:co
                     npx -y node@22 scripts/run-co-qst-p1.cjs
                   '''
                 } else {
                   bat '''@echo off
                     call npm run auth:install:co || exit /b 2
+                    if not exist playwright\\.auth mkdir playwright\\.auth
+                    copy /Y "%CO_BACKOFFICE_ADMIN_SECRET%" "playwright\\.auth\\backoffice-admin-s2.json" >nul || exit /b 2
                     set CI=1
                     call npm run auth:verify:co || exit /b 20
                     call npx -y node@22 scripts/run-co-qst-p1.cjs
