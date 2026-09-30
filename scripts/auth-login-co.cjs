@@ -18,7 +18,6 @@ const authDir = path.resolve("playwright/.auth");
 const authFile = path.join(authDir, `co-${ENV_SUFFIX}-user.json`);
 const sessionStorageFile = path.join(authDir, `co-${ENV_SUFFIX}-session-storage.json`);
 const devToolsActivePortFile = path.join(profileDir, "DevToolsActivePort");
-const sharedPreQaCdpPort = ENV_NAME === "S2" ? 9223 : null;
 const interactiveTimeout = Number(process.env.CO_AUTH_INTERACTIVE_TIMEOUT_MS || 600000);
 const manualLogin = process.env.CO_AUTH_MANUAL === "1";
 
@@ -57,14 +56,6 @@ function readDevToolsPort() {
 }
 
 async function connectDedicatedChrome() {
-  if (sharedPreQaCdpPort) {
-    const shared = await chromium.connectOverCDP(`http://127.0.0.1:${sharedPreQaCdpPort}`).catch(() => null);
-    if (shared) {
-      console.log("[auth:login:co] reusing shared PreQA Chrome on CDP 9223");
-      return shared;
-    }
-  }
-
   const existingPort = readDevToolsPort();
   if (existingPort) {
     const existing = await chromium.connectOverCDP(`http://127.0.0.1:${existingPort}`).catch(() => null);
@@ -79,7 +70,7 @@ async function connectDedicatedChrome() {
 
   const deadline = Date.now() + 30000;
   while (Date.now() < deadline) {
-    const port = sharedPreQaCdpPort || readDevToolsPort();
+    const port = readDevToolsPort();
     if (port) {
       const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`).catch(() => null);
       if (browser) return browser;
