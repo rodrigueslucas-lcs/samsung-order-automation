@@ -9,7 +9,7 @@ const listOnly = process.argv.includes("--list");
 const config = getCoQstConfig();
 const root = path.resolve("tests/markets/co/qst/base-store");
 const official = architecture.markets.CO.cases.filter((item) => item.store === "BS");
-if (official.length !== 28) throw new Error(`CO Base Store inventory drift: expected 28 official IDs, found ${official.length}.`);
+if (official.length !== 29) throw new Error(`CO Base Store inventory drift: expected 29 official IDs, found ${official.length}.`);
 const ids = official.map(({id}) => id).sort();
 const requested = String(process.env.CO_QST_TARGET_IDS || "").split(",").map(v=>v.trim().toUpperCase()).filter(Boolean);
 const unknown = requested.filter(id=>!ids.includes(id));
