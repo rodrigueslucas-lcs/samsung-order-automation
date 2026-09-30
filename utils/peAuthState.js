@@ -28,6 +28,7 @@ function getPeAuthState(environment = process.env) {
     profileMenuTrigger: "hover",
     logoutTextName: /Cerrar Sesi[oó]n/i,
     authenticatedMenuSelector: '[role="menu"].profile-menu',
+    profileMenuReadySelector: '[role="menu"].profile-menu:not(.mat-menu-panel-animating)',
   });
 }
 
