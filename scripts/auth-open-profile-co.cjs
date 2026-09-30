@@ -5,14 +5,20 @@ const { getCoQstConfig } = require("../config/markets/co");
 
 const config = getCoQstConfig();
 const envSuffix = config.environment.toLowerCase();
-const profileDir = path.resolve(`playwright/profiles/${envSuffix}-co-qa`);
+const sharedPreQaProfile = process.env.LOCALAPPDATA
+  ? path.join(process.env.LOCALAPPDATA, "Google", "Chrome", "User Data")
+  : null;
+const profileDir = config.environment === "S2" && sharedPreQaProfile
+  ? sharedPreQaProfile
+  : path.resolve(`playwright/profiles/${envSuffix}-co-qa`);
 const launchUrl = config.setupUrl?.href || config.baseUrl.href;
 
 fs.mkdirSync(profileDir, { recursive: true });
 
 const chromeArguments = [
   `--user-data-dir=${profileDir}`,
-  "--remote-debugging-port=0",
+  "--profile-directory=Default",
+  "--remote-debugging-port=9223",
   "--disable-background-mode",
   "--start-maximized",
   launchUrl,
@@ -48,7 +54,7 @@ chrome.once("error", (error) => {
 
 chrome.once("spawn", () => {
   chrome.unref();
-  console.log(`A maximized Chrome window was opened with the dedicated ${config.environment} CO QA profile.`);
+  console.log(`A maximized Chrome window was opened with the shared ${config.environment} PreQA Chrome profile.`);
   console.log("");
   console.log("Complete these steps manually:");
   if (config.setupUrl) {
