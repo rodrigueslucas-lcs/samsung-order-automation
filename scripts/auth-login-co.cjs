@@ -20,6 +20,8 @@ const sessionStorageFile = path.join(authDir, `co-${ENV_SUFFIX}-session-storage.
 const devToolsActivePortFile = path.join(profileDir, "DevToolsActivePort");
 const interactiveTimeout = Number(process.env.CO_AUTH_INTERACTIVE_TIMEOUT_MS || 600000);
 const manualLogin = process.env.CO_AUTH_MANUAL === "1";
+const preQa2CdpUrl = process.env.PREQA2_CDP_URL || "http://127.0.0.1:9223";
+const preQa2ExcludedParentCookies = /^spr-chat|^_ga|^visit_count|^AMCV|^kndctr|^_ba_|^_cl|^mbox|^_gcl|^_fbp|^cto_bundle|^s_sq|^s_ecid|^s_fpid|^FPAU|^_uetvid|^pv$|^(mx-cart|pe-cart)$/;
 
 const localCredentialsFile = [
   path.join(authDir, "samsung-storefront-user.json"),
@@ -189,7 +191,11 @@ async function exportAuthenticatedState(context, page) {
   const coState = {
     cookies: fullState.cookies.filter((cookie) => {
       const domain = cookie.domain.replace(/^\./, "");
-      return domain === HOSTNAME || domain === API_HOSTNAME || cookie.domain === ".samsung.com";
+      return domain === HOSTNAME || domain === API_HOSTNAME ||
+        (HOSTNAME === "p6-pre-qa2.samsung.com" &&
+          ["wds.samsung.com", "sts.secsso.net", "account.samsung.com"].includes(domain)) ||
+        (cookie.domain === ".samsung.com" &&
+          (HOSTNAME !== "p6-pre-qa2.samsung.com" || !preQa2ExcludedParentCookies.test(cookie.name)));
     }),
     origins: fullState.origins.filter(({ origin }) => new URL(origin).hostname === HOSTNAME),
   };
@@ -205,6 +211,71 @@ async function exportAuthenticatedState(context, page) {
   fs.mkdirSync(authDir, { recursive: true });
   writeJsonSecurely(authFile, coState);
   writeJsonSecurely(sessionStorageFile, sessionStorage);
+}
+
+async function findAuthenticatedPreQaCoPage(context) {
+  for (const page of context.pages().slice().reverse()) {
+    if (!isCoStorefront(page)) continue;
+    const profile = page.locator("button.nv00-gnb-v4__utility-user").filter({ visible: true }).first();
+    if (!(await profile.isVisible().catch(() => false))) continue;
+    const logout = page.getByText(/Cerrar Sesi[oó]n/i).filter({ visible: true }).first();
+    if (!(await logout.isVisible().catch(() => false))) await profile.click();
+    if (await logout.isVisible().catch(() => false)) return page;
+  }
+  return null;
+}
+
+async function loginCoPreQa2SharedChrome() {
+  let browser;
+  try {
+    browser = await chromium.connectOverCDP(preQa2CdpUrl);
+  } catch {
+    throw new Error(`PreQA2 shared Chrome is unavailable at ${preQa2CdpUrl}. Open the WMC-authenticated Chrome before refreshing CO S2.`);
+  }
+  let temporaryPage;
+  try {
+    const context = browser.contexts()[0];
+    if (!context) throw new Error("PreQA2 shared Chrome has no browser context.");
+    console.log(`[auth:login:co] reusing the WMC-authenticated PreQA2 Chrome at ${preQa2CdpUrl}`);
+    let page = await findAuthenticatedPreQaCoPage(context);
+    if (!page) {
+      const existingCoPage = context.pages().find((candidate) => isCoStorefront(candidate));
+      page = existingCoPage || await context.newPage();
+      if (!existingCoPage) {
+        temporaryPage = page;
+        await page.goto(homeUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+      }
+      if (!isCoStorefront(page)) {
+        throw new Error(`CO S2 did not reach ${HOSTNAME}/co/. Complete WMC → Samsung Employees → AD SSO Login → QA / PreQA2 in the shared Chrome.`);
+      }
+      const profile = page.locator("button.nv00-gnb-v4__utility-user").filter({ visible: true }).first();
+      await profile.waitFor({ state: "visible", timeout: 30000 });
+      await profile.click();
+      const login = page.locator("a.loginBtn").filter({ visible: true }).first();
+      if (!(await login.isVisible().catch(() => false))) {
+        throw new Error("CO PreQA2 account menu has neither authenticated logout nor a visible sign-in action.");
+      }
+      await login.click();
+      console.log("[auth:login:co] Complete Samsung Account login/CAPTCHA/MFA in the shared Chrome; waiting for the authenticated CO return.");
+      const deadline = Date.now() + interactiveTimeout;
+      let authenticatedPage = null;
+      while (Date.now() < deadline && !authenticatedPage) {
+        authenticatedPage = await findAuthenticatedPreQaCoPage(context);
+        if (!authenticatedPage) await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+      if (!authenticatedPage) {
+        throw new Error("Samsung Account did not return to an authenticated CO PreQA2 storefront within the allowed time.");
+      }
+      page = authenticatedPage;
+    }
+    await exportAuthenticatedState(context, page);
+    console.log("[auth:login:co] authenticated CO S2 state exported from the shared PreQA2 Chrome");
+  } finally {
+    if (temporaryPage) await temporaryPage.close().catch(() => {});
+    // connectOverCDP owns only this client connection; keep the external Chrome
+    // context and every pre-existing tab open for the PreQA2 test campaign.
+    await browser.close().catch(() => {});
+  }
 }
 
 async function loginCoSamsungAccount() {
@@ -341,7 +412,9 @@ async function loginCoSamsungAccount() {
   }
 }
 
-loginCoSamsungAccount().catch((error) => {
+(ENV_NAME === "S2" && HOSTNAME === "p6-pre-qa2.samsung.com"
+  ? loginCoPreQa2SharedChrome()
+  : loginCoSamsungAccount()).catch((error) => {
   const summary = String(error.message || "unknown error").split("\n", 1)[0]
     .replace(/([?&][^=\s]+)=([^&\s]+)/g, "$1=<redacted>");
   console.error(`[auth:login:co] ${error.name}: ${summary}`);

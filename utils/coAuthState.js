@@ -16,19 +16,21 @@ function hasCoAuthState() {
 
 function getCoAuthState(environment = process.env) {
   const config = getCoQstConfig(environment);
+  const preQa2 = config.environment === "S2" && config.baseUrl.hostname === "p6-pre-qa2.samsung.com";
   return createAuthState({
     authStatePath: CO_AUTH_STATE_PATH,
     sessionStoragePath: CO_AUTH_SESSION_STORAGE_PATH,
     hostname: config.baseUrl.hostname,
-    setupUrl: config.setupUrl?.href || null,
+    setupUrl: preQa2 ? null : config.setupUrl?.href || null,
     validationUrl: config.baseUrl.href,
     label: `${config.environment} CO`,
     refreshInstruction:
       `Open the dedicated CO ${config.environment} browser/profile, complete legitimate Samsung login, then export CO auth state. Do not commit auth artifacts.`,
-    profileMenuTrigger: "hover",
+    profileMenuTrigger: preQa2 ? "click" : "hover",
+    profileButtonSelector: preQa2 ? "button.nv00-gnb-v4__utility-user:visible" : null,
     logoutTextName: /Cerrar Sesi[oó]n/i,
-    authenticatedMenuSelector: '[role="menu"].profile-menu',
-    profileMenuReadySelector: '[role="menu"].profile-menu:not(.mat-menu-panel-animating)',
+    authenticatedMenuSelector: preQa2 ? '[role="menu"][aria-label="account"]' : '[role="menu"].profile-menu',
+    profileMenuReadySelector: preQa2 ? '[role="menu"][aria-label="account"][aria-hidden="false"]' : '[role="menu"].profile-menu:not(.mat-menu-panel-animating)',
   });
 }
 

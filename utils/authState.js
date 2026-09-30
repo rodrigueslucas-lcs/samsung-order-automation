@@ -12,6 +12,7 @@ function createAuthState({
   refreshInstruction,
   enforceHostname = true,
   profileMenuTrigger = "click",
+  profileButtonSelector = null,
   logoutLinkName = null,
   logoutTextName = "Cerrar sesión",
   authenticatedMenuSelector = null,
@@ -163,10 +164,9 @@ function createAuthState({
       throw new Error(`Unexpected ${label} authentication host.`);
     }
 
-    const profileButton = page.getByRole("button", {
-      name: "My Profile",
-      exact: true,
-    });
+    const profileButton = profileButtonSelector
+      ? page.locator(profileButtonSelector).filter({ visible: true }).first()
+      : page.getByRole("button", { name: "My Profile", exact: true });
 
     const profileVisible = await profileButton
       .waitFor({ state: "visible", timeout: 60000 })
@@ -174,7 +174,7 @@ function createAuthState({
       .catch(() => false);
     if (!profileVisible) {
       throw new Error(
-        `The saved ${label} storefront access/auth state is not usable; the storefront did not render My Profile. ${AUTH_REFRESH_INSTRUCTION}`
+        `The saved ${label} storefront access/auth state is not usable; the storefront did not render its profile control. ${AUTH_REFRESH_INSTRUCTION}`
       );
     }
     await page.keyboard.press("Escape");
