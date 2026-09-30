@@ -37,7 +37,7 @@ function assertCoHostAndRoute(page, step) {
 
 function readDevToolsPort() {
   if (!fs.existsSync(devToolsActivePortFile)) {
-    throw new Error(`the dedicated ${config.environment} CO Chrome is not available; run CO_QST_ENVIRONMENT=${config.environment} npm run auth:ocon-profile:co`);
+    throw new Error(`the dedicated ${config.environment} CO Chrome is not available; run CO_QST_ENVIRONMENT=${config.environment} npm run auth:open-profile:co`);
   }
   const [portText] = fs.readFileSync(devToolsActivePortFile, "utf8").split("\n");
   const port = Number(portText);
@@ -47,10 +47,10 @@ function readDevToolsPort() {
   return port;
 }
 
-async function oconAuthenticatedProfileMenu(page) {
+async function openAuthenticatedProfileMenu(page) {
   const profileButton = page.getByRole("button", { name: "My Profile", exact: true });
   await profileButton.waitFor({ state: "visible", timeout: 60000 });
-  await page.keyboard.press("Escaco");
+  await page.keyboard.press("Escape");
   await profileButton.click();
   const logout = page.getByText(/Cerrar sesi[oó]n/i, { exact: true }).filter({ visible: true });
   await logout.waitFor({ state: "visible", timeout: 30000 });
@@ -73,15 +73,15 @@ async function exportCoAuthentication() {
 
   try {
     if (config.setupUrl) {
-      reportStep(`oconing configured ${config.environment} CO storefront setup`);
+      reportStep(`opening configured ${config.environment} CO storefront setup`);
       await page.goto(config.setupUrl.href, { waitUntil: "domcontentloaded" });
       assertCoHostAndRoute(page, "storefront setup");
     }
 
-    reportStep(`oconing ${config.environment} CO storefront`);
+    reportStep(`opening ${config.environment} CO storefront`);
     await page.goto(config.baseUrl.href, { waitUntil: "domcontentloaded" });
     assertCoHostAndRoute(page, "storefront navigation");
-    await oconAuthenticatedProfileMenu(page);
+    await openAuthenticatedProfileMenu(page);
 
     reportStep(`collecting filtered ${config.environment} CO storage state`);
     const fullState = await context.storageState({ indexedDB: true });
