@@ -93,7 +93,9 @@
     "auth:refresh:co": "node scripts/auth-refresh-co.cjs",
     "auth:package:co": "node scripts/auth-package-co.cjs",
     "auth:install:co": "node scripts/auth-install-co-package.cjs",
-    "auth:publish:jenkins:co": "node scripts/auth-publish-jenkins-co.cjs"
+    "auth:publish:jenkins:co": "node scripts/auth-publish-jenkins-co.cjs",
+    "qst:co:epp": "playwright test tests/markets/co/qst/epp --project=chromium --workers=1",
+    "qst:co:epp:list": "playwright test tests/markets/co/qst/epp --project=chromium --list --reporter=list"
   },
   "keywords": [
     "playwright",
