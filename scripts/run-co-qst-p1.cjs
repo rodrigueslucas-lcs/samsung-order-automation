@@ -14,7 +14,7 @@ const configEnv = {
   ...process.env,
   CO_QST_ENVIRONMENT: targetEnvironment,
   CO_STOREFRONT_URL: process.env.CO_STOREFRONT_URL || (targetEnvironment === "S2"
-    ? "https://stg2.shop.samsung.com/co/"
+    ? "https://p6-pre-qa2.samsung.com/co/"
     : "https://stg.shop.samsung.com/co/"),
 };
 const config = getCoQstConfig(configEnv);
@@ -155,7 +155,10 @@ if (fs.existsSync(reportFile)) {
   console.log(`\nCO ${targetEnvironment} BASE STORE P1 SUMMARY`);
   console.log(`Official=${runtimeSummary.summary.official} Executed=${runtimeSummary.summary.executed} Passed=${runtimeSummary.summary.passed} Failed=${runtimeSummary.summary.failed} Blocked=${runtimeSummary.summary.blocked} NotRun=${runtimeSummary.summary.notRun}`);
 
-  if (runtimeSummary.summary.notRun > 0 || runtimeSummary.summary.blocked > 0 || runtimeSummary.summary.failed > 0) {
+  const targeted = requestedTargetIds.length > 0;
+  if (runtimeSummary.summary.failed > 0 || runtimeSummary.summary.blocked > 0) {
+    process.exitCode = result.status || 1;
+  } else if (!targeted && runtimeSummary.summary.notRun > 0) {
     process.exitCode = result.status || 1;
   } else {
     process.exitCode = result.status ?? 1;
