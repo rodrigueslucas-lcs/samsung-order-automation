@@ -33,11 +33,15 @@ test.describe("PE QST - registered checkout safe reuse", () => {
     recordBusinessEvidence(testInfo, getPeQstEvidenceMetadata("SAM-25085"));
 
     const auth = getPeAuthState();
-    await auth.validateAuthenticatedSession(page);
-    await page.keyboard.press("Escape");
+    await test.step("Validate authenticated PE storefront session", async () => {
+      await auth.validateAuthenticatedSession(page);
+      await page.keyboard.press("Escape");
+    });
 
     const config = getPeQstConfig();
-    const { checkout } = await reachPeRegisteredDelivery(page, config);
+    const { checkout } = await test.step("Reach registered delivery step", () =>
+      reachPeRegisteredDelivery(page, config)
+    );
     const savedAddressMode = page.getByRole("radio", {
       name: "Dirección guardada",
       exact: true,
@@ -59,8 +63,10 @@ test.describe("PE QST - registered checkout safe reuse", () => {
     recordBusinessEvidence(testInfo, getPeQstEvidenceMetadata("SAM-25086"));
 
     const auth = getPeAuthState();
-    await auth.validateAuthenticatedSession(page);
-    await page.keyboard.press("Escape");
+    await test.step("Validate authenticated PE storefront session", async () => {
+      await auth.validateAuthenticatedSession(page);
+      await page.keyboard.press("Escape");
+    });
 
     const config = getPeQstConfig();
     await reachPeRegisteredDelivery(page, config);
@@ -89,11 +95,15 @@ test.describe("PE QST - registered checkout safe reuse", () => {
     recordBusinessEvidence(testInfo, getPeQstEvidenceMetadata("SAM-25087"));
 
     const auth = getPeAuthState();
-    await auth.validateAuthenticatedSession(page);
-    await page.keyboard.press("Escape");
+    await test.step("Validate authenticated PE storefront session", async () => {
+      await auth.validateAuthenticatedSession(page);
+      await page.keyboard.press("Escape");
+    });
 
     const config = getPeQstConfig();
-    const { checkout } = await reachPeRegisteredDelivery(page, config);
+    const { checkout } = await test.step("Reach registered delivery step", () =>
+      reachPeRegisteredDelivery(page, config)
+    );
     const newAddress = page.getByRole("tabpanel", { name: "Envío", exact: true }).getByRole("radio", {
       name: "Nueva dirección",
       exact: true,
