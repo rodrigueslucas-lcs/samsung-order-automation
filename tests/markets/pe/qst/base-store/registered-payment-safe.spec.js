@@ -33,10 +33,12 @@ test.describe("PE QST - registered payment safe checkpoints", () => {
     await page.keyboard.press("Escape");
 
     const config = getPeQstConfig();
-    const { payment } = await reachPeRegisteredPayment(page, config, {
-      expectedPaymentMode: /Tarjeta de Crédito \/ Débito/i,
+    const { payment } = await test.step("Reach registered payment step", () =>
+      reachPeRegisteredPayment(page, config, { expectedPaymentMode: /Tarjeta de Crédito \/ Débito/i })
+    );
+    await test.step("Validate credit/debit card payment option", async () => {
+      await payment.selectCreditCard();
     });
-    await payment.selectCreditCard();
 
     testInfo.annotations.push({
       type: "qst-reuse-note",
@@ -54,10 +56,12 @@ test.describe("PE QST - registered payment safe checkpoints", () => {
     await page.keyboard.press("Escape");
 
     const config = getPeQstConfig();
-    const { payment } = await reachPeRegisteredPayment(page, config, {
-      expectedPaymentMode: /^Pago Efectivo\b/i,
+    const { payment } = await test.step("Reach registered payment step", () =>
+      reachPeRegisteredPayment(page, config, { expectedPaymentMode: /^Pago Efectivo\b/i })
+    );
+    await test.step("Validate Pago Efectivo payment option", async () => {
+      await payment.selectPagoEfectivo();
     });
-    await payment.selectPagoEfectivo();
 
     testInfo.annotations.push({
       type: "qst-reuse-note",
