@@ -32,7 +32,9 @@ test.describe("PE QST - authenticated safe reuse", () => {
     recordBusinessEvidence(testInfo, getPeQstEvidenceMetadata("SAM-25055"));
 
     const auth = getPeAuthState();
-    await auth.validateAuthenticatedSession(page);
+    await test.step("Validate authenticated PE storefront session", async () => {
+      await auth.validateAuthenticatedSession(page);
+    });
 
     const config = getPeQstConfig();
     const finalUrl = new URL(page.url());
@@ -57,11 +59,15 @@ test.describe("PE QST - authenticated safe reuse", () => {
       origin: config.baseUrl.origin,
       market: "pe",
     });
-    await myOrders.openMyOrders();
-    await expect.poll(() => myOrders.visibleOrderCodes().then((codes) => codes.length), {
+    await test.step("Open My Orders", async () => {
+      await myOrders.openMyOrders();
+    });
+    await test.step("Validate order history is available", async () => {
+      await expect.poll(() => myOrders.visibleOrderCodes().then((codes) => codes.length), {
       timeout: 60000,
       message: "The authenticated PE My Orders page must list an order after loading.",
-    }).toBeGreaterThan(0);
+      }).toBeGreaterThan(0);
+    });
     const orderCodes = await myOrders.visibleOrderCodes();
     testInfo.annotations.push({
       type: "qst-order-history-count",
