@@ -29,8 +29,10 @@ test.describe("PE QST - registered payment safe checkpoints", () => {
     recordBusinessEvidence(testInfo, getPeQstEvidenceMetadata("SAM-25095"));
 
     const auth = getPeAuthState();
-    await auth.validateAuthenticatedSession(page);
-    await page.keyboard.press("Escape");
+    await test.step("Validate authenticated PE storefront session", async () => {
+      await auth.validateAuthenticatedSession(page);
+      await page.keyboard.press("Escape");
+    });
 
     const config = getPeQstConfig();
     const { payment } = await test.step("Reach registered payment step", () =>
@@ -52,8 +54,10 @@ test.describe("PE QST - registered payment safe checkpoints", () => {
     recordBusinessEvidence(testInfo, getPeQstEvidenceMetadata("SAM-25096"));
 
     const auth = getPeAuthState();
-    await auth.validateAuthenticatedSession(page);
-    await page.keyboard.press("Escape");
+    await test.step("Validate authenticated PE storefront session", async () => {
+      await auth.validateAuthenticatedSession(page);
+      await page.keyboard.press("Escape");
+    });
 
     const config = getPeQstConfig();
     const { payment } = await test.step("Reach registered payment step", () =>
