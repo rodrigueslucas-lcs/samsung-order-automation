@@ -150,9 +150,7 @@ test.describe("PE QST - official safe gap reconciliation", () => {
     requirePaymentSubmitOptIn();
     evidence(testInfo, "SAM-25099");
     const cfg = config();
-    const { payment } = await test.step("Reach guest Internet Banking payment step", () =>
-      reachPeGuestPayment(page, cfg, { expectedPaymentMode: /^Banca por Internet\b/i })
-    );
+    const { payment } = await reachPeGuestPayment(page, cfg, { expectedPaymentMode: /^Banca por Internet\b/i });
     await test.step("Select Internet Banking", async () => {
       await payment.selectBancaPorInternet();
     });
