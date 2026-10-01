@@ -26,7 +26,9 @@ test.describe("PE QST - official safe gap reconciliation", () => {
   test("SAM-25065 @qst @pe @base-store @safe - Verify rewards as a rewards user baseline", async ({ page }, testInfo) => {
     evidence(testInfo, "SAM-25065");
     const cfg = config();
-    const cart = await addConfiguredProductToPeCart(page, cfg);
+    const cart = await test.step("Prepare PE cart with controlled product", () =>
+      addConfiguredProductToPeCart(page, cfg)
+    );
     const rewards = page.getByText(/Samsung Rewards|Rewards|puntos/i).filter({ visible: true });
     await expect(rewards.first()).toBeVisible({ timeout: 30000 });
     await cart.proceedToCheckout();
@@ -59,17 +61,25 @@ test.describe("PE QST - official safe gap reconciliation", () => {
   test("SAM-25075 @qst @pe @base-store @safe - Verify Trade-in on cart page", async ({ page }, testInfo) => {
     evidence(testInfo, "SAM-25075");
     const cfg = config();
-    const cart = await addConfiguredProductToPeCart(page, cfg);
-    await cart.openTradeInJourney();
-    await cart.completeTradeInJourney();
-    await cart.validateTradeInAdded();
-    await cart.validateTradeInSummaryAmount();
+    const cart = await test.step("Prepare PE cart with controlled product", () =>
+      addConfiguredProductToPeCart(page, cfg)
+    );
+    await test.step("Open and complete Trade-in journey", async () => {
+      await cart.openTradeInJourney();
+      await cart.completeTradeInJourney();
+    });
+    await test.step("Validate Trade-in was added to cart", async () => {
+      await cart.validateTradeInAdded();
+      await cart.validateTradeInSummaryAmount();
+    });
   });
 
   test("SAM-25076 @qst @pe @base-store @safe - Verify Trade-up on cart page", async ({ page }, testInfo) => {
     evidence(testInfo, "SAM-25076");
     const cfg = config();
-    const cart = await addConfiguredProductToPeCart(page, cfg);
+    const cart = await test.step("Prepare PE cart with controlled product", () =>
+      addConfiguredProductToPeCart(page, cfg)
+    );
     await cart.validateCartPage();
     await cart.validateProductInCart();
 
@@ -101,9 +111,15 @@ test.describe("PE QST - official safe gap reconciliation", () => {
     requirePaymentSubmitOptIn();
     evidence(testInfo, "SAM-25099");
     const cfg = config();
-    const { payment } = await reachPeGuestPayment(page, cfg, { expectedPaymentMode: /^Banca por Internet\b/i });
-    await payment.selectBancaPorInternet();
-    const result = await payment.submitSelectedPaymentMode();
+    const { payment } = await test.step("Reach guest Internet Banking payment step", () =>
+      reachPeGuestPayment(page, cfg, { expectedPaymentMode: /^Banca por Internet\b/i })
+    );
+    await test.step("Select Internet Banking", async () => {
+      await payment.selectBancaPorInternet();
+    });
+    const result = await test.step("Submit authorized payment", () =>
+      payment.submitSelectedPaymentMode()
+    );
     expect(result.orderCode, `Authorized PE order submit produced no observable order code. Outcome: ${result.type}`).toMatch(/^PE\d{6}-\d{8}(?:_\d+)?$/i);
 
     if (/confirmation|confirmacion|order-confirmation|checkout\/order|success/i.test(page.url())) {
