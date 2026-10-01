@@ -70,7 +70,9 @@ test("SAM-25061 @qst @pe @base-store @safe @reuse - Able to add to Cart from PDP
   const config = requirePeProductConfig();
   recordOfficialEvidence(testInfo, "SAM-25061");
 
-  const cart = await addConfiguredProductToPeCart(page, config);
+  const cart = await test.step("Prepare PE cart with controlled product", () =>
+    addConfiguredProductToPeCart(page, config)
+  );
   await cart.validateProductInCart();
 
   testInfo.annotations.push({
@@ -84,7 +86,9 @@ test("SAM-25062 @qst @pe @base-store @safe @reuse - Cart page UI baseline", asyn
   const config = requirePeProductConfig();
   recordOfficialEvidence(testInfo, "SAM-25062");
 
-  const cart = await addConfiguredProductToPeCart(page, config);
+  const cart = await test.step("Prepare PE cart with controlled product", () =>
+    addConfiguredProductToPeCart(page, config)
+  );
   await cart.validateProductInCart();
   await validateCartItemPresentation(page, {
     sku: config.sku,
@@ -112,7 +116,9 @@ test("SAM-25064 @qst @pe @base-store @safe @reuse - Order Summary on cart page b
   const config = requirePeProductConfig();
   recordOfficialEvidence(testInfo, "SAM-25064");
 
-  const cart = await addConfiguredProductToPeCart(page, config);
+  const cart = await test.step("Prepare PE cart with controlled product", () =>
+    addConfiguredProductToPeCart(page, config)
+  );
   const summary = await cart.validateOrderSummary();
   expect(summary.subtotal).toBeTruthy();
   expect(summary.total).toBeTruthy();
@@ -128,7 +134,9 @@ test("SAM-25081 @qst @pe @base-store @safe @reuse - Checkout button on cart page
   const config = requirePeProductConfig();
   recordOfficialEvidence(testInfo, "SAM-25081");
 
-  const cart = await addConfiguredProductToPeCart(page, config);
+  const cart = await test.step("Prepare PE cart with controlled product", () =>
+    addConfiguredProductToPeCart(page, config)
+  );
   await cart.validateCheckoutButton();
   await cart.proceedToCheckout();
 });
@@ -138,7 +146,9 @@ test("SAM-25080 @qst @pe @base-store @safe @reuse - Login from Checkout page", a
   const config = requirePeProductConfig();
   recordOfficialEvidence(testInfo, "SAM-25080");
 
-  const cart = await addConfiguredProductToPeCart(page, config);
+  const cart = await test.step("Prepare PE cart with controlled product", () =>
+    addConfiguredProductToPeCart(page, config)
+  );
   await cart.proceedToCheckout();
   const guestLogin = new GuestLoginPage(page);
   await guestLogin.openRegisteredLoginFromCheckout();
@@ -155,7 +165,7 @@ test("SAM-25088 @qst @pe @base-store @safe @guest @reuse - Save option not visib
   const config = requirePeProductConfig();
   recordOfficialEvidence(testInfo, "SAM-25088");
 
-  await reachPeGuestDelivery(page, config);
+  await test.step("Reach guest delivery step", () => reachPeGuestDelivery(page, config));
   const saveAddress = page
     .getByRole("checkbox", { name: /Guardar datos de env[ií]o en Mi cuenta/i })
     .filter({ visible: true });
@@ -167,7 +177,9 @@ test("SAM-25089 @qst @pe @base-store @safe @guest @reuse - Different billing and
   const config = requirePeProductConfig();
   recordOfficialEvidence(testInfo, "SAM-25089");
 
-  const { checkout } = await reachPeGuestDelivery(page, config);
+  const { checkout } = await test.step("Reach guest delivery step", () =>
+    reachPeGuestDelivery(page, config)
+  );
   await checkout.fillAddress(testData.address);
   await checkout.validateDifferentBillingAddress(testData.billingAddress);
 
@@ -182,7 +194,9 @@ test("SAM-25090 @qst @pe @base-store @safe @guest @reuse - Validate home deliver
   const config = requirePeProductConfig();
   recordOfficialEvidence(testInfo, "SAM-25090");
 
-  const { checkout } = await reachPeGuestDelivery(page, config);
+  const { checkout } = await test.step("Reach guest delivery step", () =>
+    reachPeGuestDelivery(page, config)
+  );
   await checkout.fillAddress(testData.address);
   const delivery = page.getByRole("listitem").filter({ hasText: /Para envíos a provincias/i });
   await expect(delivery).toBeVisible({ timeout: 30000 });
