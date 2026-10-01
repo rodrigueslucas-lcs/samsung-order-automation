@@ -39,9 +39,7 @@ test.describe("PE QST - registered checkout safe reuse", () => {
     });
 
     const config = getPeQstConfig();
-    const { checkout } = await test.step("Reach registered delivery step", () =>
-      reachPeRegisteredDelivery(page, config)
-    );
+    const { checkout } = await reachPeRegisteredDelivery(page, config);
     const savedAddressMode = page.getByRole("radio", {
       name: "Dirección guardada",
       exact: true,
@@ -71,9 +69,7 @@ test.describe("PE QST - registered checkout safe reuse", () => {
     });
 
     const config = getPeQstConfig();
-    await test.step("Reach registered delivery step", () =>
-      reachPeRegisteredDelivery(page, config)
-    );
+    await reachPeRegisteredDelivery(page, config);
 
     const newAddress = page.getByRole("tabpanel", { name: "Envío", exact: true }).getByRole("radio", {
       name: "Nueva dirección",
@@ -109,9 +105,7 @@ test.describe("PE QST - registered checkout safe reuse", () => {
     });
 
     const config = getPeQstConfig();
-    const { checkout } = await test.step("Reach registered delivery step", () =>
-      reachPeRegisteredDelivery(page, config)
-    );
+    const { checkout } = await reachPeRegisteredDelivery(page, config);
     const newAddress = page.getByRole("tabpanel", { name: "Envío", exact: true }).getByRole("radio", {
       name: "Nueva dirección",
       exact: true,
