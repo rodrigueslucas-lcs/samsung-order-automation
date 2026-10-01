@@ -35,9 +35,7 @@ test.describe("PE QST - registered payment safe checkpoints", () => {
     });
 
     const config = getPeQstConfig();
-    const { payment } = await test.step("Reach registered payment step", () =>
-      reachPeRegisteredPayment(page, config, { expectedPaymentMode: /Tarjeta de Crédito \/ Débito/i })
-    );
+    const { payment } = await reachPeRegisteredPayment(page, config, { expectedPaymentMode: /Tarjeta de Crédito \/ Débito/i });
     await test.step("Validate credit/debit card payment option", async () => {
       await payment.selectCreditCard();
     });
