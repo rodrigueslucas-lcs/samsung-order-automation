@@ -28,22 +28,7 @@ const peAuthenticatedPriorityFiles = [
   '**/markets/pe/qst/base-store/*registered*.spec.js',
 ];
 
-// Keep capture at the browser-context level. Project-level "use" replaces the
-// inherited config object in practice for these campaign projects, which left
-// PE/MX evidence contexts without the global screenshot/video/trace settings.
-const evidenceUse = {
-  headless,
-  channel: videoEnabled ? undefined : 'chrome',
-  viewport: { width: 1440, height: 900 },
-  screenshot: 'on',
-  video: videoEnabled
-    ? { mode: 'on', size: { width: 1280, height: 800 } }
-    : 'off',
-  trace: 'retain-on-failure',
-  actionTimeout: 15000,
-  navigationTimeout: 60000
-};
-const chromiumUse = { ...devices['Desktop Chrome'], ...evidenceUse };
+const chromiumUse = { ...devices['Desktop Chrome'] };
 
 export default defineConfig({
   testDir: './tests',
@@ -71,7 +56,18 @@ export default defineConfig({
     }]
   ],
 
-  use: evidenceUse,
+  use: {
+    headless,
+    channel: videoEnabled ? undefined : 'chrome',
+    viewport: { width: 1440, height: 900 },
+    screenshot: 'on',
+    video: videoEnabled
+      ? { mode: 'on', size: { width: 1280, height: 800 } }
+      : 'off',
+    trace: 'retain-on-failure',
+    actionTimeout: 15000,
+    navigationTimeout: 60000
+  },
 
   projects: mxOfficialP1
     ? [
