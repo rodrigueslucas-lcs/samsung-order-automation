@@ -82,18 +82,24 @@ export async function reachPeRegisteredDelivery(page, config) {
   );
 
   const checkout = new CheckoutPage(page);
-  await test.step("Contact · Validate registered customer state", async () => {
-    const firstName = page.getByRole("textbox", { name: "firstName" });
-    const contactVisible = await firstName.isVisible().catch(() => false);
-    if (contactVisible) {
+  await test.step("Contact · Resolve registered checkout state", async () => {
+    // S2 can open registered checkout either on Contact Info or directly on
+    // Delivery. Wait for the route transition first; checking firstName
+    // immediately races the SPA navigation and caused the registered suite to
+    // wait for Delivery while it was still loading Contact Info.
+    await page.waitForURL(/CHECKOUT_STEP_(CONTACT_INFO|DELIVERY)/, {
+      waitUntil: "domcontentloaded",
+      timeout: 60000,
+    });
+
+    if (/CHECKOUT_STEP_CONTACT_INFO/.test(page.url())) {
       await checkout.fillCustomerData(testData.customer);
       return;
     }
 
-    const deliverySurface = page
-      .getByRole("tabpanel", { name: "Envío", exact: true })
-      .or(page.getByText(/Dirección guardada|Nueva dirección|datos de env[ií]o/i).filter({ visible: true }));
-    await deliverySurface.first().waitFor({ state: "visible", timeout: 30000 });
+    await page
+      .getByRole("heading", { name: /Direcci[oó]n de entrega/i })
+      .waitFor({ state: "visible", timeout: 60000 });
   });
   return { cart, checkout };
 }
