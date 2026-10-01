@@ -526,14 +526,12 @@ pipeline {
             else bat '@call npx -y node@22 scripts/finalize-jenkins-suite.cjs || exit /b 0'
           }
 
-          try {
-            allure includeProperties: false, jdk: '', results: [[path: resultsPath]]
-            env.NATIVE_ALLURE_PUBLISHED = '1'
-            echo "Native Allure history published from ${resultsPath}."
-          } catch (err) {
-            env.NATIVE_ALLURE_PUBLISHED = '0'
-            echo "Native Allure publisher unavailable; HTML fallback will be used. ${err}"
-          }
+          // The repository pins the Allure Playwright adapter and CLI and
+          // finalize-jenkins-suite.cjs already generates the matching HTML.
+          // Do not feed those results to Jenkins' independently-versioned
+          // native Allure publisher: version drift there broke PE #95.
+          env.NATIVE_ALLURE_PUBLISHED = '0'
+          echo "Allure HTML generated with repository-pinned tooling from ${resultsPath}."
         }
       }
     }
