@@ -50,18 +50,28 @@ export default class CheckoutPage extends BasePage {
 
       await this.screenshot("04-customer-info");
       await this.customerContinueButton.click();
-      try {
-        await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, { waitUntil: "domcontentloaded", timeout: 30000 });
-        break;
-      } catch (error) {
-        if (/CHECKOUT_STEP_DELIVERY/.test(this.page.url())) break;
-        if (attempt === 1 || !/CHECKOUT_STEP_CONTACT_INFO/.test(this.page.url())) {
-          throw new Error(`Checkout did not advance from Contact Info after ${attempt + 1} attempt(s); current URL: ${this.page.url()}.`, { cause: error });
-        }
-        // PE S2 can leave Continue spinning without navigating; reload once and retry the same validated data.
-        await this.page.reload({ waitUntil: "domcontentloaded" });
-        await this.firstNameInput.waitFor({ state: "visible", timeout: 60000 });
+
+      const deliveryReached = await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
+        waitUntil: "domcontentloaded",
+        timeout: 12000,
+      }).then(() => true, () => false);
+      if (deliveryReached || /CHECKOUT_STEP_DELIVERY/.test(this.page.url())) break;
+
+      // Do not spend another 30s retrying identical invalid Contact Info.
+      // Retry only when S2 kept a clean, enabled form with no validation error.
+      const validationErrors = this.page.locator(
+        '[aria-invalid="true"], .mat-mdc-form-field-error, mat-error, [class*="error" i]'
+      ).filter({ visible: true });
+      const errorText = (await validationErrors.allInnerTexts().catch(() => []))
+        .join(" ").replace(/\s+/g, " ").trim().slice(0, 300);
+      if (errorText) {
+        throw new Error(`PE Contact Info rejected configured customer data: ${errorText}`);
       }
+      if (attempt === 1 || !/CHECKOUT_STEP_CONTACT_INFO/.test(this.page.url())) {
+        throw new Error(`Checkout did not advance from Contact Info after ${attempt + 1} attempt(s); current URL: ${this.page.url()}.`);
+      }
+      await this.page.reload({ waitUntil: "domcontentloaded" });
+      await this.firstNameInput.waitFor({ state: "visible", timeout: 30000 });
     }
 
     await this.page
