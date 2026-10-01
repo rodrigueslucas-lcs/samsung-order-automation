@@ -27,8 +27,12 @@ test("SAM-25103 @qst @pe @base-store @backoffice @safe @reuse - Backoffice searc
   const credentials = requirePeBackOffice(testInfo, "SAM-25103");
 
   const orders = new BackOfficeOrderPage(page);
-  await orders.login({ ...credentials, authority: "admin" });
-  await orders.openAdminOrders();
+  await test.step("Login to PE BackOffice as admin", async () => {
+    await orders.login({ ...credentials, authority: "admin" });
+  });
+  await test.step("Open BackOffice Orders", async () => {
+    await orders.openAdminOrders();
+  });
   const order = await orders.openFirstAdminOrderAndReadStatus();
 
   expect(order.orderCode).toBeTruthy();
@@ -54,8 +58,12 @@ test("SAM-25104 @qst @pe @base-store @backoffice @safe @reuse - Order Process Sh
   );
 
   const orders = new BackOfficeOrderPage(page);
-  await orders.login({ ...credentials, authority: "admin" });
-  await orders.openAdminOrders();
+  await test.step("Login to PE BackOffice as admin", async () => {
+    await orders.login({ ...credentials, authority: "admin" });
+  });
+  await test.step("Open BackOffice Orders", async () => {
+    await orders.openAdminOrders();
+  });
   await orders.openAdminOrderByCode(orderCode);
   const status = await orders.readOpenAdminOrderStatus(orderCode);
 
