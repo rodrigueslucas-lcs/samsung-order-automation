@@ -26,19 +26,29 @@ export default class BackOfficeOrderPage extends BackOfficePage {
       .getByText("Orders", { exact: true })
       .last()
       .waitFor({ state: "visible", timeout: 30000 });
-    const searchMode = this.page.locator(".yw-textsearch:visible").first();
-    await searchMode.waitFor({ state: "visible", timeout: 30000 });
-    if (/\byw-toggle-open\b/.test((await searchMode.getAttribute("class")) || "")) {
+    // ZK can render the Orders workspace before its search toolbar, especially
+    // on the second BackOffice test in headless CI. The textbox is the actual
+    // control we need, so wait for it instead of failing on the wrapper class.
+    const quickSearch = this.page
+      .getByPlaceholder("Type to search", { exact: true })
+      .filter({ visible: true });
+
+    if (!(await quickSearch.last().isVisible().catch(() => false))) {
+      await this.page.waitForFunction(() => !window.zk || !zk.processing, null, {
+        timeout: 30000,
+      }).catch(() => {});
+    }
+
+    const advancedSearch = this.page.locator(".yw-advancedsearch:visible").first();
+    if (await advancedSearch.isVisible().catch(() => false)) {
       const searchModeToggle = this.page
         .locator('button.yw-toggle-advanced-search[title="Switch search mode"]:visible')
         .first();
       await searchModeToggle.waitFor({ state: "visible", timeout: 30000 });
       await this.waitForZkUpdate(() => searchModeToggle.click());
     }
-    const quickSearch = this.page
-      .getByPlaceholder("Type to search", { exact: true })
-      .filter({ visible: true });
-    await quickSearch.last().waitFor({ state: "visible", timeout: 30000 });
+
+    await quickSearch.last().waitFor({ state: "visible", timeout: 60000 });
   }
 
   async expectAgentOrders() {
