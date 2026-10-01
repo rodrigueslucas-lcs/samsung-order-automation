@@ -29,6 +29,7 @@ const peAuthenticatedPriorityFiles = [
 ];
 
 const chromiumUse = { ...devices['Desktop Chrome'] };
+const peProjectUse = { ...chromiumUse };
 
 export default defineConfig({
   testDir: './tests',
@@ -87,14 +88,14 @@ export default defineConfig({
     : peOfficialP1
       ? [
           {
-            name: 'pe-auth-priority',
+            name: 'PE · Authenticated first',
             testMatch: peAuthenticatedPriorityFiles,
-            use: chromiumUse
+            use: peProjectUse
           },
           {
-            name: 'chromium',
+            name: 'PE · Storefront + BackOffice',
             testIgnore: peAuthenticatedPriorityFiles,
-            use: chromiumUse
+            use: peProjectUse
           }
         ]
       : [
