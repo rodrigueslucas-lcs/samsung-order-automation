@@ -51,7 +51,9 @@ test.describe("PE QST - registered checkout safe reuse", () => {
       "No saved address is available in the authenticated PE account; do not create persistent data in this safe TC."
     );
 
-    await checkout.selectSavedAddressAndValidate();
+    await test.step("Select and validate saved delivery address", async () => {
+      await checkout.selectSavedAddressAndValidate();
+    });
     testInfo.annotations.push({
       type: "qst-reuse-note",
       description: "Read-only selection of an already-existing saved address. No address is created or edited by this safe test.",
@@ -69,20 +71,26 @@ test.describe("PE QST - registered checkout safe reuse", () => {
     });
 
     const config = getPeQstConfig();
-    await reachPeRegisteredDelivery(page, config);
+    await test.step("Reach registered delivery step", () =>
+      reachPeRegisteredDelivery(page, config)
+    );
 
     const newAddress = page.getByRole("tabpanel", { name: "Envío", exact: true }).getByRole("radio", {
       name: "Nueva dirección",
       exact: true,
     });
-    await newAddress.waitFor({ state: "visible", timeout: 30000 });
-    await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
-    await expect(newAddress).toBeChecked({ timeout: 30000 });
+    await test.step("Select new-address mode", async () => {
+      await newAddress.waitFor({ state: "visible", timeout: 30000 });
+      await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
+      await expect(newAddress).toBeChecked({ timeout: 30000 });
+    });
 
     const saveAddress = page.getByRole("checkbox", {
       name: /Guardar datos de env[ií]o en Mi cuenta/i,
     });
-    await expect(saveAddress).toBeVisible({ timeout: 30000 });
+    await test.step("Validate Save address option is visible for registered user", async () => {
+      await expect(saveAddress).toBeVisible({ timeout: 30000 });
+    });
 
     testInfo.annotations.push({
       type: "qst-reuse-note",
@@ -112,8 +120,10 @@ test.describe("PE QST - registered checkout safe reuse", () => {
     await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
     await expect(newAddress).toBeChecked({ timeout: 30000 });
 
-    await checkout.fillAddress(testData.address);
-    await checkout.validateAddressValues(testData.address);
+    await test.step("Fill and validate new delivery address", async () => {
+      await checkout.fillAddress(testData.address);
+      await checkout.validateAddressValues(testData.address);
+    });
 
     const saveAddress = page.getByRole("checkbox", {
       name: /Guardar datos de env[ií]o en Mi cuenta/i,
