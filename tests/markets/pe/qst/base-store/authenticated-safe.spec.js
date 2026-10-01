@@ -52,7 +52,9 @@ test.describe("PE QST - authenticated safe reuse", () => {
     recordBusinessEvidence(testInfo, getPeQstEvidenceMetadata("SAM-25057"));
 
     const auth = getPeAuthState();
-    await auth.validateAuthenticatedSession(page);
+    await test.step("Validate authenticated PE storefront session", async () => {
+      await auth.validateAuthenticatedSession(page);
+    });
 
     const config = getPeQstConfig();
     const myOrders = new MyOrdersPage(page, {
