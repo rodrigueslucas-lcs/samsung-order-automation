@@ -60,9 +60,7 @@ test.describe("PE QST - registered payment safe checkpoints", () => {
     });
 
     const config = getPeQstConfig();
-    const { payment } = await test.step("Reach registered payment step", () =>
-      reachPeRegisteredPayment(page, config, { expectedPaymentMode: /^Pago Efectivo\b/i })
-    );
+    const { payment } = await reachPeRegisteredPayment(page, config, { expectedPaymentMode: /^Pago Efectivo\b/i });
     await test.step("Validate Pago Efectivo payment option", async () => {
       await payment.selectPagoEfectivo();
     });
