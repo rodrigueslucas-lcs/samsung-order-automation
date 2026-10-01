@@ -374,19 +374,26 @@ pipeline {
               }
             } else if (params.MARKET == 'PE') {
               env.PE_SESSION_BUNDLE_CREDENTIAL = "samsung-pe-${params.ENVIRONMENT.toLowerCase()}-session-bundle"
+              env.PE_BACKOFFICE_ADMIN_CREDENTIAL = "samsung-mx-${params.ENVIRONMENT.toLowerCase()}-backoffice-admin"
               withCredentials([
-                file(credentialsId: env.PE_SESSION_BUNDLE_CREDENTIAL, variable: 'PE_SESSION_BUNDLE')
+                file(credentialsId: env.PE_SESSION_BUNDLE_CREDENTIAL, variable: 'PE_SESSION_BUNDLE'),
+                file(credentialsId: env.PE_BACKOFFICE_ADMIN_CREDENTIAL, variable: 'PE_BACKOFFICE_ADMIN_SECRET')
               ]) {
                 if (isUnix()) {
                   sh '''
                     set -eu
                     npm run auth:install:pe
+                    mkdir -p playwright/.auth
+                    cp "$PE_BACKOFFICE_ADMIN_SECRET" "playwright/.auth/backoffice-admin-${BACKOFFICE_ENV}.json"
+                    chmod 600 "playwright/.auth/backoffice-admin-${BACKOFFICE_ENV}.json" || true
                     CI=1 npm run auth:verify:pe
                     npx -y node@22 scripts/run-pe-qst-p1.cjs
                   '''
                 } else {
                   bat '''@echo off
                     call npm run auth:install:pe || exit /b 2
+                    if not exist playwright\\.auth mkdir playwright\\.auth
+                    copy /Y "%PE_BACKOFFICE_ADMIN_SECRET%" "playwright\\.auth\\backoffice-admin-%BACKOFFICE_ENV%.json" >nul || exit /b 2
                     set CI=1
                     call npm run auth:verify:pe || exit /b 20
                     call npx -y node@22 scripts/run-pe-qst-p1.cjs
