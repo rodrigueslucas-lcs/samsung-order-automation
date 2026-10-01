@@ -4,11 +4,16 @@ import GuestLoginPage from "../../../../../pages/GuestLoginPage";
 import CheckoutPage from "../../../../../pages/CheckoutPage";
 import PaymentPage from "../../../../../pages/PaymentPage";
 import { testData } from "../../../../../utils/testData";
+import { test } from "@playwright/test";
 
 async function bootstrapPeStorefront(page, config) {
   if (!config.setupUrl) return;
-  await page.goto(config.setupUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
-  await page.getByText(/you can access pages now/i).waitFor({ state: "visible", timeout: 20000 });
+  await test.step(`Bootstrap PE ${config.environment || "staging"} storefront session`, async () => {
+    const current = new URL(page.url());
+    if (current.hostname === config.baseUrl.hostname && current.pathname.startsWith("/pe")) return;
+    await page.goto(config.setupUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await page.getByText(/you can access pages now/i).waitFor({ state: "visible", timeout: 20000 });
+  });
 }
 
 export async function addConfiguredProductToPeCart(page, config) {
@@ -19,7 +24,9 @@ export async function addConfiguredProductToPeCart(page, config) {
     pdpUrl: config.pdpUrl.href,
     cartUrl: config.cartUrl.href,
   });
-  await product.addConfiguredPdpToCart({ waitForCartMutation: true });
+  await test.step("Open controlled PE PDP and add configured product to cart", async () => {
+    await product.addConfiguredPdpToCart({ waitForCartMutation: true });
+  });
 
   return new CartPage(page, {
     cartUrl: config.cartUrl.href,
@@ -31,22 +38,34 @@ export async function addConfiguredProductToPeCart(page, config) {
 
 export async function reachPeGuestDelivery(page, config) {
   const cart = await addConfiguredProductToPeCart(page, config);
-  await cart.proceedToCheckout();
+  await test.step("Continue from cart to guest checkout", async () => {
+    await cart.proceedToCheckout();
+  });
 
   const guest = new GuestLoginPage(page);
-  await guest.checkoutAsGuest(`pe-qst-${Date.now()}@mailinator.com`);
+  await test.step("Continue as guest with isolated QST email", async () => {
+    await guest.checkoutAsGuest(`pe-qst-${Date.now()}@mailinator.com`);
+  });
 
   const checkout = new CheckoutPage(page);
-  await checkout.fillCustomerData(testData.customer);
+  await test.step("Complete customer contact information", async () => {
+    await checkout.fillCustomerData(testData.customer);
+  });
   return { cart, checkout };
 }
 
 export async function reachPeGuestPayment(page, config, options = {}) {
   const { cart, checkout } = await reachPeGuestDelivery(page, config);
-  await checkout.fillAddress(options.address || testData.address);
-  await checkout.selectShippingMethod();
-  await checkout.acceptTerms();
-  await checkout.continueToPayment({ expectedPaymentMode: options.expectedPaymentMode });
+  await test.step("Complete delivery address", async () => {
+    await checkout.fillAddress(options.address || testData.address);
+  });
+  await test.step("Select shipping method and accept terms", async () => {
+    await checkout.selectShippingMethod();
+    await checkout.acceptTerms();
+  });
+  await test.step("Continue to payment", async () => {
+    await checkout.continueToPayment({ expectedPaymentMode: options.expectedPaymentMode });
+  });
   const payment = new PaymentPage(page);
   await payment.validatePaymentPage({ expectedPaymentMode: options.expectedPaymentMode });
   return { cart, checkout, payment };
@@ -54,12 +73,18 @@ export async function reachPeGuestPayment(page, config, options = {}) {
 
 export async function reachPeRegisteredDelivery(page, config) {
   const cleanCart = new CartPage(page, { cartUrl: config.cartUrl.href });
-  await cleanCart.clearPeCartAndConfirmEmpty();
+  await test.step("Reset authenticated PE cart", async () => {
+    await cleanCart.clearPeCartAndConfirmEmpty();
+  });
   const cart = await addConfiguredProductToPeCart(page, config);
-  await cart.proceedToAuthenticatedCheckout();
+  await test.step("Continue from cart to registered checkout", async () => {
+    await cart.proceedToAuthenticatedCheckout();
+  });
 
   const checkout = new CheckoutPage(page);
-  await checkout.fillCustomerData(testData.customer);
+  await test.step("Complete registered customer contact information", async () => {
+    await checkout.fillCustomerData(testData.customer);
+  });
   return { cart, checkout };
 }
 
