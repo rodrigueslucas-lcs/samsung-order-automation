@@ -35,8 +35,10 @@ test.describe("PE QST - guarded profile writes", () => {
     recordBusinessEvidence(testInfo, getPeQstEvidenceMetadata("SAM-25056"));
 
     const auth = getPeAuthState();
-    await auth.validateAuthenticatedSession(page);
-    await page.keyboard.press("Escape");
+    await test.step("Validate authenticated PE storefront session", async () => {
+      await auth.validateAuthenticatedSession(page);
+      await page.keyboard.press("Escape");
+    });
 
     const config = getPeQstConfig();
     const profile = new ProfilePage(page, {
@@ -53,14 +55,18 @@ test.describe("PE QST - guarded profile writes", () => {
       await profile.deleteQaAddressesViaApi(created.street).catch(() => 0);
       await profile.deleteQaAddressesViaApi(updated.street).catch(() => 0);
 
-      await profile.createQaAddress(created);
-      await profile.waitForQaAddressViaApi(created.street);
-
-      await profile.editQaAddress(created.street, updated);
-      await profile.waitForQaAddressViaApi(updated.street);
-
-      await profile.deleteQaAddress(updated.street);
-      await profile.deleteQaAddressesViaApi(updated.street);
+      await test.step("Create QA-only profile address", async () => {
+        await profile.createQaAddress(created);
+        await profile.waitForQaAddressViaApi(created.street);
+      });
+      await test.step("Edit QA-only profile address", async () => {
+        await profile.editQaAddress(created.street, updated);
+        await profile.waitForQaAddressViaApi(updated.street);
+      });
+      await test.step("Delete QA-only profile address", async () => {
+        await profile.deleteQaAddress(updated.street);
+        await profile.deleteQaAddressesViaApi(updated.street);
+      });
 
       testInfo.annotations.push({
         type: "qst-reuse-note",
@@ -77,8 +83,10 @@ test.describe("PE QST - guarded profile writes", () => {
     recordBusinessEvidence(testInfo, getPeQstEvidenceMetadata("SAM-25084"));
 
     const auth = getPeAuthState();
-    await auth.validateAuthenticatedSession(page);
-    await page.keyboard.press("Escape");
+    await test.step("Validate authenticated PE storefront session", async () => {
+      await auth.validateAuthenticatedSession(page);
+      await page.keyboard.press("Escape");
+    });
 
     const config = getPeQstConfig();
     const profile = new ProfilePage(page, {
@@ -89,12 +97,18 @@ test.describe("PE QST - guarded profile writes", () => {
     const qaAddress = profile.qaAddress(`CHECKOUT ${Date.now()}`, testData.address);
 
     try {
-      const { checkout } = await reachPeRegisteredDelivery(page, config);
-      await checkout.saveNewAuthenticatedAddress(qaAddress);
-      await checkout.selectShippingMethod();
-      await checkout.acceptTerms();
-      await checkout.continueToPayment();
-      await profile.waitForQaAddressViaApi(qaAddress.street);
+      const { checkout } = await test.step("Reach registered delivery step", () =>
+        reachPeRegisteredDelivery(page, config)
+      );
+      await test.step("Save new authenticated delivery address", async () => {
+        await checkout.saveNewAuthenticatedAddress(qaAddress);
+        await checkout.selectShippingMethod();
+        await checkout.acceptTerms();
+        await checkout.continueToPayment();
+      });
+      await test.step("Verify saved address through authenticated API", async () => {
+        await profile.waitForQaAddressViaApi(qaAddress.street);
+      });
 
       testInfo.annotations.push({
         type: "qst-reuse-note",
