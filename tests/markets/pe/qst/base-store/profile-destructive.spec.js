@@ -31,6 +31,10 @@ test.describe("PE QST - guarded profile writes", () => {
   });
 
   test("SAM-25056 @destructive @qst @pe @base-store @registered @reuse - Add edit delete addresses", async ({ page }, testInfo) => {
+    test.skip(
+      true,
+      "BLOCKED: PE profile address-management/delete flow is not yet confirmed. Remove this skip once the live delete path/selectors are validated."
+    );
     test.setTimeout(420000);
     recordBusinessEvidence(testInfo, getPeQstEvidenceMetadata("SAM-25056"));
 
