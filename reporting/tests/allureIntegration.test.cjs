@@ -11,6 +11,7 @@ test('Allure reporter is opt-in and isolated from list discovery', () => {
   assert.match(config, /process\.env\.ENABLE_ALLURE === '1'/);
   assert.match(config, /'allure-playwright'/);
   assert.match(config, /ALLURE_RESULTS_DIR/);
+  assert.match(config, /detail: false/);
   assert.match(runner, /ENABLE_ALLURE: process\.env\.ENABLE_ALLURE \|\| "0"/);
   assert.match(runner, /allure-results/);
   assert.match(runner, /"--list", "--reporter=list"/);
@@ -26,8 +27,8 @@ test('Allure tooling is pinned without changing package-lock', () => {
 test('Jenkins enables, archives and publishes Allure beside Executive and Playwright reports', () => {
   assert.match(jenkins, /ENABLE_ALLURE = '1'/);
   assert.match(jenkins, /npm run reporting:allure:install/);
-  assert.match(jenkins, /allure includeProperties: false/);
-  assert.match(jenkins, /Native Allure history published/);
+  assert.doesNotMatch(jenkins, /allure includeProperties: false/);
+  assert.match(jenkins, /repository-pinned tooling/);
   assert.match(jenkins, /archiveArtifacts artifacts: 'test-results\/\*\*\/\*, playwright-report\/\*\*\/\*'/);
   assert.match(jenkins, /Executive Dashboard/);
   assert.match(jenkins, /Playwright/);
