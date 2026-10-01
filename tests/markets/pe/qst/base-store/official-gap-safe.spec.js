@@ -30,9 +30,13 @@ test.describe("PE QST - official safe gap reconciliation", () => {
       addConfiguredProductToPeCart(page, cfg)
     );
     const rewards = page.getByText(/Samsung Rewards|Rewards|puntos/i).filter({ visible: true });
-    await expect(rewards.first()).toBeVisible({ timeout: 30000 });
-    await cart.proceedToCheckout();
-    await expect(page.getByText(/Samsung Rewards|Rewards|puntos/i).filter({ visible: true }).first()).toBeVisible({ timeout: 30000 });
+    await test.step("Validate Rewards surface in cart", async () => {
+      await expect(rewards.first()).toBeVisible({ timeout: 30000 });
+    });
+    await test.step("Continue to checkout", () => cart.proceedToCheckout());
+    await test.step("Validate Rewards surface in checkout", async () => {
+      await expect(page.getByText(/Samsung Rewards|Rewards|puntos/i).filter({ visible: true }).first()).toBeVisible({ timeout: 30000 });
+    });
     testInfo.annotations.push({ type: "qst-reuse-note", description: "Cart and checkout Rewards text are proven safely; payment-page Rewards text/tooltip still requires a rewards-capable authenticated runtime." });
   });
 
@@ -44,17 +48,25 @@ test.describe("PE QST - official safe gap reconciliation", () => {
     const target = new URL(bogoPdp);
     if (target.hostname !== cfg.baseUrl.hostname || !target.pathname.startsWith("/pe/")) throw new Error("PE_QST_BOGO_PDP_URL must stay on the configured PE staging storefront.");
     const bogoCfg = { ...cfg, pdpUrl: target, sku: process.env.PE_QST_BOGO_SKU || cfg.sku };
-    await addConfiguredProductToPeCart(page, bogoCfg);
-    await expect(page.getByText(/BOGO|gratis|gratuito|free|promoci[oó]n/i).filter({ visible: true }).first()).toBeVisible({ timeout: 30000 });
+    await test.step("Add currently eligible BOGO product to cart", () =>
+      addConfiguredProductToPeCart(page, bogoCfg)
+    );
+    await test.step("Validate BOGO promotion in cart", async () => {
+      await expect(page.getByText(/BOGO|gratis|gratuito|free|promoci[oó]n/i).filter({ visible: true }).first()).toBeVisible({ timeout: 30000 });
+    });
   });
 
   test("SAM-25074 @qst @pe @base-store @safe - SC+ on cart page", async ({ page }, testInfo) => {
     evidence(testInfo, "SAM-25074");
     const cfg = config();
-    await addConfiguredProductToPeCart(page, cfg);
+    await test.step("Prepare PE cart with controlled product", () =>
+      addConfiguredProductToPeCart(page, cfg)
+    );
     const care = page.getByText(/Samsung Care\+|SC\+/i).filter({ visible: true });
     test.skip(!(await care.count()), "Configured PE SKU does not currently expose SC+; provide a verified SC+-eligible PE_QST_PDP_URL/PE_QST_SKU.");
-    await expect(care.first()).toBeVisible();
+    await test.step("Validate Samsung Care+ surface in cart", async () => {
+      await expect(care.first()).toBeVisible();
+    });
     testInfo.annotations.push({ type: "qst-reuse-note", description: "SC+ availability is proven without mutating cart services; add/remove persistence remains runtime acceptance work." });
   });
 
@@ -80,25 +92,30 @@ test.describe("PE QST - official safe gap reconciliation", () => {
     const cart = await test.step("Prepare PE cart with controlled product", () =>
       addConfiguredProductToPeCart(page, cfg)
     );
-    await cart.validateCartPage();
-    await cart.validateProductInCart();
+    await test.step("Validate cart and configured product", async () => {
+      await cart.validateCartPage();
+      await cart.validateProductInCart();
+    });
 
     const tradeUp = page
       .getByText(/Plan Canje Galaxy|Plan Renueva|Canje Galaxy|Trade[- ]?up/i)
       .filter({ visible: true })
       .first();
-    await expect(tradeUp, "The validated PE Flip6 cart should expose the Trade-up/Plan Canje surface.").toBeVisible({ timeout: 30000 });
+    await test.step("Validate Trade-up service is available", async () => {
+      await expect(tradeUp, "The validated PE Flip6 cart should expose the Trade-up/Plan Canje surface.").toBeVisible({ timeout: 30000 });
+    });
 
     const serviceCard = tradeUp.locator("xpath=ancestor::*[.//*[normalize-space()='Añadir']][1]");
     const add = serviceCard.getByText(/Añadir|Agregar/i, { exact: true }).filter({ visible: true }).first();
     await expect(add).toBeVisible({ timeout: 30000 });
-    await add.click();
-
-    await expect(
-      page.getByText(/Selecciona el dispositivo|Recibe una oferta|dispositivo actual|Plan Canje/i)
-        .filter({ visible: true })
-        .last()
-    ).toBeVisible({ timeout: 30000 });
+    await test.step("Open Trade-up journey", async () => {
+      await add.click();
+      await expect(
+        page.getByText(/Selecciona el dispositivo|Recibe una oferta|dispositivo actual|Plan Canje/i)
+          .filter({ visible: true })
+          .last()
+      ).toBeVisible({ timeout: 30000 });
+    });
 
     await page.keyboard.press("Escape");
     await expect(page).toHaveURL(/\/pe\/cart/i);
@@ -120,7 +137,9 @@ test.describe("PE QST - official safe gap reconciliation", () => {
     const result = await test.step("Submit authorized payment", () =>
       payment.submitSelectedPaymentMode()
     );
-    expect(result.orderCode, `Authorized PE order submit produced no observable order code. Outcome: ${result.type}`).toMatch(/^PE\d{6}-\d{8}(?:_\d+)?$/i);
+    await test.step("Validate created PE order code", async () => {
+      expect(result.orderCode, `Authorized PE order submit produced no observable order code. Outcome: ${result.type}`).toMatch(/^PE\d{6}-\d{8}(?:_\d+)?$/i);
+    });
 
     if (/confirmation|confirmacion|order-confirmation|checkout\/order|success/i.test(page.url())) {
       const confirmation = new OrderConfirmationPage(page);
@@ -139,7 +158,9 @@ test.describe("PE QST - official safe gap reconciliation", () => {
   test("SAM-25094 @qst @pe @base-store @safe - Verify Back to Top", async ({ page }, testInfo) => {
     evidence(testInfo, "SAM-25094");
     const cfg = config();
-    await addConfiguredProductToPeCart(page, cfg);
+    await test.step("Prepare PE cart with controlled product", () =>
+      addConfiguredProductToPeCart(page, cfg)
+    );
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.waitForFunction(() => {
       window.scrollTo(0, document.documentElement.scrollHeight);
@@ -148,6 +169,8 @@ test.describe("PE QST - official safe gap reconciliation", () => {
     const backToTop = page.getByRole("button", { name: /Volver al inicio|Back to top|Volver arriba|Ir arriba|Subir/i })
       .or(page.getByRole("link", { name: /Volver al inicio|Back to top|Volver arriba|Ir arriba|Subir/i }))
       .filter({ visible: true });
-    await expect(backToTop.first()).toBeVisible({ timeout: 30000 });
+    await test.step("Validate Back to Top control", async () => {
+      await expect(backToTop.first()).toBeVisible({ timeout: 30000 });
+    });
   });
 });
