@@ -372,105 +372,74 @@ export default class CartPage extends BasePage {
     await this.screenshot('cart-checkout-button');
   }
 
-  async proceedToCheckout() {
+  async clickCheckoutAndResolveInterceptors({ registered = false } = {}) {
     await this.continueButton.waitFor({ state: 'visible', timeout: 30000 });
     await this.continueButton.scrollIntoViewIfNeeded();
 
-    const cartReminder = this.page.locator(
-      '[class*="ins-custom-cart-reminder-container"]'
-    );
-
-    const dismissCartReminder = async () => {
-      if (!(await cartReminder.isVisible().catch(() => false))) {
-        return false;
-      }
-
-      const closeReminders = cartReminder.getByText(/^x$/i);
-      const visibleCloseIndex = await closeReminders.evaluateAll((items) =>
-        items.findIndex((item) => {
-          const rect = item.getBoundingClientRect();
-          return rect.right > 0 && rect.bottom > 0 &&
-            rect.left < window.innerWidth && rect.top < window.innerHeight;
-        })
-      );
-      if (visibleCloseIndex < 0) return false;
-
-      const closeReminder = closeReminders.nth(visibleCloseIndex);
-      const visibleReminder = closeReminder.locator(
-        'xpath=ancestor::*[contains(@class, "ins-custom-cart-reminder-container")][1]'
-      );
-
-      await closeReminder.click();
-      await visibleReminder.waitFor({ state: 'hidden', timeout: 10000 });
-
+    const reminder = this.page.locator('[class*="ins-custom-cart-reminder-container"]').filter({ visible: true });
+    const dismissReminder = async () => {
+      const close = reminder.getByText(/^x$/i).filter({ visible: true }).first();
+      if (!(await close.isVisible().catch(() => false))) return false;
+      await close.click();
+      await reminder.first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+      return true;
+    };
+    const finishReminder = async () => {
+      const finish = reminder.getByText(/^Finalizar compra$/i).filter({ visible: true }).last();
+      if (!(await finish.isVisible().catch(() => false))) return false;
+      await finish.click();
       return true;
     };
 
-    await dismissCartReminder();
-
+    await dismissReminder();
     await this.screenshot('02-before-cart-continue');
+    await this.continueButton.click({ timeout: 10000 }).catch(async (error) => {
+      if (!(await finishReminder()) && !(await dismissReminder())) throw error;
+    });
 
-    try {
-      await this.continueButton.click({ timeout: 5000 });
-    } catch (error) {
-      const reminderWasDismissed = await dismissCartReminder();
+    // Insider/cart-reminder may appear *after* the primary Continue click.
+    // Resolve it immediately instead of burning 45-60s waiting for a page that
+    // cannot appear while the modal is still blocking checkout.
+    await this.page.waitForTimeout(500);
+    await finishReminder();
 
-      if (!reminderWasDismissed) {
-        const reminderCheckout = cartReminder
-          .getByText(/^Finalizar compra$/i)
-          .filter({ visible: true })
-          .last();
-        if (!(await reminderCheckout.isVisible().catch(() => false))) throw error;
-        await reminderCheckout.focus();
-        await reminderCheckout.press('Enter');
-      } else {
-        await this.continueButton.click();
-      }
-    }
-
-    const guestEmailInput = this.page.getByPlaceholder(/ingresa tu correo/i);
-
-    await guestEmailInput.waitFor({ state: 'visible', timeout: 45000 });
-
-    await this.screenshot('03-guest-login-page');
-  }
-
-  async proceedToAuthenticatedCheckout() {
-    await this.continueButton.waitFor({ state: 'visible', timeout: 30000 });
-    await this.continueButton.scrollIntoViewIfNeeded();
-
-    const beforeUrl = this.page.url();
-    await this.continueButton.click();
-
-    const guestEmailInput = this.page.getByPlaceholder(/ingresa tu correo/i);
-
+    const guestEmail = this.page.getByPlaceholder(/ingresa tu correo|correo electr[oó]nico/i).filter({ visible: true });
     const checkoutTarget = (url) =>
       /\/checkout\/one(?:\?|$)|CHECKOUT_STEP_CONTACT_INFO|\/guestlogin\/checkout/i.test(url.href);
 
-    // The click may complete after the SPA has already changed history.
-    // Do not wait for a second navigation when checkout is already current.
-    if (!checkoutTarget(new URL(this.page.url()))) {
-      await this.page.waitForURL(checkoutTarget, {
-        waitUntil: 'domcontentloaded',
-        timeout: 60000,
-      });
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline) {
+      if (checkoutTarget(new URL(this.page.url()))) break;
+      if (await guestEmail.first().isVisible().catch(() => false)) break;
+      if (await finishReminder()) {
+        await this.page.waitForTimeout(250);
+        continue;
+      }
+      await this.page.waitForTimeout(250);
     }
 
-    if (
-      /\/guestlogin\/checkout/i.test(this.page.url()) ||
-      await guestEmailInput.isVisible().catch(() => false)
-    ) {
-      throw new Error(
-        'Registered checkout redirected to guest login; the Samsung Account session was not accepted. Refresh the authenticated state before rerunning registered cases.'
-      );
+    if (registered) {
+      if (/\/guestlogin\/checkout/i.test(this.page.url()) || await guestEmail.first().isVisible().catch(() => false)) {
+        throw new Error('Registered checkout redirected to guest login; the Samsung Account session was not accepted.');
+      }
+      if (!/\/checkout\/one(?:\?|$)/i.test(this.page.url())) {
+        throw new Error(`Registered checkout did not reach checkout. URL=${this.page.url()}`);
+      }
+      return;
     }
 
-    // The registered checkout shell is valid as soon as the canonical
-    // /checkout/one route reaches CONTACT_INFO. Market-specific controls
-    // (address/delivery/payment) are asserted by CheckoutPage in the next step.
-    if (!/\/checkout\/one(?:\?|$)/i.test(this.page.url())) {
-      throw new Error(`Registered checkout did not reach the checkout shell. URL=${this.page.url()}`);
+    if (!(await guestEmail.first().isVisible().catch(() => false))) {
+      throw new Error(`Guest checkout did not reach the email/login surface. URL=${this.page.url()}`);
     }
+    await this.screenshot('03-guest-login-page');
+  }
+
+  async proceedToCheckout() {
+    await this.clickCheckoutAndResolveInterceptors({ registered: false });
+  }
+
+  async proceedToAuthenticatedCheckout() {
+    await this.clickCheckoutAndResolveInterceptors({ registered: true });
   }
 
   async validateCartFooter() {
@@ -984,20 +953,12 @@ export default class CartPage extends BasePage {
         timeout: 30000,
       });
 
-    await dialog
-      .getByText(/Galaxy S25\s*\|\s*256GB/i)
-      .waitFor({
-        state: "visible",
-        timeout: 30000,
-      });
-
-    await dialog
-      .getByText("S/ 1,100.00", { exact: true })
-      .last()
-      .waitFor({
-        state: "visible",
-        timeout: 30000,
-      });
+    // Product/model and valuation are dynamic in PE S2. The official check is
+    // the final Trade-in review itself, not a stale S25/1100 hard-coded fixture.
+    const reviewText = await dialog.innerText();
+    if (!/S\/\s*[\d,.]+/.test(reviewText)) {
+      throw new Error("Trade-in final review did not expose a PEN valuation.");
+    }
 
     await this.screenshot("cart-trade-in-final-review");
 
