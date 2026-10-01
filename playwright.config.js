@@ -7,6 +7,7 @@ const videoEnabled = process.env.PW_VIDEO === '1';
 const headless = process.env.MX_QST_HEADLESS === '1' ||
   (!!process.env.CI && process.env.MX_QST_HEADLESS !== '0');
 const mxOfficialP1 = process.env.TEST_MARKET === 'MX' && process.env.TEST_SUITE === 'P1/QST';
+const peOfficialP1 = process.env.TEST_MARKET === 'PE' && process.env.TEST_SUITE === 'P1/QST';
 const { MX_BASE_P1_IDS } = mxQstScope;
 const mxActiveP1Pattern = new RegExp(`(?:${MX_BASE_P1_IDS.join('|')})\\b`);
 
@@ -19,6 +20,12 @@ const mxAuthenticatedPriorityFiles = [
   '**/markets/mx/qst/base-store/profile-address-destructive.spec.js',
   '**/markets/mx/qst/base-store/registered-address-safe.spec.js',
   '**/markets/mx/qst/base-store/registered-order.spec.js',
+];
+
+const peAuthenticatedPriorityFiles = [
+  '**/markets/pe/qst/base-store/authenticated-safe.spec.js',
+  '**/markets/pe/qst/base-store/profile-destructive.spec.js',
+  '**/markets/pe/qst/base-store/*registered*.spec.js',
 ];
 
 const chromiumUse = { ...devices['Desktop Chrome'] };
@@ -77,10 +84,24 @@ export default defineConfig({
           use: chromiumUse
         }
       ]
-    : [
-        {
-          name: 'chromium',
-          use: chromiumUse
-        }
-      ]
+    : peOfficialP1
+      ? [
+          {
+            name: 'pe-auth-priority',
+            testMatch: peAuthenticatedPriorityFiles,
+            use: chromiumUse
+          },
+          {
+            name: 'chromium',
+            testIgnore: peAuthenticatedPriorityFiles,
+            dependencies: ['pe-auth-priority'],
+            use: chromiumUse
+          }
+        ]
+      : [
+          {
+            name: 'chromium',
+            use: chromiumUse
+          }
+        ]
 });
