@@ -8,9 +8,15 @@ const BLOCKED_PATTERN = /SystemParking|maintenance|auth(?:enticated)? state|cred
 const AUTH_FAILURE_PATTERN = /auth|session|login|logged|credential|account/i;
 const ENVIRONMENT_FAILURE_PATTERN = /environment|backend|server|maintenance|unavailable|endpoint|cdp|network|(?:response body|request).*timed out|timeout.*(?:api|backend|delivery)|5\\d\\d\\b/i;
 const AUTOMATION_FAILURE_PATTERN = /locator|selector|strict mode|element.*(?:not found|not visible)|playwright|executable doesn.t exist|spawn (?:EPERM|ENOENT)|fixture|test timeout of \\d+ms exceeded/i;
+const TEST_DATA_BLOCKED_PATTERN = /bogo|eligible|campaign|sku|product|test data|order code|address data|prerequisite/i;
 
 function classifyFailure(status, reason = "") {
-  if (status === "SKIPPED-BLOCKED") return "AUTH_BLOCKED";
+  if (status === "SKIPPED-BLOCKED") {
+    if (AUTH_FAILURE_PATTERN.test(reason)) return "AUTH_BLOCKED";
+    if (TEST_DATA_BLOCKED_PATTERN.test(reason)) return "TEST_DATA_BLOCKED";
+    if (ENVIRONMENT_FAILURE_PATTERN.test(reason)) return "ENVIRONMENT_BLOCKED";
+    return "PREREQUISITE_BLOCKED";
+  }
   if (status !== "FAIL") return null;
   if (AUTH_FAILURE_PATTERN.test(reason)) return "AUTH_BLOCKED";
   if (ENVIRONMENT_FAILURE_PATTERN.test(reason)) return "ENVIRONMENT_ERROR";
