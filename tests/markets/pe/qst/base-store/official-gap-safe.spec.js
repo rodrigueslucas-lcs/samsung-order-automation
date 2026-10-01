@@ -61,7 +61,11 @@ test.describe("PE QST - official safe gap reconciliation", () => {
     const cart = await test.step("Add eligible Galaxy S25 BOGO product to cart", () =>
       addConfiguredProductToPeCart(page, bogoCfg)
     );
-    await test.step("Validate BOGO source product in cart", () => cart.validateProductInCart());
+    await test.step("Validate BOGO source product in cart", async () => {
+      const sourceSku = page.getByText(bogoSku, { exact: true }).filter({ visible: true });
+      await expect(sourceSku.first(), "PE BOGO cart must contain the eligible source SKU.").toBeVisible({ timeout: 30000 });
+      expect(await sourceSku.count(), "PE BOGO campaign may repeat the source SKU in paid and promotional cart entries.").toBeGreaterThanOrEqual(1);
+    });
     await test.step("Validate promotional BOGO gifts in cart", async () => {
       const giftLabels = page.getByText(/BOGO\s*Gift/i, { exact: true }).filter({ visible: true });
       await expect(giftLabels.first(), "PE BOGO cart must expose the BOGO Gift label.").toBeVisible({ timeout: 30000 });
