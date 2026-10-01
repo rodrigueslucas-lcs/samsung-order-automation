@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import BackOfficeOrderPage from "../../../../../pages/BackOfficeOrderPage";
+import BackOfficeSearchPage from "../../../../../pages/BackOfficeSearchPage";
 import evidenceContext from "../../../../../reporting/evidence/evidenceContext";
 import peEvidenceMetadata from "../../../../../utils/qstPeEvidenceMetadata";
 import backofficeCredentials from "../../../../../utils/backofficeAdminCredentials.js";
@@ -8,72 +8,108 @@ import peBackofficeTestData from "../../../../../utils/peBackofficeTestData.js";
 const { recordBusinessEvidence } = evidenceContext;
 const { getPeQstEvidenceMetadata } = peEvidenceMetadata;
 const { getBackOfficeAdminCredentials } = backofficeCredentials;
-const { getPeBackofficeOrderCode } = peBackofficeTestData;
+const { getPeBackofficeTestData } = peBackofficeTestData;
 
 function requirePeBackOffice(testInfo, zephyrId) {
   const target = (process.env.PE_QST_ENVIRONMENT || "S2").toLowerCase();
   process.env.BACKOFFICE_ENV = target;
   const credentials = getBackOfficeAdminCredentials();
-  test.skip(!credentials.password, `PE BackOffice ${target.toUpperCase()} Admin credentials are required via the shared environment-specific ignored auth file or runtime env.`);
+  test.skip(
+    !credentials.password,
+    `Shared BackOffice ${target.toUpperCase()} Admin credentials are required in playwright/.auth/backoffice-admin-${target}.json or the environment-specific runtime secret.`
+  );
   expect(credentials.environment).toBe(target);
+  testInfo.annotations.push({
+    type: "backoffice-admin-user",
+    description: credentials.username,
+  });
   recordBusinessEvidence(testInfo, getPeQstEvidenceMetadata(zephyrId));
   return credentials;
 }
 
-test.use({ screenshot: "off", video: "off", trace: "off" });
+test.describe("PE QST - BackOffice official coverage", () => {
+  test.describe.configure({ timeout: 360000 });
 
-test("SAM-25103 @qst @pe @base-store @backoffice @safe @reuse - Backoffice search baseline", async ({ page }, testInfo) => {
-  test.setTimeout(300000);
-  const credentials = requirePeBackOffice(testInfo, "SAM-25103");
+  test("SAM-25103 @qst @pe @base-store @backoffice @safe @reuse - Backoffice search baseline", async ({ page }, testInfo) => {
+    const credentials = requirePeBackOffice(testInfo, "SAM-25103");
+    const testData = getPeBackofficeTestData();
+    expect(testData.environment).toBe((process.env.PE_QST_ENVIRONMENT || "S2").toUpperCase());
 
-  const orders = new BackOfficeOrderPage(page);
-  await test.step("Login to PE BackOffice as admin", async () => {
-    await orders.login({ ...credentials, authority: "admin" });
-  });
-  await test.step("Open BackOffice Orders", async () => {
-    await orders.openAdminOrders();
-  });
-  const order = await orders.openFirstAdminOrderAndReadStatus();
+    const backOffice = new BackOfficeSearchPage(page);
+    await test.step("Authenticate in shared environment BackOffice as Admin", async () => {
+      await backOffice.login({ ...credentials, authority: "admin" });
+      await backOffice.expectPerspective("admin");
+    });
 
-  expect(order.orderCode).toBeTruthy();
-  expect(order.status).toBeTruthy();
-  recordBusinessEvidence(testInfo, {
-    orderCode: order.orderCode,
-    finalStatus: order.status,
-  });
-  testInfo.annotations.push({
-    type: "qst-reuse-note",
-    description: "S2 Admin order search/read baseline is proven by this test when it passes. Official SAM-25103 still requires product search plus basic/advanced search coverage before Full.",
-  });
-});
+    const basicOrderRow = await test.step("Validate basic order search", async () => {
+      await backOffice.openAdminOrders();
+      const row = await backOffice.searchAdminOrder(testData.orderCode);
+      await expect(row).toBeVisible();
+      return row;
+    });
+    await expect(basicOrderRow).toBeVisible();
 
-test("SAM-25104 @qst @pe @base-store @backoffice @safe @reuse - Order Process Shipping Requested baseline", async ({ page }, testInfo) => {
-  test.setTimeout(300000);
-  const credentials = requirePeBackOffice(testInfo, "SAM-25104");
+    const advancedOrderRow = await test.step("Validate advanced order search", async () => {
+      await backOffice.openAdminOrders();
+      const row = await backOffice.searchAdminOrderAdvanced(testData.orderCode);
+      await expect(row).toBeVisible();
+      return row;
+    });
+    await expect(advancedOrderRow).toBeVisible();
 
-  const orderCode = getPeBackofficeOrderCode();
-  test.skip(
-    !orderCode,
-    "Set PE_QST_ORDER_CODE to the specific PE order whose S2 fulfillment status is being verified."
-  );
+    const status = await test.step("Open order and validate current status", async () => {
+      await backOffice.openAdminOrders();
+      await backOffice.openAdminOrderByCode(testData.orderCode);
+      const currentStatus = await backOffice.readOpenAdminOrderStatus(testData.orderCode);
+      expect(currentStatus).toBeTruthy();
+      return currentStatus;
+    });
 
-  const orders = new BackOfficeOrderPage(page);
-  await test.step("Login to PE BackOffice as admin", async () => {
-    await orders.login({ ...credentials, authority: "admin" });
-  });
-  await test.step("Open BackOffice Orders", async () => {
-    await orders.openAdminOrders();
-  });
-  await orders.openAdminOrderByCode(orderCode);
-  const status = await orders.readOpenAdminOrderStatus(orderCode);
+    await test.step("Validate basic and advanced product search", async () => {
+      await backOffice.validateProductBasicAndAdvancedSearch(testData.productCode);
+    });
 
-  expect(status.toLowerCase()).toBe("shipping requested");
-  recordBusinessEvidence(testInfo, {
-    orderCode,
-    finalStatus: status,
+    recordBusinessEvidence(testInfo, {
+      orderCode: testData.orderCode,
+      productCode: testData.productCode,
+      basicOrderSearch: true,
+      advancedOrderSearch: true,
+      basicProductSearch: true,
+      advancedProductSearch: true,
+      finalStatus: status,
+      environment: testData.environment,
+      backOfficeHost: new URL(page.url()).hostname,
+    });
   });
-  testInfo.annotations.push({
-    type: "qst-reuse-note",
-    description: "Read-only Shipping Requested verification only. Official SAM-25104 requires causal proof that the same placed order reached this status; no cron or state-changing action is executed here.",
+
+  test("SAM-25104 @qst @pe @base-store @backoffice @safe @reuse - Order Process Shipping Requested baseline", async ({ page }, testInfo) => {
+    const credentials = requirePeBackOffice(testInfo, "SAM-25104");
+    const testData = getPeBackofficeTestData();
+
+    const orders = new BackOfficeSearchPage(page);
+    await test.step("Authenticate in shared environment BackOffice as Admin", async () => {
+      await orders.login({ ...credentials, authority: "admin" });
+      await orders.expectPerspective("admin");
+    });
+    await test.step("Open BackOffice Orders", async () => {
+      await orders.openAdminOrders();
+    });
+    const status = await test.step("Open target PE order and validate Shipping Requested", async () => {
+      await orders.openAdminOrderByCode(testData.orderCode);
+      const currentStatus = await orders.readOpenAdminOrderStatus(testData.orderCode);
+      expect(currentStatus.replace(/_/g, " ").trim().toLowerCase()).toBe("shipping requested");
+      return currentStatus;
+    });
+
+    recordBusinessEvidence(testInfo, {
+      orderCode: testData.orderCode,
+      finalStatus: status,
+      environment: testData.environment,
+      backOfficeHost: new URL(page.url()).hostname,
+    });
+    testInfo.annotations.push({
+      type: "qst-causality-note",
+      description: "This official checkpoint validates the configured PE campaign order in the environment-scoped BackOffice. Fulfillment mutation remains outside this read-only S2 QST.",
+    });
   });
 });
