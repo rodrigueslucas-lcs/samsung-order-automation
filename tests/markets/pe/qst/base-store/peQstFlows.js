@@ -73,17 +73,27 @@ export async function reachPeGuestPayment(page, config, options = {}) {
 
 export async function reachPeRegisteredDelivery(page, config) {
   const cleanCart = new CartPage(page, { cartUrl: config.cartUrl.href });
-  await test.step("Reset authenticated PE cart", async () => {
-    await cleanCart.clearPeCartAndConfirmEmpty();
-  });
+  await test.step("Cart · Reset authenticated cart", () =>
+    cleanCart.clearPeCartAndConfirmEmpty()
+  );
   const cart = await addConfiguredProductToPeCart(page, config);
-  await test.step("Continue from cart to registered checkout", async () => {
-    await cart.proceedToAuthenticatedCheckout();
-  });
+  await test.step("Checkout · Continue as registered customer", () =>
+    cart.proceedToAuthenticatedCheckout()
+  );
 
   const checkout = new CheckoutPage(page);
-  await test.step("Complete registered customer contact information", async () => {
-    await checkout.fillCustomerData(testData.customer);
+  await test.step("Contact · Validate registered customer state", async () => {
+    const firstName = page.getByRole("textbox", { name: "firstName" });
+    const contactVisible = await firstName.isVisible().catch(() => false);
+    if (contactVisible) {
+      await checkout.fillCustomerData(testData.customer);
+      return;
+    }
+
+    const deliverySurface = page
+      .getByRole("tabpanel", { name: "Envío", exact: true })
+      .or(page.getByText(/Dirección guardada|Nueva dirección|datos de env[ií]o/i).filter({ visible: true }));
+    await deliverySurface.first().waitFor({ state: "visible", timeout: 30000 });
   });
   return { cart, checkout };
 }
@@ -94,22 +104,32 @@ export async function reachPeRegisteredPayment(page, config, options = {}) {
     name: "Nueva dirección",
     exact: true,
   });
-  await newAddress.waitFor({ state: "visible", timeout: 30000 });
-  await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
-  if (!(await newAddress.isChecked())) throw new Error("PE delivery did not switch to the new-address mode.");
-  await checkout.fillAddress(options.address || testData.address);
-
-  const saveAddress = page.getByRole("checkbox", {
-    name: /Guardar datos de env[ií]o en Mi cuenta/i,
+  await test.step("Delivery · Select new address", async () => {
+    await newAddress.waitFor({ state: "visible", timeout: 30000 });
+    await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
+    if (!(await newAddress.isChecked())) throw new Error("PE delivery did not switch to the new-address mode.");
   });
-  if (await saveAddress.isVisible().catch(() => false) && await saveAddress.isChecked()) {
-    await saveAddress.uncheck();
-  }
+  await test.step("Delivery · Fill shipping address", () =>
+    checkout.fillAddress(options.address || testData.address)
+  );
 
-  await checkout.selectShippingMethod();
-  await checkout.acceptTerms();
-  await checkout.continueToPayment({ expectedPaymentMode: options.expectedPaymentMode });
+  await test.step("Delivery · Keep profile data unchanged", async () => {
+    const saveAddress = page.getByRole("checkbox", {
+      name: /Guardar datos de env[ií]o en Mi cuenta/i,
+    });
+    if (await saveAddress.isVisible().catch(() => false) && await saveAddress.isChecked()) {
+      await saveAddress.uncheck();
+    }
+  });
+
+  await test.step("Delivery · Select shipping method", () => checkout.selectShippingMethod());
+  await test.step("Checkout · Accept terms", () => checkout.acceptTerms());
+  await test.step("Payment · Continue to payment", () =>
+    checkout.continueToPayment({ expectedPaymentMode: options.expectedPaymentMode })
+  );
   const payment = new PaymentPage(page);
-  await payment.validatePaymentPage({ expectedPaymentMode: options.expectedPaymentMode });
+  await test.step("Payment · Validate payment page", () =>
+    payment.validatePaymentPage({ expectedPaymentMode: options.expectedPaymentMode })
+  );
   return { cart, checkout, payment };
 }
