@@ -14,10 +14,12 @@ test("SAM-25097 @qst @pe @base-store @safe @guest - Payment using Internet Banki
   recordBusinessEvidence(testInfo, getPeQstEvidenceMetadata("SAM-25097"));
 
   const config = getPeQstConfig();
-  const { payment } = await reachPeGuestPayment(page, config, {
-    expectedPaymentMode: /^Banca por Internet\b/i,
+  const { payment } = await test.step("Reach guest payment step", () =>
+    reachPeGuestPayment(page, config, { expectedPaymentMode: /^Banca por Internet\b/i })
+  );
+  await test.step("Validate Internet Banking payment option", async () => {
+    await payment.selectBancaPorInternet();
   });
-  await payment.selectBancaPorInternet();
 
   testInfo.annotations.push({
     type: "qst-reuse-note",
