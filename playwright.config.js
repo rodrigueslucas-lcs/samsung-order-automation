@@ -94,7 +94,6 @@ export default defineConfig({
           {
             name: 'chromium',
             testIgnore: peAuthenticatedPriorityFiles,
-            dependencies: ['pe-auth-priority'],
             use: chromiumUse
           }
         ]
