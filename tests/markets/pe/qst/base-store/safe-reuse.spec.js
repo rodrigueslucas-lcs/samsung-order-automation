@@ -44,20 +44,24 @@ test("SAM-25079 @qst @pe @base-store @safe @reuse - UI validation in desktop vie
   const config = requirePeStorefront();
   recordOfficialEvidence(testInfo, "SAM-25079");
 
-  await openStorefront(page, {
-    baseUrl: config.baseUrl,
-    setupUrl: config.setupUrl,
-    expectedMarket: "PE",
-  });
+  await test.step("Open PE storefront in desktop context", () =>
+    openStorefront(page, {
+      baseUrl: config.baseUrl,
+      setupUrl: config.setupUrl,
+      expectedMarket: "PE",
+    })
+  );
 
   const home = new HomePage(page, {
     setupUrl: null,
     homeUrl: config.baseUrl.href,
     footerHeadingPattern: /Tienda|Shop/i,
   });
-  const attributes = await home.validateHomepageAttributes();
-  expect(attributes.headerVisible).toBe(true);
-  expect(attributes.footerVisible).toBe(true);
+  await test.step("Validate desktop header and footer", async () => {
+    const attributes = await home.validateHomepageAttributes();
+    expect(attributes.headerVisible).toBe(true);
+    expect(attributes.footerVisible).toBe(true);
+  });
 
   testInfo.annotations.push({
     type: "qst-reuse-note",
@@ -73,7 +77,9 @@ test("SAM-25061 @qst @pe @base-store @safe @reuse - Able to add to Cart from PDP
   const cart = await test.step("Prepare PE cart with controlled product", () =>
     addConfiguredProductToPeCart(page, config)
   );
-  await cart.validateProductInCart();
+  await test.step("Validate configured product is present in cart", () =>
+    cart.validateProductInCart()
+  );
 
   testInfo.annotations.push({
     type: "qst-reuse-note",
@@ -89,14 +95,16 @@ test("SAM-25062 @qst @pe @base-store @safe @reuse - Cart page UI baseline", asyn
   const cart = await test.step("Prepare PE cart with controlled product", () =>
     addConfiguredProductToPeCart(page, config)
   );
-  await cart.validateProductInCart();
-  await validateCartItemPresentation(page, {
-    sku: config.sku,
-    currencyPattern: /S\/\s*[\d,.]+/,
+  await test.step("Validate cart item presentation", async () => {
+    await cart.validateProductInCart();
+    await validateCartItemPresentation(page, {
+      sku: config.sku,
+      currencyPattern: /S\/\s*[\d,.]+/,
+    });
   });
-  const summary = await cart.validateOrderSummary();
-  const services = await inspectAvailableServices(page);
-  await cart.validateCartFooter();
+  const summary = await test.step("Validate order summary", () => cart.validateOrderSummary());
+  const services = await test.step("Inspect available cart services", () => inspectAvailableServices(page));
+  await test.step("Validate cart footer", () => cart.validateCartFooter());
 
   expect(summary.subtotal).toBeTruthy();
   expect(summary.total).toBeTruthy();
@@ -119,7 +127,7 @@ test("SAM-25064 @qst @pe @base-store @safe @reuse - Order Summary on cart page b
   const cart = await test.step("Prepare PE cart with controlled product", () =>
     addConfiguredProductToPeCart(page, config)
   );
-  const summary = await cart.validateOrderSummary();
+  const summary = await test.step("Validate cart order summary totals", () => cart.validateOrderSummary());
   expect(summary.subtotal).toBeTruthy();
   expect(summary.total).toBeTruthy();
 
@@ -137,8 +145,8 @@ test("SAM-25081 @qst @pe @base-store @safe @reuse - Checkout button on cart page
   const cart = await test.step("Prepare PE cart with controlled product", () =>
     addConfiguredProductToPeCart(page, config)
   );
-  await cart.validateCheckoutButton();
-  await cart.proceedToCheckout();
+  await test.step("Validate checkout CTA", () => cart.validateCheckoutButton());
+  await test.step("Continue from cart to checkout", () => cart.proceedToCheckout());
 });
 
 test("SAM-25080 @qst @pe @base-store @safe @reuse - Login from Checkout page", async ({ page }, testInfo) => {
@@ -149,11 +157,15 @@ test("SAM-25080 @qst @pe @base-store @safe @reuse - Login from Checkout page", a
   const cart = await test.step("Prepare PE cart with controlled product", () =>
     addConfiguredProductToPeCart(page, config)
   );
-  await cart.proceedToCheckout();
+  await test.step("Continue from cart to checkout", () => cart.proceedToCheckout());
   const guestLogin = new GuestLoginPage(page);
-  await guestLogin.openRegisteredLoginFromCheckout();
+  await test.step("Open Samsung Account login from checkout", () =>
+    guestLogin.openRegisteredLoginFromCheckout()
+  );
 
-  expect(new URL(page.url()).hostname).toBe("account.samsung.com");
+  await test.step("Validate Samsung Account destination", async () => {
+    expect(new URL(page.url()).hostname).toBe("account.samsung.com");
+  });
   testInfo.annotations.push({
     type: "qst-reuse-note",
     description: "The checkout login action is proven to route to the legitimate Samsung Account flow. No credentials or SSO bypass are automated here.",
@@ -169,7 +181,9 @@ test("SAM-25088 @qst @pe @base-store @safe @guest @reuse - Save option not visib
   const saveAddress = page
     .getByRole("checkbox", { name: /Guardar datos de env[ií]o en Mi cuenta/i })
     .filter({ visible: true });
-  await expect(saveAddress).toHaveCount(0);
+  await test.step("Validate Save address option is absent for guest", async () => {
+    await expect(saveAddress).toHaveCount(0);
+  });
 });
 
 test("SAM-25089 @qst @pe @base-store @safe @guest @reuse - Different billing and shipping", async ({ page }, testInfo) => {
@@ -180,8 +194,10 @@ test("SAM-25089 @qst @pe @base-store @safe @guest @reuse - Different billing and
   const { checkout } = await test.step("Reach guest delivery step", () =>
     reachPeGuestDelivery(page, config)
   );
-  await checkout.fillAddress(testData.address);
-  await checkout.validateDifferentBillingAddress(testData.billingAddress);
+  await test.step("Fill shipping address", () => checkout.fillAddress(testData.address));
+  await test.step("Validate different billing address", () =>
+    checkout.validateDifferentBillingAddress(testData.billingAddress)
+  );
 
   testInfo.annotations.push({
     type: "qst-reuse-note",
@@ -197,12 +213,16 @@ test("SAM-25090 @qst @pe @base-store @safe @guest @reuse - Validate home deliver
   const { checkout } = await test.step("Reach guest delivery step", () =>
     reachPeGuestDelivery(page, config)
   );
-  await checkout.fillAddress(testData.address);
+  await test.step("Fill delivery address", () => checkout.fillAddress(testData.address));
   const delivery = page.getByRole("listitem").filter({ hasText: /Para envíos a provincias/i });
-  await expect(delivery).toBeVisible({ timeout: 30000 });
-  await delivery.click();
+  await test.step("Select province home delivery", async () => {
+    await expect(delivery).toBeVisible({ timeout: 30000 });
+    await delivery.click();
+  });
   const summary = page.getByRole("heading", { name: "Resumen de la orden", exact: true }).locator("..");
-  await expect(summary.getByText(/Envío Regular Gratis/i).first()).toBeVisible({ timeout: 30000 });
+  await test.step("Validate regular delivery in order summary", async () => {
+    await expect(summary.getByText(/Envío Regular Gratis/i).first()).toBeVisible({ timeout: 30000 });
+  });
 
   testInfo.annotations.push({
     type: "qst-reuse-note",
