@@ -14,8 +14,10 @@ function getCoQstConfig(environment = process.env) {
   const baseUrl = httpsUrl(environment.CO_STOREFRONT_URL || defaultBase, "CO_STOREFRONT_URL");
   if (baseUrl.pathname.replace(/\/+$/, "") !== "/co") throw new Error("CO_STOREFRONT_URL must point to /co/.");
   const setupUrl = envName === "S2" ? new URL("/getcookie.html", baseUrl.origin) : null;
-  const sku = String(environment.CO_QST_SKU || "").trim();
-  const pdpUrl = environment.CO_QST_PDP_URL ? httpsUrl(environment.CO_QST_PDP_URL, "CO_QST_PDP_URL") : null;
+  const sku = String(environment.CO_QST_SKU || (envName === "S2" ? "RF32CG5910B1CO" : "")).trim();
+  const pdpUrl = environment.CO_QST_PDP_URL
+    ? httpsUrl(environment.CO_QST_PDP_URL, "CO_QST_PDP_URL")
+    : envName === "S2" ? new URL(`/co/p/${sku}`, baseUrl) : null;
   if (pdpUrl && (pdpUrl.hostname !== baseUrl.hostname || !pdpUrl.pathname.startsWith("/co/"))) throw new Error("CO_QST_PDP_URL must stay inside the CO storefront.");
   return Object.freeze({ market:"CO", environment:envName, environmentLabel:envName === "S2" ? "S2/STG2" : "S1/STG", locale:"es-CO", currency:"COP", baseUrl, setupUrl, sku, pdpUrl, cartUrl:new URL("/co/cart", baseUrl) });
 }

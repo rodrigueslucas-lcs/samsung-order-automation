@@ -20,5 +20,16 @@ export async function addConfiguredProductToCoCart(page, config) {
   await bootstrapCoStorefront(page,config);
   const product=new ProductPage(page,{setupUrl:config.setupUrl?.href||null,sku:resolved.sku,pdpUrl:resolved.pdpUrl.href,cartUrl:config.cartUrl.href});
   await product.addConfiguredPdpToCart({waitForCartMutation:true});
-  return new CartPage(page,{cartUrl:config.cartUrl.href,sku:resolved.sku,productNamePattern:null,currencyPattern:/\$\s*[\d.,]+/});
+  return new CartPage(page,{
+    cartUrl:config.cartUrl.href,
+    sku:resolved.sku,
+    productNamePattern:null,
+    currencyPattern:/\$\s*[\d.,]+/,
+    cartPageTitlePattern:/Tienes\s+1\s+Producto\(s\)\s+en\s+tu\s+carrito/i,
+    orderSummaryPattern:/^Resumen$/i,
+    summaryProductPattern:/1\s+Producto/i,
+    checkoutButtonPattern:/^Continuar con la compra$/i,
+    guestEmailPattern:/Escribe tu correo electr[oó]nico para tramitar el pedido/i,
+    footerAccountPattern:/^Account$/i,
+  });
 }

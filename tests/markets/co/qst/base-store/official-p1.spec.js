@@ -7,16 +7,71 @@ import coAuthStateModule from "../../../../../utils/coAuthState";
 import BackOfficeOrderPage from "../../../../../pages/BackOfficeOrderPage";
 import backofficeCredentials from "../../../../../utils/backofficeAdminCredentials.js";
 import { addConfiguredProductToCoCart, bootstrapCoStorefront } from "./coQstFlows";
+import cartPresentation from "../../../../../flows/smb/cartPresentation";
 const {getCoQstConfig}=coConfigModule;
 const {recordBusinessEvidence}=evidenceContext;
 const {getCoQstEvidenceMetadata}=coEvidenceMetadata;
 const {CO_AUTH_STATE_PATH,getCoAuthState,hasCoAuthState}=coAuthStateModule;
 const {getBackOfficeAdminCredentials}=backofficeCredentials;
+const {validateCartItemPresentation,inspectAvailableServices}=cartPresentation;
 const productCases=new Set(["SAM-24880","SAM-24882","SAM-24883","SAM-24886","SAM-24892","SAM-24893","SAM-24896","SAM-24898","SAM-24899","SAM-24900","SAM-24901","SAM-24902","SAM-24903","SAM-24904","SAM-24905","SAM-24909","SAM-24910","SAM-24911","SAM-24912","SAM-24915","SAM-24919","SAM-24920","SAM-24925"]);
 function evidence(info,id){recordBusinessEvidence(info,getCoQstEvidenceMetadata(id));}
 async function home(page,cfg){await bootstrapCoStorefront(page,cfg);await page.goto(cfg.baseUrl.href,{waitUntil:"domcontentloaded"});await expect(page.getByRole("button",{name:"My Profile",exact:true})).toBeVisible({timeout:60000});}
 async function authenticatedPage(browser,cfg){test.skip(!hasCoAuthState(),"CO authenticated state is required.");const context=await browser.newContext({storageState:CO_AUTH_STATE_PATH});await getCoAuthState().applyAuthSessionStorage(context);const page=await context.newPage();await home(page,cfg);return {context,page};}
 async function cart(page,cfg){const c=await addConfiguredProductToCoCart(page,cfg);await c.validateProductInCart();return c;}
+async function coGuestCheckout(page,cartPage){
+  try {
+    await cartPage.proceedToCheckout();
+  } catch (error) {
+    if (!/\/co\/cart(?:\?|$)/i.test(page.url())) throw error;
+    await page.reload({waitUntil:"domcontentloaded"});
+    await cartPage.proceedToCheckout();
+  }
+  const email=page.getByPlaceholder(/Escribe tu correo electr[oó]nico para tramitar el pedido/i);
+  await expect(email).toBeVisible({timeout:30000});
+  await email.fill(`co-qst-${Date.now()}@mailinator.com`);
+  await page.getByRole("button",{name:"Continuar como invitado",exact:true}).click();
+  try {
+    await expect(page).toHaveURL(/\/co\/checkout\/one(?:\?|$)/i,{timeout:30000});
+  } catch (error) {
+    if (!/\/co\/guestlogin\/checkout(?:\?|$)/i.test(page.url())) throw error;
+    await page.reload({waitUntil:"domcontentloaded"});
+    await email.fill(`co-qst-${Date.now()}@mailinator.com`);
+    await page.getByRole("button",{name:"Continuar como invitado",exact:true}).click();
+    await expect(page).toHaveURL(/\/co\/checkout\/one(?:\?|$)/i,{timeout:30000});
+  }
+}
+async function fillCoGuestContact(page){
+  const firstName=page.getByRole("textbox",{name:"firstName",exact:true});
+  await expect(firstName).toBeVisible({timeout:60000});
+  const reminder=page.getByRole("dialog").filter({hasText:/¡Listo!/i});
+  const dismissReminder=async()=>{
+    if(await reminder.isVisible().catch(()=>false))await reminder.getByText(/¡Listo!/i).click();
+  };
+  await dismissReminder();
+  await firstName.fill("Cliente");
+  await page.getByRole("textbox",{name:"lastName",exact:true}).fill("Prueba");
+  await page.getByRole("textbox",{name:"phone",exact:true}).fill("3001234567");
+  await dismissReminder();
+  const documentType=page.locator('mat-select[name="identificationType"]');
+  await documentType.click({timeout:5000}).catch(async(error)=>{
+    if(!(await reminder.isVisible().catch(()=>false)))throw error;
+    await dismissReminder();
+    await documentType.click();
+  });
+  await page.getByRole("option").filter({hasText:/Pasaporte/i}).first().click();
+  await page.getByRole("textbox",{name:"vatNumber",exact:true}).fill("AB1234567");
+  await page.getByRole("checkbox",{name:"Persona Natural",exact:true}).check();
+  await page.locator('input[name="purchaseCompany"]').check();
+  await page.getByRole("textbox",{name:"companyEmail",exact:true}).fill("co-qst-company@mailinator.com");
+  await page.getByRole("textbox",{name:"companyName",exact:true}).fill("QA Automation");
+  await page.getByRole("textbox",{name:"companyId",exact:true}).fill("9001234567");
+  await page.getByRole("textbox",{name:"companyPhone",exact:true}).fill("3001234567");
+  const next=page.getByRole("button",{name:/Continuar con el m[eé]todo de env[ií]o/i});
+  await expect(next).toBeEnabled();
+  await next.click();
+  await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i,{timeout:60000});
+}
 test.describe("CO QST - Base Store official P1",()=>{test.describe.configure({timeout:420000});
 test("SAM-24806 @qst @co @base-store @safe - UI validation in desktop view",async({page},i)=>{evidence(i,"SAM-24806");const c=getCoQstConfig();await home(page,c);const h=new HomePage(page,{setupUrl:null,homeUrl:c.baseUrl.href,footerHeadingPattern:/Tienda|Shop|Samsung/i});const a=await h.validateHomepageAttributes();expect(a.headerVisible).toBe(true);expect(a.footerVisible).toBe(true);expect(await page.locator("img").count()).toBeGreaterThan(0);});
 test("SAM-24873 @qst @co @base-store @registered - Login Home page",async({browser},i)=>{evidence(i,"SAM-24873");const c=getCoQstConfig();const {context,page}=await authenticatedPage(browser,c);await page.getByRole("button",{name:"My Profile",exact:true}).hover();await expect(page.getByText(/Cerrar Sesi[oó]n/i).filter({visible:true}).first()).toBeVisible({timeout:30000});await context.close();});
@@ -26,13 +81,27 @@ test("SAM-24879 @qst @co @base-store @safe - Facets Filter on PLP",async({page},
 async function runCanonicalCase(id,page,info){evidence(info,id);const cfg=getCoQstConfig();
 if(id==="SAM-24920"){process.env.BACKOFFICE_ENV=cfg.environment.toLowerCase();const credentials=getBackOfficeAdminCredentials();test.skip(!credentials.password,"Shared environment-scoped BackOffice credentials are required.");const orders=new BackOfficeOrderPage(page);await orders.login({...credentials,authority:"admin"});await orders.openAdminOrders();const order=await orders.openFirstAdminOrderAndReadStatus();expect(order.orderCode).toBeTruthy();expect(order.status).toBeTruthy();return;}
 const c=await cart(page,cfg);
-if(id==="SAM-24882"){await c.validateCartPage();await c.validateOrderSummary();await c.validateCartFooter();return;}
+if(id==="SAM-24882"){await c.validateCartPage();await validateCartItemPresentation(page,{sku:cfg.sku,currencyPattern:/\$\s*[\d.,]+/});await c.validateOrderSummary();await inspectAvailableServices(page);await c.validateCartFooter();return;}
 if(id==="SAM-24883"){await c.validateQuantityCanChange();return;}
 if(id==="SAM-24886"){await expect(page.getByText(/Samsung Rewards|Rewards|puntos/i).filter({visible:true}).first()).toBeVisible({timeout:30000});return;}
 if(id==="SAM-24892"){await expect(page.getByText(/Samsung Care\\+|SC\\+/i).filter({visible:true}).first()).toBeVisible({timeout:30000});return;}
 if(id==="SAM-24893"){await expect(page.getByText(/Trade[- ]?up|Plan Canje|Renueva/i).filter({visible:true}).first()).toBeVisible({timeout:30000});return;}
-if(id==="SAM-24898"){await c.proceedToCheckout();return;}
-if(id==="SAM-24899"){await c.proceedToCheckout();await expect(page.getByText(/Resumen|Order Summary/i).filter({visible:true}).first()).toBeVisible({timeout:60000});return;}
+if(id==="SAM-24898"){await coGuestCheckout(page,c);return;}
+if(id==="SAM-24899"){await coGuestCheckout(page,c);await expect(page.getByText(/Resumen|Order Summary|Ver pedido/i).filter({visible:true}).first()).toBeVisible({timeout:60000});await expect(page.getByText(/Total/i).filter({visible:true}).first()).toBeVisible({timeout:30000});return;}
+if(id==="SAM-24900"){await coGuestCheckout(page,c);await fillCoGuestContact(page);return;}
+if(id==="SAM-24905"){
+  await coGuestCheckout(page,c);
+  await fillCoGuestContact(page);
+  await page.reload({waitUntil:"domcontentloaded"});
+  await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i,{timeout:30000});
+  const delivery=page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
+  await expect(delivery).toBeVisible({timeout:60000});
+  await expect(delivery.getByText("Dirección de entrega",{exact:true})).toBeVisible({timeout:60000});
+  await expect(delivery.locator('mat-select[name="regionIso"]')).toBeVisible();
+  await expect(delivery.locator('input[name="saveInAddressBook"]:not([disabled])')).toHaveCount(0);
+  await expect(delivery.locator('input[name="saveInAddressBook"]:disabled')).toHaveCount(2);
+  return;
+}
 if(id==="SAM-24911"){await page.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));await expect(page.getByText(/Volver al inicio|Back to top|Volver arriba|Subir/i).filter({visible:true}).first()).toBeVisible({timeout:30000});return;}
 if(id==="SAM-24925"){await page.setViewportSize({width:390,height:844});await expect(page.getByRole("button",{name:/checkout|comprar|continuar/i}).filter({visible:true}).first()).toBeVisible({timeout:30000});return;}
 test.skip(true,id+" is represented canonically but requires live CO checkout/auth/payment data before promotion.");

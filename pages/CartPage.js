@@ -12,7 +12,7 @@ export default class CartPage extends BasePage {
       name: options.checkoutButtonPattern || /^continuar$/i
     });
 
-    this.cartPageTitle = page.getByText(/Tienes 1 producto en tu carrito/i);
+    this.cartPageTitle = page.getByText(options.cartPageTitlePattern || /Tienes 1 producto en tu carrito/i);
     this.cartProductSku = page.getByText(this.sku, { exact: true });
     this.cartProductName = options.productNamePattern === null
       ? null
@@ -24,12 +24,15 @@ export default class CartPage extends BasePage {
       name: options.orderSummaryPattern || /Resumen de la orden/i
     });
 
+    this.summaryProductPattern = options.summaryProductPattern || null;
     this.subtotalLabel = page.getByText('Subtotal', { exact: true });
 
     this.totalTitle = page.getByRole('heading', {
       name: options.totalPattern || /^Total$/i
     });
     this.currencyPattern = options.currencyPattern || /S\/\s*[\d,.]+/;
+    this.guestEmailPattern = options.guestEmailPattern || /ingresa tu correo|correo electr[oó]nico/i;
+    this.footerAccountPattern = options.footerAccountPattern || 'Cuenta';
   }
 
   async openCart() {
@@ -51,11 +54,9 @@ export default class CartPage extends BasePage {
     const waitForCartSurface = async () => {
       const remove = main.getByRole('button', { name: /^Remove$|^Eliminar$/i });
       const empty = main.getByText(/carrito.*vac[ií]o|no hay productos|cart.*empty/i).first();
-      const sku = main.getByText(/[A-Z]{2}-?[A-Z0-9]{5,}/).first();
       await Promise.race([
         remove.first().waitFor({ state: 'visible', timeout: 60000 }),
         empty.waitFor({ state: 'visible', timeout: 60000 }),
-        sku.waitFor({ state: 'visible', timeout: 60000 }),
       ]).catch(() => {
         throw new Error(`PE cart surface did not render after navigation. url=${this.page.url()}`);
       });
@@ -334,17 +335,18 @@ export default class CartPage extends BasePage {
       timeout: 30000
     });
 
-    await this.subtotalLabel.waitFor({
-      state: 'visible',
-      timeout: 30000
-    });
+    if (this.summaryProductPattern) {
+      await expect(this.orderSummaryTitle.locator('..')).toContainText(this.summaryProductPattern, { timeout: 30000 });
+    } else {
+      await this.subtotalLabel.waitFor({ state: 'visible', timeout: 30000 });
+    }
 
     await this.totalTitle.waitFor({
       state: 'visible',
       timeout: 30000
     });
 
-    const subtotalContainer = this.subtotalLabel.locator('..');
+    const subtotalContainer = this.summaryProductPattern ? this.orderSummaryTitle.locator('..') : this.subtotalLabel.locator('..');
     const totalContainer = this.totalTitle.locator('..');
 
     const subtotalText = await subtotalContainer.textContent();
@@ -403,7 +405,7 @@ export default class CartPage extends BasePage {
     await this.page.waitForTimeout(500);
     await finishReminder();
 
-    const guestEmail = this.page.getByPlaceholder(/ingresa tu correo|correo electr[oó]nico/i).filter({ visible: true });
+    const guestEmail = this.page.getByPlaceholder(this.guestEmailPattern).filter({ visible: true });
     const checkoutTarget = (url) =>
       /\/checkout\/one(?:\?|$)|CHECKOUT_STEP_CONTACT_INFO|\/guestlogin\/checkout/i.test(url.href);
 
@@ -419,6 +421,12 @@ export default class CartPage extends BasePage {
     }
 
     if (registered) {
+      if (/\/pe\/cart(?:\?|$)/i.test(this.page.url()) && new URL(this.cartUrl).pathname === '/pe/cart') {
+        await this.page.reload({ waitUntil: 'domcontentloaded' });
+        await this.continueButton.waitFor({ state: 'visible', timeout: 30000 });
+        await this.continueButton.click();
+        await expect(this.page).toHaveURL(/\/pe\/checkout\/one(?:\?|$)/i, { timeout: 30000 });
+      }
       if (/\/guestlogin\/checkout/i.test(this.page.url()) || await guestEmail.first().isVisible().catch(() => false)) {
         throw new Error('Registered checkout redirected to guest login; the Samsung Account session was not accepted.');
       }
@@ -428,6 +436,16 @@ export default class CartPage extends BasePage {
       return;
     }
 
+    if (!(await guestEmail.first().isVisible().catch(() => false)) && new URL(this.cartUrl).pathname === '/pe/cart') {
+      if (/\/pe\/guestlogin\/checkout/i.test(this.page.url())) {
+        await this.page.reload({ waitUntil: 'domcontentloaded' });
+      } else if (/\/pe\/cart(?:\?|$)/i.test(this.page.url())) {
+        await this.page.reload({ waitUntil: 'domcontentloaded' });
+        await this.continueButton.waitFor({ state: 'visible', timeout: 30000 });
+        await this.continueButton.click();
+      }
+      await guestEmail.first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    }
     if (!(await guestEmail.first().isVisible().catch(() => false))) {
       throw new Error(`Guest checkout did not reach the email/login surface. URL=${this.page.url()}`);
     }
@@ -482,7 +500,7 @@ export default class CartPage extends BasePage {
 
     const cuenta = footer.getByRole("heading", {
 
-      name: "Cuenta",
+      name: this.footerAccountPattern,
 
       level: 2,
 
@@ -955,10 +973,11 @@ export default class CartPage extends BasePage {
 
     // Product/model and valuation are dynamic in PE S2. The official check is
     // the final Trade-in review itself, not a stale S25/1100 hard-coded fixture.
-    const reviewText = await dialog.innerText();
-    if (!/S\/\s*[\d,.]+/.test(reviewText)) {
-      throw new Error("Trade-in final review did not expose a PEN valuation.");
-    }
+    await dialog.getByText(/Cargando p[aá]gina/i).waitFor({ state: 'hidden', timeout: 60000 });
+    await expect.poll(async () => /S\/\s*[\d,.]+/.test(await dialog.innerText()), {
+      timeout: 60000,
+      message: "Trade-in final review did not expose a PEN valuation after loading.",
+    }).toBe(true);
 
     await this.screenshot("cart-trade-in-final-review");
 
