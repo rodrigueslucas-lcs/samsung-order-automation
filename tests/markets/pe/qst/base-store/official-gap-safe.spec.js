@@ -43,16 +43,38 @@ test.describe("PE QST - official safe gap reconciliation", () => {
   test("SAM-25068 @qst @pe @base-store @safe - Verify BOGO product on cart page", async ({ page }, testInfo) => {
     evidence(testInfo, "SAM-25068");
     const cfg = config();
-    const bogoPdp = process.env.PE_QST_BOGO_PDP_URL;
-    test.skip(!bogoPdp, "PE_QST_BOGO_PDP_URL must identify a currently eligible PE BOGO product; stale campaign SKUs are not hardcoded.");
+    // Live-validated PE S2 BOGO campaign (2026-10-01):
+    // Galaxy S25 SM-S931BDBLLTP adds the promotional gifts in cart.
+    // Keep env overrides so the campaign can be rotated without changing the TC.
+    const defaultBogoSku = cfg.environment === "S2" ? "SM-S931BDBLLTP" : "";
+    const bogoSku = String(process.env.PE_QST_BOGO_SKU || defaultBogoSku).trim();
+    const bogoPdp = process.env.PE_QST_BOGO_PDP_URL ||
+      (bogoSku ? new URL(`/pe/p/${bogoSku}`, cfg.baseUrl.origin).href : "");
+    test.skip(!bogoPdp || !bogoSku, "A currently eligible PE BOGO product is required for this environment.");
+
     const target = new URL(bogoPdp);
-    if (target.hostname !== cfg.baseUrl.hostname || !target.pathname.startsWith("/pe/")) throw new Error("PE_QST_BOGO_PDP_URL must stay on the configured PE staging storefront.");
-    const bogoCfg = { ...cfg, pdpUrl: target, sku: process.env.PE_QST_BOGO_SKU || cfg.sku };
-    await test.step("Add currently eligible BOGO product to cart", () =>
+    if (target.hostname !== cfg.baseUrl.hostname || !target.pathname.startsWith("/pe/")) {
+      throw new Error("PE_QST_BOGO_PDP_URL must stay on the configured PE staging storefront.");
+    }
+    const bogoCfg = { ...cfg, pdpUrl: target, sku: bogoSku };
+
+    const cart = await test.step("Add eligible Galaxy S25 BOGO product to cart", () =>
       addConfiguredProductToPeCart(page, bogoCfg)
     );
-    await test.step("Validate BOGO promotion in cart", async () => {
-      await expect(page.getByText(/BOGO|gratis|gratuito|free|promoci[oó]n/i).filter({ visible: true }).first()).toBeVisible({ timeout: 30000 });
+    await test.step("Validate BOGO source product in cart", () => cart.validateProductInCart());
+    await test.step("Validate promotional BOGO gifts in cart", async () => {
+      const giftLabels = page.getByText(/BOGO\s*Gift/i, { exact: true }).filter({ visible: true });
+      await expect(giftLabels.first(), "PE BOGO cart must expose the BOGO Gift label.").toBeVisible({ timeout: 30000 });
+      expect(await giftLabels.count(), "PE BOGO cart should expose the promotional gift entries.").toBeGreaterThanOrEqual(1);
+
+      const freeGiftPrices = page.getByText(/^GRATIS$/i, { exact: true }).filter({ visible: true });
+      await expect(freeGiftPrices.first(), "PE BOGO promotional gift must be marked GRATIS.").toBeVisible({ timeout: 30000 });
+    });
+    recordBusinessEvidence(testInfo, {
+      bogoSku,
+      bogoPdp: target.href,
+      promotionLabel: "BOGO Gift",
+      freeGiftValidated: true,
     });
   });
 
