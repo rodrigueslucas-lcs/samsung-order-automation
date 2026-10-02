@@ -97,9 +97,18 @@ function isCoStorefront(page) {
   }
 }
 
+function profileControl(page) {
+  return page
+    .getByRole("button", { name: "My Profile", exact: true })
+    .or(page.locator("button.nv00-gnb-v4__utility-user"))
+    .or(page.locator('[data-an-tr="account"], [data-an-la*="account" i]'))
+    .filter({ visible: true })
+    .first();
+}
+
 async function hasRenderedStorefront(page, timeout = 3000) {
   if (!isCoStorefront(page)) return false;
-  return page.getByRole("button", { name: "My Profile", exact: true })
+  return profileControl(page)
     .waitFor({ state: "visible", timeout })
     .then(() => true)
     .catch(() => false);
@@ -115,7 +124,7 @@ async function findRenderedCoPage(context, preferredPage = null) {
 }
 
 async function waitForProfileMenu(page) {
-  const profile = page.getByRole("button", { name: "My Profile", exact: true });
+  const profile = profileControl(page);
   await profile.waitFor({ state: "visible", timeout: 120000 });
 
   const menu = page.locator('[role="menu"].profile-menu')
