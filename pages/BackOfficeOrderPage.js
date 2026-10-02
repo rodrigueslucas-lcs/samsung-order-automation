@@ -20,52 +20,44 @@ export default class BackOfficeOrderPage extends BackOfficePage {
   }
 
   async openAdminOrders() {
+    await this.openTreeRow("Order");
+    await this.openTreeRow("Orders");
+    await this.page
+      .getByText("Orders", { exact: true })
+      .last()
+      .waitFor({ state: "visible", timeout: 30000 });
+
+    // Orders is ready in either basic or advanced search mode. Do not force a
+    // mode switch here: Jenkins/headless can legitimately open directly in
+    // Advanced Search and the toggle transition is not reliable there.
     const quickSearch = this.page
       .getByPlaceholder("Type to search", { exact: true })
-      .filter({ visible: true });
+      .filter({ visible: true })
+      .last();
+    const advancedSearch = this.page.locator(".yw-advancedsearch:visible").first();
 
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      await this.openTreeRow("Order");
-      await this.openTreeRow("Orders");
-      await this.page
-        .getByText("Orders", { exact: true })
-        .last()
-        .waitFor({ state: "visible", timeout: 30000 });
+    await Promise.race([
+      quickSearch.waitFor({ state: "visible", timeout: 30000 }),
+      advancedSearch.waitFor({ state: "visible", timeout: 30000 }),
+    ]);
+  }
 
-      const ready = await quickSearch
-        .last()
-        .waitFor({ state: "visible", timeout: 30000 })
-        .then(() => true, () => false);
-      if (ready) break;
-
-      // Jenkins/headless sometimes leaves the ZK navigation on the Orders tree
-      // while the center workspace never mounts. Re-enter the perspective once
-      // and reopen Orders; local headed runs normally succeed on the first pass.
-      if (attempt === 0) {
-        await this.page
-          .getByText("Administration Cockpit", { exact: true })
-          .first()
-          .click();
-        await this.page.waitForFunction(() => !window.zk || !zk.processing, null, {
-          timeout: 30000,
-        }).catch(() => {});
-        continue;
-      }
-
-      throw new Error(
-        `BackOffice Orders workspace did not expose quick search after retry; current URL: ${this.page.url()}`
-      );
-    }
+  async ensureAdminBasicSearch() {
+    const quickSearch = this.page
+      .getByPlaceholder("Type to search", { exact: true })
+      .filter({ visible: true })
+      .last();
+    if (await quickSearch.isVisible().catch(() => false)) return quickSearch;
 
     const advancedSearch = this.page.locator(".yw-advancedsearch:visible").first();
-    if (await advancedSearch.isVisible().catch(() => false)) {
-      const searchModeToggle = this.page
-        .locator('button.yw-toggle-advanced-search[title="Switch search mode"]:visible')
-        .first();
-      await searchModeToggle.waitFor({ state: "visible", timeout: 30000 });
-      await this.waitForZkUpdate(() => searchModeToggle.click());
-      await quickSearch.last().waitFor({ state: "visible", timeout: 30000 });
-    }
+    await advancedSearch.waitFor({ state: "visible", timeout: 30000 });
+    const toggle = this.page
+      .locator('button.yw-toggle-advanced-search[title="Switch search mode"]:visible')
+      .first();
+    await toggle.waitFor({ state: "visible", timeout: 30000 });
+    await this.waitForZkUpdate(() => toggle.click());
+    await quickSearch.waitFor({ state: "visible", timeout: 30000 });
+    return quickSearch;
   }
 
   async expectAgentOrders() {
@@ -80,9 +72,7 @@ export default class BackOfficeOrderPage extends BackOfficePage {
   }
 
   async searchAdminOrder(orderCode) {
-    const searchInput = this.page
-      .getByPlaceholder("Type to search", { exact: true })
-      .last();
+    const searchInput = await this.ensureAdminBasicSearch();
     await searchInput.fill(orderCode);
 
     const searchToolbar = searchInput.locator("xpath=../..");
