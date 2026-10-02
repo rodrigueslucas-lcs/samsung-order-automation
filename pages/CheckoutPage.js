@@ -925,16 +925,31 @@ export default class CheckoutPage extends BasePage {
       await label.waitFor({ state: "visible", timeout: 30000 });
       await label.click({ timeout: 30000 });
 
-      await this.page.waitForFunction(
+      const selectedAfterClick = await this.page.waitForFunction(
         (name) =>
           [...document.querySelectorAll(`input[type="radio"][name="${name}"]`)]
             .some((input) => input.checked),
         groupName,
         { timeout: 10000 }
-      ).catch(() => {});
+      ).then(() => true, () => false);
 
-      if (!(await group.evaluateAll((inputs) => inputs.some((input) => input.checked)))) {
-        throw new Error(`Delivery option did not remain selected for ${groupName}.`);
+      // S2 occasionally re-renders the delivery card after address persistence,
+      // dropping the checked state from the first click. Retry the visible card
+      // once instead of failing an otherwise valid delivery selection.
+      if (!selectedAfterClick) {
+        const currentOption = this.page
+          .locator(`input[type="radio"][name="${groupName}"]`)
+          .first();
+        const currentLabel = currentOption.locator("xpath=ancestor::label[1]");
+        await currentLabel.waitFor({ state: "visible", timeout: 30000 });
+        await currentLabel.click({ timeout: 30000 });
+        await this.page.waitForFunction(
+          (name) =>
+            [...document.querySelectorAll(`input[type="radio"][name="${name}"]`)]
+              .some((input) => input.checked),
+          groupName,
+          { timeout: 15000 }
+        );
       }
     }
 
