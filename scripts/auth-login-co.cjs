@@ -311,7 +311,7 @@ async function loginCoSamsungAccount() {
   const existingAccountPage = context.pages().find((candidate) => {
     try { return new URL(candidate.url()).hostname === ACCOUNT_HOSTNAME; } catch { return false; }
   });
-  let page = existingAccountPage || await findRenderedCoPage(context) || await context.newPage();
+  let page = existingAccountPage || await findRenderedCoPage(context) || context.pages().slice(-1)[0] || await context.newPage();
   let authenticated = false;
   page.setDefaultTimeout(120000);
 
