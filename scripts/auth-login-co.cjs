@@ -117,7 +117,23 @@ async function findRenderedCoPage(context, preferredPage = null) {
 async function waitForProfileMenu(page) {
   const profile = page.getByRole("button", { name: "My Profile", exact: true });
   await profile.waitFor({ state: "visible", timeout: 120000 });
+
+  const menu = page.locator('[role="menu"].profile-menu')
+    .filter({ hasText: /Cerrar Sesi[oó]n|Iniciar Sesi[oó]n/i })
+    .filter({ visible: true })
+    .last();
+
   await profile.hover();
+  const openedFromHover = await menu
+    .waitFor({ state: "visible", timeout: 5000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (!openedFromHover) {
+    await profile.click();
+  }
+
+  await menu.waitFor({ state: "visible", timeout: 30000 });
   await page.waitForFunction(() => {
     return [...document.querySelectorAll('[role="menu"].profile-menu')].some(
       (current) => current.offsetParent !== null &&
@@ -125,11 +141,7 @@ async function waitForProfileMenu(page) {
         /Cerrar Sesi[oó]n|Iniciar Sesi[oó]n/i.test(current.innerText)
     );
   }, null, { timeout: 30000 });
-  const menu = page.locator('[role="menu"].profile-menu')
-    .filter({ hasText: /Cerrar Sesi[oó]n|Iniciar Sesi[oó]n/i })
-    .filter({ visible: true })
-    .last();
-  await menu.waitFor({ state: "visible", timeout: 30000 });
+
   return { profile, menu };
 }
 
