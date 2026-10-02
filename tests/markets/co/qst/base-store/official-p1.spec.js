@@ -5,6 +5,7 @@ import evidenceContext from "../../../../../reporting/evidence/evidenceContext";
 import coEvidenceMetadata from "../../../../../utils/qstCoEvidenceMetadata";
 import coAuthStateModule from "../../../../../utils/coAuthState";
 import BackOfficeOrderPage from "../../../../../pages/BackOfficeOrderPage";
+import CheckoutPage from "../../../../../pages/CheckoutPage";
 import backofficeCredentials from "../../../../../utils/backofficeAdminCredentials.js";
 import { addConfiguredProductToCoCart, bootstrapCoStorefront } from "./coQstFlows";
 import cartPresentation from "../../../../../flows/smb/cartPresentation";
@@ -80,6 +81,39 @@ test("SAM-24875 @qst @co @base-store @safe - GNB menu",async({page},i)=>{evidenc
 test("SAM-24879 @qst @co @base-store @safe - Facets Filter on PLP",async({page},i)=>{evidence(i,"SAM-24879");const c=getCoQstConfig();await home(page,c);const nav=page.getByRole("link",{name:/Galaxy|Smartphone|TV|Televisores/i}).filter({visible:true}).first();await nav.click();await expect(page.getByText(/Filtrar|Filtro|Filter/i).filter({visible:true}).first()).toBeVisible({timeout:60000});});
 async function runCanonicalCase(id,page,info){evidence(info,id);const cfg=getCoQstConfig();
 if(id==="SAM-24920"){process.env.BACKOFFICE_ENV=cfg.environment.toLowerCase();const credentials=getBackOfficeAdminCredentials();test.skip(!credentials.password,"Shared environment-scoped BackOffice credentials are required.");const orders=new BackOfficeOrderPage(page);await orders.login({...credentials,authority:"admin"});await orders.openAdminOrders();const order=await orders.openFirstAdminOrderAndReadStatus();expect(order.orderCode).toBeTruthy();expect(order.status).toBeTruthy();return;}
+if(id==="SAM-24912"){
+  test.skip(!hasCoAuthState(),"CO authenticated state is required for SAM-24912.");
+  const auth=getCoAuthState();
+  await auth.installPersistedBrowserState(page.context(),page);
+  await auth.validateAuthenticatedSession(page);
+  await page.keyboard.press("Escape");
+
+  const registeredCart=await cart(page,cfg);
+  await registeredCart.proceedToAuthenticatedCheckout();
+  await page.waitForURL(/CHECKOUT_STEP_(CONTACT_INFO|DELIVERY)/,{waitUntil:"domcontentloaded",timeout:60000});
+
+  if(/CHECKOUT_STEP_CONTACT_INFO/.test(page.url())){
+    await fillCoGuestContact(page);
+  }
+
+  await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i,{timeout:60000});
+  const checkout=new CheckoutPage(page);
+
+  await checkout.selectShippingMethod();
+  await checkout.acceptTerms();
+
+  const continueToPayment=page.getByRole("button",{
+    name:/Continuar con (?:el pago|los m[eé]todos de pago)/i
+  }).filter({visible:true}).first();
+  await expect(continueToPayment).toBeVisible({timeout:30000});
+  await expect(continueToPayment).toBeEnabled({timeout:30000});
+  await continueToPayment.click();
+
+  await expect(page).toHaveURL(/CHECKOUT_STEP_PAYMENT/i,{timeout:60000});
+  console.log("[SAM-24912] Payment reached. Pausing for manual payment-method inspection.");
+  await page.pause();
+  return;
+}
 if(id==="SAM-24892"){
   test.skip(true,"Official CO Care+ case is BLOCKED: the configured fridge and verified SM-S928BZTKLTC mobile expose no Samsung Care+ option. An eligible SKU is required before testing add-to-cart persistence.");
 }
