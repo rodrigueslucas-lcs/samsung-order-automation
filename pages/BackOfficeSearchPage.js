@@ -4,7 +4,10 @@ import BackOfficeCatalogPage from "./BackOfficeCatalogPage";
 
 export default class BackOfficeSearchPage extends BackOfficeOrderPage {
   async openAdvancedSearch() {
-    const quickSearch = this.page.getByRole("textbox", { name: "Type to search" }).filter({ visible: true }).first();
+    const advancedSearch = this.page.locator(".yw-advancedsearch:visible").first();
+    if (await advancedSearch.isVisible().catch(() => false)) return;
+
+    const quickSearch = await this.ensureAdminBasicSearch();
     await quickSearch.waitFor({ state: "visible", timeout: 30000 });
 
     const advancedButton = this.page
@@ -12,7 +15,7 @@ export default class BackOfficeSearchPage extends BackOfficeOrderPage {
       .first();
     await advancedButton.waitFor({ state: "visible", timeout: 30000 });
     await this.waitForZkUpdate(() => advancedButton.click());
-    await this.page.locator(".yw-advancedsearch:visible").first().waitFor({
+    await advancedSearch.waitFor({
       state: "visible",
       timeout: 30000,
     });
