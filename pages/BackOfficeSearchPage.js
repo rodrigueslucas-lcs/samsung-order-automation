@@ -24,14 +24,23 @@ export default class BackOfficeSearchPage extends BackOfficeOrderPage {
   async searchAdminOrderAdvanced(orderCode) {
     await this.openAdvancedSearch();
 
-    const orderField = this.page
-      .getByRole("row")
-      .filter({ has: this.page.getByText("Order Nr.", { exact: true }) })
-      .filter({ visible: true })
-      .first()
+    // BackOffice S2 has two valid Advanced Search renderings:
+    // a row-based form and a ZK grid where label/input are separate cells.
+    // Scope to the visible advanced-search container instead of requiring the
+    // textbox to be a descendant of the "Order Nr." row.
+    const advancedSearch = this.page.locator(".yw-advancedsearch:visible").first();
+    await advancedSearch.waitFor({ state: "visible", timeout: 30000 });
+
+    let orderField = advancedSearch
       .getByRole("textbox")
       .filter({ visible: true })
-      .last();
+      .first();
+
+    const inputs = advancedSearch.locator('input:visible:not([type="hidden"])');
+    if (!(await orderField.isVisible().catch(() => false))) {
+      orderField = inputs.first();
+    }
+
     await orderField.waitFor({ state: "visible", timeout: 30000 });
     await orderField.fill(orderCode);
 
