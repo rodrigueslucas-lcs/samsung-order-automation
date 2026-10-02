@@ -101,6 +101,16 @@ if(id==="SAM-24912"){
 
   await checkout.selectShippingMethod();
 
+  const termsConsent=page.getByText(/Acepto los T[eé]rminos\s*&\s*Condiciones vigentes/i)
+    .filter({visible:true}).first();
+  await expect(termsConsent).toBeVisible({timeout:30000});
+  await termsConsent.click();
+
+  const dataConsent=page.getByText(/Autorizo a SAMSUNG ELECTRONICS COLOMBIA/i)
+    .filter({visible:true}).first();
+  await expect(dataConsent).toBeVisible({timeout:30000});
+  await dataConsent.click();
+
   const continueToPayment=page.getByRole("button",{
     name:/Continuar con (?:el pago|los m[eé]todos de pago)/i
   }).filter({visible:true}).first();
