@@ -20,23 +20,41 @@ export default class BackOfficeOrderPage extends BackOfficePage {
   }
 
   async openAdminOrders() {
-    await this.openTreeRow("Order");
-    await this.openTreeRow("Orders");
-    await this.page
-      .getByText("Orders", { exact: true })
-      .last()
-      .waitFor({ state: "visible", timeout: 30000 });
-    // ZK can render the Orders workspace before its search toolbar, especially
-    // on the second BackOffice test in headless CI. The textbox is the actual
-    // control we need, so wait for it instead of failing on the wrapper class.
     const quickSearch = this.page
       .getByPlaceholder("Type to search", { exact: true })
       .filter({ visible: true });
 
-    if (!(await quickSearch.last().isVisible().catch(() => false))) {
-      await this.page.waitForFunction(() => !window.zk || !zk.processing, null, {
-        timeout: 30000,
-      }).catch(() => {});
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await this.openTreeRow("Order");
+      await this.openTreeRow("Orders");
+      await this.page
+        .getByText("Orders", { exact: true })
+        .last()
+        .waitFor({ state: "visible", timeout: 30000 });
+
+      const ready = await quickSearch
+        .last()
+        .waitFor({ state: "visible", timeout: 30000 })
+        .then(() => true, () => false);
+      if (ready) break;
+
+      // Jenkins/headless sometimes leaves the ZK navigation on the Orders tree
+      // while the center workspace never mounts. Re-enter the perspective once
+      // and reopen Orders; local headed runs normally succeed on the first pass.
+      if (attempt === 0) {
+        await this.page
+          .getByText("Administration Cockpit", { exact: true })
+          .first()
+          .click();
+        await this.page.waitForFunction(() => !window.zk || !zk.processing, null, {
+          timeout: 30000,
+        }).catch(() => {});
+        continue;
+      }
+
+      throw new Error(
+        `BackOffice Orders workspace did not expose quick search after retry; current URL: ${this.page.url()}`
+      );
     }
 
     const advancedSearch = this.page.locator(".yw-advancedsearch:visible").first();
@@ -46,9 +64,8 @@ export default class BackOfficeOrderPage extends BackOfficePage {
         .first();
       await searchModeToggle.waitFor({ state: "visible", timeout: 30000 });
       await this.waitForZkUpdate(() => searchModeToggle.click());
+      await quickSearch.last().waitFor({ state: "visible", timeout: 30000 });
     }
-
-    await quickSearch.last().waitFor({ state: "visible", timeout: 60000 });
   }
 
   async expectAgentOrders() {
