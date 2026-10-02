@@ -4,21 +4,36 @@ import BackOfficeCatalogPage from "./BackOfficeCatalogPage";
 
 export default class BackOfficeSearchPage extends BackOfficeOrderPage {
   async openAdvancedSearch() {
-    const advancedSearch = this.page.locator(".yw-advancedsearch:visible").first();
-    if (await advancedSearch.isVisible().catch(() => false)) return;
+    const quickSearch = this.page
+      .getByPlaceholder("Type to search", { exact: true })
+      .filter({ visible: true })
+      .last();
+    const orderLabel = this.page
+      .getByText("Order Nr.", { exact: true })
+      .filter({ visible: true })
+      .first();
 
-    const quickSearch = await this.ensureAdminBasicSearch();
-    await quickSearch.waitFor({ state: "visible", timeout: 30000 });
+    // ZK keeps .yw-advancedsearch in the DOM even while Basic Search is active
+    // in Jenkins/headless. Treat Advanced Search as active only when the Basic
+    // search input is gone and the advanced Order Nr. field label is rendered.
+    if (
+      !(await quickSearch.isVisible().catch(() => false)) &&
+      (await orderLabel.isVisible().catch(() => false))
+    ) {
+      return;
+    }
+
+    const basicSearch = await this.ensureAdminBasicSearch();
+    await basicSearch.waitFor({ state: "visible", timeout: 30000 });
 
     const advancedButton = this.page
       .locator('button.yw-toggle-advanced-search[title="Switch search mode"]:visible')
       .first();
     await advancedButton.waitFor({ state: "visible", timeout: 30000 });
     await this.waitForZkUpdate(() => advancedButton.click());
-    await advancedSearch.waitFor({
-      state: "visible",
-      timeout: 30000,
-    });
+
+    await quickSearch.waitFor({ state: "hidden", timeout: 30000 });
+    await orderLabel.waitFor({ state: "visible", timeout: 30000 });
   }
 
   async searchAdminOrderAdvanced(orderCode) {
