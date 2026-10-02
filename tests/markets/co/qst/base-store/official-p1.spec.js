@@ -100,7 +100,6 @@ if(id==="SAM-24912"){
   const checkout=new CheckoutPage(page);
 
   await checkout.selectShippingMethod();
-  await checkout.acceptTerms();
 
   const continueToPayment=page.getByRole("button",{
     name:/Continuar con (?:el pago|los m[eé]todos de pago)/i
