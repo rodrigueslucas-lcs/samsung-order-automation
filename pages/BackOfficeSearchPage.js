@@ -39,24 +39,24 @@ export default class BackOfficeSearchPage extends BackOfficeOrderPage {
   async searchAdminOrderAdvanced(orderCode) {
     await this.openAdvancedSearch();
 
-    // BackOffice S2 has two valid Advanced Search renderings:
-    // a row-based form and a ZK grid where label/input are separate cells.
-    // Scope to the visible advanced-search container instead of requiring the
-    // textbox to be a descendant of the "Order Nr." row.
     const advancedSearch = this.page.locator(".yw-advancedsearch:visible").first();
     await advancedSearch.waitFor({ state: "visible", timeout: 30000 });
 
-    let orderField = advancedSearch
-      .getByRole("textbox")
+    // In Jenkins/headless the first textbox in Advanced Search is the
+    // read-only comparator combobox ("Contains"), not the Order Nr. value.
+    // Anchor on the visible Order Nr. label and take the first editable text
+    // input that follows it, which is the actual value field for that row.
+    const orderLabel = advancedSearch
+      .getByText("Order Nr.", { exact: true })
       .filter({ visible: true })
       .first();
+    await orderLabel.waitFor({ state: "visible", timeout: 30000 });
 
-    const inputs = advancedSearch.locator('input:visible:not([type="hidden"])');
-    if (!(await orderField.isVisible().catch(() => false))) {
-      orderField = inputs.first();
-    }
-
+    const orderField = orderLabel.locator(
+      'xpath=following::input[@type="text" and not(@readonly) and not(@aria-readonly="true")][1]'
+    );
     await orderField.waitFor({ state: "visible", timeout: 30000 });
+    await expect(orderField).toBeEditable({ timeout: 30000 });
     await orderField.fill(orderCode);
 
     const searchButton = this.page
