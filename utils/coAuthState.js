@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { writeJsonAtomically } = require("./atomicJson");
 const { createAuthState } = require("./authState");
+const { withRegisteredSessionRecovery } = require("./registeredSessionRecovery");
 const { getCoQstConfig, targetEnvironment } = require("../config/markets/co");
 
 const CO_ENVIRONMENT = targetEnvironment();
@@ -17,7 +18,7 @@ function hasCoAuthState() {
 function getCoAuthState(environment = process.env) {
   const config = getCoQstConfig(environment);
   const preQa2 = config.environment === "S2" && config.baseUrl.hostname === "p6-pre-qa2.samsung.com";
-  return createAuthState({
+  const auth = createAuthState({
     authStatePath: CO_AUTH_STATE_PATH,
     sessionStoragePath: CO_AUTH_SESSION_STORAGE_PATH,
     hostname: config.baseUrl.hostname,
@@ -31,6 +32,18 @@ function getCoAuthState(environment = process.env) {
     logoutTextName: /Cerrar Sesi[oó]n/i,
     authenticatedMenuSelector: preQa2 ? '[role="menu"][aria-label="account"]' : '[role="menu"].profile-menu',
     profileMenuReadySelector: preQa2 ? '[role="menu"][aria-label="account"][aria-hidden="false"]' : '[role="menu"].profile-menu',
+  });
+
+  return withRegisteredSessionRecovery(auth, {
+    market: "CO",
+    environment: config.environment,
+    loginScript: "scripts/auth-login-co.cjs",
+    autoRenewEnv: "CO_AUTH_AUTO_RENEW",
+    enabled: !preQa2,
+    env: {
+      CO_QST_ENVIRONMENT: config.environment,
+      CO_STOREFRONT_URL: config.baseUrl.href,
+    },
   });
 }
 
