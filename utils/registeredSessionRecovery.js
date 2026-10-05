@@ -1,6 +1,8 @@
 const { spawnSync } = require("node:child_process");
 const path = require("node:path");
 
+const GUARDED_CONTEXT = Symbol.for("samsung.registeredSessionRecovery.guardedContext");
+
 function isCiRuntime() {
   return Boolean(process.env.CI || process.env.JENKINS_URL || process.env.JENKINS_HOME);
 }
@@ -24,6 +26,7 @@ function withRegisteredSessionRecovery(authState, {
   autoRenewEnv,
   env = {},
   enabled = true,
+  guardFuturePages = true,
 } = {}) {
   if (!authState || typeof authState.validateAuthenticatedSession !== "function") {
     throw new Error("A valid auth state is required for registered-session recovery.");
@@ -32,6 +35,7 @@ function withRegisteredSessionRecovery(authState, {
   const strictValidate = authState.validateAuthenticatedSession.bind(authState);
   const installState = authState.installPersistedBrowserState.bind(authState);
   const refreshState = authState.refreshAuthenticatedState.bind(authState);
+  const applySessionStorage = authState.applyAuthSessionStorage.bind(authState);
   const label = `${market || "storefront"} ${environment || ""}`.trim();
 
   async function validateAuthenticatedSession(page) {
@@ -82,8 +86,32 @@ function withRegisteredSessionRecovery(authState, {
     }
   }
 
+  async function applyAuthSessionStorage(context) {
+    await applySessionStorage(context);
+    if (!guardFuturePages || context[GUARDED_CONTEXT]) return;
+
+    const originalNewPage = context.newPage.bind(context);
+    Object.defineProperty(context, GUARDED_CONTEXT, {
+      value: true,
+      configurable: false,
+      enumerable: false,
+    });
+    context.newPage = async (...args) => {
+      const page = await originalNewPage(...args);
+      try {
+        await validateAuthenticatedSession(page);
+        await page.keyboard.press("Escape").catch(() => {});
+        return page;
+      } catch (error) {
+        await page.close().catch(() => {});
+        throw error;
+      }
+    };
+  }
+
   return {
     ...authState,
+    applyAuthSessionStorage,
     validateAuthenticatedSession,
   };
 }
