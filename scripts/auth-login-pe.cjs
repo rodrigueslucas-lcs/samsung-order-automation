@@ -80,6 +80,22 @@ async function connectDedicatedChrome() {
   throw new Error("Dedicated PE Chrome did not expose CDP within 30 seconds.");
 }
 
+async function gotoWithTransientRetry(page, url, options = {}) {
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      return await page.goto(url, options);
+    } catch (error) {
+      const transientNavigation = /net::ERR_ABORTED|frame was detached|ERR_NETWORK_CHANGED/i.test(
+        String(error?.message || error)
+      );
+      if (!transientNavigation || attempt === 2) throw error;
+      console.warn(`[auth:login:pe] transient navigation abort; retrying ${url} (${attempt + 1}/2)`);
+      await page.waitForTimeout(1000);
+    }
+  }
+  return null;
+}
+
 function assertAllowedHost(page, allowed, step) {
   if (!allowed.includes(new URL(page.url()).hostname)) throw new Error(`${step} reached an unexpected host.`);
 }
@@ -136,12 +152,12 @@ async function openPeHome(page, context) {
     return renderedBeforeNavigation;
   }
 
-  await page.goto(setupUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await gotoWithTransientRetry(page, setupUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
   assertAllowedHost(page, [HOSTNAME], "PE setup");
   await page.getByText(/You can access pages now/i).waitFor({ timeout: 60000 });
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
-    await page.goto(homeUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await gotoWithTransientRetry(page, homeUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
     assertAllowedHost(page, [HOSTNAME], "PE storefront");
     if (await hasRenderedStorefront(page, 30000)) return page;
 
