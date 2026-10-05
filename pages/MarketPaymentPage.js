@@ -24,6 +24,32 @@ export default class MarketPaymentPage extends PaymentPage {
     ]);
   }
 
+  async selectInstallments() {
+    if (this.marketProfile.code !== "CO") return super.selectInstallments();
+
+    const installments = this.page
+      .getByRole("combobox", { name: /Cuotas mensuales/i })
+      .filter({ visible: true })
+      .first();
+
+    await installments.waitFor({ state: "visible", timeout: 30000 });
+
+    const options = await installments.locator("option").evaluateAll((items) =>
+      items
+        .filter((option) => !option.disabled && option.value)
+        .map((option) => option.value)
+    );
+
+    if (options.length) {
+      await installments.selectOption(options[0]);
+      return;
+    }
+
+    await installments.click();
+    await this.page.keyboard.press("ArrowDown");
+    await this.page.keyboard.press("Enter");
+  }
+
   async placeOrderAndCapture(options = {}) {
     if (this.externalMercadoPago) return this.placeExternalMercadoPagoOrder(options);
     const { orderCodePattern } = this.marketProfile;
