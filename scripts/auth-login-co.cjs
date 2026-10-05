@@ -174,6 +174,30 @@ async function waitForProfileMenu(page) {
   throw new Error("CO profile control is visible, but login/logout actions did not render after hover/click retries.");
 }
 
+async function clickSamsungAccountSignIn(page) {
+  await page.evaluate(() => window.scrollTo(0, 0)).catch(() => {});
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const menuResult = await waitForProfileMenu(page);
+    if (menuResult.state === "authenticated") return "authenticated";
+
+    const clicked = await menuResult.login.evaluate((element) => {
+      element.click();
+      return true;
+    }).catch(() => false);
+
+    if (clicked) {
+      console.log(`[auth:login:co] Samsung Account sign-in action dispatched (${attempt}/3)`);
+      return "clicked";
+    }
+
+    await page.keyboard.press("Escape").catch(() => {});
+    await page.waitForTimeout(750);
+  }
+
+  throw new Error("CO sign-in action was visible, but the Samsung Account navigation could not be dispatched after 3 menu reopen attempts.");
+}
+
 async function openCoHome(page, context) {
   const renderedBeforeNavigation = await findRenderedCoPage(context, page);
   if (renderedBeforeNavigation) {
@@ -337,7 +361,6 @@ async function loginCoSamsungAccount() {
 
   try {
     let menuState = "signed-out";
-    let login;
     if (existingAccountPage) {
       console.log("[auth:login:co] resuming the existing Samsung Account tab in dedicated Chrome");
     } else {
@@ -347,37 +370,40 @@ async function loginCoSamsungAccount() {
       page = await openCoHome(page, context);
       const menuResult = await waitForProfileMenu(page);
       console.log(`[auth:login:co] CO profile actions are stable (${menuResult.state})`);
-      login = menuResult.login;
       menuState = menuResult.state;
     }
     if (menuState === "signed-out") {
       if (!existingAccountPage) {
         console.log("[auth:login:co] opening Samsung Account sign-in");
         const pagesBeforeLogin = new Set(context.pages());
-        await login.click();
-        const accountPage = await Promise.race([
-          page.waitForURL((url) => url.hostname === ACCOUNT_HOSTNAME, { timeout: 60000 }).then(() => page).catch(() => null),
-          context.waitForEvent("page", { timeout: 60000 }).then(async (candidate) => {
-            await candidate.waitForLoadState("domcontentloaded", { timeout: 60000 }).catch(() => {});
-            return candidate;
-          }).catch(() => null),
-        ]);
-        const accountCandidate = accountPage && (() => {
-          try { return new URL(accountPage.url()).hostname === ACCOUNT_HOSTNAME; } catch { return false; }
-        })() ? accountPage : context.pages().find((candidate) => {
-          if (pagesBeforeLogin.has(candidate)) return false;
-          try { return new URL(candidate.url()).hostname === ACCOUNT_HOSTNAME; } catch { return false; }
-        });
-        if (!accountCandidate) {
-          const currentMenu = await waitForProfileMenu(page).catch(() => null);
-          if (currentMenu?.state === "authenticated") {
-            console.log("[auth:login:co] storefront became authenticated without an account-page navigation");
-            menuState = "authenticated";
-          } else {
-            throw new Error("Samsung Account sign-in did not open in the current tab or a new tab within 60 seconds.");
-          }
+        const signInDispatch = await clickSamsungAccountSignIn(page);
+        if (signInDispatch === "authenticated") {
+          menuState = "authenticated";
         } else {
-          page = accountCandidate;
+          const accountPage = await Promise.race([
+            page.waitForURL((url) => url.hostname === ACCOUNT_HOSTNAME, { timeout: 60000 }).then(() => page).catch(() => null),
+            context.waitForEvent("page", { timeout: 60000 }).then(async (candidate) => {
+              await candidate.waitForLoadState("domcontentloaded", { timeout: 60000 }).catch(() => {});
+              return candidate;
+            }).catch(() => null),
+          ]);
+          const accountCandidate = accountPage && (() => {
+            try { return new URL(accountPage.url()).hostname === ACCOUNT_HOSTNAME; } catch { return false; }
+          })() ? accountPage : context.pages().find((candidate) => {
+            if (pagesBeforeLogin.has(candidate)) return false;
+            try { return new URL(candidate.url()).hostname === ACCOUNT_HOSTNAME; } catch { return false; }
+          });
+          if (!accountCandidate) {
+            const currentMenu = await waitForProfileMenu(page).catch(() => null);
+            if (currentMenu?.state === "authenticated") {
+              console.log("[auth:login:co] storefront became authenticated without an account-page navigation");
+              menuState = "authenticated";
+            } else {
+              throw new Error("Samsung Account sign-in did not open in the current tab or a new tab within 60 seconds.");
+            }
+          } else {
+            page = accountCandidate;
+          }
         }
       }
       if (menuState === "signed-out") assertAllowedHost(page, [ACCOUNT_HOSTNAME], "Samsung Account login");
