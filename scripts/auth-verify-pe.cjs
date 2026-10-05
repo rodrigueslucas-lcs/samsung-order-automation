@@ -14,6 +14,12 @@ function writeJsonSecurely(destination, value) {
   fs.renameSync(temporary, destination);
 }
 
+function isTransientNavigationError(error) {
+  return /ERR_CONNECTION_TIMED_OUT|ERR_NETWORK_CHANGED|ERR_ABORTED|frame was detached/i.test(
+    String(error?.message || error)
+  );
+}
+
 async function safeDiagnostic(page) {
   let url = "unavailable";
   let title = "unavailable";
@@ -62,7 +68,7 @@ async function verifyPeAuthentication() {
     console.log(`[auth:verify:pe] runtime: ${ci ? "CI Chrome | headless" : "local Chrome | headed"}`);
 
     let lastError;
-    const attempts = ci ? 3 : 1;
+    const attempts = 3;
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       try {
         await auth.validateAuthenticatedSession(page);
@@ -78,10 +84,13 @@ async function verifyPeAuthentication() {
         );
 
         const message = String(error?.message || error);
+        const transientNavigation = isTransientNavigationError(error);
         const storefrontDidNotRender = /storefront did not render My Profile/i.test(message);
         const runtimeBlank = storefrontDidNotRender && Number(diagnostic.bodyChars) < 100;
-        if (!ci || !runtimeBlank || attempt === attempts) {
-          if (ci && runtimeBlank) {
+        const retryableRuntimeFailure = transientNavigation || runtimeBlank;
+
+        if (!retryableRuntimeFailure || attempt === attempts) {
+          if (ci && runtimeBlank && !transientNavigation) {
             const runtimeError = new Error(
               `PE ${config.environment} storefront did not render usable content in Jenkins CI Chrome after ${attempts} attempts; authentication could not be evaluated. This is a CI/storefront runtime failure, not proof that the saved Samsung session expired.`
             );
@@ -91,7 +100,8 @@ async function verifyPeAuthentication() {
           throw error;
         }
 
-        console.warn(`[auth:verify:pe] blank storefront runtime detected; retrying with a fresh navigation (${attempt + 1}/${attempts})`);
+        const reason = transientNavigation ? "transient navigation/network failure" : "blank storefront runtime";
+        console.warn(`[auth:verify:pe] ${reason}; retrying with a fresh navigation (${attempt + 1}/${attempts})`);
         await page.waitForTimeout(3000);
         try { await page.goto("about:blank"); } catch {}
       }
