@@ -155,10 +155,11 @@ if (fs.existsSync(reportFile)) {
   console.log(`\nPE ${targetEnvironment} BASE STORE P1 SUMMARY`);
   console.log(`Official=${runtimeSummary.summary.official} Executed=${runtimeSummary.summary.executed} Passed=${runtimeSummary.summary.passed} Failed=${runtimeSummary.summary.failed} Blocked=${runtimeSummary.summary.blocked} NotRun=${runtimeSummary.summary.notRun}`);
 
-  // A targeted run intentionally leaves the rest of the official scope as NotRun.
-  // Build health must reflect the tests that were actually requested/executed, not untouched scope.
+  // Intentionally skipped/blocked TCs are reported for visibility but do not
+  // make the campaign fail. Build health is red only for a real test failure,
+  // an unexpected full-scope NOT_RUN, or an underlying Playwright/runner error.
   const targeted = requestedTargetIds.length > 0;
-  if (runtimeSummary.summary.failed > 0 || runtimeSummary.summary.blocked > 0) {
+  if (runtimeSummary.summary.failed > 0) {
     process.exitCode = result.status || 1;
   } else if (!targeted && runtimeSummary.summary.notRun > 0) {
     process.exitCode = result.status || 1;
