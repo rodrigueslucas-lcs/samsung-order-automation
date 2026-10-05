@@ -35,6 +35,16 @@ export default class MarketPaymentPage extends PaymentPage {
 
   async selectCreditCard() {
     const directCard = this.creditCardOption.filter({ visible: true }).first();
+
+    if (this.marketProfile.code === "CO") {
+      await directCard.waitFor({ state: "visible", timeout: 90000 }).catch(() => {
+        throw new Error(
+          "CO credit/debit card option did not render on Payment. Keep the SAM-24912 cart at one low-value product and verify the storefront payment methods before retrying."
+        );
+      });
+      return super.selectCreditCard();
+    }
+
     if (await directCard.isVisible().catch(() => false)) return super.selectCreditCard();
 
     const walletsHeading = this.page.getByRole("heading", { name: /^Billeteras digitales$/i }).filter({ visible: true }).first();
