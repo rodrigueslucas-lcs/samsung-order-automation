@@ -106,6 +106,31 @@ function profileControl(page) {
     .first();
 }
 
+function accountActions(page) {
+  const login = page
+    .locator('a[data-an-la="login"], a.loginBtn')
+    .or(page.getByRole("link", { name: /Iniciar Sesi[oó]n/i }))
+    .filter({ visible: true })
+    .first();
+  const logout = page
+    .getByText(/Cerrar Sesi[oó]n/i)
+    .filter({ visible: true })
+    .first();
+  return { login, logout };
+}
+
+async function visibleAccountState(page, timeout = 5000) {
+  const { login, logout } = accountActions(page);
+  const state = await Promise.race([
+    logout.waitFor({ state: "visible", timeout }).then(() => "authenticated").catch(() => null),
+    login.waitFor({ state: "visible", timeout }).then(() => "signed-out").catch(() => null),
+  ]);
+  if (state) return { state, login, logout };
+  if (await logout.isVisible().catch(() => false)) return { state: "authenticated", login, logout };
+  if (await login.isVisible().catch(() => false)) return { state: "signed-out", login, logout };
+  return null;
+}
+
 async function hasRenderedStorefront(page, timeout = 3000) {
   if (!isCoStorefront(page)) return false;
   return profileControl(page)
@@ -127,23 +152,26 @@ async function waitForProfileMenu(page) {
   const profile = profileControl(page);
   await profile.waitFor({ state: "visible", timeout: 120000 });
 
-  const menu = page.locator('[role="menu"].profile-menu')
-    .filter({ hasText: /Cerrar Sesi[oó]n|Iniciar Sesi[oó]n/i })
-    .filter({ visible: true })
-    .last();
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const alreadyOpen = await visibleAccountState(page, 1000);
+    if (alreadyOpen) return { profile, ...alreadyOpen };
 
-  await profile.hover();
-  const openedFromHover = await menu
-    .waitFor({ state: "visible", timeout: 5000 })
-    .then(() => true)
-    .catch(() => false);
+    if (attempt === 1) {
+      await profile.hover().catch(() => {});
+    } else {
+      await profile.click({ timeout: 10000 }).catch(() => {});
+    }
 
-  if (!openedFromHover) {
-    await profile.click();
+    const opened = await visibleAccountState(page, attempt === 1 ? 6000 : 10000);
+    if (opened) return { profile, ...opened };
+
+    if (attempt < 3) {
+      await page.keyboard.press("Escape").catch(() => {});
+      await page.waitForTimeout(750);
+    }
   }
 
-  await menu.waitFor({ state: "visible", timeout: 30000 });
-  return { profile, menu };
+  throw new Error("CO profile control is visible, but login/logout actions did not render after hover/click retries.");
 }
 
 async function openCoHome(page, context) {
@@ -308,7 +336,6 @@ async function loginCoSamsungAccount() {
   page.setDefaultTimeout(120000);
 
   try {
-    let menu;
     let menuState = "signed-out";
     let login;
     if (existingAccountPage) {
@@ -318,10 +345,10 @@ async function loginCoSamsungAccount() {
       page = await openCoHome(page, context);
       console.log(`[auth:login:co] CO ${ENV_NAME} My Profile is visible`);
       page = await openCoHome(page, context);
-      ({ menu } = await waitForProfileMenu(page));
-      console.log("[auth:login:co] CO profile menu is stable");
-      login = menu.locator('a[data-an-la="login"]').filter({ visible: true });
-      menuState = /Cerrar Sesi[oó]n/i.test(await menu.innerText()) ? "authenticated" : "signed-out";
+      const menuResult = await waitForProfileMenu(page);
+      console.log(`[auth:login:co] CO profile actions are stable (${menuResult.state})`);
+      login = menuResult.login;
+      menuState = menuResult.state;
     }
     if (menuState === "signed-out") {
       if (!existingAccountPage) {
@@ -343,7 +370,7 @@ async function loginCoSamsungAccount() {
         });
         if (!accountCandidate) {
           const currentMenu = await waitForProfileMenu(page).catch(() => null);
-          if (currentMenu && /Cerrar Sesi[oó]n/i.test(await currentMenu.menu.innerText())) {
+          if (currentMenu?.state === "authenticated") {
             console.log("[auth:login:co] storefront became authenticated without an account-page navigation");
             menuState = "authenticated";
           } else {
@@ -403,8 +430,7 @@ async function loginCoSamsungAccount() {
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       page = await openCoHome(page, context);
       const menuResult = await waitForProfileMenu(page).catch(() => null);
-      if (menuResult && /Cerrar Sesi[oó]n/i.test(await menuResult.menu.innerText())) {
-        menu = menuResult.menu;
+      if (menuResult?.state === "authenticated") {
         authenticatedMenu = menuResult;
         break;
       }
