@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { writeJsonAtomically } = require("./atomicJson");
 const { createAuthState } = require("./authState");
+const { withRegisteredSessionRecovery } = require("./registeredSessionRecovery");
 const { getPeQstConfig, targetEnvironment } = require("../config/markets/pe");
 
 const PE_ENVIRONMENT = targetEnvironment();
@@ -16,7 +17,7 @@ function hasPeAuthState() {
 
 function getPeAuthState(environment = process.env) {
   const config = getPeQstConfig(environment);
-  return createAuthState({
+  const auth = createAuthState({
     authStatePath: PE_AUTH_STATE_PATH,
     sessionStoragePath: PE_AUTH_SESSION_STORAGE_PATH,
     hostname: config.baseUrl.hostname,
@@ -29,6 +30,18 @@ function getPeAuthState(environment = process.env) {
     logoutTextName: /Cerrar Sesi[oó]n/i,
     authenticatedMenuSelector: '[role="menu"].profile-menu',
     profileMenuReadySelector: '[role="menu"].profile-menu:not(.mat-menu-panel-animating)',
+  });
+
+  return withRegisteredSessionRecovery(auth, {
+    market: "PE",
+    environment: config.environment,
+    loginScript: "scripts/auth-login-pe.cjs",
+    autoRenewEnv: "PE_AUTH_AUTO_RENEW",
+    env: {
+      PE_QST_ENVIRONMENT: config.environment,
+      PE_STOREFRONT_URL: config.baseUrl.href,
+      ...(config.setupUrl ? { PE_SETUP_URL: config.setupUrl.href } : {}),
+    },
   });
 }
 
