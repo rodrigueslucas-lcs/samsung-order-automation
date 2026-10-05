@@ -30,7 +30,7 @@ function getCoAuthState(environment = process.env) {
     profileButtonSelector: preQa2 ? "button.nv00-gnb-v4__utility-user:visible" : null,
     logoutTextName: /Cerrar Sesi[oó]n/i,
     authenticatedMenuSelector: preQa2 ? '[role="menu"][aria-label="account"]' : '[role="menu"].profile-menu',
-    profileMenuReadySelector: preQa2 ? '[role="menu"][aria-label="account"][aria-hidden="false"]' : '[role="menu"].profile-menu:not(.mat-menu-panel-animating)',
+    profileMenuReadySelector: preQa2 ? '[role="menu"][aria-label="account"][aria-hidden="false"]' : '[role="menu"].profile-menu',
   });
 }
 

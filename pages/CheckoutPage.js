@@ -51,16 +51,16 @@ export default class CheckoutPage extends BasePage {
       await this.screenshot("04-customer-info");
       await this.customerContinueButton.click();
 
-      const deliveryReached = await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, {
-        waitUntil: "domcontentloaded",
-        timeout: 12000,
-      }).then(() => true, () => false);
+      const deliveryReached = await this.page
+        .getByRole("heading", { name: /Direcci[oó]n de entrega/i })
+        .waitFor({ state: "visible", timeout: 30000 })
+        .then(() => true, () => false);
       if (deliveryReached || /CHECKOUT_STEP_DELIVERY/.test(this.page.url())) break;
 
       // Do not spend another 30s retrying identical invalid Contact Info.
       // Retry only when S2 kept a clean, enabled form with no validation error.
       const validationErrors = this.page.locator(
-        '[aria-invalid="true"], .mat-mdc-form-field-error, mat-error, [class*="error" i]'
+        '.mat-mdc-form-field-error, mat-error, [role="alert"]'
       ).filter({ visible: true });
       const errorText = (await validationErrors.allInnerTexts().catch(() => []))
         .join(" ").replace(/\s+/g, " ").trim().slice(0, 300);

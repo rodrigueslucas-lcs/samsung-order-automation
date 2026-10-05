@@ -143,14 +143,6 @@ async function waitForProfileMenu(page) {
   }
 
   await menu.waitFor({ state: "visible", timeout: 30000 });
-  await page.waitForFunction(() => {
-    return [...document.querySelectorAll('[role="menu"].profile-menu')].some(
-      (current) => current.offsetParent !== null &&
-        !current.classList.contains("mat-menu-panel-animating") &&
-        /Cerrar Sesi[oó]n|Iniciar Sesi[oó]n/i.test(current.innerText)
-    );
-  }, null, { timeout: 30000 });
-
   return { profile, menu };
 }
 

@@ -6,7 +6,10 @@ import coEvidenceMetadata from "../../../../../utils/qstCoEvidenceMetadata";
 import coAuthStateModule from "../../../../../utils/coAuthState";
 import BackOfficeOrderPage from "../../../../../pages/BackOfficeOrderPage";
 import CheckoutPage from "../../../../../pages/CheckoutPage";
+import MarketPaymentPage from "../../../../../pages/MarketPaymentPage";
 import backofficeCredentials from "../../../../../utils/backofficeAdminCredentials.js";
+import mxTestCard from "../../../../../utils/mxTestCard.js";
+import destructiveGuards from "../../../../../utils/destructiveGuards.js";
 import { addConfiguredProductToCoCart, bootstrapCoStorefront } from "./coQstFlows";
 import cartPresentation from "../../../../../flows/smb/cartPresentation";
 const {getCoQstConfig}=coConfigModule;
@@ -14,12 +17,38 @@ const {recordBusinessEvidence}=evidenceContext;
 const {getCoQstEvidenceMetadata}=coEvidenceMetadata;
 const {CO_AUTH_STATE_PATH,getCoAuthState,hasCoAuthState}=coAuthStateModule;
 const {getBackOfficeAdminCredentials}=backofficeCredentials;
+const {getMxTestCard}=mxTestCard;
+const {requirePaymentSubmitOptIn}=destructiveGuards;
 const {validateCartItemPresentation,inspectAvailableServices}=cartPresentation;
 const productCases=new Set(["SAM-24880","SAM-24882","SAM-24883","SAM-24886","SAM-24892","SAM-24893","SAM-24896","SAM-24898","SAM-24899","SAM-24900","SAM-24901","SAM-24902","SAM-24903","SAM-24904","SAM-24905","SAM-24909","SAM-24910","SAM-24911","SAM-24912","SAM-24915","SAM-24919","SAM-24920","SAM-24925"]);
 function evidence(info,id){recordBusinessEvidence(info,getCoQstEvidenceMetadata(id));}
 async function home(page,cfg){await bootstrapCoStorefront(page,cfg);await page.goto(cfg.baseUrl.href,{waitUntil:"domcontentloaded"});await expect(page.getByRole("button",{name:"My Profile",exact:true})).toBeVisible({timeout:60000});}
 async function authenticatedPage(browser,cfg){test.skip(!hasCoAuthState(),"CO authenticated state is required.");const context=await browser.newContext({storageState:CO_AUTH_STATE_PATH});await getCoAuthState().applyAuthSessionStorage(context);const page=await context.newPage();await home(page,cfg);return {context,page};}
 async function cart(page,cfg){const c=await addConfiguredProductToCoCart(page,cfg);await c.validateProductInCart();return c;}
+async function clearCoCartForPayment(page,cfg){
+  await page.goto(cfg.cartUrl.href,{waitUntil:"domcontentloaded",timeout:60000});
+  const main=page.getByRole("main");
+  const remove=main.getByRole("button",{name:/^Remove$|^Eliminar$/i});
+  const empty=main.getByText(/carrito.*vac[ií]o|no hay productos/i).first();
+  await Promise.race([
+    remove.first().waitFor({state:"visible",timeout:60000}),
+    empty.waitFor({state:"visible",timeout:60000}),
+  ]);
+  for(let removed=0;removed<20;removed++){
+    const count=await remove.count();
+    if(!count){
+      await expect(empty).toBeVisible({timeout:30000});
+      return;
+    }
+    await remove.first().click();
+    const confirmation=page.getByRole("dialog").or(page.getByRole("alertdialog"))
+      .filter({hasText:/Eliminar/i});
+    await expect(confirmation).toBeVisible({timeout:30000});
+    await confirmation.getByRole("button",{name:/^S[ií],?\s*eliminar$/i}).click();
+    await expect(remove).toHaveCount(count-1,{timeout:30000});
+  }
+  throw new Error("CO payment cart cleanup exceeded the 20-row safety limit.");
+}
 async function coGuestCheckout(page,cartPage){
   try {
     await cartPage.proceedToCheckout();
@@ -73,6 +102,93 @@ async function fillCoGuestContact(page){
   await next.click();
   await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i,{timeout:60000});
 }
+async function coRegisteredDelivery(browser){
+  const cfg=getCoQstConfig();
+  const {context,page}=await authenticatedPage(browser,cfg);
+  try{
+    const c=await addConfiguredProductToCoCart(page,{...cfg,setupUrl:null});
+    await c.validateProductInCart();
+    await page.getByRole("button",{name:/^Continuar con la compra$/i}).click();
+    await expect(page).toHaveURL(/\/co\/checkout\/one/i,{timeout:60000});
+    if(/CHECKOUT_STEP_CONTACT_INFO/i.test(page.url()))await fillCoGuestContact(page);
+    const delivery=page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
+    await expect(delivery).toBeVisible({timeout:60000});
+    return {context,page,delivery};
+  }catch(error){await context.close();throw error;}
+}
+async function coDismissReminder(page){
+  const dialog=page.locator('[role="dialog"][aria-modal="true"]:visible');
+  for(let n=0;n<4 && await dialog.isVisible().catch(()=>false);n++){
+    await dialog.getByText(/¡Listo!/i).filter({visible:true}).last().click({timeout:3000}).catch(async()=>{
+      await page.locator('#ins-frameless-overlay[close-on-click="true"]').click({position:{x:1,y:1},timeout:3000});
+    });
+  }
+  await expect(dialog).toBeHidden({timeout:5000});
+}
+async function coClick(page,locator){
+  await expect(locator).toBeEnabled({timeout:30000});
+  for(let n=0;n<4;n++){
+    await coDismissReminder(page);
+    try{await locator.click({timeout:3000});return;}
+    catch(error){if(!/intercepts pointer events/i.test(String(error)))throw error;}
+  }
+  throw new Error("Checkout reminder repeatedly blocked the address control.");
+}
+async function coSelectAddressMode(page,delivery,kind,mode){
+  const radio=delivery.locator(`input[name="addressOption${kind}"][value="${mode}"]`);
+  await expect(radio).toBeVisible({timeout:30000});
+  if(!await radio.isChecked()){
+    const label=radio.locator('xpath=ancestor::mat-radio-button[1]');
+    await coClick(page,label.getByText(mode==="NEW_ADDRESS"?/Nueva direcci[oó]n/i:/Direcci[oó]n guardada/i));
+  }
+  await expect(radio).toBeChecked();
+}
+async function coSelectOption(page,delivery,name,option){
+  await coClick(page,delivery.locator(`mat-select[name="${name}"]`));
+  await coClick(page,page.getByRole("option",{name:option,exact:true}));
+}
+async function coFillNewShipping(page,delivery,secondaryNumber="113-43"){
+  await coSelectAddressMode(page,delivery,"Shipping","NEW_ADDRESS");
+  for(const [field,option] of [["regionIso","Bogota, D.C."],["town","BOGOTA, D.C."],["line2_a","Carrera"],["line1","Oficina"]]){
+    await coSelectOption(page,delivery,field,option);
+  }
+  await delivery.locator('input[name="line2_b"]').fill("7");
+  await delivery.locator('input[name="line2_c"]').fill(secondaryNumber);
+  await delivery.locator('input[name="line2_d"]').fill("Usaquen");
+  await delivery.locator('input[name="apartment"]').fill("607");
+}
+async function coFillNewBilling(page,delivery,secondaryNumber="113-43"){
+  await coDismissReminder(page);
+  await delivery.locator('input[name="sameAsShipping"]').uncheck();
+  await coSelectAddressMode(page,delivery,"Billing","NEW_ADDRESS");
+  await coSelectOption(page,delivery,"departmentBilling","Bogota, D.C.");
+  await coSelectOption(page,delivery,"municipalityBilling","BOGOTA, D.C.");
+  await delivery.locator('input[name="line1"]').fill(`Carrera 7 #${secondaryNumber}, Oficina 607, Usaquen`);
+}
+async function coContinueToPayment(page,delivery){
+  if(await delivery.locator('input[name="group0delivery_mode_option"]:checked').count()===0){
+    await delivery.locator('mat-radio-button').filter({hasText:/Envío regular/i}).first().locator('input[type="radio"]').check();
+  }
+  for(const field of ["termsAndCondition","termsAndCondition2"]){
+    await coDismissReminder(page);
+    await delivery.locator(`input[name="${field}"]`).check();
+  }
+  await coDismissReminder(page);
+  await delivery.getByRole("button",{name:/Continuar con el pago/i}).click();
+  await expect(page).toHaveURL(/CHECKOUT_STEP_PAYMENT/i,{timeout:60000});
+}
+async function coSelectSavedAddress(page,delivery,kind){
+  const savedMode=delivery.locator(`input[name="addressOption${kind}"]:not([value="NEW_ADDRESS"])`).first();
+  await expect(savedMode,"A saved CO address must be available.").toBeVisible({timeout:30000});
+  if(!await savedMode.isChecked()){
+    await coClick(page,savedMode.locator('xpath=ancestor::mat-radio-button[1]').getByText(/Direcci[oó]n guardada/i));
+  }
+  await expect(savedMode).toBeChecked();
+  const savedOptions=delivery.locator(`input[name*="${kind.toLowerCase()}"]:checked`).filter({visible:true});
+  await expect(delivery.getByText(/Carrera|Calle|Bogot[aá]/i).filter({visible:true}).first(),
+    "The selected saved address must render in checkout.").toBeVisible({timeout:30000});
+  return savedOptions;
+}
 test.describe("CO QST - Base Store official P1",()=>{test.describe.configure({timeout:420000});
 test("SAM-24806 @qst @co @base-store @safe - UI validation in desktop view",async({page},i)=>{evidence(i,"SAM-24806");const c=getCoQstConfig();await home(page,c);const h=new HomePage(page,{setupUrl:null,homeUrl:c.baseUrl.href,footerHeadingPattern:/Tienda|Shop|Samsung/i});const a=await h.validateHomepageAttributes();expect(a.headerVisible).toBe(true);expect(a.footerVisible).toBe(true);expect(await page.locator("img").count()).toBeGreaterThan(0);});
 test("SAM-24873 @qst @co @base-store @registered - Login Home page",async({browser},i)=>{evidence(i,"SAM-24873");const c=getCoQstConfig();const {context,page}=await authenticatedPage(browser,c);await page.getByRole("button",{name:"My Profile",exact:true}).hover();await expect(page.getByText(/Cerrar Sesi[oó]n/i).filter({visible:true}).first()).toBeVisible({timeout:30000});await context.close();});
@@ -82,13 +198,23 @@ test("SAM-24879 @qst @co @base-store @safe - Facets Filter on PLP",async({page},
 async function runCanonicalCase(id,page,info){evidence(info,id);const cfg=getCoQstConfig();
 if(id==="SAM-24920"){process.env.BACKOFFICE_ENV=cfg.environment.toLowerCase();const credentials=getBackOfficeAdminCredentials();test.skip(!credentials.password,"Shared environment-scoped BackOffice credentials are required.");const orders=new BackOfficeOrderPage(page);await orders.login({...credentials,authority:"admin"});await orders.openAdminOrders();const order=await orders.openFirstAdminOrderAndReadStatus();expect(order.orderCode).toBeTruthy();expect(order.status).toBeTruthy();return;}
 if(id==="SAM-24912"){
+  test.setTimeout(600000);
+  requirePaymentSubmitOptIn();
   test.skip(!hasCoAuthState(),"CO authenticated state is required for SAM-24912.");
   const auth=getCoAuthState();
   await auth.installPersistedBrowserState(page.context(),page);
-  await auth.validateAuthenticatedSession(page);
+  try{
+    await auth.validateAuthenticatedSession(page);
+  }catch(error){
+    if(!/storefront did not render its profile control/i.test(String(error)))throw error;
+    await page.reload({waitUntil:"domcontentloaded",timeout:60000});
+    await auth.validateAuthenticatedSession(page);
+  }
   await page.keyboard.press("Escape");
 
+  await clearCoCartForPayment(page,cfg);
   const registeredCart=await cart(page,cfg);
+  await expect(page.getByText(/Tienes\s+1\s+Producto\(s\)\s+en\s+tu\s+carrito/i)).toBeVisible({timeout:30000});
   await registeredCart.proceedToAuthenticatedCheckout();
   await page.waitForURL(/CHECKOUT_STEP_(CONTACT_INFO|DELIVERY)/,{waitUntil:"domcontentloaded",timeout:60000});
 
@@ -119,8 +245,14 @@ if(id==="SAM-24912"){
   await continueToPayment.click();
 
   await expect(page).toHaveURL(/CHECKOUT_STEP_PAYMENT/i,{timeout:60000});
-  console.log("[SAM-24912] Payment reached. Pausing for manual payment-method inspection.");
-  await page.pause();
+  const payment=new MarketPaymentPage(page,{market:"CO"});
+  const card=getMxTestCard();
+  await payment.selectCreditCard();
+  await payment.fillCardData(card);
+  await payment.validateCreditCardReady(card);
+  const result=await payment.placeOrderAndCapture();
+  expect(result.orderCode).toMatch(/^CO\d{6}-\d{8}(?:_\d+)?$/i);
+  console.log("CO_QST_REGISTERED_ORDER",JSON.stringify({orderCode:result.orderCode,paymentMode:"co-mercadoCC",outcome:result.outcome}));
   return;
 }
 if(id==="SAM-24892"){
@@ -180,15 +312,89 @@ test("SAM-24896 @qst @co @base-store - Cart value when Reg user logs out",async(
 test("SAM-24898 @qst @co @base-store - Checkout button on cart page",async({page},i)=>runCanonicalCase("SAM-24898",page,i));
 test("SAM-24899 @qst @co @base-store - Order Summary on checkout page",async({page},i)=>runCanonicalCase("SAM-24899",page,i));
 test("SAM-24900 @qst @co @base-store - Step 1 Contact Details Section",async({page},i)=>runCanonicalCase("SAM-24900",page,i));
-test("SAM-24901 @qst @co @base-store - Add Edit saved new address",async({page},i)=>runCanonicalCase("SAM-24901",page,i));
-test("SAM-24902 @qst @co @base-store - Select saved address",async({page},i)=>runCanonicalCase("SAM-24902",page,i));
-test("SAM-24903 @qst @co @base-store - Save option for reg user",async({page},i)=>runCanonicalCase("SAM-24903",page,i));
+test("SAM-24901 @qst @co @base-store @registered - Add Edit saved new address",async({browser},i)=>{
+  test.skip(process.env.ALLOW_PROFILE_WRITE!=="1","Persistent CO address edits require ALLOW_PROFILE_WRITE=1.");
+  evidence(i,"SAM-24901");
+  const {context,page,delivery}=await coRegisteredDelivery(browser);
+  try{
+    const secondaryNumber=`113-${Date.now()%10000}`;
+    await coFillNewShipping(page,delivery,secondaryNumber);
+    const save=delivery.locator('input[name="saveInAddressBook"]:not([disabled])').first();
+    await expect(save).toBeVisible();
+    await save.check();
+    await expect(save).toBeChecked();
+    await coFillNewBilling(page,delivery,secondaryNumber);
+    await delivery.locator('input[name="saveInAddressBook"]:not([disabled])').last().check();
+    await coContinueToPayment(page,delivery);
+    await expect(page.getByText(secondaryNumber,{exact:false}).filter({visible:true}).first()).toBeVisible({timeout:30000});
+    const edit=page.locator('.delivery-item-actions a.actions__edit').first();
+    await expect(edit).toBeVisible({timeout:30000});
+    await coClick(page,edit);
+    await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i,{timeout:30000});
+    await expect(page.getByText(secondaryNumber,{exact:false}).filter({visible:true}).first()).toBeVisible({timeout:30000});
+    const changedNumber=`114-${Date.now()%10000}`;
+    await coFillNewShipping(page,delivery,changedNumber);
+    const changedShippingSave=delivery.locator('input[name="saveInAddressBook"]:not([disabled])').first();
+    await changedShippingSave.check();
+    await expect(changedShippingSave).toBeChecked();
+    await coFillNewBilling(page,delivery,changedNumber);
+    const changedBillingSave=delivery.locator('input[name="saveInAddressBook"]:not([disabled])').last();
+    await changedBillingSave.check();
+    await expect(changedBillingSave).toBeChecked();
+    await coContinueToPayment(page,delivery);
+    const shippingSummary=page.locator('.address-details__delivery-address');
+    const billingSummary=page.locator('.address-details__billing-address');
+    await expect(shippingSummary).toContainText(changedNumber,{timeout:30000});
+    await expect(billingSummary).toContainText(changedNumber,{timeout:30000});
+    await expect(shippingSummary).not.toContainText(secondaryNumber);
+    await i.attach("co-24901-updated-checkout-addresses",{body:await page.screenshot({fullPage:true}),contentType:"image/png"});
+  }finally{await context.close();}
+});
+test("SAM-24902 @qst @co @base-store @registered - Select saved address",async({browser},i)=>{
+  evidence(i,"SAM-24902");
+  const {context,page,delivery}=await coRegisteredDelivery(browser);
+  try{
+    await coSelectSavedAddress(page,delivery,"Shipping");
+    await coDismissReminder(page);
+    await delivery.locator('input[name="sameAsShipping"]').uncheck();
+    await coSelectSavedAddress(page,delivery,"Billing");
+    await coContinueToPayment(page,delivery);
+    await expect(page.getByText(/Bogot[aá]|Carrera|Calle/i).filter({visible:true}).first()).toBeVisible({timeout:30000});
+  }finally{await context.close();}
+});
+test("SAM-24903 @qst @co @base-store @registered - Save option for reg user",async({browser},i)=>{
+  test.skip(process.env.ALLOW_PROFILE_WRITE!=="1","Saving CO profile addresses requires ALLOW_PROFILE_WRITE=1.");
+  evidence(i,"SAM-24903");
+  const {context,page,delivery}=await coRegisteredDelivery(browser);
+  try{
+    const secondaryNumber=`113-${Date.now()%10000}`;
+    await coFillNewShipping(page,delivery,secondaryNumber);
+    const shippingSave=delivery.locator('input[name="saveInAddressBook"]:not([disabled])').first();
+    await expect(shippingSave).toBeVisible();
+    await shippingSave.check();
+    await expect(shippingSave).toBeChecked();
+    await coFillNewBilling(page,delivery,secondaryNumber);
+    const billingSave=delivery.locator('input[name="saveInAddressBook"]:not([disabled])').last();
+    await expect(billingSave).toBeVisible();
+    await billingSave.check();
+    await expect(billingSave).toBeChecked();
+    await coContinueToPayment(page,delivery);
+    await expect(page.getByText(secondaryNumber,{exact:false}).filter({visible:true}).first()).toBeVisible({timeout:30000});
+    const editDelivery=page.locator('.delivery-item-actions a.actions__edit').first();
+    await expect(editDelivery).toBeVisible({timeout:30000});
+    await coClick(page,editDelivery);
+    await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i,{timeout:30000});
+    await expect(delivery.getByRole("radio",{name:new RegExp(secondaryNumber)}).first(),
+      "The newly saved shipping address must be available in the registered account's saved-address list.")
+      .toBeVisible({timeout:30000});
+  }finally{await context.close();}
+});
 test("SAM-24904 @qst @co @base-store - Able to checkout with New address",async({page},i)=>runCanonicalCase("SAM-24904",page,i));
 test("SAM-24905 @qst @co @base-store - Save option not visible",async({page},i)=>runCanonicalCase("SAM-24905",page,i));
 test("SAM-24909 @qst @co @base-store - Validate Invalid address details",async({page},i)=>runCanonicalCase("SAM-24909",page,i));
 test("SAM-24910 @qst @co @base-store - Validate switching delivery modes address",async({page},i)=>runCanonicalCase("SAM-24910",page,i));
 test("SAM-24911 @qst @co @base-store - Verify Back to Top",async({page},i)=>runCanonicalCase("SAM-24911",page,i));
-test("SAM-24912 @qst @co @base-store - Payment using credit card with reg user",async({page},i)=>runCanonicalCase("SAM-24912",page,i));
+test("SAM-24912 @destructive @qst @co @base-store @registered - Payment using credit card with reg user",async({page},i)=>runCanonicalCase("SAM-24912",page,i));
 test("SAM-24915 @qst @co @base-store - Payment using Rewards",async({page},i)=>runCanonicalCase("SAM-24915",page,i));
 test("SAM-24919 @qst @co @base-store - Track Order",async({page},i)=>runCanonicalCase("SAM-24919",page,i));
 test("SAM-24920 @qst @co @base-store - Backoffice",async({page},i)=>runCanonicalCase("SAM-24920",page,i));
