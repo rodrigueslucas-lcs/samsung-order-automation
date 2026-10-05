@@ -9,7 +9,7 @@ function isCiRuntime() {
 
 function isRecoverableRegisteredAuthFailure(error) {
   const message = String(error?.message || error || "");
-  return /session is signed out|session is expired|access\/auth state is not usable|setup cookie is no longer valid|profile menu opened but authenticated logout control was not rendered/i.test(message);
+  return /session is signed out|session is expired|access\/auth state is not usable|setup cookie is no longer valid|profile menu did not open|profile menu opened but authenticated logout control was not rendered/i.test(message);
 }
 
 function autoRenewAllowed(envName) {
