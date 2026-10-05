@@ -89,12 +89,50 @@ export default class BackOfficeOrderPage extends BackOfficePage {
 
   async openAdminOrderByCode(orderCode) {
     const row = await this.searchAdminOrder(orderCode);
-    await this.waitForZkUpdate(() => row.click());
-    await this.page
+    const orderNumberControl = this.page
       .locator(`input[value="${orderCode}"]`)
       .filter({ visible: true })
-      .first()
-      .waitFor({ state: "visible", timeout: 30000 });
+      .first();
+    const orderCodeCell = row.getByText(orderCode, { exact: true }).first();
+
+    await row.scrollIntoViewIfNeeded();
+
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      if (await orderNumberControl.isVisible().catch(() => false)) return;
+
+      const target = (await orderCodeCell.isVisible().catch(() => false))
+        ? orderCodeCell
+        : row;
+
+      if (attempt === 1) {
+        await target.click({ timeout: 10000 }).catch(() => {});
+      } else if (attempt === 2) {
+        await target.dblclick({ timeout: 10000 }).catch(() => {});
+      } else {
+        await target.evaluate((element) => element.click()).catch(() => {});
+      }
+
+      await this.page
+        .waitForFunction(() => !window.zk || !zk.processing, null, {
+          timeout: 15000,
+        })
+        .catch(() => {});
+
+      const opened = await orderNumberControl
+        .waitFor({ state: "visible", timeout: 10000 })
+        .then(() => true)
+        .catch(() => false);
+      if (opened) return;
+
+      if (attempt < 3) {
+        await row.scrollIntoViewIfNeeded().catch(() => {});
+        await this.page.waitForTimeout(750);
+      }
+    }
+
+    throw new Error(
+      `BackOffice order ${orderCode} was found in the Admin grid, but the detail editor did not open after click, double-click, and DOM-click retries.`
+    );
   }
 
   async readVisibleAdminOrders() {
