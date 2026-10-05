@@ -100,8 +100,8 @@ function isCoStorefront(page) {
 function profileControl(page) {
   return page
     .getByRole("button", { name: "My Profile", exact: true })
+    .or(page.locator('button[data-an-la="L0_13_login"]'))
     .or(page.locator("button.nv00-gnb-v4__utility-user"))
-    .or(page.locator('[data-an-tr="account"], [data-an-la*="account" i]'))
     .filter({ visible: true })
     .first();
 }
@@ -110,6 +110,7 @@ function accountActions(page) {
   const login = page
     .locator('a[data-an-la="login"], a.loginBtn')
     .or(page.getByRole("link", { name: /Iniciar Sesi[oó]n/i }))
+    .or(page.getByText(/^Iniciar Sesi[oó]n$/i))
     .filter({ visible: true })
     .first();
   const logout = page
@@ -121,10 +122,10 @@ function accountActions(page) {
 
 async function visibleAccountState(page, timeout = 5000) {
   const { login, logout } = accountActions(page);
-  const state = await Promise.race([
-    logout.waitFor({ state: "visible", timeout }).then(() => "authenticated").catch(() => null),
-    login.waitFor({ state: "visible", timeout }).then(() => "signed-out").catch(() => null),
-  ]);
+  const state = await Promise.any([
+    logout.waitFor({ state: "visible", timeout }).then(() => "authenticated"),
+    login.waitFor({ state: "visible", timeout }).then(() => "signed-out"),
+  ]).catch(() => null);
   if (state) return { state, login, logout };
   if (await logout.isVisible().catch(() => false)) return { state: "authenticated", login, logout };
   if (await login.isVisible().catch(() => false)) return { state: "signed-out", login, logout };
@@ -150,17 +151,15 @@ async function findRenderedCoPage(context, preferredPage = null) {
 
 async function waitForProfileMenu(page) {
   const profile = profileControl(page);
-  await profile.waitFor({ state: "visible", timeout: 120000 });
+  await profile.waitFor({ state: "visible", timeout: 30000 });
+  await page.bringToFront().catch(() => {});
+  await page.evaluate(() => window.scrollTo(0, 0)).catch(() => {});
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     const alreadyOpen = await visibleAccountState(page, 1000);
     if (alreadyOpen) return { profile, ...alreadyOpen };
 
-    if (attempt === 1) {
-      await profile.hover().catch(() => {});
-    } else {
-      await profile.click({ timeout: 10000 }).catch(() => {});
-    }
+    await profile.click({ timeout: 10000 }).catch(() => {});
 
     const opened = await visibleAccountState(page, attempt === 1 ? 6000 : 10000);
     if (opened) return { profile, ...opened };
@@ -171,7 +170,7 @@ async function waitForProfileMenu(page) {
     }
   }
 
-  throw new Error("CO profile control is visible, but login/logout actions did not render after hover/click retries.");
+  throw new Error("CO profile control is visible, but login/logout actions did not render after click retries.");
 }
 
 async function clickSamsungAccountSignIn(page) {
@@ -205,14 +204,16 @@ async function openCoHome(page, context) {
     return renderedBeforeNavigation;
   }
 
+  console.log(`[auth:login:co] checking CO ${ENV_NAME} storefront setup`);
   await page.goto(setupUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
   assertAllowedHost(page, [HOSTNAME], "CO setup");
   await page.getByText(/You can access pages now/i).waitFor({ timeout: 60000 });
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
+    console.log(`[auth:login:co] loading CO ${ENV_NAME} home (${attempt}/3)`);
     await page.goto(homeUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
     assertAllowedHost(page, [HOSTNAME], "CO storefront");
-    if (await hasRenderedStorefront(page, 30000)) return page;
+    if (await hasRenderedStorefront(page, 15000)) return page;
 
     const renderedSibling = await findRenderedCoPage(context);
     if (renderedSibling) {
@@ -367,7 +368,6 @@ async function loginCoSamsungAccount() {
       console.log(`[auth:login:co] opening CO ${ENV_NAME} storefront in dedicated Chrome`);
       page = await openCoHome(page, context);
       console.log(`[auth:login:co] CO ${ENV_NAME} My Profile is visible`);
-      page = await openCoHome(page, context);
       const menuResult = await waitForProfileMenu(page);
       console.log(`[auth:login:co] CO profile actions are stable (${menuResult.state})`);
       menuState = menuResult.state;
