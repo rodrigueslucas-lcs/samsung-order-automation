@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { writeJsonAtomically } = require("./atomicJson");
 const { createAuthState } = require("./authState");
+const { withRegisteredSessionRecovery } = require("./registeredSessionRecovery");
 const { resolveMxEnvironment } = require("./mxConfig");
 
 const target = resolveMxEnvironment();
@@ -14,7 +15,7 @@ const slotInfix = requestedSlot === "second" ? "-second" : "";
 const slotLabel = requestedSlot === "second" ? " second account" : "";
 const verifiedStatePath = path.resolve(`playwright/.auth/mx-${suffix}${slotInfix}-verified.json`);
 
-const authState = createAuthState({
+const baseAuthState = createAuthState({
   authStatePath: `playwright/.auth/mx-${suffix}${slotInfix}-user.json`,
   sessionStoragePath: `playwright/.auth/mx-${suffix}${slotInfix}-session-storage.json`,
   hostname: target.hostname,
@@ -27,6 +28,17 @@ const authState = createAuthState({
   logoutLinkName: null,
   logoutTextName: /Cerrar Sesi[oó]n/i,
   authenticatedMenuSelector: '[role="menu"].profile-menu',
+});
+
+const authState = withRegisteredSessionRecovery(baseAuthState, {
+  market: `MX${slotLabel}`,
+  environment: target.name,
+  loginScript: "scripts/auth-login-mx.cjs",
+  autoRenewEnv: "MX_AUTH_AUTO_RENEW",
+  env: {
+    MX_QST_ENVIRONMENT: target.name,
+    MX_AUTH_SLOT: requestedSlot,
+  },
 });
 
 function writeJsonSecurely(destination, value) {
