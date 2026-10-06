@@ -24,6 +24,7 @@ const playwrightCli = path.resolve("node_modules/@playwright/test/cli.js");
 const artifactDir = path.resolve(process.env.CO_QST_ARTIFACT_DIR || process.env.MX_QST_ARTIFACT_DIR || "test-results/jenkins/co-qst");
 const reportFile = path.join(artifactDir, "results.json");
 const sessionReportFile = path.join(artifactDir, "session-results.json");
+const registeredReportFile = path.join(artifactDir, "registered-results.json");
 const runtimeSummaryFile = path.join(artifactDir, "runtime-summary.json");
 const allureResultsDir = path.join(artifactDir, "allure-results");
 const executiveDir = path.join(artifactDir, "executive");
@@ -45,8 +46,6 @@ const requestedTargetIds = String(process.env.CO_QST_TARGET_IDS || "")
 const unknownTargetIds = requestedTargetIds.filter((id) => !officialSet.has(id));
 if (unknownTargetIds.length) throw new Error(`Unknown CO_QST_TARGET_IDS: ${unknownTargetIds.join(", ")}.`);
 const executionIds = requestedTargetIds.length ? requestedTargetIds : CO_BASE_P1_IDS;
-const sessionPriorityIds = ["SAM-24873", "SAM-24874"].filter((id) => executionIds.includes(id));
-const remainingExecutionIds = executionIds.filter((id) => !sessionPriorityIds.includes(id));
 process.env.CO_QST_TARGET_IDS = requestedTargetIds.join(",");
 configEnv.CO_QST_TARGET_IDS = requestedTargetIds.join(",");
 configEnv.CO_QST_FULL_P1_COUNT = String(CO_BASE_P1_IDS.length);
@@ -75,9 +74,17 @@ const explicitNotRunIds = officialTitles
   .filter(Boolean);
 const duplicateIds = CO_BASE_P1_IDS.filter((id) => implementedTitles.filter((title) => title.includes(id)).length > 1);
 
+const registeredIds = implementedTitles
+  .filter((title) => /@registered\b/i.test(title))
+  .map((title) => title.match(/SAM-\d+/)?.[0])
+  .filter((id) => id && executionIds.includes(id));
+const sessionGateIds = ["SAM-24873", "SAM-24874"].filter((id) => registeredIds.includes(id));
+const remainingRegisteredIds = registeredIds.filter((id) => !sessionGateIds.includes(id));
+const guestAndSafeIds = executionIds.filter((id) => !registeredIds.includes(id));
+
 console.log(`[co-qst] Official CO ${targetEnvironment} Base Store P1 scope: ${CO_BASE_P1_IDS.length} TCs.`);
 if (requestedTargetIds.length) console.log(`[co-qst] Targeted execution: ${executionIds.join(", ")}.`);
-if (sessionPriorityIds.length) console.log(`[co-qst] Session-first priority: ${sessionPriorityIds.join(", ")}.`);
+if (registeredIds.length) console.log(`[co-qst] Registered-first order: ${registeredIds.join(", ")}.`);
 console.log(`[co-qst] Represented in canonical Base Store scope: ${representedIds.size}/${CO_BASE_P1_IDS.length}.`);
 console.log(`[co-qst] Executable implementations: ${implementedIds.size}/${CO_BASE_P1_IDS.length}.`);
 console.log(`[co-qst] Explicit NOT_RUN: ${explicitNotRunIds.join(", ") || "none"}.`);
@@ -113,10 +120,14 @@ if (listOnly) {
 for (const target of [
   reportFile,
   sessionReportFile,
+  registeredReportFile,
   runtimeSummaryFile,
   path.join(artifactDir, "playwright"),
   path.join(artifactDir, "playwright-session"),
+  path.join(artifactDir, "playwright-registered"),
   path.join(artifactDir, "playwright-report"),
+  path.join(artifactDir, "playwright-report-session"),
+  path.join(artifactDir, "playwright-report-registered"),
   path.join(artifactDir, "evidence"),
   allureResultsDir,
   path.join(artifactDir, "allure-report"),
@@ -144,68 +155,101 @@ const executionEnv = {
 };
 
 const titles = Object.fromEntries(implementedTitles.map((title) => [title.match(/SAM-\d+/)?.[0], title]));
-let sessionReport = null;
+const phaseReports = [];
 let result = { status: 0 };
+let registeredPhaseFailed = false;
 
-if (sessionPriorityIds.length) {
-  console.log(`\n[co-qst] Running authenticated session TCs first: ${sessionPriorityIds.join(", ")}`);
-  const sessionEnv = {
+function readPhaseReport(reportPath) {
+  if (!fs.existsSync(reportPath)) return null;
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  phaseReports.push(report);
+  return report;
+}
+
+function runPhase({ label, ids, reportPath, outputDir, htmlDir, evidenceDir, allure = false }) {
+  if (!ids.length) return { status: 0, report: null };
+  console.log(`\n[co-qst] ${label}: ${ids.join(", ")}`);
+  const phaseEnv = {
     ...executionEnv,
-    PLAYWRIGHT_JSON_OUTPUT_FILE: sessionReportFile,
-    PLAYWRIGHT_HTML_OUTPUT_DIR: path.join(artifactDir, "playwright-report-session"),
-    SMB_EVIDENCE_DIR: path.join(artifactDir, "evidence", "session"),
-    ENABLE_ALLURE: "0",
+    PLAYWRIGHT_JSON_OUTPUT_FILE: reportPath,
+    PLAYWRIGHT_HTML_OUTPUT_DIR: htmlDir,
+    SMB_EVIDENCE_DIR: evidenceDir,
+    ENABLE_ALLURE: allure ? executionEnv.ENABLE_ALLURE : "0",
   };
-  const sessionResult = spawnSync(process.execPath, buildArgs(sessionPriorityIds, path.join(artifactDir, "playwright-session")), {
-    env: sessionEnv,
+  const phaseResult = spawnSync(process.execPath, buildArgs(ids, outputDir), {
+    env: phaseEnv,
     stdio: "inherit",
   });
+  return { status: phaseResult.status ?? 1, report: readPhaseReport(reportPath) };
+}
 
-  if (fs.existsSync(sessionReportFile)) {
-    sessionReport = JSON.parse(fs.readFileSync(sessionReportFile, "utf8"));
-    const sessionSummary = buildMxQstRuntimeSummary(sessionReport, {
-      officialIds: sessionPriorityIds,
+if (sessionGateIds.length) {
+  const session = runPhase({
+    label: "Running authenticated session gate first",
+    ids: sessionGateIds,
+    reportPath: sessionReportFile,
+    outputDir: path.join(artifactDir, "playwright-session"),
+    htmlDir: path.join(artifactDir, "playwright-report-session"),
+    evidenceDir: path.join(artifactDir, "evidence", "session"),
+  });
+
+  if (session.report) {
+    const sessionSummary = buildMxQstRuntimeSummary(session.report, {
+      officialIds: sessionGateIds,
       titles,
       market: "CO",
       store: "BASE_STORE",
       environment: environmentLabel,
       suite: "P1/QST SESSION GATE",
     });
-    const sessionHealthy = sessionSummary.summary.passed === sessionPriorityIds.length
+    const sessionHealthy = sessionSummary.summary.passed === sessionGateIds.length
       && sessionSummary.summary.failed === 0
       && sessionSummary.summary.blocked === 0
       && sessionSummary.summary.notRun === 0;
-    console.log(`[co-qst] Session gate: Passed=${sessionSummary.summary.passed}/${sessionPriorityIds.length} Failed=${sessionSummary.summary.failed} Blocked=${sessionSummary.summary.blocked} NotRun=${sessionSummary.summary.notRun}`);
-    if (!sessionHealthy) {
-      fs.copyFileSync(sessionReportFile, reportFile);
-      result = { status: sessionResult.status || 1 };
-    }
+    console.log(`[co-qst] Session gate: Passed=${sessionSummary.summary.passed}/${sessionGateIds.length} Failed=${sessionSummary.summary.failed} Blocked=${sessionSummary.summary.blocked} NotRun=${sessionSummary.summary.notRun}`);
+    if (!sessionHealthy) result.status = session.status || 1;
   } else {
-    result = { status: sessionResult.status || 1 };
+    result.status = session.status || 1;
   }
 
   if (result.status !== 0) {
-    console.error("[co-qst] Session-first gate failed. Remaining Base Store TCs will not run.");
+    console.error("[co-qst] Session gate failed. Remaining registered and guest/safe Base Store TCs will not run.");
   }
 }
 
-if (result.status === 0 && remainingExecutionIds.length) {
-  console.log(`\n[co-qst] Session gate passed. Running remaining ${remainingExecutionIds.length} Base Store TCs.`);
-  result = spawnSync(process.execPath, buildArgs(remainingExecutionIds, path.join(artifactDir, "playwright")), {
+if (result.status === 0 && remainingRegisteredIds.length) {
+  const registered = runPhase({
+    label: "Session gate passed. Running remaining registered TCs",
+    ids: remainingRegisteredIds,
+    reportPath: registeredReportFile,
+    outputDir: path.join(artifactDir, "playwright-registered"),
+    htmlDir: path.join(artifactDir, "playwright-report-registered"),
+    evidenceDir: path.join(artifactDir, "evidence", "registered"),
+  });
+  if (registered.status !== 0) registeredPhaseFailed = true;
+}
+
+if (result.status === 0 && guestAndSafeIds.length) {
+  console.log(`\n[co-qst] Registered block finished. Running remaining ${guestAndSafeIds.length} guest/safe Base Store TCs.`);
+  const mainResult = spawnSync(process.execPath, buildArgs(guestAndSafeIds, path.join(artifactDir, "playwright")), {
     env: executionEnv,
     stdio: "inherit",
   });
+  result.status = mainResult.status ?? 1;
+  readPhaseReport(reportFile);
 }
 
-if (sessionReport && fs.existsSync(reportFile) && remainingExecutionIds.length) {
-  const mainReport = JSON.parse(fs.readFileSync(reportFile, "utf8"));
+if (phaseReports.length) {
+  const baseReport = phaseReports[phaseReports.length - 1];
   const mergedReport = {
-    ...mainReport,
-    suites: [...(sessionReport.suites || []), ...(mainReport.suites || [])],
-    errors: [...(sessionReport.errors || []), ...(mainReport.errors || [])],
+    ...baseReport,
+    suites: phaseReports.flatMap((report) => report.suites || []),
+    errors: phaseReports.flatMap((report) => report.errors || []),
   };
   fs.writeFileSync(reportFile, JSON.stringify(mergedReport, null, 2));
 }
+
+if (registeredPhaseFailed && result.status === 0) result.status = 1;
 
 if (fs.existsSync(reportFile)) {
   const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
