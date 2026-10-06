@@ -83,13 +83,17 @@ const registeredIds = implementedTitles
 const sessionGateIds = ["SAM-24873", "SAM-24874"].filter((id) => registeredIds.includes(id));
 const remainingRegisteredIds = registeredIds.filter((id) => !sessionGateIds.includes(id));
 const guestAndSafeIds = executionIds.filter((id) => !registeredIds.includes(id));
+const campaignLabel = `Samsung CO ${targetEnvironment} · Base Store P1`;
 
-console.log(`[co-qst] Official CO ${targetEnvironment} Base Store P1 scope: ${CO_BASE_P1_IDS.length} TCs.`);
-if (requestedTargetIds.length) console.log(`[co-qst] Targeted execution: ${executionIds.join(", ")}.`);
-if (registeredIds.length) console.log(`[co-qst] Registered-first order: ${registeredIds.join(", ")}.`);
-console.log(`[co-qst] Represented in canonical Base Store scope: ${representedIds.size}/${CO_BASE_P1_IDS.length}.`);
-console.log(`[co-qst] Executable implementations: ${implementedIds.size}/${CO_BASE_P1_IDS.length}.`);
-console.log(`[co-qst] Explicit NOT_RUN: ${explicitNotRunIds.join(", ") || "none"}.`);
+console.log("\n============================================================");
+console.log(` ${campaignLabel.toUpperCase()}`);
+console.log(" SINGLE CAMPAIGN · AUTHENTICATED-FIRST EXECUTION");
+console.log("============================================================");
+console.log(`[co-qst] Official scope: ${CO_BASE_P1_IDS.length} TCs · executable: ${implementedIds.size}/${CO_BASE_P1_IDS.length}.`);
+if (requestedTargetIds.length) console.log(`[co-qst] Targeted campaign: ${executionIds.join(", ")}.`);
+if (registeredIds.length) console.log(`[co-qst] Priority order: ${registeredIds.length} authenticated TC(s) first, then ${guestAndSafeIds.length} remaining TC(s).`);
+console.log(`[co-qst] Coverage: ${representedIds.size}/${CO_BASE_P1_IDS.length} represented · NOT_RUN: ${explicitNotRunIds.join(", ") || "none"}.`);
+console.log("============================================================\n");
 if (missingIds.length) {
   console.error(`[co-qst] Missing canonical implementations: ${missingIds.join(", ")}`);
   process.exit(1);
@@ -168,7 +172,7 @@ function readPhaseReport(reportPath, label, htmlDir) {
 
 function runPhase({ label, ids, reportPath, outputDir, htmlDir, evidenceDir }) {
   if (!ids.length) return { status: 0, report: null };
-  console.log(`\n[co-qst] ${label}: ${ids.join(", ")}`);
+  console.log(`\n[co-qst] ${campaignLabel} · ${label} · ${ids.length} TC(s)`);
   const phaseEnv = {
     ...executionEnv,
     PLAYWRIGHT_JSON_OUTPUT_FILE: reportPath,
@@ -190,15 +194,15 @@ function writePlaywrightReportHub() {
   const rows = phaseReports.map(({ report, label, htmlDir }) => {
     const stats = report.stats || {};
     const relative = path.relative(playwrightReportDir, path.join(htmlDir, "index.html")).replaceAll("\\", "/");
-    return `<tr><td>${label}</td><td>${stats.expected ?? 0}</td><td>${stats.unexpected ?? 0}</td><td>${stats.skipped ?? 0}</td><td><a href="${relative}">Open Playwright report</a></td></tr>`;
+    return `<tr><td>${label}</td><td>${stats.expected ?? 0}</td><td>${stats.unexpected ?? 0}</td><td>${stats.skipped ?? 0}</td><td><a href="${relative}">Open evidence</a></td></tr>`;
   }).join("\n");
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CO QST Playwright Reports</title><style>body{font-family:Segoe UI,Arial,sans-serif;margin:0;background:#f5f7fb;color:#111827}.wrap{max-width:1100px;margin:auto;padding:28px}h1{margin:0 0 8px}.meta{color:#667085;margin-bottom:22px}table{width:100%;border-collapse:collapse;background:white;border:1px solid #e5e7eb}th,td{padding:12px 14px;border-bottom:1px solid #e5e7eb;text-align:left}th{background:#f9fafb}a{color:#175cd3;font-weight:600;text-decoration:none}</style></head><body><div class="wrap"><h1>Samsung CO ${targetEnvironment} · Playwright</h1><div class="meta">Official P1 · session gate → registered → storefront/backoffice</div><table><thead><tr><th>Phase</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Report</th></tr></thead><tbody>${rows}</tbody></table></div></body></html>`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${campaignLabel} · Playwright</title><style>body{font-family:Segoe UI,Arial,sans-serif;margin:0;background:#f5f7fb;color:#111827}.hero{background:#101828;color:white;padding:28px 34px}.hero h1{margin:0;font-size:26px}.hero p{margin:8px 0 0;color:#cdd5df}.wrap{max-width:1100px;margin:auto;padding:28px}.card{background:white;border:1px solid #e5e7eb;border-radius:14px;padding:18px;margin-bottom:18px}.meta{color:#667085}table{width:100%;border-collapse:collapse;background:white;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden}th,td{padding:12px 14px;border-bottom:1px solid #e5e7eb;text-align:left}th{background:#f9fafb}a{color:#175cd3;font-weight:600;text-decoration:none}</style></head><body><div class="hero"><h1>${campaignLabel}</h1><p>Single Base Store campaign · ${CO_BASE_P1_IDS.length} official TCs · authenticated-first execution</p></div><div class="wrap"><div class="card"><strong>Unified execution</strong><div class="meta">The blocks below are internal ordering only. Results are merged into one campaign, one runtime summary, one Executive Dashboard and one Jenkins result.</div></div><table><thead><tr><th>Internal execution block</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Detailed evidence</th></tr></thead><tbody>${rows}</tbody></table></div></body></html>`;
   fs.writeFileSync(path.join(playwrightReportDir, "index.html"), html);
 }
 
 if (sessionGateIds.length) {
   const session = runPhase({
-    label: "Authenticated session gate",
+    label: "Authenticated validation",
     ids: sessionGateIds,
     reportPath: sessionReportFile,
     outputDir: path.join(artifactDir, "playwright-session"),
@@ -219,20 +223,20 @@ if (sessionGateIds.length) {
       && sessionSummary.summary.failed === 0
       && sessionSummary.summary.blocked === 0
       && sessionSummary.summary.notRun === 0;
-    console.log(`[co-qst] Session gate: Passed=${sessionSummary.summary.passed}/${sessionGateIds.length} Failed=${sessionSummary.summary.failed} Blocked=${sessionSummary.summary.blocked} NotRun=${sessionSummary.summary.notRun}`);
+    console.log(`[co-qst] Authenticated validation: Passed=${sessionSummary.summary.passed}/${sessionGateIds.length} Failed=${sessionSummary.summary.failed} Blocked=${sessionSummary.summary.blocked} NotRun=${sessionSummary.summary.notRun}`);
     if (!sessionHealthy) result.status = session.status || 1;
   } else {
     result.status = session.status || 1;
   }
 
   if (result.status !== 0) {
-    console.error("[co-qst] Session gate failed. Remaining registered and guest/safe Base Store TCs will not run.");
+    console.error("[co-qst] Authenticated validation failed. Remaining registered and guest/safe TCs will not run.");
   }
 }
 
 if (result.status === 0 && remainingRegisteredIds.length) {
   const registered = runPhase({
-    label: "Remaining registered TCs",
+    label: "Registered coverage",
     ids: remainingRegisteredIds,
     reportPath: registeredReportFile,
     outputDir: path.join(artifactDir, "playwright-registered"),
@@ -244,7 +248,7 @@ if (result.status === 0 && remainingRegisteredIds.length) {
 
 if (result.status === 0 && guestAndSafeIds.length) {
   const storefront = runPhase({
-    label: "Storefront + BackOffice TCs",
+    label: "Remaining Base Store coverage",
     ids: guestAndSafeIds,
     reportPath: storefrontReportFile,
     outputDir: path.join(artifactDir, "playwright"),
@@ -288,8 +292,17 @@ if (fs.existsSync(reportFile)) {
   ], { stdio: "inherit", env: executionEnv });
   if (executive.status !== 0) console.error("[co-qst] Executive dashboard generation failed; raw runtime summary was preserved.");
 
-  console.log(`\nCO ${targetEnvironment} BASE STORE P1 SUMMARY`);
-  console.log(`Official=${runtimeSummary.summary.official} Executed=${runtimeSummary.summary.executed} Passed=${runtimeSummary.summary.passed} Failed=${runtimeSummary.summary.failed} Blocked=${runtimeSummary.summary.blocked} NotRun=${runtimeSummary.summary.notRun}`);
+  console.log("\n============================================================");
+  console.log(` ${campaignLabel.toUpperCase()} · FINAL RESULT`);
+  console.log("============================================================");
+  console.log(` Official : ${runtimeSummary.summary.official}`);
+  console.log(` Executed : ${runtimeSummary.summary.executed}`);
+  console.log(` Passed   : ${runtimeSummary.summary.passed}`);
+  console.log(` Failed   : ${runtimeSummary.summary.failed}`);
+  console.log(` Blocked  : ${runtimeSummary.summary.blocked}`);
+  console.log(` NotRun   : ${runtimeSummary.summary.notRun}`);
+  console.log(" Reports  : Executive Dashboard · Playwright · Allure");
+  console.log("============================================================");
 
   // Intentionally skipped/blocked TCs are reported for visibility but do not
   // make the campaign fail, matching the PE QST policy.
