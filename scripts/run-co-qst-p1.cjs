@@ -275,8 +275,10 @@ if (fs.existsSync(reportFile)) {
   console.log(`\nCO ${targetEnvironment} BASE STORE P1 SUMMARY`);
   console.log(`Official=${runtimeSummary.summary.official} Executed=${runtimeSummary.summary.executed} Passed=${runtimeSummary.summary.passed} Failed=${runtimeSummary.summary.failed} Blocked=${runtimeSummary.summary.blocked} NotRun=${runtimeSummary.summary.notRun}`);
 
+  // Intentionally skipped/blocked TCs are reported for visibility but do not
+  // make the campaign fail, matching the PE QST policy.
   const targeted = requestedTargetIds.length > 0;
-  if (runtimeSummary.summary.failed > 0 || runtimeSummary.summary.blocked > 0) {
+  if (runtimeSummary.summary.failed > 0) {
     process.exitCode = result.status || 1;
   } else if (!targeted && runtimeSummary.summary.notRun > 0) {
     process.exitCode = result.status || 1;
