@@ -141,10 +141,18 @@ async function visibleAccountState(page, timeout = 5000) {
 
 async function hasRenderedStorefront(page, timeout = 3000) {
   if (!isCoStorefront(page)) return false;
-  return profileControl(page)
-    .waitFor({ state: "visible", timeout })
-    .then(() => true)
-    .catch(() => false);
+  // The notifications tutorial masks the header with aria-hidden and intercepts
+  // profile clicks until its ¡Listo! action is dismissed.
+  const notice = page.getByText("¡Listo!", { exact: true }).filter({ visible: true }).first();
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline && !page.isClosed()) {
+    if (await notice.isVisible().catch(() => false)) {
+      await notice.click({ timeout: 5000 }).catch(() => {});
+    }
+    if (await profileControl(page).isVisible().catch(() => false)) return true;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  return false;
 }
 
 async function maximizeDedicatedChrome(page) {
@@ -239,6 +247,7 @@ async function openCoHome(page, context) {
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     console.log(`[auth:login:co] loading CO ${ENV_NAME} home (${attempt}/3)`);
     await page.goto(homeUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await closeDedicatedDevTools(context);
     assertAllowedHost(page, [HOSTNAME], "CO storefront");
     if (await hasRenderedStorefront(page, 15000)) return page;
 

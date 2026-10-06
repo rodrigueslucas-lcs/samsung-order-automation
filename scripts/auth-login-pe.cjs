@@ -90,7 +90,8 @@ async function gotoWithTransientRetry(page, url, options = {}) {
       );
       if (!transientNavigation || attempt === 2) throw error;
       console.warn(`[auth:login:pe] transient navigation abort; retrying ${url} (${attempt + 1}/2)`);
-      await page.waitForTimeout(1000);
+      if (page.isClosed()) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
   return null;
@@ -122,6 +123,21 @@ async function findRenderedPePage(context, preferredPage = null) {
     .filter((candidate, index, all) => candidate && all.indexOf(candidate) === index);
   for (const candidate of candidates) {
     if (await hasRenderedStorefront(candidate)) return candidate;
+  }
+  return null;
+}
+
+async function findAccountLoginPage(context, timeoutMs = 60000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    for (const candidate of context.pages().slice().reverse()) {
+      if (candidate.isClosed()) continue;
+      try {
+        if (new URL(candidate.url()).hostname !== ACCOUNT_HOSTNAME) continue;
+        if (await candidate.locator('input#account').isVisible().catch(() => false)) return candidate;
+      } catch { /* The Samsung redirect may replace the tab while we inspect it. */ }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
   return null;
 }
@@ -256,31 +272,21 @@ async function loginPeSamsungAccount() {
     if (menuState === "signed-out") {
       if (!existingAccountPage) {
         console.log("[auth:login:pe] opening Samsung Account sign-in");
-        const pagesBeforeLogin = new Set(context.pages());
         await login.click();
-        const accountPage = await Promise.race([
-          page.waitForURL((url) => url.hostname === ACCOUNT_HOSTNAME, { timeout: 60000 }).then(() => page).catch(() => null),
-          context.waitForEvent("page", { timeout: 60000 }).then(async (candidate) => {
-            await candidate.waitForLoadState("domcontentloaded", { timeout: 60000 }).catch(() => {});
-            return candidate;
-          }).catch(() => null),
-        ]);
-        const accountCandidate = accountPage && (() => {
-          try { return new URL(accountPage.url()).hostname === ACCOUNT_HOSTNAME; } catch { return false; }
-        })() ? accountPage : context.pages().find((candidate) => {
-          if (pagesBeforeLogin.has(candidate)) return false;
-          try { return new URL(candidate.url()).hostname === ACCOUNT_HOSTNAME; } catch { return false; }
-        });
+        const accountCandidate = await findAccountLoginPage(context);
         if (!accountCandidate) {
-          const currentMenu = await waitForProfileMenu(page).catch(() => null);
+          const storefrontPage = await findRenderedPePage(context);
+          const currentMenu = storefrontPage ? await waitForProfileMenu(storefrontPage).catch(() => null) : null;
           if (currentMenu && /Cerrar Sesi[oó]n/i.test(await currentMenu.menu.innerText())) {
             console.log("[auth:login:pe] storefront became authenticated without an account-page navigation");
+            page = storefrontPage;
             menuState = "authenticated";
           } else {
             throw new Error("Samsung Account sign-in did not open in the current tab or a new tab within 60 seconds.");
           }
         } else {
           page = accountCandidate;
+          page.setDefaultTimeout(120000);
         }
       }
       if (menuState === "signed-out") assertAllowedHost(page, [ACCOUNT_HOSTNAME], "Samsung Account login");
@@ -361,5 +367,5 @@ loginPeSamsungAccount().catch((error) => {
   const summary = String(error.message || "unknown error").split("\n", 1)[0]
     .replace(/([?&][^=\s]+)=([^&\s]+)/g, "$1=<redacted>");
   console.error(`[auth:login:pe] ${error.name}: ${summary}`);
-  process.exitCode = 1;
+  process.exitCode = /Target page, context or browser has been closed|browser has been closed|Target closed|frame was detached/i.test(summary) ? 75 : 1;
 });

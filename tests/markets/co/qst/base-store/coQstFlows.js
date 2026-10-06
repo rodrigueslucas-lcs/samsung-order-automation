@@ -2,8 +2,17 @@ import ProductPage from "../../../../../pages/ProductPage";
 import CartPage from "../../../../../pages/CartPage";
 export async function bootstrapCoStorefront(page, config) {
   if (!config.setupUrl) return;
+  if (new URL(page.url()).pathname.startsWith("/co/") &&
+      await page.getByRole("button",{name:"My Profile",exact:true}).isVisible().catch(()=>false)) return;
   await page.goto(config.setupUrl.href,{waitUntil:"domcontentloaded",timeout:60000});
-  await page.getByText(/you can access pages now/i).waitFor({state:"visible",timeout:30000});
+  const setupReady=await page.getByText(/you can access pages now/i)
+    .waitFor({state:"visible",timeout:8000}).then(()=>true,()=>false);
+  if (setupReady) return;
+  // getcookie sometimes returns an empty document despite setting the staging cookie.
+  // Prove access against the storefront itself instead of requiring its prose.
+  await page.goto(config.baseUrl.href,{waitUntil:"domcontentloaded",timeout:60000});
+  await page.getByRole("button",{name:"My Profile",exact:true})
+    .waitFor({state:"visible",timeout:60000});
 }
 async function resolveProduct(page,config){
   if(config.pdpUrl&&config.sku)return{pdpUrl:config.pdpUrl,sku:config.sku};

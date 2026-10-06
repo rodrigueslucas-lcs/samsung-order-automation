@@ -2,7 +2,7 @@ import { expect } from "@playwright/test";
 import BasePage from "./BasePage";
 
 const KNOWN_SUBJECTS = [/\u00a1Recibimos tu pedido!/i, /\u00a1Pago confirmado!/i];
-const OTP_SUBJECT = /Contrase\u00f1a \u00danica de Samsung \(OTP\)|Samsung C[oó]digo de Verificaci[oó]n/i;
+const OTP_SUBJECT = /Contrase\u00f1a (?:\u00danica de Samsung \(OTP\)|de un solo uso \(OTP\) de Samsung)|Samsung C[oó]digo de Verificaci[oó]n/i;
 const EXPECTED_SENDER = /Customer Services Team|customerservice@shopmail\.samsung\.com/i;
 
 export default class MailinatorPage extends BasePage {

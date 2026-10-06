@@ -219,7 +219,7 @@ export default class GuestOrderTrackingPage extends BasePage {
       .or(card.getByRole("button", { name: /Ver detalles/i })).first();
     await details.waitFor({ state: "visible", timeout: 30000 });
 
-    const statusPattern = /Pedido Registrado|Recibido|Pagado|En proceso|Preparando env[i\u00ed]o|En camino|Entregado|Processing|Shipping/i;
+    const statusPattern = /Pedido Registrado|Recibido|Pagado|En proceso|Procesando|Preparando env[i\u00ed]o|En camino|Entregado|Order received|Processing|Shipping/i;
     const status = card.getByText(statusPattern).first();
     await status.waitFor({ state: "visible", timeout: 30000 });
     const statusText = (await status.innerText()).trim();
