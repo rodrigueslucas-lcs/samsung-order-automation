@@ -23,6 +23,7 @@ const root = path.resolve("tests/markets/co/qst/base-store");
 const playwrightCli = path.resolve("node_modules/@playwright/test/cli.js");
 const artifactDir = path.resolve(process.env.CO_QST_ARTIFACT_DIR || process.env.MX_QST_ARTIFACT_DIR || "test-results/jenkins/co-qst");
 const reportFile = path.join(artifactDir, "results.json");
+const sessionReportFile = path.join(artifactDir, "session-results.json");
 const runtimeSummaryFile = path.join(artifactDir, "runtime-summary.json");
 const allureResultsDir = path.join(artifactDir, "allure-results");
 const executiveDir = path.join(artifactDir, "executive");
@@ -44,10 +45,15 @@ const requestedTargetIds = String(process.env.CO_QST_TARGET_IDS || "")
 const unknownTargetIds = requestedTargetIds.filter((id) => !officialSet.has(id));
 if (unknownTargetIds.length) throw new Error(`Unknown CO_QST_TARGET_IDS: ${unknownTargetIds.join(", ")}.`);
 const executionIds = requestedTargetIds.length ? requestedTargetIds : CO_BASE_P1_IDS;
+const sessionPriorityIds = ["SAM-24873", "SAM-24874"].filter((id) => executionIds.includes(id));
+const remainingExecutionIds = executionIds.filter((id) => !sessionPriorityIds.includes(id));
 process.env.CO_QST_TARGET_IDS = requestedTargetIds.join(",");
 configEnv.CO_QST_TARGET_IDS = requestedTargetIds.join(",");
 configEnv.CO_QST_FULL_P1_COUNT = String(CO_BASE_P1_IDS.length);
-const p1Pattern = `(?:${executionIds.join("|")})\\b`;
+
+function grepPattern(ids) {
+  return `(?:${ids.join("|")})\\b`;
+}
 
 function specFilesUnder(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -71,6 +77,7 @@ const duplicateIds = CO_BASE_P1_IDS.filter((id) => implementedTitles.filter((tit
 
 console.log(`[co-qst] Official CO ${targetEnvironment} Base Store P1 scope: ${CO_BASE_P1_IDS.length} TCs.`);
 if (requestedTargetIds.length) console.log(`[co-qst] Targeted execution: ${executionIds.join(", ")}.`);
+if (sessionPriorityIds.length) console.log(`[co-qst] Session-first priority: ${sessionPriorityIds.join(", ")}.`);
 console.log(`[co-qst] Represented in canonical Base Store scope: ${representedIds.size}/${CO_BASE_P1_IDS.length}.`);
 console.log(`[co-qst] Executable implementations: ${implementedIds.size}/${CO_BASE_P1_IDS.length}.`);
 console.log(`[co-qst] Explicit NOT_RUN: ${explicitNotRunIds.join(", ") || "none"}.`);
@@ -83,24 +90,32 @@ if (duplicateIds.length) {
   process.exit(1);
 }
 
-const args = [
-  playwrightCli, "test", "tests/markets/co/qst/base-store",
-  "--project=chromium", "--workers=1", "--retries=0",
-  "--grep", p1Pattern,
-  "--output", path.join(artifactDir, "playwright"),
-];
-if (listOnly) args.push("--list", "--reporter=list");
-else if (process.env.MX_QST_HEADLESS !== "1") args.splice(4, 0, "--headed");
+function buildArgs(ids, outputDir, list = false) {
+  const args = [
+    playwrightCli, "test", "tests/markets/co/qst/base-store",
+    "--project=chromium", "--workers=1", "--retries=0",
+    "--grep", grepPattern(ids),
+    "--output", outputDir,
+  ];
+  if (list) args.push("--list", "--reporter=list");
+  else if (process.env.MX_QST_HEADLESS !== "1") args.splice(4, 0, "--headed");
+  return args;
+}
 
 if (listOnly) {
-  const listed = spawnSync(process.execPath, args, { env: configEnv, stdio: "inherit" });
+  const listed = spawnSync(process.execPath, buildArgs(executionIds, path.join(artifactDir, "playwright"), true), {
+    env: configEnv,
+    stdio: "inherit",
+  });
   process.exit(listed.status ?? 1);
 }
 
 for (const target of [
   reportFile,
+  sessionReportFile,
   runtimeSummaryFile,
   path.join(artifactDir, "playwright"),
+  path.join(artifactDir, "playwright-session"),
   path.join(artifactDir, "playwright-report"),
   path.join(artifactDir, "evidence"),
   allureResultsDir,
@@ -128,11 +143,72 @@ const executionEnv = {
   BACKOFFICE_ENV: targetEnvironment.toLowerCase(),
 };
 
-const result = spawnSync(process.execPath, args, { env: executionEnv, stdio: "inherit" });
+const titles = Object.fromEntries(implementedTitles.map((title) => [title.match(/SAM-\d+/)?.[0], title]));
+let sessionReport = null;
+let result = { status: 0 };
+
+if (sessionPriorityIds.length) {
+  console.log(`\n[co-qst] Running authenticated session TCs first: ${sessionPriorityIds.join(", ")}`);
+  const sessionEnv = {
+    ...executionEnv,
+    PLAYWRIGHT_JSON_OUTPUT_FILE: sessionReportFile,
+    PLAYWRIGHT_HTML_OUTPUT_DIR: path.join(artifactDir, "playwright-report-session"),
+    SMB_EVIDENCE_DIR: path.join(artifactDir, "evidence", "session"),
+    ENABLE_ALLURE: "0",
+  };
+  const sessionResult = spawnSync(process.execPath, buildArgs(sessionPriorityIds, path.join(artifactDir, "playwright-session")), {
+    env: sessionEnv,
+    stdio: "inherit",
+  });
+
+  if (fs.existsSync(sessionReportFile)) {
+    sessionReport = JSON.parse(fs.readFileSync(sessionReportFile, "utf8"));
+    const sessionSummary = buildMxQstRuntimeSummary(sessionReport, {
+      officialIds: sessionPriorityIds,
+      titles,
+      market: "CO",
+      store: "BASE_STORE",
+      environment: environmentLabel,
+      suite: "P1/QST SESSION GATE",
+    });
+    const sessionHealthy = sessionSummary.summary.passed === sessionPriorityIds.length
+      && sessionSummary.summary.failed === 0
+      && sessionSummary.summary.blocked === 0
+      && sessionSummary.summary.notRun === 0;
+    console.log(`[co-qst] Session gate: Passed=${sessionSummary.summary.passed}/${sessionPriorityIds.length} Failed=${sessionSummary.summary.failed} Blocked=${sessionSummary.summary.blocked} NotRun=${sessionSummary.summary.notRun}`);
+    if (!sessionHealthy) {
+      fs.copyFileSync(sessionReportFile, reportFile);
+      result = { status: sessionResult.status || 1 };
+    }
+  } else {
+    result = { status: sessionResult.status || 1 };
+  }
+
+  if (result.status !== 0) {
+    console.error("[co-qst] Session-first gate failed. Remaining Base Store TCs will not run.");
+  }
+}
+
+if (result.status === 0 && remainingExecutionIds.length) {
+  console.log(`\n[co-qst] Session gate passed. Running remaining ${remainingExecutionIds.length} Base Store TCs.`);
+  result = spawnSync(process.execPath, buildArgs(remainingExecutionIds, path.join(artifactDir, "playwright")), {
+    env: executionEnv,
+    stdio: "inherit",
+  });
+}
+
+if (sessionReport && fs.existsSync(reportFile) && remainingExecutionIds.length) {
+  const mainReport = JSON.parse(fs.readFileSync(reportFile, "utf8"));
+  const mergedReport = {
+    ...mainReport,
+    suites: [...(sessionReport.suites || []), ...(mainReport.suites || [])],
+    errors: [...(sessionReport.errors || []), ...(mainReport.errors || [])],
+  };
+  fs.writeFileSync(reportFile, JSON.stringify(mergedReport, null, 2));
+}
 
 if (fs.existsSync(reportFile)) {
   const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
-  const titles = Object.fromEntries(implementedTitles.map((title) => [title.match(/SAM-\d+/)?.[0], title]));
   const runtimeSummary = buildMxQstRuntimeSummary(report, {
     officialIds: CO_BASE_P1_IDS,
     titles,
