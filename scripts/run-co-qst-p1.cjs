@@ -25,9 +25,11 @@ const artifactDir = path.resolve(process.env.CO_QST_ARTIFACT_DIR || process.env.
 const reportFile = path.join(artifactDir, "results.json");
 const sessionReportFile = path.join(artifactDir, "session-results.json");
 const registeredReportFile = path.join(artifactDir, "registered-results.json");
+const storefrontReportFile = path.join(artifactDir, "storefront-results.json");
 const runtimeSummaryFile = path.join(artifactDir, "runtime-summary.json");
 const allureResultsDir = path.join(artifactDir, "allure-results");
 const executiveDir = path.join(artifactDir, "executive");
+const playwrightReportDir = path.join(artifactDir, "playwright-report");
 
 const CO_BASE_P1_IDS = Object.freeze(
   Object.entries(reusePlan.cases)
@@ -121,13 +123,12 @@ for (const target of [
   reportFile,
   sessionReportFile,
   registeredReportFile,
+  storefrontReportFile,
   runtimeSummaryFile,
   path.join(artifactDir, "playwright"),
   path.join(artifactDir, "playwright-session"),
   path.join(artifactDir, "playwright-registered"),
-  path.join(artifactDir, "playwright-report"),
-  path.join(artifactDir, "playwright-report-session"),
-  path.join(artifactDir, "playwright-report-registered"),
+  playwrightReportDir,
   path.join(artifactDir, "evidence"),
   allureResultsDir,
   path.join(artifactDir, "allure-report"),
@@ -144,11 +145,10 @@ const executionEnv = {
   CO_QST_TARGET_IDS: requestedTargetIds.join(","),
   CO_QST_FULL_P1_COUNT: String(CO_BASE_P1_IDS.length),
   CO_STOREFRONT_URL: config.baseUrl.href,
-  PLAYWRIGHT_JSON_OUTPUT_FILE: reportFile,
-  PLAYWRIGHT_HTML_OUTPUT_DIR: path.join(artifactDir, "playwright-report"),
   SMB_EVIDENCE_DIR: path.join(artifactDir, "evidence"),
   ENABLE_ALLURE: process.env.ENABLE_ALLURE || "0",
   ALLURE_RESULTS_DIR: allureResultsDir,
+  PW_TRACE: process.env.PW_TRACE ?? (process.env.CI ? "1" : "0"),
   ALLOW_PAYMENT_SUBMIT: process.env.ALLOW_PAYMENT_SUBMIT ?? "1",
   ALLOW_PROFILE_WRITE: process.env.ALLOW_PROFILE_WRITE ?? "1",
   BACKOFFICE_ENV: targetEnvironment.toLowerCase(),
@@ -159,14 +159,14 @@ const phaseReports = [];
 let result = { status: 0 };
 let registeredPhaseFailed = false;
 
-function readPhaseReport(reportPath) {
+function readPhaseReport(reportPath, label, htmlDir) {
   if (!fs.existsSync(reportPath)) return null;
   const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
-  phaseReports.push(report);
+  phaseReports.push({ report, label, htmlDir });
   return report;
 }
 
-function runPhase({ label, ids, reportPath, outputDir, htmlDir, evidenceDir, allure = false }) {
+function runPhase({ label, ids, reportPath, outputDir, htmlDir, evidenceDir }) {
   if (!ids.length) return { status: 0, report: null };
   console.log(`\n[co-qst] ${label}: ${ids.join(", ")}`);
   const phaseEnv = {
@@ -174,22 +174,35 @@ function runPhase({ label, ids, reportPath, outputDir, htmlDir, evidenceDir, all
     PLAYWRIGHT_JSON_OUTPUT_FILE: reportPath,
     PLAYWRIGHT_HTML_OUTPUT_DIR: htmlDir,
     SMB_EVIDENCE_DIR: evidenceDir,
-    ENABLE_ALLURE: allure ? executionEnv.ENABLE_ALLURE : "0",
+    ENABLE_ALLURE: executionEnv.ENABLE_ALLURE,
+    ALLURE_RESULTS_DIR: allureResultsDir,
   };
   const phaseResult = spawnSync(process.execPath, buildArgs(ids, outputDir), {
     env: phaseEnv,
     stdio: "inherit",
   });
-  return { status: phaseResult.status ?? 1, report: readPhaseReport(reportPath) };
+  return { status: phaseResult.status ?? 1, report: readPhaseReport(reportPath, label, htmlDir) };
+}
+
+function writePlaywrightReportHub() {
+  if (!phaseReports.length) return;
+  fs.mkdirSync(playwrightReportDir, { recursive: true });
+  const rows = phaseReports.map(({ report, label, htmlDir }) => {
+    const stats = report.stats || {};
+    const relative = path.relative(playwrightReportDir, path.join(htmlDir, "index.html")).replaceAll("\\", "/");
+    return `<tr><td>${label}</td><td>${stats.expected ?? 0}</td><td>${stats.unexpected ?? 0}</td><td>${stats.skipped ?? 0}</td><td><a href="${relative}">Open Playwright report</a></td></tr>`;
+  }).join("\n");
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CO QST Playwright Reports</title><style>body{font-family:Segoe UI,Arial,sans-serif;margin:0;background:#f5f7fb;color:#111827}.wrap{max-width:1100px;margin:auto;padding:28px}h1{margin:0 0 8px}.meta{color:#667085;margin-bottom:22px}table{width:100%;border-collapse:collapse;background:white;border:1px solid #e5e7eb}th,td{padding:12px 14px;border-bottom:1px solid #e5e7eb;text-align:left}th{background:#f9fafb}a{color:#175cd3;font-weight:600;text-decoration:none}</style></head><body><div class="wrap"><h1>Samsung CO ${targetEnvironment} · Playwright</h1><div class="meta">Official P1 · session gate → registered → storefront/backoffice</div><table><thead><tr><th>Phase</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Report</th></tr></thead><tbody>${rows}</tbody></table></div></body></html>`;
+  fs.writeFileSync(path.join(playwrightReportDir, "index.html"), html);
 }
 
 if (sessionGateIds.length) {
   const session = runPhase({
-    label: "Running authenticated session gate first",
+    label: "Authenticated session gate",
     ids: sessionGateIds,
     reportPath: sessionReportFile,
     outputDir: path.join(artifactDir, "playwright-session"),
-    htmlDir: path.join(artifactDir, "playwright-report-session"),
+    htmlDir: path.join(playwrightReportDir, "session"),
     evidenceDir: path.join(artifactDir, "evidence", "session"),
   });
 
@@ -219,34 +232,37 @@ if (sessionGateIds.length) {
 
 if (result.status === 0 && remainingRegisteredIds.length) {
   const registered = runPhase({
-    label: "Session gate passed. Running remaining registered TCs",
+    label: "Remaining registered TCs",
     ids: remainingRegisteredIds,
     reportPath: registeredReportFile,
     outputDir: path.join(artifactDir, "playwright-registered"),
-    htmlDir: path.join(artifactDir, "playwright-report-registered"),
+    htmlDir: path.join(playwrightReportDir, "registered"),
     evidenceDir: path.join(artifactDir, "evidence", "registered"),
   });
   if (registered.status !== 0) registeredPhaseFailed = true;
 }
 
 if (result.status === 0 && guestAndSafeIds.length) {
-  console.log(`\n[co-qst] Registered block finished. Running remaining ${guestAndSafeIds.length} guest/safe Base Store TCs.`);
-  const mainResult = spawnSync(process.execPath, buildArgs(guestAndSafeIds, path.join(artifactDir, "playwright")), {
-    env: executionEnv,
-    stdio: "inherit",
+  const storefront = runPhase({
+    label: "Storefront + BackOffice TCs",
+    ids: guestAndSafeIds,
+    reportPath: storefrontReportFile,
+    outputDir: path.join(artifactDir, "playwright"),
+    htmlDir: path.join(playwrightReportDir, "storefront"),
+    evidenceDir: path.join(artifactDir, "evidence", "storefront"),
   });
-  result.status = mainResult.status ?? 1;
-  readPhaseReport(reportFile);
+  result.status = storefront.status;
 }
 
 if (phaseReports.length) {
-  const baseReport = phaseReports[phaseReports.length - 1];
+  const baseReport = phaseReports[phaseReports.length - 1].report;
   const mergedReport = {
     ...baseReport,
-    suites: phaseReports.flatMap((report) => report.suites || []),
-    errors: phaseReports.flatMap((report) => report.errors || []),
+    suites: phaseReports.flatMap(({ report }) => report.suites || []),
+    errors: phaseReports.flatMap(({ report }) => report.errors || []),
   };
   fs.writeFileSync(reportFile, JSON.stringify(mergedReport, null, 2));
+  writePlaywrightReportHub();
 }
 
 if (registeredPhaseFailed && result.status === 0) result.status = 1;
