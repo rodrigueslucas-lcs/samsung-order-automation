@@ -60,7 +60,7 @@ async function clearCoCartForPayment(page,cfg){
   }
   throw new Error("CO payment cart cleanup exceeded the 20-row safety limit.");
 }
-async function coGuestCheckout(page,cartPage){
+async function coGuestCheckout(page,cartPage,guestEmail=`co-qst-${Date.now()}@mailinator.com`){
   try {
     await cartPage.proceedToCheckout();
   } catch (error) {
@@ -70,14 +70,14 @@ async function coGuestCheckout(page,cartPage){
   }
   const email=page.getByPlaceholder(/Escribe tu correo electr[oó]nico para tramitar el pedido/i);
   await expect(email).toBeVisible({timeout:30000});
-  await email.fill(`co-qst-${Date.now()}@mailinator.com`);
+  await email.fill(guestEmail);
   await page.getByRole("button",{name:"Continuar como invitado",exact:true}).click();
   try {
     await expect(page).toHaveURL(/\/co\/checkout\/one(?:\?|$)/i,{timeout:30000});
   } catch (error) {
     if (!/\/co\/guestlogin\/checkout(?:\?|$)/i.test(page.url())) throw error;
     await page.reload({waitUntil:"domcontentloaded"});
-    await email.fill(`co-qst-${Date.now()}@mailinator.com`);
+    await email.fill(guestEmail);
     await page.getByRole("button",{name:"Continuar como invitado",exact:true}).click();
     await expect(page).toHaveURL(/\/co\/checkout\/one(?:\?|$)/i,{timeout:30000});
   }
@@ -170,7 +170,8 @@ async function coSelectOption(page,delivery,name,option){
   await coClick(page,page.getByRole("option",{name:option,exact:true}));
 }
 async function coFillNewShipping(page,delivery,secondaryNumber="113-43"){
-  await coSelectAddressMode(page,delivery,"Shipping","NEW_ADDRESS");
+  const newAddressMode=delivery.locator('input[name="addressOptionShipping"][value="NEW_ADDRESS"]');
+  if(await newAddressMode.isEnabled().catch(()=>false))await coSelectAddressMode(page,delivery,"Shipping","NEW_ADDRESS");
   for(const [field,option] of [["regionIso","Bogota, D.C."],["town","BOGOTA, D.C."],["line2_a","Carrera"],["line1","Oficina"]]){
     await coSelectOption(page,delivery,field,option);
   }
@@ -189,7 +190,9 @@ async function coFillNewBilling(page,delivery,secondaryNumber="113-43"){
 }
 async function coContinueToPayment(page,delivery){
   if(await delivery.locator('input[name="group0delivery_mode_option"]:checked').count()===0){
-    await delivery.locator('mat-radio-button').filter({hasText:/Envío regular/i}).first().locator('input[type="radio"]').check();
+    const regularRadio=delivery.locator('mat-radio-button').filter({hasText:/Envío regular/i}).first().locator('input[type="radio"]');
+    if(await regularRadio.count())await regularRadio.check();
+    else await coClick(page,delivery.getByRole('listitem').filter({hasText:/Envío regular \(Gratis\)/i}).first());
   }
   for(const field of ["termsAndCondition","termsAndCondition2"]){
     await coDismissReminder(page);
@@ -320,7 +323,22 @@ if(id==="SAM-24909"){
   await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i);
   return;
 }
-if(id==="SAM-24911"){await page.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));await expect(page.getByText(/Volver al inicio|Back to top|Volver arriba|Subir/i).filter({visible:true}).first()).toBeVisible({timeout:30000});return;}
+if(id==="SAM-24911"){
+  await page.setViewportSize({width:1920,height:1080});
+  const controlRendered=await page.waitForFunction(()=>{
+    window.scrollTo(0,document.documentElement.scrollHeight);
+    return /Volver al inicio|Back to top|Volver arriba|Ir arriba|Subir/i.test(document.body.innerText);
+  },null,{timeout:20000,polling:"raf"}).then(()=>true,()=>false);
+  if(!controlRendered)throw new Error("CO S2 cart footer loaded, but no Back to Top control rendered. Verify manually on /co/cart after scrolling to the bottom.");
+  const backToTop=page.getByRole("button",{name:/Volver al inicio|Back to top|Volver arriba|Ir arriba|Subir/i})
+    .or(page.getByRole("link",{name:/Volver al inicio|Back to top|Volver arriba|Ir arriba|Subir/i})).filter({visible:true}).first();
+  await expect(backToTop).toBeVisible({timeout:30000});
+  const cartTop=page.getByText(/Tienes\s+\d+\s+Producto\(s\)\s+en\s+tu\s+carrito/i).first();
+  await expect(cartTop).not.toBeInViewport();
+  await backToTop.click();
+  await expect(cartTop).toBeInViewport({timeout:30000});
+  return;
+}
 if(id==="SAM-24925"){await page.setViewportSize({width:390,height:844});await expect(page.getByRole("button",{name:/checkout|comprar|continuar/i}).filter({visible:true}).first()).toBeVisible({timeout:30000});return;}
 test.skip(true,id+" is represented canonically but requires live CO checkout/auth/payment data before promotion.");
 }
@@ -552,22 +570,46 @@ test("SAM-24910 @qst @co @base-store @registered - Validate switching delivery m
 test("SAM-24911 @qst @co @base-store - Verify Back to Top",async({page},i)=>runCanonicalCase("SAM-24911",page,i));
 test("SAM-24912 @destructive @qst @co @base-store @registered - Payment using credit card with reg user",async({page},i)=>runCanonicalCase("SAM-24912",page,i));
 test("SAM-24915 @qst @co @base-store - Payment using Rewards",async({page},i)=>runCanonicalCase("SAM-24915",page,i));
-test("SAM-24919 @qst @co @base-store - Track Order",async({page,context},i)=>{
+test("SAM-24919 @destructive @qst @co @base-store - Track Order",async({page,context},i)=>{
   test.setTimeout(900000);
   evidence(i,"SAM-24919");
   const cfg=getCoQstConfig();
-  const savedOrderFile=path.resolve("playwright/.auth/co-s2-guest-tracking.json");
-  const saved=fs.existsSync(savedOrderFile)?JSON.parse(fs.readFileSync(savedOrderFile,"utf8")):{};
-  const orderNumber=process.env.CO_QST_TRACKING_ORDER?.trim()||saved.orderNumber;
-  const email=(process.env.CO_QST_TRACKING_EMAIL?.trim()||saved.email||"").toLowerCase();
-  expect(orderNumber,"A confirmed CO guest order is required for Track Order.").toMatch(/^CO\d{6}-\d{8}(?:_\d+)?$/i);
-  expect(email,"The guest order email must identify a readable Mailinator inbox.").toMatch(/^[^@]+@mailinator\.com$/i);
+  requirePaymentSubmitOptIn();
+  const email=`co-qst-${Date.now()}@mailinator.com`;
   const inbox=email.split("@")[0];
+  const guestCart=await cart(page,cfg);
+  await coGuestCheckout(page,guestCart,email);
+  await fillCoGuestContact(page,{recoverStalledTransition:true});
+  const delivery=page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
+  await expect(delivery).toBeVisible({timeout:60000});
+  await coFillNewShipping(page,delivery);
+  await coContinueToPayment(page,delivery);
+  const payment=new MarketPaymentPage(page,{market:"CO"});
+  const card=getMxTestCard();
+  await payment.selectCreditCard();
+  await payment.fillCardData(card);
+  await payment.validateCreditCardReady(card);
+  const created=await payment.placeOrderAndCapture();
+  await expect(page,"The newly submitted CO order must reach a confirmation page, not just return an order code in an API response.")
+    .toHaveURL(/confirmation|confirmacion|order-confirmation|checkout\/order|success/i,{timeout:90000});
+  const confirmationText=await expect.poll(async()=>{
+    const text=await page.locator("body").innerText().catch(()=>"");
+    return /N[uú]mero de pedido:\s*CO\d{6}-\d{8}/i.test(text)?text:null;
+  },{timeout:90000,message:"CO confirmation did not hydrate its public order number."}).toBeTruthy()
+    .then(()=>page.locator("body").innerText());
+  const orderNumber=confirmationText.match(/N[uú]mero de pedido:\s*(CO\d{6}-\d{8})/i)?.[1];
+  expect(orderNumber,"CO confirmation must display the public order number used by Track Order.").toBeTruthy();
+  expect(created.orderCode.startsWith(orderNumber),"The confirmation order must match the submitted checkout response.").toBe(true);
+  expect(confirmationText.toLowerCase(),"The new guest inbox must match the address shown on CO confirmation.").toContain(email);
+  console.log(`[co-tracking] fresh guest order ${orderNumber} confirmed for ${email}`);
+  i.annotations.push({type:"co-tracking-created-order",description:`Fresh guest order ${orderNumber} for ${email}`});
   const ordersUrl=new URL("/co/mypage/orders",cfg.baseUrl.origin).toString();
   let tracking;
   for(let attempt=1;attempt<=3;attempt++){
     if(attempt>1)await bootstrapCoStorefront(page,cfg);
-    await page.goto(ordersUrl,{waitUntil:"domcontentloaded",timeout:60000});
+    await page.goto(ordersUrl,{waitUntil:"domcontentloaded",timeout:60000}).catch(async(error)=>{
+      if(attempt===3)throw error;
+    });
     tracking=new GuestOrderTrackingPage(page,{market:"co",currencyPattern:/\$\s*[\d.,]+/,productPattern:new RegExp(cfg.sku,"i")});
     if(await tracking.form.waitFor({state:"visible",timeout:20000}).then(()=>true).catch(()=>false))break;
     if(attempt===3)throw new Error("CO Track Order form did not render after three controlled navigations.");
