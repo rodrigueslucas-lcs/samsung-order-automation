@@ -4,6 +4,7 @@ import mxQstScope from './utils/mxQstScope.cjs';
 
 const allureEnabled = process.env.ENABLE_ALLURE === '1';
 const videoEnabled = process.env.PW_VIDEO === '1';
+const traceAll = process.env.PW_TRACE === '1';
 const headless = process.env.MX_QST_HEADLESS === '1' ||
   (!!process.env.CI && process.env.MX_QST_HEADLESS !== '0');
 const mxOfficialP1 = process.env.TEST_MARKET === 'MX' && process.env.TEST_SUITE === 'P1/QST';
@@ -48,7 +49,7 @@ export default defineConfig({
     ...(allureEnabled
       ? [['allure-playwright', {
           resultsDir: process.env.ALLURE_RESULTS_DIR || 'allure-results',
-          detail: false,
+          detail: true,
           suiteTitle: false
         }]]
       : []),
@@ -65,7 +66,7 @@ export default defineConfig({
     video: videoEnabled
       ? { mode: 'on', size: { width: 1280, height: 800 } }
       : 'off',
-    trace: 'retain-on-failure',
+    trace: traceAll ? 'on' : 'retain-on-failure',
     actionTimeout: 15000,
     navigationTimeout: 60000
   },
