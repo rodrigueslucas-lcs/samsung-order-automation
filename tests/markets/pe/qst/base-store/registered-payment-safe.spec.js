@@ -15,6 +15,8 @@ const { recordBusinessEvidence } = evidenceContext;
 const { getPeQstEvidenceMetadata } = peEvidenceMetadata;
 
 test.describe("PE QST - registered payment safe checkpoints", () => {
+  // Fixture setup (including a fresh Chrome page) must share the test budget.
+  test.describe.configure({ timeout: 360000 });
   test.use({ storageState: hasPeAuthState() ? PE_AUTH_STATE_PATH : undefined });
 
   test.beforeEach(async ({ context }) => {
