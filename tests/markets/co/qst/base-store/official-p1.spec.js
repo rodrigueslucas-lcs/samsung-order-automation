@@ -9,6 +9,8 @@ import coAuthStateModule from "../../../../../utils/coAuthState";
 import BackOfficeOrderPage from "../../../../../pages/BackOfficeOrderPage";
 import CheckoutPage from "../../../../../pages/CheckoutPage";
 import MarketPaymentPage from "../../../../../pages/MarketPaymentPage";
+import GuestOrderTrackingPage from "../../../../../pages/GuestOrderTrackingPage";
+import MailinatorPage from "../../../../../pages/MailinatorPage";
 import backofficeCredentials from "../../../../../utils/backofficeAdminCredentials.js";
 import mxTestCard from "../../../../../utils/mxTestCard.js";
 import destructiveGuards from "../../../../../utils/destructiveGuards.js";
@@ -48,6 +50,11 @@ async function clearCoCartForPayment(page,cfg){
     const confirmation=page.getByRole("dialog").or(page.getByRole("alertdialog"))
       .filter({hasText:/Eliminar/i});
     await expect(confirmation).toBeVisible({timeout:30000});
+    const overlay=page.locator('#ins-frameless-overlay[close-on-click="true"]:visible');
+    if(await overlay.isVisible().catch(()=>false)){
+      await overlay.click({position:{x:1,y:1},timeout:5000});
+      await expect(overlay).toBeHidden({timeout:10000});
+    }
     await confirmation.getByRole("button",{name:/^S[ií],?\s*eliminar$/i}).click();
     await expect(remove).toHaveCount(count-1,{timeout:30000});
   }
@@ -75,7 +82,7 @@ async function coGuestCheckout(page,cartPage){
     await expect(page).toHaveURL(/\/co\/checkout\/one(?:\?|$)/i,{timeout:30000});
   }
 }
-async function fillCoGuestContact(page){
+async function fillCoGuestContact(page,{recoverStalledTransition=false}={}){
   const firstName=page.getByRole("textbox",{name:"firstName",exact:true});
   await expect(firstName).toBeVisible({timeout:60000});
   const reminder=page.getByRole("dialog").filter({hasText:/¡Listo!/i});
@@ -104,6 +111,17 @@ async function fillCoGuestContact(page){
   const next=page.getByRole("button",{name:/Continuar con el m[eé]todo de env[ií]o/i});
   await expect(next).toBeEnabled();
   await next.click();
+  if(recoverStalledTransition){
+    const advanced=await page.waitForURL(/CHECKOUT_STEP_DELIVERY/i,{timeout:20000}).then(()=>true).catch(()=>false);
+    if(!advanced){
+      console.log(`[co-qst] Contact Info remained pending after submit; reloading checkout once (${page.url()}).`);
+      await page.reload({waitUntil:"domcontentloaded",timeout:60000});
+      if(/CHECKOUT_STEP_CONTACT_INFO/i.test(page.url())){
+        await fillCoGuestContact(page);
+        return;
+      }
+    }
+  }
   await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i,{timeout:60000});
 }
 async function coRegisteredDelivery(browser){
@@ -114,7 +132,7 @@ async function coRegisteredDelivery(browser){
     await c.validateProductInCart();
     await page.getByRole("button",{name:/^Continuar con la compra$/i}).click();
     await expect(page).toHaveURL(/\/co\/checkout\/one/i,{timeout:60000});
-    if(/CHECKOUT_STEP_CONTACT_INFO/i.test(page.url()))await fillCoGuestContact(page);
+    if(/CHECKOUT_STEP_CONTACT_INFO/i.test(page.url()))await fillCoGuestContact(page,{recoverStalledTransition:true});
     const delivery=page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
     await expect(delivery).toBeVisible({timeout:60000});
     return {context,page,delivery};
@@ -306,7 +324,66 @@ if(id==="SAM-24911"){await page.evaluate(()=>window.scrollTo(0,document.body.scr
 if(id==="SAM-24925"){await page.setViewportSize({width:390,height:844});await expect(page.getByRole("button",{name:/checkout|comprar|continuar/i}).filter({visible:true}).first()).toBeVisible({timeout:30000});return;}
 test.skip(true,id+" is represented canonically but requires live CO checkout/auth/payment data before promotion.");
 }
-test("SAM-24880 @qst @co @base-store - Add product from BC Page",async({page},i)=>runCanonicalCase("SAM-24880",page,i));
+test("SAM-24880 @qst @co @base-store - Add product from BC Page",async({page},i)=>{
+  evidence(i,"SAM-24880");
+  const cfg=getCoQstConfig();
+  await home(page,cfg);
+  const configuredBc=process.env.CO_QST_BC_URL?.trim();
+  let bcUrl;
+  if(configuredBc){
+    bcUrl=new URL(configuredBc);
+    expect(bcUrl.origin).toBe(cfg.baseUrl.origin);
+    expect(bcUrl.pathname).toMatch(/^\/co\//i);
+  }else{
+    const appliance=page.getByRole("link",{name:/Electrodom[eé]sticos/i}).filter({visible:true}).first();
+    await expect(appliance,"CO home must expose the appliance category navigation.").toBeVisible({timeout:30000});
+    await appliance.hover();
+    const refrigerators=page.locator('a[href*="/co/"]')
+      .filter({hasText:/Refrigeradores|Neveras/i}).filter({visible:true}).first();
+    await expect(refrigerators,"CO BC refrigerator category must be discoverable from the home navigation.").toBeVisible({timeout:30000});
+    bcUrl=new URL(await refrigerators.getAttribute("href"),cfg.baseUrl);
+  }
+  await page.goto(bcUrl.href,{waitUntil:"domcontentloaded",timeout:60000});
+  await expect(page).toHaveURL(bcUrl.href,{timeout:30000});
+  const productCard=page.getByRole("listitem")
+    .filter({has:page.getByRole("link",{name:/Agregar al carrito/i})}).first();
+  await expect(productCard,`BC category ${bcUrl.pathname} must list a purchasable CO product.`).toBeVisible({timeout:60000});
+  const productLink=productCard.locator('a[href^="/co/refrigerators/"]:not([href*="#"])').first();
+  await expect(productLink).toBeVisible();
+  await productLink.click();
+  await expect(page).toHaveURL(/\/co\/refrigerators\/[^?#]+\/[^?#]+\//i,{timeout:60000});
+  const pdpUrl=page.url();
+  const minicartUrl=await page.waitForFunction(()=>performance.getEntriesByType("resource")
+    .map(entry=>entry.name).find(url=>/\/minicart\/totalProducts(?:[?#]|$)/i.test(url)),null,{timeout:30000});
+  const countUrl=await minicartUrl.jsonValue();
+  const cartCount=async()=>{
+    const response=await page.request.get(countUrl);
+    expect(response.ok(),"BC minicart count request must succeed.").toBe(true);
+    const body=await response.text();
+    const count=Number(body.match(/<Integer>(\d+)<\/Integer>/i)?.[1]);
+    expect(Number.isFinite(count),"BC minicart count must be numeric.").toBe(true);
+    return count;
+  };
+  const before=await cartCount();
+  const noTradeIn=page.getByRole("radio",{name:"No",exact:true}).filter({visible:true}).first();
+  if(await noTradeIn.isVisible() && !await noTradeIn.isChecked())await noTradeIn.check();
+  const add=page.getByRole("link",{name:/Agregar al carrito/i}).filter({visible:true})
+    .or(page.getByRole("button",{name:/Agregar al carrito/i}).filter({visible:true}))
+    .or(page.getByRole("link",{name:/Comprar ahora/i}).filter({visible:true})).first();
+  await expect(add,"BC PDP must expose an Add to Cart action.").toBeVisible({timeout:60000});
+  const addResponse=page.waitForResponse(response=>response.request().method()==="POST"&&
+    /\/addToCart\/multi\/$|\/users\/current\/carts\/[^/]+\/entries(?:\?|$)/i.test(new URL(response.url()).pathname),
+  {timeout:30000}).catch(()=>null);
+  await add.click();
+  const response=await addResponse;
+  if(response)expect(response.ok(),"BC Add to Cart mutation must succeed.").toBe(true);
+  if(/SystemParking|System Check/i.test(page.url())){
+    await page.goBack({waitUntil:"domcontentloaded",timeout:30000}).catch(()=>null);
+    if(!/\/co\/refrigerators\//i.test(page.url()))await page.goto(pdpUrl,{waitUntil:"domcontentloaded",timeout:30000});
+  }
+  await expect.poll(cartCount,{timeout:30000,message:"BC Add to Cart must increase the CO minicart count."}).toBeGreaterThan(before);
+  await i.attach("co-24880-bc-add",{body:await page.screenshot({fullPage:true}),contentType:"image/png"});
+});
 test("SAM-24882 @qst @co @base-store - Cart page UI",async({page},i)=>runCanonicalCase("SAM-24882",page,i));
 test("SAM-24883 @qst @co @base-store - Increase decrease delete quantity",async({page},i)=>runCanonicalCase("SAM-24883",page,i));
 test("SAM-24886 @qst @co @base-store - Verify rewards text as Guest User",async({page},i)=>runCanonicalCase("SAM-24886",page,i));
@@ -438,14 +515,81 @@ test("SAM-24903 @qst @co @base-store @registered - Save option for reg user",asy
       .toBeVisible({timeout:30000});
   }finally{await context.close();}
 });
-test("SAM-24904 @qst @co @base-store - Able to checkout with New address",async({page},i)=>runCanonicalCase("SAM-24904",page,i));
+test("SAM-24904 @qst @co @base-store @registered - Able to checkout with New address",async({browser},i)=>{
+  evidence(i,"SAM-24904");
+  const {context,page,delivery}=await coRegisteredDelivery(browser);
+  try{
+    const secondaryNumber=`113-${Date.now()%10000}`;
+    await coFillNewShipping(page,delivery,secondaryNumber);
+    await expect(delivery.locator('input[name="addressOptionShipping"][value="NEW_ADDRESS"]')).toBeChecked();
+    await expect(delivery.locator('input[name="line2_c"]')).toHaveValue(new RegExp(`#?\\s*${secondaryNumber}$`));
+    const save=delivery.locator('input[name="saveInAddressBook"]:not([disabled])').first();
+    if(await save.isVisible() && await save.isChecked())await save.uncheck();
+    await coContinueToPayment(page,delivery);
+    await expect(page.locator('.address-details__delivery-address')).toContainText(secondaryNumber,{timeout:30000});
+    await i.attach("co-24904-new-address-payment-checkpoint",{body:await page.screenshot({fullPage:true}),contentType:"image/png"});
+  }finally{await context.close();}
+});
 test("SAM-24905 @qst @co @base-store - Save option not visible",async({page},i)=>runCanonicalCase("SAM-24905",page,i));
 test("SAM-24909 @qst @co @base-store - Validate Invalid address details",async({page},i)=>runCanonicalCase("SAM-24909",page,i));
-test("SAM-24910 @qst @co @base-store - Validate switching delivery modes address",async({page},i)=>runCanonicalCase("SAM-24910",page,i));
+test("SAM-24910 @qst @co @base-store @registered - Validate switching delivery modes address",async({browser},i)=>{
+  evidence(i,"SAM-24910");
+  const {context,page,delivery}=await coRegisteredDelivery(browser);
+  try{
+    const saved=delivery.locator('input[name="addressOptionShipping"]:not([value="NEW_ADDRESS"])').first();
+    const fresh=delivery.locator('input[name="addressOptionShipping"][value="NEW_ADDRESS"]');
+    await coSelectSavedAddress(page,delivery,"Shipping");
+    await expect(saved).toBeChecked();
+    await coSelectAddressMode(page,delivery,"Shipping","NEW_ADDRESS");
+    await expect(fresh).toBeChecked();
+    await expect(saved).not.toBeChecked();
+    await expect(delivery.locator('mat-select[name="regionIso"]')).toBeVisible();
+    await coSelectSavedAddress(page,delivery,"Shipping");
+    await expect(saved).toBeChecked();
+    await expect(fresh).not.toBeChecked();
+  }finally{await context.close();}
+});
 test("SAM-24911 @qst @co @base-store - Verify Back to Top",async({page},i)=>runCanonicalCase("SAM-24911",page,i));
 test("SAM-24912 @destructive @qst @co @base-store @registered - Payment using credit card with reg user",async({page},i)=>runCanonicalCase("SAM-24912",page,i));
 test("SAM-24915 @qst @co @base-store - Payment using Rewards",async({page},i)=>runCanonicalCase("SAM-24915",page,i));
-test("SAM-24919 @qst @co @base-store - Track Order",async({page},i)=>runCanonicalCase("SAM-24919",page,i));
+test("SAM-24919 @qst @co @base-store - Track Order",async({page,context},i)=>{
+  test.setTimeout(900000);
+  evidence(i,"SAM-24919");
+  const cfg=getCoQstConfig();
+  const savedOrderFile=path.resolve("playwright/.auth/co-s2-guest-tracking.json");
+  const saved=fs.existsSync(savedOrderFile)?JSON.parse(fs.readFileSync(savedOrderFile,"utf8")):{};
+  const orderNumber=process.env.CO_QST_TRACKING_ORDER?.trim()||saved.orderNumber;
+  const email=(process.env.CO_QST_TRACKING_EMAIL?.trim()||saved.email||"").toLowerCase();
+  expect(orderNumber,"A confirmed CO guest order is required for Track Order.").toMatch(/^CO\d{6}-\d{8}(?:_\d+)?$/i);
+  expect(email,"The guest order email must identify a readable Mailinator inbox.").toMatch(/^[^@]+@mailinator\.com$/i);
+  const inbox=email.split("@")[0];
+  const ordersUrl=new URL("/co/mypage/orders",cfg.baseUrl.origin).toString();
+  let tracking;
+  for(let attempt=1;attempt<=3;attempt++){
+    if(attempt>1)await bootstrapCoStorefront(page,cfg);
+    await page.goto(ordersUrl,{waitUntil:"domcontentloaded",timeout:60000});
+    tracking=new GuestOrderTrackingPage(page,{market:"co",currencyPattern:/\$\s*[\d.,]+/,productPattern:new RegExp(cfg.sku,"i")});
+    if(await tracking.form.waitFor({state:"visible",timeout:20000}).then(()=>true).catch(()=>false))break;
+    if(attempt===3)throw new Error("CO Track Order form did not render after three controlled navigations.");
+  }
+  await tracking.validateGuestTrackingForm();
+  const mailPage=await context.newPage();
+  try{
+    const mail=new MailinatorPage(mailPage,inbox);
+    await mail.openInbox();
+    const baselineMessageIds=await mail.snapshotMessageIds();
+    await page.bringToFront();
+    const otpRequest=await tracking.requestVerificationCode(orderNumber,email,{maxAttempts:4,retryDelayMs:15000});
+    i.annotations.push({type:"co-tracking-otp-request",description:`${otpRequest.method} ${otpRequest.status} ${otpRequest.endpoint}`});
+    await mailPage.bringToFront();
+    const otpEmail=await mail.waitForOtpEmail({baselineMessageIds});
+    await page.bringToFront();
+    await tracking.submitVerificationCode(otpEmail.otp,orderNumber);
+    const result=await tracking.validateTrackedOrder(orderNumber);
+    expect(result.status).toBeTruthy();
+    expect(result.hasOrderSummary).toBe(true);
+  }finally{await mailPage.close();}
+});
 test("SAM-24920 @qst @co @base-store - Backoffice",async({page},i)=>runCanonicalCase("SAM-24920",page,i));
 test("SAM-24925 @qst @co @base-store - Mobile Sticky checkout",async({page},i)=>runCanonicalCase("SAM-24925",page,i));
 test("SAM-24914 @not-run @qst @co @base-store @payment - Payment using ADDI pay",async({},i)=>{evidence(i,"SAM-24914");test.skip(true,"Official source is BLOCKED and documents a PSE/BO/Kibana callback workflow; no automated bypass or fabricated payment completion.");});

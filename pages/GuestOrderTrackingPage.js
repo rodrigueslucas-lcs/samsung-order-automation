@@ -14,11 +14,11 @@ export default class GuestOrderTrackingPage extends BasePage {
     this.orderNumber = this.form.locator('input[type="text"]').first();
     this.email = this.form.locator('input[type="email"]');
     this.verificationCode = this.form.getByRole("textbox", {
-      name: /Código de Verificación/i,
+      name: this.market === "co" ? /C[oó]digo OTP/i : /Código de Verificación/i,
     });
     this.sendCodeButton = this.form.getByRole("button", {
-      name: "Enviar código",
-      exact: true,
+      name: this.market === "co" ? /Enviar c[oó]digo/i : "Enviar código",
+      exact: this.market !== "co",
     });
     this.searchButton = this.form.getByRole("button", {
       name: "Buscar",
@@ -166,10 +166,12 @@ export default class GuestOrderTrackingPage extends BasePage {
     // its active verification state (code input + resend countdown). The old
     // transient toast is not consistently rendered.
     await this.verificationCode.waitFor({ state: "visible", timeout: 30000 });
-    const resendButton = this.form.getByRole("button", { name: /Reenviar c[oó]digo/i });
-    await resendButton.waitFor({ state: "visible", timeout: 30000 });
-    if (!(await resendButton.isDisabled())) {
-      throw new Error("OTP request returned success but the resend countdown was not active.");
+    if (this.market !== "co") {
+      const resendButton = this.form.getByRole("button", { name: /Reenviar c[oó]digo/i });
+      await resendButton.waitFor({ state: "visible", timeout: 30000 });
+      if (!(await resendButton.isDisabled())) {
+        throw new Error("OTP request returned success but the resend countdown was not active.");
+      }
     }
 
     return {

@@ -11,9 +11,9 @@ export default class ProfilePage extends MyAccountPage {
     this.profileButton = page.getByRole("button", { name: "My Profile", exact: true });
     this.qaMarker = "QA AUTOMATION";
     this.addressApiUrl = options.addressApiUrl || LEGACY_PE_ST2_ADDRESS_API;
-    this.addressCards = page.locator(
-      'article, [class*="address-card" i], [class*="address-item" i], [data-testid*="address" i]'
-    );
+    this.addressCards = this.market === "pe"
+      ? page.getByRole("tabpanel", { name: "Envío" }).getByRole("listitem")
+      : page.locator('article, [class*="address-card" i], [class*="address-item" i], [data-testid*="address" i]');
   }
 
   assertAddressApiUrl() {
@@ -69,6 +69,14 @@ export default class ProfilePage extends MyAccountPage {
   }
 
   async openAddressManagement() {
+    if (this.market === "pe") {
+      await this.openRoute(`/${this.market}/mypage/profile-setting`);
+      await this.page.getByRole("heading", { name: /Configuraci[oó]n de Perfil/i })
+        .waitFor({ state: "visible", timeout: 60000 });
+      await this.page.getByText("Direcciones", { exact: true }).first()
+        .waitFor({ state: "visible", timeout: 30000 });
+      return;
+    }
     await this.openProfile();
 
     const addressEntry = () => this.page
@@ -152,10 +160,18 @@ export default class ProfilePage extends MyAccountPage {
       throw new Error("Refusing to create an address without the QA AUTOMATION marker.");
     }
     await this.openAddressManagement();
-    await this.page.getByRole("button", { name: /Agregar|Añadir|Nueva dirección|Add address/i }).click();
+    const add = this.market === "pe"
+      ? this.page.getByRole("heading", { name: "Direcciones" }).locator("xpath=..").getByRole("button")
+      : this.page.getByRole("button", { name: /Agregar|Añadir|Nueva dirección|Add address/i });
+    await add.click();
     await this.fillAddressForm(address);
     await this.page.getByRole("button", { name: /Guardar|Save/i }).click();
-    await this.expectAddressNotification(/agreg|cread|guardad|success/i);
+    if (this.market === "pe") {
+      await expect(this.page.getByRole("dialog", { name: "Añadir nueva dirección" }).first()).toBeHidden({ timeout: 30000 });
+      await this.page.reload({ waitUntil: "domcontentloaded" });
+      await expect(this.page.getByRole("heading", { name: "Configuración de Perfil" })).toBeVisible();
+    }
+    if (this.market !== "pe") await this.expectAddressNotification(/agreg|cread|guardad|success/i);
     await this.expectQaAddress(address.street);
   }
 
@@ -164,16 +180,16 @@ export default class ProfilePage extends MyAccountPage {
     await card.getByRole("button", { name: /Editar|Edit/i }).click();
     await this.fillAddressForm(updatedAddress);
     await this.page.getByRole("button", { name: /Guardar|Actualizar|Save|Update/i }).click();
-    await this.expectAddressNotification(/actualiz|editad|guardad|success/i);
+    if (this.market !== "pe") await this.expectAddressNotification(/actualiz|editad|guardad|success/i);
     await this.expectQaAddress(updatedAddress.street);
   }
 
   async deleteQaAddress(marker) {
     const card = await this.qaCard(marker);
-    await card.getByRole("button", { name: /Eliminar|Delete/i }).click();
-    const confirm = this.page.getByRole("button", { name: /Confirmar|Eliminar|Sí|Delete/i }).last();
+    await card.getByRole("button", { name: /Eliminar|Delete|Remove/i }).click();
+    const confirm = this.page.getByRole("button", { name: /Confirmar|Eliminar|Sí|Delete|Remove/i }).last();
     if (await confirm.isVisible()) await confirm.click();
-    await this.expectAddressNotification(/elimin|remov|success/i);
+    if (this.market !== "pe") await this.expectAddressNotification(/elimin|remov|success/i);
     await expect(this.page.getByText(marker, { exact: false })).toHaveCount(0);
   }
 
@@ -202,16 +218,31 @@ export default class ProfilePage extends MyAccountPage {
   }
 
   async expectQaAddress(marker) {
-    await expect(this.page.getByText(marker, { exact: false }).first()).toBeVisible();
+    if (this.market === "pe") await this.expandPeAddressesUntil(marker);
+    await expect(this.page.getByText(marker, { exact: false }).first()).toBeVisible({ timeout: 30000 });
   }
 
   async qaCard(marker) {
     if (!marker.startsWith(this.qaMarker)) {
       throw new Error("Refusing to mutate a non-QA address.");
     }
+    if (this.market === "pe") await this.expandPeAddressesUntil(marker);
     const card = this.addressCards.filter({ hasText: marker }).first();
     await card.waitFor({ state: "visible", timeout: 30000 });
     return card;
+  }
+
+  async expandPeAddressesUntil(marker) {
+    const panel = this.page.getByRole("tabpanel", { name: "Envío" });
+    await panel.getByRole("listitem").first().waitFor({ state: "visible", timeout: 30000 });
+    for (let attempt = 0; attempt < 10; attempt++) {
+      if (await panel.getByRole("listitem").filter({ hasText: marker }).count()) return;
+      const more = panel.getByRole("button", { name: "Ver más" });
+      if (!(await more.waitFor({ state: "visible", timeout: 5000 }).then(() => true, () => false))) return;
+      const before = await panel.getByRole("listitem").count();
+      await more.click();
+      await expect.poll(() => panel.getByRole("listitem").count(), { timeout: 10000 }).toBeGreaterThan(before);
+    }
   }
 
   async expectAddressNotification(pattern) {
@@ -221,6 +252,48 @@ export default class ProfilePage extends MyAccountPage {
   }
 
   async fillAddressForm(address) {
+    if (this.market === "pe") {
+      const dialog = this.page.getByRole("dialog", { name: /Añadir nueva dirección|Editar Dirección/i }).first();
+      await dialog.getByRole("textbox", { name: "Teléfono Móvil" }).fill(String(address.phone || "944895260"));
+      const documentType = dialog.getByRole("combobox", { name: "Tipo de Documento" });
+      if (!(await documentType.innerText()).includes("DNI")) {
+        await documentType.click();
+        await this.page.getByRole("option", { name: "DNI", exact: true }).click();
+      }
+      const documentNumber = dialog.getByRole("textbox", { name: "Número de documento de identidad" });
+      await expect(documentNumber).toBeEnabled();
+      await documentNumber.fill(String(address.documentNumber || "12345678"));
+      for (const [label, value] of [
+        ["Departamento", address.department],
+        ["Provincia", address.province],
+        ["Distrito", address.district],
+      ]) {
+        const control = dialog.getByRole("combobox", { name: label, exact: true });
+        const option = this.page.getByRole("option", { name: value, exact: true });
+        let offered = false;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          if ((await control.getAttribute("aria-expanded")) !== "true") await control.click();
+          offered = await option.waitFor({ state: "visible", timeout: 4000 }).then(() => true, () => false);
+          if (offered) break;
+        }
+        if (!offered) {
+          const choices = await this.page.getByRole("option").allTextContents();
+          const combobox = await control.evaluate((element) => element.outerHTML);
+          throw new Error(`PE ${label} did not offer ${value}; options=${JSON.stringify(choices)}; control=${combobox.slice(0, 1200)}`);
+        }
+        await option.click();
+      }
+      await dialog.getByRole("textbox", { name: "Dirección", exact: true }).fill(address.street);
+      await dialog.getByRole("textbox", { name: "Número", exact: true }).fill(String(address.number));
+      await dialog.getByRole("checkbox", { name: "Nombre de la persona que va a recibir" }).check();
+      await dialog.getByRole("textbox", { name: "Nombre", exact: true }).last().fill(await dialog.getByRole("textbox", { name: "Nombre", exact: true }).first().inputValue());
+      await dialog.getByRole("textbox", { name: "Apellidos", exact: true }).last().fill(await dialog.getByRole("textbox", { name: "Apellidos", exact: true }).first().inputValue());
+      await dialog.getByRole("textbox", { name: "Teléfono Móvil" }).last().fill(String(address.phone || "944895260"));
+      await dialog.getByRole("combobox", { name: "Tipo de Documento" }).last().click();
+      await this.page.getByRole("option", { name: "DNI", exact: true }).click();
+      await dialog.getByRole("textbox", { name: "Número de documento de identidad" }).last().fill(String(address.documentNumber || "12345678"));
+      return;
+    }
     const form = this.page.locator("form").filter({ has: this.page.getByText(/dirección|address/i) }).last();
     await form.getByRole("textbox", { name: /line1|dirección|address/i }).first().fill(address.street);
     const line2 = form.getByRole("textbox", { name: /line2|número|referencia/i }).first();

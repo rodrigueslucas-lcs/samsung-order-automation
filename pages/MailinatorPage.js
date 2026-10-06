@@ -27,7 +27,7 @@ export default class MailinatorPage extends BasePage {
   async inboxRows() {
     // Mailinator's subject cell is not exposed consistently through the text
     // engine, but the visual inbox row is a stable table row.
-    return this.page.locator("tr").filter({ hasText: /Samsung.*Verificaci/i });
+    return this.page.locator("tr").filter({ hasText: OTP_SUBJECT });
   }
 
   async snapshotInbox() {

@@ -17,6 +17,7 @@ const { recordBusinessEvidence } = evidenceContext;
 const { getPeQstEvidenceMetadata } = peEvidenceMetadata;
 
 test.describe("PE QST - guarded profile writes", () => {
+  test.describe.configure({ timeout: 420000 });
   test.use({ storageState: hasPeAuthState() ? PE_AUTH_STATE_PATH : undefined });
 
   test.beforeEach(async ({ context }) => {
@@ -31,10 +32,6 @@ test.describe("PE QST - guarded profile writes", () => {
   });
 
   test("SAM-25056 @destructive @qst @pe @base-store @registered @reuse - Add edit delete addresses", async ({ page }, testInfo) => {
-    test.skip(
-      true,
-      "BLOCKED: PE profile address-management/delete flow is not yet confirmed. Remove this skip once the live delete path/selectors are validated."
-    );
     test.setTimeout(420000);
     recordBusinessEvidence(testInfo, getPeQstEvidenceMetadata("SAM-25056"));
 
@@ -54,6 +51,12 @@ test.describe("PE QST - guarded profile writes", () => {
     const runId = String(Date.now());
     const created = profile.qaAddress(`PROFILE ${runId}`, testData.address);
     const updated = profile.qaAddress(`PROFILE EDITED ${runId}`, testData.address);
+    created.number = "297";
+    updated.number = "298";
+    created.phone = testData.customer.phone;
+    updated.phone = testData.customer.phone;
+    created.documentNumber = testData.customer.documentNumber;
+    updated.documentNumber = testData.customer.documentNumber;
 
     try {
       await profile.deleteQaAddressesViaApi(created.street).catch(() => 0);
