@@ -1,7 +1,14 @@
 const { spawnSync } = require("node:child_process");
 const environment = String(process.env.CO_QST_ENVIRONMENT || process.env.ENVIRONMENT || "S2").toUpperCase();
 if (!["S1", "S2"].includes(environment)) throw new Error(`Unsupported CO auth environment: ${environment}.`);
-const baseEnv = { ...process.env, CO_QST_ENVIRONMENT: environment };
+const accountSlot = String(process.env.CO_AUTH_SLOT || "primary").toLowerCase();
+if (!["primary", "second"].includes(accountSlot)) throw new Error(`Unsupported CO auth slot: ${accountSlot}.`);
+const baseEnv = {
+  ...process.env,
+  CO_QST_ENVIRONMENT: environment,
+  CO_AUTH_SLOT: accountSlot,
+  CO_AUTH_MANUAL: accountSlot === "second" ? "1" : process.env.CO_AUTH_MANUAL,
+};
 
 function sleep(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
@@ -25,12 +32,13 @@ function run(label, script, { attempts = 1, retryDelayMs = 2500 } = {}) {
   throw new Error(`${label} failed after ${attempts} attempt(s) with exit code ${lastStatus ?? "unknown"}.`);
 }
 
-run(`Refreshing Samsung Account session for ${environment}`, "scripts/auth-login-co.cjs", { attempts: 3 });
-run(`Verifying Samsung Account session for ${environment}`, "scripts/auth-verify-co.cjs");
+const slotLabel = accountSlot === "second" ? " second account" : "";
+run(`Refreshing Samsung Account${slotLabel} session for ${environment}`, "scripts/auth-login-co.cjs", { attempts: accountSlot === "second" ? 1 : 3 });
+run(`Verifying Samsung Account${slotLabel} session for ${environment}`, "scripts/auth-verify-co.cjs");
 run(`Packaging verified CO ${environment} session for CI handoff`, "scripts/auth-package-co.cjs");
 
 if (process.env.JENKINS_AUTH_PUBLISH === "1") {
   run(`Publishing CO ${environment} session bundle to Jenkins`, "scripts/auth-publish-jenkins-co.cjs");
 }
-console.log(`\n[auth:refresh:co] READY · CO ${environment} authenticated session refreshed, verified and packaged.`);
+console.log(`\n[auth:refresh:co] READY · CO ${environment}${slotLabel} authenticated session refreshed, verified and packaged.`);
 console.log("[auth:refresh:co] CAPTCHA/MFA remains a human security gate when Samsung Account requests it.");

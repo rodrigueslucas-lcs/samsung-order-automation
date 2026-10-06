@@ -1,4 +1,6 @@
 import { test, expect } from "@playwright/test";
+import fs from "node:fs";
+import path from "node:path";
 import HomePage from "../../../../../pages/HomePage";
 import coConfigModule from "../../../../../config/markets/co";
 import evidenceContext from "../../../../../reporting/evidence/evidenceContext";
@@ -12,6 +14,7 @@ import mxTestCard from "../../../../../utils/mxTestCard.js";
 import destructiveGuards from "../../../../../utils/destructiveGuards.js";
 import { addConfiguredProductToCoCart, bootstrapCoStorefront } from "./coQstFlows";
 import cartPresentation from "../../../../../flows/smb/cartPresentation";
+import authStateModule from "../../../../../utils/authState";
 const {getCoQstConfig}=coConfigModule;
 const {recordBusinessEvidence}=evidenceContext;
 const {getCoQstEvidenceMetadata}=coEvidenceMetadata;
@@ -20,6 +23,7 @@ const {getBackOfficeAdminCredentials}=backofficeCredentials;
 const {getMxTestCard}=mxTestCard;
 const {requirePaymentSubmitOptIn}=destructiveGuards;
 const {validateCartItemPresentation,inspectAvailableServices}=cartPresentation;
+const {createAuthState}=authStateModule;
 const productCases=new Set(["SAM-24880","SAM-24882","SAM-24883","SAM-24886","SAM-24892","SAM-24893","SAM-24896","SAM-24898","SAM-24899","SAM-24900","SAM-24901","SAM-24902","SAM-24903","SAM-24904","SAM-24905","SAM-24909","SAM-24910","SAM-24911","SAM-24912","SAM-24915","SAM-24919","SAM-24920","SAM-24925"]);
 function evidence(info,id){recordBusinessEvidence(info,getCoQstEvidenceMetadata(id));}
 async function home(page,cfg){await bootstrapCoStorefront(page,cfg);await page.goto(cfg.baseUrl.href,{waitUntil:"domcontentloaded"});await expect(page.getByRole("button",{name:"My Profile",exact:true})).toBeVisible({timeout:60000});}
@@ -308,7 +312,52 @@ test("SAM-24883 @qst @co @base-store - Increase decrease delete quantity",async(
 test("SAM-24886 @qst @co @base-store - Verify rewards text as Guest User",async({page},i)=>runCanonicalCase("SAM-24886",page,i));
 test("SAM-24892 @qst @co @base-store - Add SC+ from BC PDP Page",async({page},i)=>runCanonicalCase("SAM-24892",page,i));
 test("SAM-24893 @qst @co @base-store - Verify trade-up cart page",async({page},i)=>runCanonicalCase("SAM-24893",page,i));
-test("SAM-24896 @qst @co @base-store - Cart value when Reg user logs out",async({page},i)=>runCanonicalCase("SAM-24896",page,i));
+test("SAM-24896 @qst @co @base-store @registered - Cart value when Reg user logs out",async({browser},i)=>{
+  evidence(i,"SAM-24896");
+  const cfg=getCoQstConfig();
+  const suffix=cfg.environment.toLowerCase();
+  const statePath=path.resolve(`playwright/.auth/co-${suffix}-second-user.json`);
+  const sessionPath=path.resolve(`playwright/.auth/co-${suffix}-second-session-storage.json`);
+  test.skip(!fs.existsSync(statePath)||!fs.existsSync(sessionPath),"A dedicated CO second-account session is required for the logout test.");
+  const secondAuth=createAuthState({
+    authStatePath:statePath,
+    sessionStoragePath:sessionPath,
+    hostname:cfg.baseUrl.hostname,
+    setupUrl:cfg.setupUrl?.href||null,
+    validationUrl:cfg.baseUrl.href,
+    label:`${cfg.environment} CO second account`,
+    refreshInstruction:"Refresh CO_AUTH_SLOT=second before running SAM-24896.",
+    profileMenuTrigger:"hover",
+    logoutTextName:/Cerrar Sesi[oó]n/i,
+    authenticatedMenuSelector:'[role="menu"].profile-menu',
+    profileMenuReadySelector:'[role="menu"].profile-menu',
+  });
+  const context=await browser.newContext({storageState:statePath});
+  try{
+    await secondAuth.applyAuthSessionStorage(context);
+    const page=await context.newPage();
+    await secondAuth.validateAuthenticatedSession(page);
+    await page.keyboard.press("Escape");
+    const registeredCart=await cart(page,cfg);
+    await registeredCart.validateProductInCart();
+    const total=page.getByRole("heading",{name:/^Total$/i}).locator("xpath=..");
+    const registeredTotal=(await total.innerText()).match(/\$\s*([\d.,]+)/)?.[1];
+    expect(registeredTotal,"Registered CO cart must show a numeric total before logout.").toBeTruthy();
+    expect(Number(registeredTotal.replace(/\D/g,""))).toBeGreaterThan(0);
+    const logout=page.getByText(/Cerrar Sesi[oó]n/i).filter({visible:true}).first();
+    if(!await logout.isVisible())await page.getByRole("button",{name:"My Profile",exact:true}).click();
+    await expect(logout).toBeVisible({timeout:30000});
+    await logout.click();
+    await expect(page.getByText(/Sign Up\s*\/\s*Inicia sesi[oó]n/i).filter({visible:true}).first(),
+      "CO must show the signed-out cart after the logout navigation.")
+      .toBeVisible({timeout:60000});
+    await expect(page.getByText(cfg.sku,{exact:true}).first()).toBeVisible({timeout:30000});
+    await expect.poll(async()=>{
+      const guestTotal=(await total.innerText()).match(/\$\s*([\d.,]+)/)?.[1];
+      return guestTotal?.replace(/\D/g,"");
+    },{timeout:30000}).toBe(registeredTotal.replace(/\D/g,""));
+  }finally{await context.close();}
+});
 test("SAM-24898 @qst @co @base-store - Checkout button on cart page",async({page},i)=>runCanonicalCase("SAM-24898",page,i));
 test("SAM-24899 @qst @co @base-store - Order Summary on checkout page",async({page},i)=>runCanonicalCase("SAM-24899",page,i));
 test("SAM-24900 @qst @co @base-store - Step 1 Contact Details Section",async({page},i)=>runCanonicalCase("SAM-24900",page,i));

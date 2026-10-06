@@ -5,7 +5,9 @@ const { getCoQstConfig } = require("../config/markets/co");
 
 const config = getCoQstConfig();
 const envSuffix = config.environment.toLowerCase();
-const profileDir = path.resolve(`playwright/profiles/${envSuffix}-co-qa`);
+const accountSlot = String(process.env.CO_AUTH_SLOT || "primary").toLowerCase();
+if (!["primary", "second"].includes(accountSlot)) throw new Error(`Unsupported CO auth slot: ${accountSlot}.`);
+const profileDir = path.resolve(`playwright/profiles/${envSuffix}-co-${accountSlot === "second" ? "second" : "qa"}`);
 const launchUrl = config.setupUrl?.href || config.baseUrl.href;
 
 fs.mkdirSync(profileDir, { recursive: true });
@@ -48,7 +50,7 @@ chrome.once("error", (error) => {
 
 chrome.once("spawn", () => {
   chrome.unref();
-  console.log(`A maximized Chrome window was opened with the dedicated ${config.environment} CO QA profile.`);
+  console.log(`A maximized Chrome window was opened with the dedicated ${config.environment} CO ${accountSlot === "second" ? "second-account" : "QA"} profile.`);
   console.log("");
   console.log("Complete these steps manually:");
   if (config.setupUrl) {
@@ -62,5 +64,5 @@ chrome.once("spawn", () => {
   console.log("4. Complete CAPTCHA/MFA/FedCM manually if requested.");
   console.log("5. Confirm that the authenticated profile/logout action is visible.");
   console.log("6. Keep this dedicated Chrome open.");
-  console.log(`7. Run: CO_QST_ENVIRONMENT=${config.environment} npm run auth:export:co`);
+  console.log(`7. Run: CO_QST_ENVIRONMENT=${config.environment}${accountSlot === "second" ? " CO_AUTH_SLOT=second" : ""} npm run auth:export:co`);
 });

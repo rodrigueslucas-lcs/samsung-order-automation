@@ -12,27 +12,28 @@ const API_HOSTNAME = CONFIG.environment === "S2"
   : "co-smb-api-cdn.ecom-stg.samsung.com";
 const ENV_NAME = CONFIG.environment;
 const ENV_SUFFIX = ENV_NAME.toLowerCase();
+const accountSlot = String(process.env.CO_AUTH_SLOT || "primary").toLowerCase();
+if (!["primary", "second"].includes(accountSlot)) throw new Error(`Unsupported CO auth slot: ${accountSlot}.`);
 const ACCOUNT_HOSTNAME = "account.samsung.com";
 const setupUrl = CONFIG.setupUrl?.href || `https://${HOSTNAME}/getcookie.html`;
 const homeUrl = CONFIG.baseUrl.href;
-const profileDir = path.resolve(`playwright/profiles/${ENV_SUFFIX}-co-qa`);
+const profileDir = path.resolve(`playwright/profiles/${ENV_SUFFIX}-co-${accountSlot === "second" ? "second" : "qa"}`);
 const authDir = path.resolve("playwright/.auth");
-const authFile = path.join(authDir, `co-${ENV_SUFFIX}-user.json`);
-const sessionStorageFile = path.join(authDir, `co-${ENV_SUFFIX}-session-storage.json`);
+const authFile = path.join(authDir, `co-${ENV_SUFFIX}-${accountSlot === "second" ? "second-user" : "user"}.json`);
+const sessionStorageFile = path.join(authDir, `co-${ENV_SUFFIX}-${accountSlot === "second" ? "second-session-storage" : "session-storage"}.json`);
 const devToolsActivePortFile = path.join(profileDir, "DevToolsActivePort");
 const interactiveTimeout = Number(process.env.CO_AUTH_INTERACTIVE_TIMEOUT_MS || 600000);
 const manualLogin = process.env.CO_AUTH_MANUAL === "1";
 const preQa2CdpUrl = process.env.PREQA2_CDP_URL || "http://127.0.0.1:9223";
 const preQa2ExcludedParentCookies = /^spr-chat|^_ga|^visit_count|^AMCV|^kndctr|^_ba_|^_cl|^mbox|^_gcl|^_fbp|^cto_bundle|^s_sq|^s_ecid|^s_fpid|^FPAU|^_uetvid|^pv$|^(mx-cart|pe-cart)$/;
 
-const localCredentialsFile = [
-  path.join(authDir, "samsung-storefront-user.json"),
-  path.join(authDir, "mx-storefront-user.json"),
-  path.join(authDir, "co-storefront-user.json"),
-].find((candidate) => fs.existsSync(candidate)) || path.join(authDir, "samsung-storefront-user.json");
+const localCredentialsFile = (accountSlot === "second"
+  ? [path.join(authDir, "co-second-storefront-user.json"), path.join(authDir, "mx-second-storefront-user.json")]
+  : [path.join(authDir, "samsung-storefront-user.json"), path.join(authDir, "mx-storefront-user.json"), path.join(authDir, "co-storefront-user.json")]
+).find((candidate) => fs.existsSync(candidate));
 
 function readLocalCredentials() {
-  if (!fs.existsSync(localCredentialsFile)) return {};
+  if (!localCredentialsFile) return {};
   const credentials = JSON.parse(fs.readFileSync(localCredentialsFile, "utf8"));
   return {
     email: String(credentials.email || "").trim(),
@@ -42,11 +43,17 @@ function readLocalCredentials() {
 
 function resolveRuntimeCredentials() {
   const local = readLocalCredentials();
-  const email = process.env.SAMSUNG_ACCOUNT_EMAIL?.trim() || process.env.CO_SAMSUNG_EMAIL?.trim() || local.email;
-  const password = process.env.SAMSUNG_ACCOUNT_PASSWORD || process.env.CO_SAMSUNG_PASSWORD || local.password;
+  const email = accountSlot === "second"
+    ? process.env.CO_SECOND_SAMSUNG_EMAIL?.trim() || local.email
+    : process.env.SAMSUNG_ACCOUNT_EMAIL?.trim() || process.env.CO_SAMSUNG_EMAIL?.trim() || local.email;
+  const password = accountSlot === "second"
+    ? process.env.CO_SECOND_SAMSUNG_PASSWORD || local.password
+    : process.env.SAMSUNG_ACCOUNT_PASSWORD || process.env.CO_SAMSUNG_PASSWORD || local.password;
   if (!email || !password) {
     throw new Error(
-      "Global Samsung Account credentials were not found. Configure SAMSUNG_ACCOUNT_EMAIL/SAMSUNG_ACCOUNT_PASSWORD or the ignored playwright/.auth/samsung-storefront-user.json once."
+      accountSlot === "second"
+        ? "CO second-account credentials are unavailable. Use CO_AUTH_MANUAL=1 for interactive Samsung login or configure dedicated second-account credentials locally."
+        : "Global Samsung Account credentials were not found. Configure SAMSUNG_ACCOUNT_EMAIL/SAMSUNG_ACCOUNT_PASSWORD or the ignored playwright/.auth/samsung-storefront-user.json once."
     );
   }
   return { email, password };
@@ -138,6 +145,26 @@ async function hasRenderedStorefront(page, timeout = 3000) {
     .waitFor({ state: "visible", timeout })
     .then(() => true)
     .catch(() => false);
+}
+
+async function maximizeDedicatedChrome(page) {
+  const session = await page.context().newCDPSession(page);
+  try {
+    const { windowId, bounds } = await session.send("Browser.getWindowForTarget");
+    if (bounds.windowState !== "maximized") {
+      await session.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "maximized" } });
+    }
+  } finally {
+    await session.detach();
+  }
+}
+
+async function closeDedicatedDevTools(context) {
+  for (const candidate of context.pages()) {
+    if (!candidate.url().startsWith("devtools://")) continue;
+    await candidate.close();
+    console.log("[auth:login:co] closed DevTools in dedicated CO Chrome to restore storefront viewport");
+  }
 }
 
 async function findRenderedCoPage(context, preferredPage = null) {
@@ -353,6 +380,7 @@ async function loginCoSamsungAccount() {
   const browser = await connectDedicatedChrome();
   const context = browser.contexts()[0];
   if (!context) throw new Error("Dedicated CO Chrome did not expose a browser context.");
+  await closeDedicatedDevTools(context);
   const existingAccountPage = context.pages().find((candidate) => {
     try { return new URL(candidate.url()).hostname === ACCOUNT_HOSTNAME; } catch { return false; }
   });
@@ -361,6 +389,9 @@ async function loginCoSamsungAccount() {
   page.setDefaultTimeout(120000);
 
   try {
+    // A restored CO window can reopen at mobile width despite --start-maximized.
+    // The desktop My Profile button is then present but has a 0x0 bounding box.
+    await maximizeDedicatedChrome(page);
     let menuState = "signed-out";
     if (existingAccountPage) {
       console.log("[auth:login:co] resuming the existing Samsung Account tab in dedicated Chrome");

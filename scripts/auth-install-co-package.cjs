@@ -32,4 +32,8 @@ function write(name, value) {
 }
 write(`co-${suffix}-user.json`, bundle.primary.storageState);
 write(`co-${suffix}-session-storage.json`, bundle.primary.sessionStorage);
-console.log(`[auth:install:co] READY · installed CO ${requested} primary session state.`);
+if (bundle.second) {
+  write(`co-${suffix}-second-user.json`, bundle.second.storageState);
+  write(`co-${suffix}-second-session-storage.json`, bundle.second.sessionStorage);
+}
+console.log(`[auth:install:co] READY · installed CO ${requested} primary${bundle.second ? " + second" : ""} session state.`);

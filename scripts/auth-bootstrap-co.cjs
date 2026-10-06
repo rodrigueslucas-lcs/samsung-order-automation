@@ -5,15 +5,17 @@ const { getCoQstConfig } = require("../config/markets/co");
 
 const config = getCoQstConfig();
 const envSuffix = config.environment.toLowerCase();
+const accountSlot = String(process.env.CO_AUTH_SLOT || "primary").toLowerCase();
+if (!["primary", "second"].includes(accountSlot)) throw new Error(`Unsupported CO auth slot: ${accountSlot}.`);
 const HOSTNAME = config.baseUrl.hostname;
 const API_HOSTNAME = config.environment === "S2"
   ? "s2-smb-api-cdn.ecom-stg.samsung.com"
   : "co-smb-api-cdn.ecom-stg.samsung.com";
-const profileDir = path.resolve(`playwright/profiles/${envSuffix}-co-qa`);
+const profileDir = path.resolve(`playwright/profiles/${envSuffix}-co-${accountSlot === "second" ? "second" : "qa"}`);
 const authDir = path.resolve("playwright/.auth");
-const authFile = path.join(authDir, `co-${envSuffix}-user.json`);
+const authFile = path.join(authDir, `co-${envSuffix}-${accountSlot === "second" ? "second-user" : "user"}.json`);
 const authTempFile = `${authFile}.tmp`;
-const sessionStorageFile = path.join(authDir, `co-${envSuffix}-session-storage.json`);
+const sessionStorageFile = path.join(authDir, `co-${envSuffix}-${accountSlot === "second" ? "second-session-storage" : "session-storage"}.json`);
 const sessionStorageTempFile = `${sessionStorageFile}.tmp`;
 const devToolsActivePortFile = path.join(profileDir, "DevToolsActivePort");
 

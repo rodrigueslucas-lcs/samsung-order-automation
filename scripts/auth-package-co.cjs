@@ -15,6 +15,13 @@ function readRequired(name) {
   if (!fs.existsSync(file)) throw new Error(`Missing ${name}. Run auth:refresh:co first.`);
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
+function readOptional(name) {
+  const file = path.join(authDir, name);
+  return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : null;
+}
+
+const secondState = readOptional(`co-${suffix}-second-user.json`);
+const secondSession = readOptional(`co-${suffix}-second-session-storage.json`);
 
 const bundle = {
   schemaVersion: 1,
@@ -25,6 +32,7 @@ const bundle = {
     storageState: readRequired(`co-${suffix}-user.json`),
     sessionStorage: readRequired(`co-${suffix}-session-storage.json`),
   },
+  second: secondState && secondSession ? { storageState: secondState, sessionStorage: secondSession } : null,
 };
 const clone = { ...bundle };
 bundle.integrity = { sha256: crypto.createHash("sha256").update(JSON.stringify(clone)).digest("hex") };

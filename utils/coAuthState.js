@@ -7,9 +7,12 @@ const { getCoQstConfig, targetEnvironment } = require("../config/markets/co");
 
 const CO_ENVIRONMENT = targetEnvironment();
 const CO_AUTH_SUFFIX = CO_ENVIRONMENT.toLowerCase();
-const CO_AUTH_STATE_PATH = path.resolve(`playwright/.auth/co-${CO_AUTH_SUFFIX}-user.json`);
-const CO_AUTH_SESSION_STORAGE_PATH = path.resolve(`playwright/.auth/co-${CO_AUTH_SUFFIX}-session-storage.json`);
-const CO_VERIFIED_STATE_PATH = path.resolve(`playwright/.auth/co-${CO_AUTH_SUFFIX}-verified.json`);
+const CO_AUTH_SLOT = String(process.env.CO_AUTH_SLOT || "primary").toLowerCase();
+if (!["primary", "second"].includes(CO_AUTH_SLOT)) throw new Error(`Unsupported CO auth slot: ${CO_AUTH_SLOT}.`);
+const slotInfix = CO_AUTH_SLOT === "second" ? "-second" : "";
+const CO_AUTH_STATE_PATH = path.resolve(`playwright/.auth/co-${CO_AUTH_SUFFIX}${slotInfix}-user.json`);
+const CO_AUTH_SESSION_STORAGE_PATH = path.resolve(`playwright/.auth/co-${CO_AUTH_SUFFIX}${slotInfix}-session-storage.json`);
+const CO_VERIFIED_STATE_PATH = path.resolve(`playwright/.auth/co-${CO_AUTH_SUFFIX}${slotInfix}-verified.json`);
 
 function hasCoAuthState() {
   return fs.existsSync(CO_AUTH_STATE_PATH) && fs.existsSync(CO_AUTH_SESSION_STORAGE_PATH);
@@ -24,7 +27,7 @@ function getCoAuthState(environment = process.env) {
     hostname: config.baseUrl.hostname,
     setupUrl: preQa2 ? null : config.setupUrl?.href || null,
     validationUrl: config.baseUrl.href,
-    label: `${config.environment} CO`,
+    label: `${config.environment} CO${CO_AUTH_SLOT === "second" ? " second account" : ""}`,
     refreshInstruction:
       `Open the dedicated CO ${config.environment} browser/profile, complete legitimate Samsung login, then export CO auth state. Do not commit auth artifacts.`,
     profileMenuTrigger: preQa2 ? "click" : "hover",
@@ -43,6 +46,7 @@ function getCoAuthState(environment = process.env) {
     env: {
       CO_QST_ENVIRONMENT: config.environment,
       CO_STOREFRONT_URL: config.baseUrl.href,
+      CO_AUTH_SLOT,
     },
   });
 }
@@ -77,6 +81,7 @@ function hasVerifiedCoAuthState() {
 module.exports = {
   CO_ENVIRONMENT,
   CO_AUTH_SUFFIX,
+  CO_AUTH_SLOT,
   CO_AUTH_STATE_PATH,
   CO_AUTH_SESSION_STORAGE_PATH,
   CO_VERIFIED_STATE_PATH,
