@@ -178,6 +178,19 @@ async function maximizeDedicatedChrome(page) {
 }
 
 async function closeDedicatedDevTools(context) {
+  // Docked DevTools is a CDP "other" target, not necessarily a Playwright page.
+  // Closing only context.pages() leaves it open and halves the storefront width.
+  const browserSession = await context.browser().newBrowserCDPSession();
+  try {
+    const { targetInfos } = await browserSession.send("Target.getTargets");
+    for (const target of targetInfos) {
+      if (!target.url.startsWith("devtools://")) continue;
+      await browserSession.send("Target.closeTarget", { targetId: target.targetId });
+      console.log("[auth:login:co] closed docked DevTools in dedicated CO Chrome");
+    }
+  } finally {
+    await browserSession.detach();
+  }
   for (const candidate of context.pages()) {
     if (!candidate.url().startsWith("devtools://")) continue;
     await candidate.close();

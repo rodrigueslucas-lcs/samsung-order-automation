@@ -561,6 +561,14 @@ export default class PaymentPage extends BasePage {
 
     const responses = [];
     const responseBodies = [];
+    const paymentNetworkFailures = [];
+    const recordRequestFailure = (request) => {
+      if (!/mercadopago\.com|payment|placeorder/i.test(request.url())) return;
+      paymentNetworkFailures.push({
+        endpoint: new URL(request.url()).origin + new URL(request.url()).pathname,
+        failure: request.failure()?.errorText || "unknown",
+      });
+    };
     let resolveResponseOrderCode;
     const responseOrderCode = new Promise((resolve) => {
       resolveResponseOrderCode = resolve;
@@ -580,6 +588,7 @@ export default class PaymentPage extends BasePage {
       });
     };
     this.page.on("response", recordResponse);
+    this.page.on("requestfailed", recordRequestFailure);
 
     await this.screenshot("11-before-mx-registered-card-submit");
     await this.placeOrderButton.click();
@@ -587,22 +596,23 @@ export default class PaymentPage extends BasePage {
     const outcome = await Promise.race([
       this.page.waitForURL(/confirmation|confirmacion|order-confirmation|checkout\/order|success/i, {
         timeout: 120000,
-      }).then(() => ({ type: "CONFIRMATION" })),
+      }).then(() => ({ type: "CONFIRMATION" })).catch(() => ({ type: "TIMEOUT" })),
       this.page.waitForFunction(
         ({ source, flags }) => new RegExp(source, flags).test(document.body.innerText),
         { source: orderCodePattern.source, flags: orderCodePattern.flags },
         { timeout: 120000 }
-      ).then(() => ({ type: "ORDER_CODE" })),
+      ).then(() => ({ type: "ORDER_CODE" })).catch(() => ({ type: "TIMEOUT" })),
       responseOrderCode.then((orderCode) => ({ type: "ORDER_CODE_RESPONSE", orderCode })),
       this.page.getByRole("alert")
         .filter({ hasText: /error|rechazad|no pudimos|problema|inv[aá]lid/i })
         .first()
         .waitFor({ state: "visible", timeout: 120000 })
-        .then(() => ({ type: "ERROR_MESSAGE" })),
+        .then(() => ({ type: "ERROR_MESSAGE" })).catch(() => ({ type: "TIMEOUT" })),
       this.page.waitForTimeout(120000).then(() => ({ type: "TIMEOUT" })),
     ]);
 
     this.page.off("response", recordResponse);
+    this.page.off("requestfailed", recordRequestFailure);
     const bodies = await Promise.all(responseBodies);
     let pageText = await this.page.locator("body").innerText({ timeout: 15000 }).catch(() => "");
     let orderCode =
@@ -624,7 +634,7 @@ export default class PaymentPage extends BasePage {
     await this.screenshot(`11-after-mx-registered-card-${outcome.type.toLowerCase()}`);
     if (!orderCode) {
       throw new Error(
-        `The single MX registered-card submit completed with ${outcome.type}, but no order number was observable. Do not retry blindly. Network evidence: ${JSON.stringify(responses.slice(-20))}`
+        `The single registered-card submit completed with ${outcome.type}, but no order number was observable. Do not retry blindly. Payment network failures: ${JSON.stringify(paymentNetworkFailures.slice(-10))}. Network evidence: ${JSON.stringify(responses.slice(-20))}`
       );
     }
 
