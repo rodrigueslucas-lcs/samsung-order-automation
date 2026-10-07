@@ -17,6 +17,7 @@ function createAuthState({
   logoutTextName = "Cerrar sesión",
   authenticatedMenuSelector = null,
   profileMenuReadySelector = null,
+  storefrontDismissTextName = null,
 }) {
   const AUTH_STATE_PATH = path.resolve(authStatePath);
   const AUTH_SESSION_STORAGE_PATH = path.resolve(sessionStoragePath);
@@ -164,9 +165,18 @@ function createAuthState({
       throw new Error(`Unexpected ${label} authentication host.`);
     }
 
+    if (storefrontDismissTextName) {
+      const dismiss = page.getByText(storefrontDismissTextName, { exact: true }).filter({ visible: true }).first();
+      if (await dismiss.isVisible().catch(() => false)) {
+        await dismiss.click({ timeout: 5000 });
+        await dismiss.waitFor({ state: "hidden", timeout: 5000 });
+      }
+    }
+
+    const profileByRole = page.getByRole("button", { name: "My Profile", exact: true });
     const profileButton = profileButtonSelector
-      ? page.locator(profileButtonSelector).filter({ visible: true }).first()
-      : page.getByRole("button", { name: "My Profile", exact: true });
+      ? profileByRole.or(page.locator(profileButtonSelector)).filter({ visible: true }).first()
+      : profileByRole;
 
     const profileVisible = await profileButton
       .waitFor({ state: "visible", timeout: 60000 })

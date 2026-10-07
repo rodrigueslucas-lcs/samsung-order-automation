@@ -31,7 +31,10 @@ function getCoAuthState(environment = process.env) {
     refreshInstruction:
       `Open the dedicated CO ${config.environment} browser/profile, complete legitimate Samsung login, then export CO auth state. Do not commit auth artifacts.`,
     profileMenuTrigger: preQa2 ? "click" : "hover",
-    profileButtonSelector: preQa2 ? "button.nv00-gnb-v4__utility-user:visible" : null,
+    profileButtonSelector: preQa2
+      ? "button.nv00-gnb-v4__utility-user:visible"
+      : 'button[data-an-la="L0_13_login"]:visible, button.nv00-gnb-v4__utility-user:visible',
+    storefrontDismissTextName: preQa2 ? null : "¡Listo!",
     logoutTextName: /Cerrar Sesi[oó]n/i,
     authenticatedMenuSelector: preQa2 ? '[role="menu"][aria-label="account"]' : '[role="menu"].profile-menu',
     profileMenuReadySelector: preQa2 ? '[role="menu"][aria-label="account"][aria-hidden="false"]' : '[role="menu"].profile-menu',
