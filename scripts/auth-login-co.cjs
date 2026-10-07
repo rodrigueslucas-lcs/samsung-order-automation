@@ -141,18 +141,25 @@ async function visibleAccountState(page, timeout = 5000) {
 
 async function hasRenderedStorefront(page, timeout = 3000) {
   if (!isCoStorefront(page)) return false;
-  // The notifications tutorial masks the header with aria-hidden and intercepts
-  // profile clicks until its ¡Listo! action is dismissed.
-  const notice = page.getByText("¡Listo!", { exact: true }).filter({ visible: true }).first();
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline && !page.isClosed()) {
-    if (await notice.isVisible().catch(() => false)) {
-      await notice.click({ timeout: 5000 }).catch(() => {});
-    }
+    await dismissCoNotificationTutorial(page);
     if (await profileControl(page).isVisible().catch(() => false)) return true;
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
   return false;
+}
+
+async function dismissCoNotificationTutorial(page) {
+  // This Insiders tutorial makes the profile inaccessible (aria-hidden) even
+  // when its icon can still be seen behind the overlay.
+  const notice = page.getByText(/^¡Listo!$/i).filter({ visible: true }).first();
+  if (!(await notice.isVisible().catch(() => false))) return;
+  await notice.click({ timeout: 3000 }).catch(async () => {
+    await notice.evaluate((element) => element.click()).catch(() => {});
+  });
+  await notice.waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+  console.log("[auth:login:co] dismissed CO notifications tutorial");
 }
 
 async function maximizeDedicatedChrome(page) {
@@ -236,6 +243,8 @@ async function clickSamsungAccountSignIn(page) {
 }
 
 async function openCoHome(page, context) {
+  await closeDedicatedDevTools(context);
+  await maximizeDedicatedChrome(page);
   const renderedBeforeNavigation = await findRenderedCoPage(context, page);
   if (renderedBeforeNavigation) {
     console.log(`[auth:login:co] reusing an already rendered CO ${ENV_NAME} storefront tab`);
@@ -251,6 +260,7 @@ async function openCoHome(page, context) {
     console.log(`[auth:login:co] loading CO ${ENV_NAME} home (${attempt}/3)`);
     await page.goto(homeUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
     await closeDedicatedDevTools(context);
+    await maximizeDedicatedChrome(page);
     assertAllowedHost(page, [HOSTNAME], "CO storefront");
     if (await hasRenderedStorefront(page, 15000)) return page;
 

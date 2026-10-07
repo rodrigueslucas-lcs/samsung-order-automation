@@ -409,7 +409,11 @@ export default class CartPage extends BasePage {
     const checkoutTarget = (url) =>
       /\/checkout\/one(?:\?|$)|CHECKOUT_STEP_CONTACT_INFO|\/guestlogin\/checkout/i.test(url.href);
 
-    const deadline = Date.now() + 30000;
+    // PE registered checkout has a bounded reload-and-retry path below when
+    // the cart remains unchanged. Do not spend the full guest-flow wait budget
+    // polling the same cart before taking that recovery path.
+    const peRegisteredCheckout = registered && new URL(this.cartUrl).pathname === '/pe/cart';
+    const deadline = Date.now() + (peRegisteredCheckout ? 10000 : 30000);
     while (Date.now() < deadline) {
       if (checkoutTarget(new URL(this.page.url()))) break;
       if (await guestEmail.first().isVisible().catch(() => false)) break;

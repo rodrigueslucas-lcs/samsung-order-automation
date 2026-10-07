@@ -349,7 +349,8 @@ pipeline {
               env.CO_SESSION_BUNDLE_CREDENTIAL = "samsung-co-${params.ENVIRONMENT.toLowerCase()}-session-bundle"
               withCredentials([
                 file(credentialsId: env.CO_SESSION_BUNDLE_CREDENTIAL, variable: 'CO_SESSION_BUNDLE'),
-                file(credentialsId: 'samsung-mx-s2-backoffice-admin', variable: 'CO_BACKOFFICE_ADMIN_SECRET')
+                file(credentialsId: 'samsung-mx-s2-backoffice-admin', variable: 'CO_BACKOFFICE_ADMIN_SECRET'),
+                file(credentialsId: 'samsung-mx-test-card', variable: 'MX_TEST_CARD_SECRET')
               ]) {
                 if (isUnix()) {
                   sh '''
@@ -357,7 +358,8 @@ pipeline {
                     npm run auth:install:co
                     mkdir -p playwright/.auth
                     cp "$CO_BACKOFFICE_ADMIN_SECRET" playwright/.auth/backoffice-admin-s2.json
-                    chmod 600 playwright/.auth/backoffice-admin-s2.json || true
+                    cp "$MX_TEST_CARD_SECRET" playwright/.auth/mx-test-card.json
+                    chmod 600 playwright/.auth/backoffice-admin-s2.json playwright/.auth/mx-test-card.json || true
                     CI=1 npm run auth:verify:co
                     npx -y node@22 scripts/run-co-qst-p1.cjs
                   '''
@@ -366,6 +368,7 @@ pipeline {
                     call npm run auth:install:co || exit /b 2
                     if not exist playwright\\.auth mkdir playwright\\.auth
                     copy /Y "%CO_BACKOFFICE_ADMIN_SECRET%" "playwright\\.auth\\backoffice-admin-s2.json" >nul || exit /b 2
+                    copy /Y "%MX_TEST_CARD_SECRET%" "playwright\\.auth\\mx-test-card.json" >nul || exit /b 2
                     set CI=1
                     call npm run auth:verify:co || exit /b 20
                     call npx -y node@22 scripts/run-co-qst-p1.cjs
