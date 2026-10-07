@@ -1,18 +1,11 @@
 const { chromium } = require("@playwright/test");
-const fs = require("node:fs");
+const { writeJsonAtomically } = require("../utils/atomicJson");
 const {
   CO_AUTH_SESSION_STORAGE_PATH,
   getCoAuthState,
   markCoAuthStateVerified,
 } = require("../utils/coAuthState");
 const { getCoQstConfig } = require("../config/markets/co");
-
-function writeJsonSecurely(destination, value) {
-  const temporary = `${destination}.tmp`;
-  fs.writeFileSync(temporary, JSON.stringify(value, null, 2), { mode: 0o600 });
-  fs.chmodSync(temporary, 0o600);
-  fs.renameSync(temporary, destination);
-}
 
 async function safeDiagnostic(page) {
   let url = "unavailable";
@@ -109,7 +102,7 @@ async function verifyCoAuthentication() {
         }).filter(([key]) => key !== null)
       )
     );
-    writeJsonSecurely(CO_AUTH_SESSION_STORAGE_PATH, sessionStorage);
+    writeJsonAtomically(CO_AUTH_SESSION_STORAGE_PATH, sessionStorage);
     markCoAuthStateVerified();
     console.log(`[auth:verify:co] refreshed ${config.environment} CO session state preserved and marked as verified for the test fixture`);
   } finally {

@@ -160,6 +160,9 @@ async function maximizeDedicatedChrome(page) {
   try {
     const { windowId, bounds } = await session.send("Browser.getWindowForTarget");
     if (bounds.windowState !== "maximized") {
+      if (bounds.windowState === "minimized" || bounds.windowState === "fullscreen") {
+        await session.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "normal" } });
+      }
       await session.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "maximized" } });
     }
   } finally {

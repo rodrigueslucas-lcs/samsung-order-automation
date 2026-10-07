@@ -7,7 +7,6 @@ import evidenceContext from "../../../../../reporting/evidence/evidenceContext";
 import coEvidenceMetadata from "../../../../../utils/qstCoEvidenceMetadata";
 import coAuthStateModule from "../../../../../utils/coAuthState";
 import BackOfficeOrderPage from "../../../../../pages/BackOfficeOrderPage";
-import CheckoutPage from "../../../../../pages/CheckoutPage";
 import MarketPaymentPage from "../../../../../pages/MarketPaymentPage";
 import GuestOrderTrackingPage from "../../../../../pages/GuestOrderTrackingPage";
 import MailinatorPage from "../../../../../pages/MailinatorPage";
@@ -106,7 +105,7 @@ async function fillCoGuestContact(page,{recoverStalledTransition=false,guestEmai
     await dismissReminder();
     await documentType.click();
   });
-  await page.getByRole("option").filter({hasText:/Pasaporte/i}).first().click();
+  await coClick(page,page.getByRole("option").filter({hasText:/Pasaporte/i}).first());
   await page.getByRole("textbox",{name:"vatNumber",exact:true}).fill("AB1234567");
   await page.getByRole("checkbox",{name:"Persona Natural",exact:true}).check();
   await page.locator('input[name="purchaseCompany"]').check();
@@ -194,19 +193,33 @@ async function coFillNewBilling(page,delivery,secondaryNumber="113-43"){
   await coSelectOption(page,delivery,"municipalityBilling","BOGOTA, D.C.");
   await delivery.locator('input[name="line1"]').fill(`Carrera 7 #${secondaryNumber}, Oficina 607, Usaquen`);
 }
-async function coContinueToPayment(page,delivery){
-  if(await delivery.locator('input[name="group0delivery_mode_option"]:checked').count()===0){
-    const regularRadio=delivery.locator('mat-radio-button').filter({hasText:/Envío regular/i}).first().locator('input[type="radio"]');
-    if(await regularRadio.count())await regularRadio.check();
-    else await coClick(page,delivery.getByRole('listitem').filter({hasText:/Envío regular \(Gratis\)/i}).first());
+async function coAdvanceDeliveryToPayment(page,delivery,continueButton){
+  const ecoRenueva=delivery.getByRole("listitem").filter({hasText:/Eco Renueva/i}).first();
+  const paymentReady=async()=>/CHECKOUT_STEP_PAYMENT/i.test(page.url()) &&
+    !(await ecoRenueva.isVisible().catch(()=>false));
+  for(let attempt=1;attempt<=3;attempt++){
+    if(await paymentReady())return;
+    await expect(ecoRenueva).toBeVisible({timeout:30000});
+    try{await coClick(page,ecoRenueva);}
+    catch(error){
+      if(await paymentReady())return;
+      throw error;
+    }
+    await expect(continueButton).toBeEnabled({timeout:30000});
+    await coClick(page,continueButton);
+    await page.waitForTimeout(3000);
+    if(await paymentReady())return;
+    console.log(`[co-qst] Delivery returned after Eco Renueva selection (${attempt}/3): ${page.url()}`);
   }
+  throw new Error(`CO checkout stayed on Delivery after selecting Eco Renueva and continuing three times: ${page.url()}`);
+}
+async function coContinueToPayment(page,delivery){
   for(const field of ["termsAndCondition","termsAndCondition2"]){
     await coDismissReminder(page);
     await delivery.locator(`input[name="${field}"]`).check();
   }
   await coDismissReminder(page);
-  await delivery.getByRole("button",{name:/Continuar con el pago/i}).click();
-  await expect(page).toHaveURL(/CHECKOUT_STEP_PAYMENT/i,{timeout:60000});
+  await coAdvanceDeliveryToPayment(page,delivery,delivery.getByRole("button",{name:/Continuar con el pago/i}));
 }
 async function coSelectSavedAddress(page,delivery,kind){
   const savedMode=delivery.locator(`input[name="addressOption${kind}"]:not([value="NEW_ADDRESS"])`).first();
@@ -254,10 +267,6 @@ if(id==="SAM-24912"){
   }
 
   await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i,{timeout:60000});
-  const checkout=new CheckoutPage(page);
-
-  await checkout.selectShippingMethod();
-
   const termsConsent=page.getByText(/Acepto los T[eé]rminos\s*&\s*Condiciones vigentes/i)
     .filter({visible:true}).first();
   await expect(termsConsent).toBeVisible({timeout:30000});
@@ -271,30 +280,8 @@ if(id==="SAM-24912"){
   const continueToPayment=page.getByRole("button",{
     name:/Continuar con (?:el pago|los m[eé]todos de pago)/i
   }).filter({visible:true}).first();
-  await expect(continueToPayment).toBeVisible({timeout:30000});
-  await expect(continueToPayment).toBeEnabled({timeout:30000});
-  await continueToPayment.click();
-
-  // S2 can invalidate payment availability while staying on Delivery. In this
-  // CO layout the visible Eco Renueva card needs to be reselected; the shipping
-  // radio is already chosen and toggling it does not resolve the storefront.
-  for(let attempt=0;attempt<2;attempt++){
-    // The URL briefly reports Payment before the storefront redirects back to
-    // Delivery, so let that redirect settle before deciding whether to retry.
-    await page.waitForTimeout(2500);
-    if(!/CHECKOUT_STEP_DELIVERY.*paymentNotAvailable=true/i.test(page.url()))break;
-    const ecoRenueva=page.getByText(/^Eco Renueva$/i).filter({visible:true}).first();
-    await expect(ecoRenueva).toBeVisible({timeout:30000});
-    await ecoRenueva.click();
-    await expect(continueToPayment).toBeEnabled({timeout:10000});
-    await continueToPayment.click();
-  }
-
-  await expect(page).toHaveURL(/CHECKOUT_STEP_PAYMENT/i,{timeout:60000});
-  await page.waitForTimeout(2500);
-  if(/CHECKOUT_STEP_DELIVERY/i.test(page.url())){
-    throw new Error(`CO checkout returned to Delivery after Eco Renueva retry: ${page.url()}`);
-  }
+  const delivery=page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
+  await coAdvanceDeliveryToPayment(page,delivery,continueToPayment);
   const payment=new MarketPaymentPage(page,{market:"CO"});
   const card=getMxTestCard();
   await payment.selectCreditCard();
