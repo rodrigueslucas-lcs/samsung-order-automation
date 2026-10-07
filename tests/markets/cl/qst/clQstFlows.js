@@ -1,5 +1,8 @@
 import ProductPage from "../../../../pages/ProductPage";
 import CartPage from "../../../../pages/CartPage";
+import clAuthStateModule from "../../../../utils/clAuthState";
+
+const { CL_AUTH_STATE_PATH, getClAuthState, hasClAuthState } = clAuthStateModule;
 
 export async function bootstrapClStorefront(page, config) {
   if (config.setupUrl) {
@@ -11,6 +14,23 @@ export async function bootstrapClStorefront(page, config) {
   await page.goto(config.baseUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.getByRole("button", { name: "My Profile", exact: true })
     .waitFor({ state: "visible", timeout: 60000 });
+}
+
+export function hasClRegisteredSession() {
+  return hasClAuthState();
+}
+
+export async function openAuthenticatedClPage(browser, config) {
+  if (!hasClAuthState()) {
+    throw new Error(`CL registered auth state is missing: ${CL_AUTH_STATE_PATH}`);
+  }
+  const context = await browser.newContext({ storageState: CL_AUTH_STATE_PATH });
+  const auth = getClAuthState();
+  await auth.applyAuthSessionStorage(context);
+  const page = await context.newPage();
+  await bootstrapClStorefront(page, config);
+  await auth.validateAuthenticatedSession(page);
+  return { context, page, auth };
 }
 
 async function resolveProduct(page, config) {
