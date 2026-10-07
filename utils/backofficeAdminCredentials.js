@@ -5,7 +5,14 @@ const DEFAULT_USERNAME = "admin.lucas.afonso";
 const DEFAULT_FILE = path.resolve("playwright/.auth/backoffice-admin.json");
 
 function resolveBackOfficeEnvironment(environment = process.env) {
-  return String(environment.BACKOFFICE_ENV || environment.MX_QST_ENVIRONMENT || environment.PE_QST_ENVIRONMENT || "s1").toLowerCase();
+  return String(
+    environment.BACKOFFICE_ENV ||
+    environment.MX_QST_ENVIRONMENT ||
+    environment.PE_QST_ENVIRONMENT ||
+    environment.CO_QST_ENVIRONMENT ||
+    environment.CL_QST_ENVIRONMENT ||
+    "s1"
+  ).toLowerCase();
 }
 
 function resolveCredentialsFile(environment = process.env) {
