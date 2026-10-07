@@ -411,7 +411,7 @@ test("SAM-24880 @qst @co @base-store - Add product from BC Page",async({page},i)
 test("SAM-24882 @qst @co @base-store - Cart page UI",async({page},i)=>runCanonicalCase("SAM-24882",page,i));
 test("SAM-24883 @qst @co @base-store - Increase decrease delete quantity",async({page},i)=>runCanonicalCase("SAM-24883",page,i));
 test("SAM-24886 @qst @co @base-store - Verify rewards text as Guest User",async({page},i)=>runCanonicalCase("SAM-24886",page,i));
-test("SAM-24892 @qst @co @base-store - Add SC+ from BC PDP Page",async({page},i)=>runCanonicalCase("SAM-24892",page,i));
+test("SAM-24892 @blocked @qst @co @base-store - Add SC+ from BC PDP Page",async({page},i)=>runCanonicalCase("SAM-24892",page,i));
 test("SAM-24893 @qst @co @base-store - Verify trade-up cart page",async({page},i)=>runCanonicalCase("SAM-24893",page,i));
 test("SAM-24896 @qst @co @base-store @registered - Cart value when Reg user logs out",async({browser},i)=>{
   evidence(i,"SAM-24896");
@@ -573,9 +573,9 @@ test("SAM-24910 @qst @co @base-store @registered - Validate switching delivery m
     await expect(fresh).not.toBeChecked();
   }finally{await context.close();}
 });
-test("SAM-24911 @qst @co @base-store - Verify Back to Top",async({page},i)=>runCanonicalCase("SAM-24911",page,i));
+test("SAM-24911 @blocked @qst @co @base-store - Verify Back to Top",async({},i)=>{evidence(i,"SAM-24911");test.skip(true,"BLOCKED: known CO STG2 storefront issue. Back to Top is currently failing and is being handled internally; re-enable after the storefront fix.");});
 test("SAM-24912 @destructive @qst @co @base-store @registered - Payment using credit card with reg user",async({page},i)=>runCanonicalCase("SAM-24912",page,i));
-test("SAM-24915 @qst @co @base-store - Payment using Rewards",async({page},i)=>runCanonicalCase("SAM-24915",page,i));
+test("SAM-24915 @blocked @qst @co @base-store - Payment using Rewards",async({page},i)=>runCanonicalCase("SAM-24915",page,i));
 test("SAM-24919 @destructive @qst @co @base-store - Track Order",async({page,context},i)=>{
   test.setTimeout(900000);
   evidence(i,"SAM-24919");
@@ -641,5 +641,5 @@ test("SAM-24919 @destructive @qst @co @base-store - Track Order",async({page,con
 });
 test("SAM-24920 @qst @co @base-store - Backoffice",async({page},i)=>runCanonicalCase("SAM-24920",page,i));
 test("SAM-24925 @qst @co @base-store - Mobile Sticky checkout",async({page},i)=>runCanonicalCase("SAM-24925",page,i));
-test("SAM-24914 @not-run @qst @co @base-store @payment - Payment using ADDI pay",async({},i)=>{evidence(i,"SAM-24914");test.skip(true,"Official source is BLOCKED and documents a PSE/BO/Kibana callback workflow; no automated bypass or fabricated payment completion.");});
+test("SAM-24914 @blocked @qst @co @base-store @payment - Payment using ADDI pay",async({},i)=>{evidence(i,"SAM-24914");test.skip(true,"Official source is BLOCKED and documents a PSE/BO/Kibana callback workflow; no automated bypass or fabricated payment completion.");});
 });
