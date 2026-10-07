@@ -31,6 +31,8 @@ const env = {
   ...process.env,
   CL_QST_ENVIRONMENT: targetEnvironment,
   CL_STOREFRONT_URL: cfg.baseUrl.href,
+  BACKOFFICE_ENV: process.env.BACKOFFICE_ENV || targetEnvironment.toLowerCase(),
+  SMB_TEST_CARD_FILE: process.env.SMB_TEST_CARD_FILE || path.resolve("playwright/.auth/mx-test-card.json"),
   TEST_ENV: cfg.environmentLabel,
   TEST_MARKET: "CL",
   TEST_STORE: "SMB",
