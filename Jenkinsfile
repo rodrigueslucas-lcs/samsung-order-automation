@@ -11,20 +11,21 @@ pipeline {
   }
 
   parameters {
-    choice(name: 'MARKET', choices: ['MX', 'PE', 'CL', 'CO'], description: 'SMB market / storefront target. MX/PE/CO have official QST lanes. CL remains a roadmap target.')
+    choice(name: 'MARKET', choices: ['MX', 'PE', 'CL', 'CO'], description: 'SMB market / storefront target. MX/PE/CL/CO have official QST lanes.')
     choice(name: 'ENVIRONMENT', choices: ['S1', 'S2'], description: 'Target staging environment. S1 = stg, S2 = stg2.')
     choice(name: 'TEST_SUITE', choices: ['fast-guest', 'authenticated-safe', 'official-p1', 'backoffice-safe', 'allure-smoke'], description: 'Execution profile. Functional suites use the shared Executive Dashboard + Playwright + Allure reporting standard.')
     choice(name: 'EXECUTION_MODE', choices: ['safe', 'authorized-destructive'], description: 'Safety mode. Full official-p1 payment/order execution requires authorized-destructive.')
     choice(name: 'BROWSER_MODE', choices: ['headless', 'headed'], description: 'Browser mode. Headless is recommended on Jenkins.')
     choice(name: 'EVIDENCE_MODE', choices: ['screenshots-trace', 'screenshots-trace-video'], description: 'Evidence capture. Video requires FFmpeg on the Jenkins agent.')
     choice(name: 'AUTH_SOURCE', choices: ['session-bundle', 'legacy-files'], description: 'MX authenticated session source. session-bundle is the default and consumes the single ephemeral bundle managed by auth:refresh:mx + auth:publish:jenkins; legacy-files remains available only as a fallback.')
-    string(name: 'P1_TARGET_IDS', defaultValue: '', description: 'Optional MX/PE/CO official-p1 stabilization filter. Comma/space separated active SAM IDs, e.g. SAM-24969,SAM-24991,SAM-25002. Leave empty for the full 29-TC P1.')
+    string(name: 'P1_TARGET_IDS', defaultValue: '', description: 'Optional MX/PE/CL/CO official-p1 stabilization filter. Comma/space separated active SAM IDs. Leave empty for the full market P1.')
   }
 
   environment {
     CI = '1'
     MX_QST_USE_EXISTING_AUTH = '1'
     MX_AUTH_AUTO_RENEW = '0'
+    CL_AUTH_AUTO_RENEW = '0'
     ENABLE_ALLURE = '1'
     PLAYWRIGHT_BROWSERS_PATH = '0'
     NATIVE_ALLURE_PUBLISHED = '0'
@@ -37,7 +38,7 @@ pipeline {
           def targetedIds = params.P1_TARGET_IDS?.trim()
             ? params.P1_TARGET_IDS.split(/[\\s,;]+/).findAll { it?.trim() }
             : []
-          def p1Count = params.MARKET == 'MX' ? '29' : params.MARKET == 'PE' ? '28' : params.MARKET == 'CO' ? '29' : '—'
+          def p1Count = params.MARKET == 'MX' ? '29' : params.MARKET == 'PE' ? '28' : params.MARKET == 'CO' ? '29' : params.MARKET == 'CL' ? '38' : '—'
           def suiteLabel = [
             'fast-guest': 'FAST',
             'authenticated-safe': 'AUTH SAFE',
@@ -63,6 +64,7 @@ pipeline {
           env.MX_QST_ARTIFACT_DIR = artifactDir
           env.PE_QST_ARTIFACT_DIR = artifactDir
           env.CO_QST_ARTIFACT_DIR = artifactDir
+          env.CL_QST_ARTIFACT_DIR = artifactDir
           env.PW_VIDEO = params.EVIDENCE_MODE == 'screenshots-trace-video' ? '1' : '0'
           env.TEST_MARKET = params.MARKET
           env.MARKET = params.MARKET
@@ -71,17 +73,18 @@ pipeline {
           env.MX_QST_ENVIRONMENT = params.ENVIRONMENT
           env.PE_QST_ENVIRONMENT = params.ENVIRONMENT
           env.CO_QST_ENVIRONMENT = params.ENVIRONMENT
+          env.CL_QST_ENVIRONMENT = params.ENVIRONMENT
           env.BACKOFFICE_ENV = params.ENVIRONMENT.toLowerCase()
           env.MX_QST_HEADLESS = params.BROWSER_MODE == 'headless' ? '1' : '0'
+          env.CL_QST_HEADLESS = params.BROWSER_MODE == 'headless' ? '1' : '0'
           env.MX_QST_TARGET_IDS = params.P1_TARGET_IDS?.trim() ?: ''
           env.PE_QST_TARGET_IDS = params.P1_TARGET_IDS?.trim() ?: ''
           env.CO_QST_TARGET_IDS = params.P1_TARGET_IDS?.trim() ?: ''
+          env.CL_QST_TARGET_IDS = params.P1_TARGET_IDS?.trim() ?: ''
           env.PE_STOREFRONT_URL = params.ENVIRONMENT == 'S2' ? 'https://stg2.shop.samsung.com/pe/' : 'https://stg.shop.samsung.com/pe/'
           env.CO_STOREFRONT_URL = params.ENVIRONMENT == 'S2' ? 'https://stg2.shop.samsung.com/co/' : 'https://stg.shop.samsung.com/co/'
+          env.CL_STOREFRONT_URL = params.ENVIRONMENT == 'S2' ? 'https://stg2.shop.samsung.com/cl/' : 'https://stg.shop.samsung.com/cl/'
 
-          // Keep Playwright browsers outside node_modules so npm ci does not
-          // force a ~300 MB Chromium/FFmpeg download on every Jenkins build.
-          // First build seeds the cache; following builds reuse it.
           env.PLAYWRIGHT_BROWSERS_PATH = isUnix()
             ? "${env.HOME}/.cache/ms-playwright"
             : "${env.JENKINS_HOME}\\playwright-browsers"
@@ -123,33 +126,16 @@ pipeline {
     stage('03 · Validate Request') {
       steps {
         script {
-          if (!['MX', 'PE', 'CL', 'CO'].contains(params.MARKET)) {
-            error('Unsupported market. Select MX, PE, CL or CO.')
-          }
-          if (!['S1', 'S2'].contains(params.ENVIRONMENT)) {
-            error('Unsupported environment. Select S1 or S2.')
-          }
-          if (params.MARKET == 'CL') {
-            error('CL is exposed as a regional roadmap target but is not runtime-enabled yet.')
-          }
-          if (params.MARKET == 'CO' && params.ENVIRONMENT != 'S2') {
-            error('CO official QST is currently limited to S2/STG2, matching the supplied Samsung QST source and WMC route.')
-          }
-          if (params.MARKET == 'PE' && params.ENVIRONMENT != 'S2') {
-            error('PE phase 1 is intentionally limited to S2/STG2 while the existing PE QST automation is stabilized.')
-          }
-          if (params.MARKET == 'PE' && params.TEST_SUITE != 'official-p1') {
-            error('PE phase 1 currently exposes the coverage-aware official-p1 stabilization lane only. FAST/AUTH/BACKOFFICE lanes will be enabled after PE S2 credentials and runtime baselines are proven.')
-          }
-          if (params.MARKET == 'CO' && params.TEST_SUITE != 'official-p1') {
-            error('CO currently exposes the coverage-aware official-p1 lane; EPP remains available from the repository command.')
-          }
-          if (params.P1_TARGET_IDS?.trim() && (!['MX', 'PE', 'CO'].contains(params.MARKET) || params.TEST_SUITE != 'official-p1')) {
-            error('P1_TARGET_IDS is supported only for MX/PE/CO official-p1. Clear the field for other suites/markets.')
-          }
-          if (params.TEST_SUITE == 'official-p1' && params.EXECUTION_MODE != 'authorized-destructive') {
-            error("${params.MARKET} official P1 contains payment/order scenarios. Select EXECUTION_MODE=authorized-destructive for the campaign.")
-          }
+          if (!['MX', 'PE', 'CL', 'CO'].contains(params.MARKET)) error('Unsupported market. Select MX, PE, CL or CO.')
+          if (!['S1', 'S2'].contains(params.ENVIRONMENT)) error('Unsupported environment. Select S1 or S2.')
+          if (params.MARKET == 'CO' && params.ENVIRONMENT != 'S2') error('CO official QST is currently limited to S2/STG2, matching the supplied Samsung QST source and WMC route.')
+          if (params.MARKET == 'PE' && params.ENVIRONMENT != 'S2') error('PE phase 1 is intentionally limited to S2/STG2 while the existing PE QST automation is stabilized.')
+          if (params.MARKET == 'CL' && params.ENVIRONMENT != 'S2') error('CL official QST is currently enabled only for S2/STG2 while the Chile runtime baseline is stabilized.')
+          if (params.MARKET == 'PE' && params.TEST_SUITE != 'official-p1') error('PE phase 1 currently exposes the coverage-aware official-p1 stabilization lane only.')
+          if (params.MARKET == 'CO' && params.TEST_SUITE != 'official-p1') error('CO currently exposes the coverage-aware official-p1 lane; EPP remains available from the repository command.')
+          if (params.MARKET == 'CL' && params.TEST_SUITE != 'official-p1') error('CL currently exposes the coverage-aware official-p1 lane only.')
+          if (params.P1_TARGET_IDS?.trim() && (!['MX', 'PE', 'CL', 'CO'].contains(params.MARKET) || params.TEST_SUITE != 'official-p1')) error('P1_TARGET_IDS is supported only for MX/PE/CL/CO official-p1.')
+          if (params.TEST_SUITE == 'official-p1' && params.EXECUTION_MODE != 'authorized-destructive') error("${params.MARKET} official P1 contains payment/order scenarios. Select EXECUTION_MODE=authorized-destructive for the campaign.")
           echo "Validated request: ${params.MARKET} ${params.ENVIRONMENT} · ${params.TEST_SUITE} · ${params.EXECUTION_MODE}"
         }
       }
@@ -193,11 +179,13 @@ pipeline {
             if (params.MARKET == 'MX') sh 'npm run qst:mx:list'
             else if (params.MARKET == 'PE') sh 'node scripts/run-pe-qst-p1.cjs --list'
             else if (params.MARKET == 'CO') sh 'node scripts/run-co-qst-p1.cjs --list'
+            else if (params.MARKET == 'CL') sh 'node scripts/run-cl-qst-p1.cjs --list'
           } else {
             bat '@npm run qst:official:gate'
             if (params.MARKET == 'MX') bat '@npm run qst:mx:list'
             else if (params.MARKET == 'PE') bat '@call node scripts/run-pe-qst-p1.cjs --list'
             else if (params.MARKET == 'CO') bat '@call node scripts/run-co-qst-p1.cjs --list'
+            else if (params.MARKET == 'CL') bat '@call node scripts/run-cl-qst-p1.cjs --list'
           }
         }
       }
@@ -345,7 +333,38 @@ pipeline {
         }
         catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
           script {
-            if (params.MARKET == 'CO') {
+            if (params.MARKET == 'CL') {
+              env.CL_SESSION_BUNDLE_CREDENTIAL = "samsung-cl-${params.ENVIRONMENT.toLowerCase()}-session-bundle"
+              env.CL_BACKOFFICE_ADMIN_CREDENTIAL = "samsung-mx-${params.ENVIRONMENT.toLowerCase()}-backoffice-admin"
+              withCredentials([
+                file(credentialsId: env.CL_SESSION_BUNDLE_CREDENTIAL, variable: 'CL_SESSION_BUNDLE'),
+                file(credentialsId: env.CL_BACKOFFICE_ADMIN_CREDENTIAL, variable: 'CL_BACKOFFICE_ADMIN_SECRET'),
+                file(credentialsId: 'samsung-mx-test-card', variable: 'CL_TEST_CARD_SECRET')
+              ]) {
+                if (isUnix()) {
+                  sh '''
+                    set -eu
+                    npm run auth:install:cl
+                    mkdir -p playwright/.auth
+                    cp "$CL_BACKOFFICE_ADMIN_SECRET" "playwright/.auth/backoffice-admin-${BACKOFFICE_ENV}.json"
+                    cp "$CL_TEST_CARD_SECRET" playwright/.auth/mx-test-card.json
+                    chmod 600 "playwright/.auth/backoffice-admin-${BACKOFFICE_ENV}.json" playwright/.auth/mx-test-card.json || true
+                    CI=1 npm run auth:verify:cl
+                    npx -y node@22 scripts/run-cl-qst-p1.cjs
+                  '''
+                } else {
+                  bat '''@echo off
+                    call npm run auth:install:cl || exit /b 2
+                    if not exist playwright\\.auth mkdir playwright\\.auth
+                    copy /Y "%CL_BACKOFFICE_ADMIN_SECRET%" "playwright\\.auth\\backoffice-admin-%BACKOFFICE_ENV%.json" >nul || exit /b 2
+                    copy /Y "%CL_TEST_CARD_SECRET%" "playwright\\.auth\\mx-test-card.json" >nul || exit /b 2
+                    set CI=1
+                    call npm run auth:verify:cl || exit /b 20
+                    call npx -y node@22 scripts/run-cl-qst-p1.cjs
+                  '''
+                }
+              }
+            } else if (params.MARKET == 'CO') {
               env.CO_SESSION_BUNDLE_CREDENTIAL = "samsung-co-${params.ENVIRONMENT.toLowerCase()}-session-bundle"
               withCredentials([
                 file(credentialsId: env.CO_SESSION_BUNDLE_CREDENTIAL, variable: 'CO_SESSION_BUNDLE'),
@@ -528,11 +547,6 @@ pipeline {
             if (isUnix()) sh 'npx -y node@22 scripts/finalize-jenkins-suite.cjs || true'
             else bat '@call npx -y node@22 scripts/finalize-jenkins-suite.cjs || exit /b 0'
           }
-
-          // The repository pins the Allure Playwright adapter and CLI and
-          // finalize-jenkins-suite.cjs already generates the matching HTML.
-          // Do not feed those results to Jenkins' independently-versioned
-          // native Allure publisher: version drift there broke PE #95.
           env.NATIVE_ALLURE_PUBLISHED = '0'
           echo "Allure HTML generated with repository-pinned tooling from ${resultsPath}."
         }
