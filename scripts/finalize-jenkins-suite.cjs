@@ -10,7 +10,7 @@ const runtimeSummaryFile = path.join(artifactDir, 'runtime-summary.json');
 const allureResultsDir = path.resolve(process.env.ALLURE_RESULTS_DIR || path.join(artifactDir, 'allure-results'));
 const allureReportDir = path.join(artifactDir, 'allure-report');
 const market = String(process.env.TEST_MARKET || process.env.MARKET || 'MX').toUpperCase();
-const environment = String(process.env.MX_QST_ENVIRONMENT || process.env.PE_QST_ENVIRONMENT || process.env.ENVIRONMENT || 'S1').toUpperCase();
+const environment = String(process.env.MX_QST_ENVIRONMENT || process.env.PE_QST_ENVIRONMENT || process.env.CO_QST_ENVIRONMENT || process.env.ENVIRONMENT || 'S1').toUpperCase();
 const suite = process.env.TEST_SUITE || 'SMB SUITE';
 const store = process.env.TEST_STORE || 'BASE_STORE';
 const buildNumber = process.env.BUILD_NUMBER || 'LOCAL';
@@ -102,6 +102,20 @@ function writeAllureEnvironment() {
   fs.writeFileSync(path.join(allureResultsDir, 'environment.properties'), `${content}\n`);
 }
 
+function enrichAllure() {
+  if (!fs.existsSync(allureResultsDir)) return;
+  if (market !== 'CO' || !/P1|QST/i.test(suite)) return;
+  const script = path.resolve('scripts/enrich-allure-co-qst.cjs');
+  if (!fs.existsSync(script)) return;
+  const enriched = spawnSync(process.execPath, [script, allureResultsDir, runtimeSummaryFile], {
+    stdio: 'inherit',
+    env: process.env,
+  });
+  if (enriched.status !== 0) {
+    console.error('[reporting] CO Allure enrichment failed; raw results were preserved.');
+  }
+}
+
 function generateAllure() {
   if (!fs.existsSync(allureResultsDir)) return;
   const allureCli = process.platform === 'win32'
@@ -127,4 +141,5 @@ if (!(fs.existsSync(runtimeSummaryFile) && fs.existsSync(path.join(executiveDir,
   }
 }
 writeAllureEnvironment();
+enrichAllure();
 generateAllure();
