@@ -40,7 +40,14 @@ function withRegisteredSessionRecovery(authState, {
 
   async function validateAuthenticatedSession(page) {
     try {
-      return await strictValidate(page);
+      const result = await strictValidate(page);
+
+      // Samsung may rotate storefront/session cookies while proving the user is
+      // still authenticated. Persist the latest validated browser/session
+      // state immediately so the next registered test does not start from the
+      // older bundle snapshot and expire halfway through a long serial suite.
+      await refreshState(page.context(), page);
+      return result;
     } catch (error) {
       if (!isRecoverableRegisteredAuthFailure(error)) throw error;
 
