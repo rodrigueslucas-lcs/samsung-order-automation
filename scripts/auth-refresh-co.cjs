@@ -33,7 +33,7 @@ function run(label, script, { attempts = 1, retryDelayMs = 2500 } = {}) {
 }
 
 const slotLabel = accountSlot === "second" ? " second account" : "";
-run(`Refreshing Samsung Account${slotLabel} session for ${environment}`, "scripts/auth-login-co.cjs", { attempts: accountSlot === "second" ? 1 : 3 });
+run(`Refreshing Samsung Account${slotLabel} session for ${environment}`, "scripts/auth-login-co.cjs", { attempts: 3 });
 run(`Verifying Samsung Account${slotLabel} session for ${environment}`, "scripts/auth-verify-co.cjs");
 run(`Packaging verified CO ${environment} session for CI handoff`, "scripts/auth-package-co.cjs");
 

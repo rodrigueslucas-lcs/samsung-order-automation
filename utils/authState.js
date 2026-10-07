@@ -195,7 +195,7 @@ function createAuthState({
     if (profileMenuTrigger === "hover") {
       await profileButton.hover();
       const openedFromHover = await (menuReady || logout)
-        .waitFor({ state: "visible", timeout: authenticatedMenuSelector ? 10000 : 1000 })
+        .waitFor({ state: "visible", timeout: 1000 })
         .then(() => true)
         .catch(() => false);
       if (!openedFromHover) await profileButton.click();
@@ -204,15 +204,20 @@ function createAuthState({
     }
 
     if (menuReady) {
-      await menuReady.waitFor({ state: "visible", timeout: 30000 }).catch(() => {
+      await menuReady.waitFor({ state: "visible", timeout: authenticatedMenuSelector ? 5000 : 30000 }).catch(() => {
         throw new Error(
           `The saved ${label} profile menu did not open. ${AUTH_REFRESH_INSTRUCTION}`
         );
       });
     }
 
+    if (menuRoot && await menuRoot.locator('a[data-an-la="login"]')
+      .filter({ visible: true }).isVisible().catch(() => false)) {
+      throw new Error(`The saved ${label} storefront session is signed out. ${AUTH_REFRESH_INSTRUCTION}`);
+    }
+
     const authenticated = await logout
-      .waitFor({ state: "visible", timeout: 30000 })
+      .waitFor({ state: "visible", timeout: authenticatedMenuSelector ? 5000 : 30000 })
       .then(() => true)
       .catch(() => false);
     if (!authenticated) {

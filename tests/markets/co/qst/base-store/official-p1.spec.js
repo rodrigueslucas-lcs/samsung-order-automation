@@ -275,7 +275,26 @@ if(id==="SAM-24912"){
   await expect(continueToPayment).toBeEnabled({timeout:30000});
   await continueToPayment.click();
 
+  // S2 can invalidate payment availability while staying on Delivery. In this
+  // CO layout the visible Eco Renueva card needs to be reselected; the shipping
+  // radio is already chosen and toggling it does not resolve the storefront.
+  for(let attempt=0;attempt<2;attempt++){
+    // The URL briefly reports Payment before the storefront redirects back to
+    // Delivery, so let that redirect settle before deciding whether to retry.
+    await page.waitForTimeout(2500);
+    if(!/CHECKOUT_STEP_DELIVERY.*paymentNotAvailable=true/i.test(page.url()))break;
+    const ecoRenueva=page.getByText(/^Eco Renueva$/i).filter({visible:true}).first();
+    await expect(ecoRenueva).toBeVisible({timeout:30000});
+    await ecoRenueva.click();
+    await expect(continueToPayment).toBeEnabled({timeout:10000});
+    await continueToPayment.click();
+  }
+
   await expect(page).toHaveURL(/CHECKOUT_STEP_PAYMENT/i,{timeout:60000});
+  await page.waitForTimeout(2500);
+  if(/CHECKOUT_STEP_DELIVERY/i.test(page.url())){
+    throw new Error(`CO checkout returned to Delivery after Eco Renueva retry: ${page.url()}`);
+  }
   const payment=new MarketPaymentPage(page,{market:"CO"});
   const card=getMxTestCard();
   await payment.selectCreditCard();
