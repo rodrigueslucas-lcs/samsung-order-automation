@@ -40,6 +40,8 @@
     "qst:pe:base-store": "node scripts/run-pe-qst-p1.cjs",
     "qst:pe:list": "node scripts/run-pe-qst-p1.cjs --list",
     "qst:pe:progress": "node scripts/print-pe-qst-progress.cjs",
+    "qst:cl": "node scripts/run-cl-qst-p1.cjs",
+    "qst:cl:list": "node scripts/run-cl-qst-p1.cjs --list",
     "qst:smb:basic": "playwright test tests/markets/shared/qst/base-store/basic-storefront.spec.js --project=chromium --workers=1",
     "qst:smb:basic:list": "playwright test tests/markets/shared/qst/base-store/basic-storefront.spec.js --project=chromium --list --reporter=list",
     "qst:smb:backoffice": "playwright test tests/markets/shared/qst/backoffice --project=chromium --workers=1",
