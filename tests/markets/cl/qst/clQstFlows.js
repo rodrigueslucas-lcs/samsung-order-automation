@@ -50,6 +50,9 @@ async function resolveProduct(page, config) {
 
 export async function addConfiguredProductToClCart(page, config) {
   const resolved = await resolveProduct(page, config);
+  // The S2 staging access cookie must be established before a direct PDP URL;
+  // otherwise the same sellable SKU can redirect to SystemParking.
+  await bootstrapClStorefront(page, config);
   const product = new ProductPage(page, {
     setupUrl: config.setupUrl?.href || null,
     sku: resolved.sku,
@@ -62,11 +65,12 @@ export async function addConfiguredProductToClCart(page, config) {
     sku: resolved.sku,
     productNamePattern: null,
     currencyPattern: /\$\s*[\d.,]+/,
-    cartPageTitlePattern: /Producto\(s\).*carrito|carrito/i,
+    cartPageTitlePattern: /Tienes\s+\d+\s+producto(?:s)?\s+en\s+tu\s+carro/i,
     orderSummaryPattern: /Resumen/i,
-    summaryProductPattern: /Producto/i,
-    checkoutButtonPattern: /Continuar con la compra|checkout|comprar/i,
-    guestEmailPattern: /correo electr[oó]nico|email/i,
+    // CL summary lists subtotal/total but not a separate product-count row.
+    summaryProductPattern: null,
+    checkoutButtonPattern: /^Continuar$/i,
+    guestEmailPattern: /Ingresa tu correo|correo electr[oó]nico|email/i,
     footerAccountPattern: /Account|Cuenta/i,
   });
 }

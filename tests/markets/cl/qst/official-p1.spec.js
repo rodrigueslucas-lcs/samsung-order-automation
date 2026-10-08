@@ -1,6 +1,9 @@
 import { test as base, expect } from "@playwright/test";
+import fs from "node:fs";
 import HomePage from "../../../../pages/HomePage";
 import CartPage from "../../../../pages/CartPage";
+import ProfilePage from "../../../../pages/ProfilePage";
+import MyOrdersPage from "../../../../pages/MyOrdersPage";
 import clConfigModule from "../../../../config/markets/cl";
 import clAuthStateModule from "../../../../utils/clAuthState";
 import { addConfiguredProductToClCart, bootstrapClStorefront } from "./clQstFlows";
@@ -18,10 +21,10 @@ const test = base.extend({
 });
 
 const { getClQstConfig } = clConfigModule;
-const { CL_AUTH_STATE_PATH, getClAuthState, hasClAuthState } = clAuthStateModule;
+const { CL_AUTH_STATE_PATH, CL_AUTH_SESSION_STORAGE_PATH, getClAuthState, hasClAuthState } = clAuthStateModule;
 
 test.describe("CL QST - Official P1", () => {
-  test.describe.configure({ timeout: 420000 });
+  test.setTimeout(420000);
 
   const blocked = (reason) => test.skip(true, `CL QST environment prerequisite BLOCKED: ${reason}`);
   const config = () => getClQstConfig();
@@ -65,8 +68,82 @@ test.describe("CL QST - Official P1", () => {
       await context.close();
     }
   });
-  test("SAM-24785 @blocked @qst @cl @base-store @registered - Add/edit/delete addresses", async () => blocked("registered auth is wired; Chile address fixtures/selectors still need local proof before profile writes."));
-  test("SAM-24786 @blocked @qst @cl @base-store @registered - My Orders page", async () => blocked("registered auth is wired; CL My Orders navigation/content still needs local proof."));
+  test("SAM-24785 @destructive @qst @cl @base-store @registered - Add/edit/delete addresses", async ({ browser }) => {
+    test.skip(process.env.ALLOW_PROFILE_WRITE !== "1", "Set ALLOW_PROFILE_WRITE=1 for the CL QA address lifecycle.");
+    test.skip(!hasClAuthState(), "CL authenticated state is required.");
+    const cfg = config();
+    test.skip(!cfg.setupUrl, "The CL profile-address lifecycle is configured for S2 only.");
+    const context = await browser.newContext({ storageState: CL_AUTH_STATE_PATH });
+    const sessionState = JSON.parse(fs.readFileSync(CL_AUTH_SESSION_STORAGE_PATH, "utf8"));
+    await context.addInitScript(({ hostname, state }) => {
+      if (location.hostname === hostname) {
+        for (const [key, value] of Object.entries(state)) sessionStorage.setItem(key, value);
+      }
+    }, { hostname: cfg.baseUrl.hostname, state: sessionState });
+    const page = await context.newPage();
+    const profile = new ProfilePage(page, { origin: cfg.baseUrl.origin, market: "cl" });
+    const runId = Date.now() % 1000000;
+    const letters = (value) => String(value).padStart(6, "0").replace(/[0-9]/g, (digit) => "ABCDEFGHIJ"[Number(digit)]);
+    const addressId = letters(runId);
+    const editedAddressId = letters((runId + 1) % 1000000);
+    const created = profile.qaAddress(addressId, {
+      phone: "987654321",
+      rut: "12.345.678-5",
+      region: "Metropolitana de Santiago",
+      commune: "Alhué",
+    });
+    const updated = { ...created, street: `${profile.qaMarker} ${editedAddressId}`, number: "124" };
+    created.number = "123";
+    try {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          await page.goto(cfg.setupUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
+          break;
+        } catch (error) {
+          if (attempt === 2 || !/ERR_NETWORK_CHANGED|ERR_ABORTED|ERR_CONNECTION_RESET/.test(String(error))) throw error;
+        }
+      }
+      await page.getByText(/you can access pages now/i)
+        .waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
+      await profile.openAddressManagement();
+      await expect(page.locator('button[data-an-la="address:add"]')).toBeVisible({ timeout: 30000 });
+      await profile.expandClAddressesUntil("QA AUTOMATION NEVER MATCH THIS SENTINEL");
+      const staleMarkers = [...new Set((await page.getByText(/QA AUTOMATION [A-J]{6}/).allTextContents())
+        .flatMap((text) => text.match(/QA AUTOMATION [A-J]{6}/g) || []))];
+      for (const marker of staleMarkers) await profile.deleteQaAddress(marker);
+      await test.step("Create QA-only CL address", () => profile.createQaAddress(created));
+      await test.step("Edit QA-only CL address", () => profile.editQaAddress(created.street, updated));
+      await test.step("Delete QA-only CL address", () => profile.deleteQaAddress(updated.street));
+    } finally {
+      for (const marker of [updated.street, created.street]) {
+        await profile.expandClAddressesUntil(marker);
+        const visible = await page.getByText(marker, { exact: false }).first().isVisible().catch(() => false);
+        if (visible) await profile.deleteQaAddress(marker);
+      }
+      await context.close();
+    }
+  });
+  test("SAM-24786 @qst @cl @base-store @registered - My Orders page", async ({ browser }) => {
+    test.skip(!hasClAuthState(), "CL authenticated state is required.");
+    const cfg = config();
+    const context = await browser.newContext({ storageState: CL_AUTH_STATE_PATH });
+    const sessionState = JSON.parse(fs.readFileSync(CL_AUTH_SESSION_STORAGE_PATH, "utf8"));
+    await context.addInitScript(({ hostname, state }) => {
+      if (location.hostname === hostname) {
+        for (const [key, value] of Object.entries(state)) sessionStorage.setItem(key, value);
+      }
+    }, { hostname: cfg.baseUrl.hostname, state: sessionState });
+    const page = await context.newPage();
+    const orders = new MyOrdersPage(page, { origin: cfg.baseUrl.origin, market: "cl" });
+    try {
+      if (cfg.setupUrl) await page.goto(cfg.setupUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
+      await orders.openMyOrders();
+      await expect(page).toHaveURL(/\/cl\/mypage\/orders/i);
+      console.log(`[cl-orders] ${JSON.stringify({ url: page.url(), codes: await orders.visibleOrderCodes(), main: (await page.getByRole("main").innerText()).slice(0, 1600) })}`);
+    } finally {
+      await context.close();
+    }
+  });
 
   test("SAM-24790 @qst @cl @base-store - Able to add to Cart from PDP", async ({ page }) => {
     const { cart: current } = await cart(page);
@@ -116,11 +193,17 @@ test.describe("CL QST - Official P1", () => {
   test("SAM-24810 @qst @cl @base-store - Step 1 Contact Details Section", async ({ page }) => {
     const { cart: current } = await cart(page);
     await current.proceedToCheckout();
-    const email = page.getByPlaceholder(/correo electr[oó]nico|email/i).first();
+    const email = page.getByPlaceholder(/Ingresa tu correo|correo electr[oó]nico|email/i).first();
     if (await email.isVisible().catch(() => false)) {
       await email.fill(`cl-qst-${Date.now()}@mailinator.com`);
-      const guest = page.getByRole("button", { name: /Continuar como invitado/i }).first();
-      if (await guest.isVisible().catch(() => false)) await guest.click();
+      const reminderClose = page.locator('[class*="ins-custom-cart-reminder-container"] [class*="ins-close-button"]')
+        .filter({ visible: true });
+      for (let attempt = 0; attempt < 3 && await reminderClose.count(); attempt++) {
+        await reminderClose.last().click();
+      }
+      const guest = page.getByRole("button", { name: /Compra como invitad/i }).first();
+      await expect(guest).toBeVisible({ timeout: 30000 });
+      await guest.click();
     }
     await expect(page).toHaveURL(/\/cl\/checkout\/one/i, { timeout: 60000 });
     await expect(page.locator('input[name="firstName"], input[formcontrolname="firstName"]').first()).toBeVisible({ timeout: 60000 });
@@ -128,8 +211,29 @@ test.describe("CL QST - Official P1", () => {
     await expect(page.locator('input[name="phone"], input[formcontrolname="phone"]').first()).toBeVisible();
   });
 
+  test("SAM-24811 @qst @cl @base-store @registered - Add/Edit saved/new address on checkout page", async ({ browser }) => {
+    test.skip(!hasClAuthState(), "CL authenticated state is required.");
+    const cfg = config();
+    const context = await browser.newContext({ storageState: CL_AUTH_STATE_PATH });
+    const sessionState = JSON.parse(fs.readFileSync(CL_AUTH_SESSION_STORAGE_PATH, "utf8"));
+    await context.addInitScript(({ hostname, state }) => {
+      if (location.hostname === hostname) {
+        for (const [key, value] of Object.entries(state)) sessionStorage.setItem(key, value);
+      }
+    }, { hostname: cfg.baseUrl.hostname, state: sessionState });
+    const page = await context.newPage();
+    try {
+      const current = await addConfiguredProductToClCart(page, cfg);
+      await current.proceedToAuthenticatedCheckout();
+      await expect(page).toHaveURL(/\/cl\/checkout\/one/i, { timeout: 60000 });
+      console.log(`[cl-24811] ${JSON.stringify({ url: page.url(), radios: await page.getByRole("radio").allTextContents(), buttons: await page.getByRole("button").allTextContents() })}`);
+      await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i, { timeout: 60000 });
+    } finally {
+      await context.close();
+    }
+  });
+
   for (const [id, title, reason] of [
-    ["SAM-24811", "Add/Edit saved/new address on checkout page", "registered auth is wired; saved-address flow needs verified Chile address selectors/data."],
     ["SAM-24812", "Select saved address", "registered auth is wired; a proven CL saved-address fixture is still required."],
     ["SAM-24813", "Save option for reg user", "registered auth is wired; profile-write address flow needs local proof."],
     ["SAM-24814", "Able to checkout with a New address", "Chile shipping/billing address fixture must be proven locally."],

@@ -380,10 +380,10 @@ export default class CartPage extends BasePage {
 
     const reminder = this.page.locator('[class*="ins-custom-cart-reminder-container"]').filter({ visible: true });
     const dismissReminder = async () => {
-      const close = reminder.getByText(/^x$/i).filter({ visible: true }).first();
+      const close = reminder.getByText(/^x$/i).filter({ visible: true }).last();
       if (!(await close.isVisible().catch(() => false))) return false;
       await close.click();
-      await reminder.first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+      await close.waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
       return true;
     };
     const finishReminder = async () => {
@@ -393,7 +393,9 @@ export default class CartPage extends BasePage {
       return true;
     };
 
-    await dismissReminder();
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (!(await dismissReminder())) break;
+    }
     await this.screenshot('02-before-cart-continue');
     await this.continueButton.click({ timeout: 10000 }).catch(async (error) => {
       if (!(await finishReminder()) && !(await dismissReminder())) throw error;
@@ -404,6 +406,18 @@ export default class CartPage extends BasePage {
     // cannot appear while the modal is still blocking checkout.
     await this.page.waitForTimeout(500);
     await finishReminder();
+
+    // CL displays a different exit-intent card after Continue. It is not the
+    // Insider reminder above and can leave checkout on /cl/cart until closed.
+    if (new URL(this.cartUrl).pathname === '/cl/cart') {
+      const offer = this.page.getByText(/Espera antes de comprar/i).filter({ visible: true }).first();
+      if (await offer.isVisible().catch(() => false)) {
+        const close = offer.locator('xpath=ancestor::*[.//button][1]').getByRole('button').last();
+        await close.click({ timeout: 10000 });
+        await offer.waitFor({ state: 'hidden', timeout: 10000 });
+        if (/\/cl\/cart(?:\?|$)/i.test(this.page.url())) await this.continueButton.click({ timeout: 10000 });
+      }
+    }
 
     const guestEmail = this.page.getByPlaceholder(this.guestEmailPattern).filter({ visible: true });
     const checkoutTarget = (url) =>

@@ -31,7 +31,7 @@ export default class ProductPage extends BasePage {
 
       const addButton = this.page
         .getByRole('main')
-        .getByRole('button', { name: /Agregar al carrito|Add to cart|Add to basket/i })
+        .getByRole('button', { name: /Agregar al (?:carro|carrito)|Add to cart|Add to basket/i })
         .filter({ visible: true })
         .first();
 

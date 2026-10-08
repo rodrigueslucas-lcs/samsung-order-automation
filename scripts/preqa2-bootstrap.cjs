@@ -253,17 +253,35 @@ async function main() {
   context.on("page", observePage);
 
   try {
-    const wmc = context.pages()[0] || await context.newPage();
-    await wmc.goto(WMC_URL, { waitUntil: "domcontentloaded" });
-    console.log("[preqa2] Complete WMC -> Samsung Employees -> AD SSO Login -> QA / Preqa2.");
-    console.log("[preqa2] Waiting for the authenticated Preqa2 tab; Chrome must remain open.");
-
-    const page = await waitForAuthenticatedPreqa2(
-      context,
-      Number(process.env.PREQA2_AUTH_TIMEOUT_MS || 7200000),
-      credentials,
-      runtime
-    );
+    let page = null;
+    for (const candidate of context.pages()) {
+      if (classifyWmcUrl(candidate.url()) !== "preqa2") continue;
+      const text = await candidate.locator("body").innerText().catch(() => "");
+      if (!/Please login through WMC/i.test(text)) {
+        page = candidate;
+        console.log("[preqa2] Reusing the already authenticated Preqa2 tab.");
+        break;
+      }
+    }
+    if (!page) {
+      const wmc = context.pages().find((candidate) => classifyWmcUrl(candidate.url()).startsWith("wmc"))
+        || await context.newPage();
+      try {
+        await wmc.goto(WMC_URL, { waitUntil: "commit", timeout: 30000 });
+      } catch (error) {
+        // WMC can leave its initial navigation pending even after Chrome is usable.
+        if (!/Timeout.*exceeded/i.test(error.message) || wmc.isClosed()) throw error;
+        console.warn(`[preqa2] WMC navigation is still pending (${wmc.url()}); continue in the visible Chrome.`);
+      }
+      console.log("[preqa2] Complete WMC -> Samsung Employees -> AD SSO Login -> QA / Preqa2.");
+      console.log("[preqa2] Waiting for the authenticated Preqa2 tab; Chrome must remain open.");
+      page = await waitForAuthenticatedPreqa2(
+        context,
+        Number(process.env.PREQA2_AUTH_TIMEOUT_MS || 7200000),
+        credentials,
+        runtime
+      );
+    }
     credentials.email = "";
     credentials.password = "";
     const results = [];

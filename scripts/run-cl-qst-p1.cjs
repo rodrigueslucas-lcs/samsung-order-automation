@@ -63,7 +63,7 @@ const env = {
   SMB_EVIDENCE_DIR: path.join(artifactDir, "evidence"),
   PW_TRACE: process.env.PW_TRACE ?? (process.env.CI ? "1" : "0"),
   ALLOW_PAYMENT_SUBMIT: process.env.ALLOW_PAYMENT_SUBMIT ?? "0",
-  ALLOW_PROFILE_WRITE: process.env.ALLOW_PROFILE_WRITE ?? "0",
+  ALLOW_PROFILE_WRITE: process.env.ALLOW_PROFILE_WRITE ?? "1",
 };
 
 const cli = path.resolve("node_modules/@playwright/test/cli.js");

@@ -13,7 +13,9 @@ export default class ProfilePage extends MyAccountPage {
     this.addressApiUrl = options.addressApiUrl || LEGACY_PE_ST2_ADDRESS_API;
     this.addressCards = this.market === "pe"
       ? page.getByRole("tabpanel", { name: "Envío" }).getByRole("listitem")
-      : page.locator('article, [class*="address-card" i], [class*="address-item" i], [data-testid*="address" i]');
+      : this.market === "cl"
+        ? page.locator('button[data-an-la="address:edit"]').locator('xpath=../..')
+        : page.locator('article, [class*="address-card" i], [class*="address-item" i], [data-testid*="address" i]');
   }
 
   assertAddressApiUrl() {
@@ -69,6 +71,17 @@ export default class ProfilePage extends MyAccountPage {
   }
 
   async openAddressManagement() {
+    if (this.market === "cl") {
+      const addAddress = this.page.locator('button[data-an-la="address:add"]');
+      if (await addAddress.isVisible().catch(() => false)) return;
+      const target = new URL(`/${this.market}/mypage/profile-setting`, this.origin).href;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        await this.page.goto(target, { waitUntil: "commit", timeout: 60000 });
+        this.assertStagingUrl();
+        if (await addAddress.waitFor({ state: "visible", timeout: 20000 }).then(() => true, () => false)) return;
+      }
+      throw new Error(`CL profile-setting did not render address controls after 3 navigations; url=${this.page.url()}`);
+    }
     if (this.market === "pe") {
       await this.openRoute(`/${this.market}/mypage/profile-setting`);
       await this.page.getByRole("heading", { name: /Configuraci[oó]n de Perfil/i })
@@ -160,12 +173,33 @@ export default class ProfilePage extends MyAccountPage {
       throw new Error("Refusing to create an address without the QA AUTOMATION marker.");
     }
     await this.openAddressManagement();
-    const add = this.market === "pe"
+    const add = this.market === "cl"
+      ? this.page.locator('button[data-an-la="address:add"]')
+      : this.market === "pe"
       ? this.page.getByRole("heading", { name: "Direcciones" }).locator("xpath=..").getByRole("button")
       : this.page.getByRole("button", { name: /Agregar|Añadir|Nueva dirección|Add address/i });
     await add.click();
     await this.fillAddressForm(address);
-    await this.page.getByRole("button", { name: /Guardar|Save/i }).click();
+    const save = this.market === "cl"
+      ? this.page.getByRole("dialog", { name: /Agregar nueva direcci[oó]n/i }).getByRole("button", { name: "Guardar", exact: true })
+      : this.page.getByRole("button", { name: /Guardar|Save/i });
+    if (this.market === "cl" && !(await save.isEnabled())) {
+      const invalid = await this.page.getByRole("dialog", { name: /Agregar nueva direcci[oó]n/i })
+        .locator('[formcontrolname].ng-invalid').evaluateAll((elements) => elements.map((element) => ({
+          field: element.getAttribute("formcontrolname"),
+          length: String(element.value || "").length,
+          pattern: element.getAttribute("pattern"),
+          maxlength: element.getAttribute("maxlength"),
+          error: element.closest("mat-form-field")?.querySelector("mat-error")?.textContent?.trim() || "",
+        })));
+      throw new Error(`CL address form rejected QA data; invalid fields=${JSON.stringify(invalid)}`);
+    }
+    await save.click();
+    if (this.market === "cl") {
+      await expect(this.page.locator("app-address-form-dialog")).toBeHidden({ timeout: 30000 });
+      await this.expectQaAddress(address.street);
+      return;
+    }
     if (this.market === "pe") {
       await expect(this.page.getByRole("dialog", { name: "Añadir nueva dirección" }).first()).toBeHidden({ timeout: 30000 });
       await this.page.reload({ waitUntil: "domcontentloaded" });
@@ -179,14 +213,39 @@ export default class ProfilePage extends MyAccountPage {
     const card = await this.qaCard(currentMarker);
     await card.getByRole("button", { name: /Editar|Edit/i }).click();
     await this.fillAddressForm(updatedAddress);
-    await this.page.getByRole("button", { name: /Guardar|Actualizar|Save|Update/i }).click();
+    await (this.market === "cl"
+      ? this.page.getByRole("dialog", { name: /Editar direcci[oó]n/i }).last().getByRole("button", { name: "Guardar", exact: true })
+      : this.page.getByRole("button", { name: /Guardar|Actualizar|Save|Update/i })).click();
+    if (this.market === "cl") {
+      await this.expectQaAddress(updatedAddress.street);
+      return;
+    }
     if (this.market !== "pe") await this.expectAddressNotification(/actualiz|editad|guardad|success/i);
     await this.expectQaAddress(updatedAddress.street);
   }
 
   async deleteQaAddress(marker) {
-    const card = await this.qaCard(marker);
-    await card.getByRole("button", { name: /Eliminar|Delete|Remove/i }).click();
+    let clicked = false;
+    for (let attempt = 0; attempt < (this.market === "cl" ? 3 : 1); attempt++) {
+      const card = await this.qaCard(marker);
+      try {
+        const remove = card.getByRole("button", { name: /Eliminar|Delete|Remove/i });
+        if (this.market === "cl") await remove.evaluate((button) => button.click());
+        else await remove.click({ timeout: 5000 });
+        clicked = true;
+        break;
+      } catch (error) {
+        if (attempt === 2 || !/detached|intercepts pointer|Timeout/i.test(String(error))) throw error;
+        await this.page.waitForTimeout(250);
+      }
+    }
+    if (!clicked) throw new Error(`Could not open deletion for QA address ${marker}.`);
+    if (this.market === "cl") {
+      const dialog = this.page.getByRole("dialog").filter({ hasText: /eliminar/i }).last();
+      await dialog.getByRole("button", { name: /Eliminar|S[ií]|Confirmar/i }).last().click();
+      await expect(this.page.getByText(marker, { exact: false })).toHaveCount(0, { timeout: 30000 });
+      return;
+    }
     const confirm = this.page.getByRole("button", { name: /Confirmar|Eliminar|Sí|Delete|Remove/i }).last();
     if (await confirm.isVisible()) await confirm.click();
     if (this.market !== "pe") await this.expectAddressNotification(/elimin|remov|success/i);
@@ -219,6 +278,7 @@ export default class ProfilePage extends MyAccountPage {
 
   async expectQaAddress(marker) {
     if (this.market === "pe") await this.expandPeAddressesUntil(marker);
+    if (this.market === "cl") await this.expandClAddressesUntil(marker);
     await expect(this.page.getByText(marker, { exact: false }).first()).toBeVisible({ timeout: 30000 });
   }
 
@@ -227,7 +287,11 @@ export default class ProfilePage extends MyAccountPage {
       throw new Error("Refusing to mutate a non-QA address.");
     }
     if (this.market === "pe") await this.expandPeAddressesUntil(marker);
-    const card = this.addressCards.filter({ hasText: marker }).first();
+    if (this.market === "cl") await this.expandClAddressesUntil(marker);
+    const card = this.market === "cl"
+      ? this.page.getByText(marker, { exact: false }).first()
+        .locator('xpath=ancestor::*[.//button[@data-an-la="address:edit"]][1]')
+      : this.addressCards.filter({ hasText: marker }).first();
     await card.waitFor({ state: "visible", timeout: 30000 });
     return card;
   }
@@ -245,6 +309,16 @@ export default class ProfilePage extends MyAccountPage {
     }
   }
 
+  async expandClAddressesUntil(marker) {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      if (await this.page.getByText(marker, { exact: false }).first().isVisible().catch(() => false)) return;
+      const more = this.page.getByRole("button", { name: /Ver m[aá]s/i }).filter({ visible: true }).first();
+      if (!(await more.isVisible().catch(() => false))) return;
+      await more.click();
+      await this.page.waitForTimeout(300);
+    }
+  }
+
   async expectAddressNotification(pattern) {
     await this.page.getByRole("alert").or(this.page.locator('[class*="toast" i]'))
       .filter({ hasText: pattern }).first()
@@ -252,6 +326,34 @@ export default class ProfilePage extends MyAccountPage {
   }
 
   async fillAddressForm(address) {
+    if (this.market === "cl") {
+      const dialog = this.page.getByRole("dialog").filter({ hasText: /direcci[oó]n/i }).last();
+      await dialog.locator('input[formcontrolname="phone"]').fill(String(address.phone));
+      await dialog.locator('input[formcontrolname="vatNumber"]').fill(String(address.rut));
+      const choose = async (field, name) => {
+        const control = dialog.locator(`mat-select[formcontrolname="${field}"]`);
+        await expect(control).toBeEnabled({ timeout: 15000 });
+        const options = this.page.getByRole("option").filter({ visible: true });
+        for (let attempt = 0; attempt < 3; attempt++) {
+          if ((await control.getAttribute("aria-expanded")) !== "true") await control.click();
+          const offered = await options.first().waitFor({ state: "visible", timeout: 4000 })
+            .then(() => true, () => false);
+          if (!offered) continue;
+          const preferred = options.filter({ hasText: new RegExp(name === "Alhué" ? "Alhu[eé]" : "Metropolitana", "i") }).first();
+          await (await preferred.isVisible().catch(() => false) ? preferred : options.first()).click();
+          return;
+        }
+        throw new Error(`CL ${field} did not offer options after 3 attempts; control=${(await control.evaluate((el) => el.outerHTML)).slice(0, 700)}`);
+      };
+      await choose("regionIso", address.region);
+      await choose("townCity", address.commune);
+      await dialog.locator('input[formcontrolname="line1"]').fill(String(address.number));
+      const street = dialog.locator('input[formcontrolname="line2"]');
+      await street.fill(address.street);
+      await street.press("Tab");
+      await expect(street).toHaveClass(/ng-valid/, { timeout: 10000 });
+      return;
+    }
     if (this.market === "pe") {
       const dialog = this.page.getByRole("dialog", { name: /Añadir nueva dirección|Editar Dirección/i }).first();
       await dialog.getByRole("textbox", { name: "Teléfono Móvil" }).fill(String(address.phone || "944895260"));
