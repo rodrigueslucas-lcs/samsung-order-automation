@@ -1,9 +1,21 @@
-import { test, expect } from "@playwright/test";
+import { test as base, expect } from "@playwright/test";
 import HomePage from "../../../../pages/HomePage";
 import CartPage from "../../../../pages/CartPage";
 import clConfigModule from "../../../../config/markets/cl";
 import clAuthStateModule from "../../../../utils/clAuthState";
 import { addConfiguredProductToClCart, bootstrapClStorefront } from "./clQstFlows";
+
+const test = base.extend({
+  qstBusinessScenario: [async ({}, use, testInfo) => {
+    const samId = testInfo.title.match(/SAM-\d+/)?.[0];
+    const businessTitle = testInfo.title.includes(" - ")
+      ? testInfo.title.split(" - ").slice(1).join(" - ")
+      : "Execute and validate CL QST business scenario";
+    await base.step(`${samId ? `${samId} · ` : ""}${businessTitle}`, async () => {
+      await use();
+    });
+  }, { auto: true }],
+});
 
 const { getClQstConfig } = clConfigModule;
 const { CL_AUTH_STATE_PATH, getClAuthState, hasClAuthState } = clAuthStateModule;
