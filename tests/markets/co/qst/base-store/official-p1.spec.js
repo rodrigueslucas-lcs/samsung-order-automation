@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test as base, expect } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import HomePage from "../../../../../pages/HomePage";
@@ -16,6 +16,19 @@ import destructiveGuards from "../../../../../utils/destructiveGuards.js";
 import { addConfiguredProductToCoCart, bootstrapCoStorefront } from "./coQstFlows";
 import cartPresentation from "../../../../../flows/smb/cartPresentation";
 import authStateModule from "../../../../../utils/authState";
+
+const test = base.extend({
+  qstBusinessScenario: [async ({}, use, testInfo) => {
+    const samId = testInfo.title.match(/SAM-\d+/)?.[0];
+    const businessTitle = testInfo.title.includes(" - ")
+      ? testInfo.title.split(" - ").slice(1).join(" - ")
+      : "Execute and validate CO QST business scenario";
+    await base.step(`${samId ? `${samId} · ` : ""}${businessTitle}`, async () => {
+      await use();
+    });
+  }, { auto: true }],
+});
+
 const {getCoQstConfig}=coConfigModule;
 const {recordBusinessEvidence}=evidenceContext;
 const {getCoQstEvidenceMetadata}=coEvidenceMetadata;
