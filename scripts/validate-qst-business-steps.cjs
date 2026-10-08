@@ -3,6 +3,13 @@ const path = require("node:path");
 
 const ROOT = path.resolve("tests/markets");
 const MARKETS = ["mx", "pe", "co", "cl"];
+const MARKET_ROOTS = Object.freeze({
+  mx: path.join(ROOT, "mx", "qst", "base-store"),
+  pe: path.join(ROOT, "pe", "qst", "base-store"),
+  co: path.join(ROOT, "co", "qst", "base-store"),
+  // CL currently keeps Base Store + blocked EPP declarations in one official spec.
+  cl: path.join(ROOT, "cl", "qst"),
+});
 
 const BUSINESS_FIXTURE_IMPORTS = [
   /from\s+["']\.\/mxQst\.fixture["']/,
@@ -47,8 +54,7 @@ const errors = [];
 const summary = Object.fromEntries(MARKETS.map((market) => [market, { audited: 0, covered: 0, blocked: 0 }]));
 
 for (const market of MARKETS) {
-  const root = path.join(ROOT, market, "qst");
-  for (const file of walk(root)) {
+  for (const file of walk(MARKET_ROOTS[market])) {
     const source = fs.readFileSync(file, "utf8");
     const autoCovered = hasAutoBusinessFixture(source);
     const tests = collectLiteralTests(source);
@@ -91,7 +97,7 @@ for (const fixture of [
   }
 }
 
-console.log("[qst-business-steps] Business-step audit");
+console.log("[qst-business-steps] Business-step audit · active Base Store lanes");
 for (const market of MARKETS) {
   const current = summary[market];
   console.log(
@@ -106,4 +112,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log("[qst-business-steps] PASS · executable literal QST cases expose business-level Playwright steps.");
+console.log("[qst-business-steps] PASS · executable literal Base Store QST cases expose business-level Playwright steps.");
