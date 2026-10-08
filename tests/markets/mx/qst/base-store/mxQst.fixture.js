@@ -37,10 +37,10 @@ export const test = base.extend({
   },
   qstBusinessScenario: [async ({}, use, testInfo) => {
     const samId = testInfo.title.match(/SAM-\d+/)?.[0];
-    const stepName = samId
-      ? `${samId} · Execute and validate QST business scenario`
-      : "Execute and validate QST business scenario";
-    await base.step(stepName, async () => {
+    const businessTitle = testInfo.title.includes(" - ")
+      ? testInfo.title.split(" - ").slice(1).join(" - ")
+      : "Execute and validate MX QST business scenario";
+    await base.step(`${samId ? `${samId} · ` : ""}${businessTitle}`, async () => {
       await use();
     });
   }, { auto: true }],
