@@ -17,6 +17,7 @@ function hasPeAuthState() {
 
 function getPeAuthState(environment = process.env) {
   const config = getPeQstConfig(environment);
+  const ci = ["1", "true"].includes(String(environment.CI || "").toLowerCase());
   const auth = createAuthState({
     authStatePath: PE_AUTH_STATE_PATH,
     sessionStoragePath: PE_AUTH_SESSION_STORAGE_PATH,
@@ -30,6 +31,7 @@ function getPeAuthState(environment = process.env) {
     logoutTextName: /Cerrar Sesi[oó]n/i,
     authenticatedMenuSelector: '[role="menu"].profile-menu',
     profileMenuReadySelector: '[role="menu"].profile-menu:not(.mat-menu-panel-animating)',
+    navigationTimeoutMs: ci ? 120000 : 60000,
   });
 
   return withRegisteredSessionRecovery(auth, {
