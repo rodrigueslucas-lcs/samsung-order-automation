@@ -18,6 +18,7 @@ function createAuthState({
   authenticatedMenuSelector = null,
   profileMenuReadySelector = null,
   storefrontDismissTextName = null,
+  navigationTimeoutMs = null,
 }) {
   const AUTH_STATE_PATH = path.resolve(authStatePath);
   const AUTH_SESSION_STORAGE_PATH = path.resolve(sessionStoragePath);
@@ -108,8 +109,6 @@ function createAuthState({
   }
 
   async function refreshAuthenticatedState(context, page) {
-    // Call only after validating the authenticated storefront UI. A new
-    // Playwright context must receive the latest rotated Samsung cookies.
     requireAuthState();
     if (new URL(page.url()).hostname !== hostname) {
       throw new Error(`Cannot refresh ${label} auth state from another host.`);
@@ -146,15 +145,20 @@ function createAuthState({
   }
 
   async function gotoWithNetworkRetry(page, url, options = {}) {
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const effectiveOptions = {
+      ...options,
+      ...(navigationTimeoutMs != null && options.timeout == null ? { timeout: navigationTimeoutMs } : {}),
+    };
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
       try {
-        return await page.goto(url, options);
+        return await page.goto(url, effectiveOptions);
       } catch (error) {
-        const transientNetworkChange = /net::ERR_NETWORK_CHANGED/i.test(
-          String(error?.message || error)
+        const retryableNavigation = /TimeoutError|timeout .* exceeded|ERR_CONNECTION_TIMED_OUT|ERR_NETWORK_CHANGED|ERR_ABORTED|ERR_NETWORK_IO_SUSPENDED|frame was detached/i.test(
+          String(error?.name || "") + " " + String(error?.message || error)
         );
-        if (!transientNetworkChange || attempt === 2) throw error;
-        await page.waitForTimeout(1000);
+        if (!retryableNavigation || attempt === 3) throw error;
+        console.warn(`[auth-state:${label}] transient navigation failure; retrying ${attempt + 1}/3`);
+        await page.waitForTimeout(2000 * attempt);
       }
     }
     return null;
