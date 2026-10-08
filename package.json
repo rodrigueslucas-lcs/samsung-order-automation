@@ -47,6 +47,8 @@
     "qst:pe:progress": "node scripts/print-pe-qst-progress.cjs",
     "qst:cl": "node scripts/run-cl-qst-p1.cjs",
     "qst:cl:list": "node scripts/run-cl-qst-p1.cjs --list",
+    "qst:cl:base-store": "node -e \"process.env.CL_QST_STORE='BS'; require('./scripts/run-cl-qst-p1.cjs')\"",
+    "qst:cl:base-store:list": "node -e \"process.env.CL_QST_STORE='BS'; process.argv.push('--list'); require('./scripts/run-cl-qst-p1.cjs')\"",
     "qst:smb:basic": "playwright test tests/markets/shared/qst/base-store/basic-storefront.spec.js --project=chromium --workers=1",
     "qst:smb:basic:list": "playwright test tests/markets/shared/qst/base-store/basic-storefront.spec.js --project=chromium --list --reporter=list",
     "qst:smb:backoffice": "playwright test tests/markets/shared/qst/backoffice --project=chromium --workers=1",
