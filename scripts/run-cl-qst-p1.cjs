@@ -8,24 +8,44 @@ const { getClQstConfig } = require("../config/markets/cl");
 const listOnly = process.argv.includes("--list");
 const targetEnvironment = String(process.env.CL_QST_ENVIRONMENT || process.env.ENVIRONMENT || "S2").toUpperCase();
 const cfg = getClQstConfig({ ...process.env, CL_QST_ENVIRONMENT: targetEnvironment });
-const officialIds = Object.keys(plan.cases);
-if (officialIds.length !== 38) throw new Error(`CL official P1 drift: expected 38 IDs, found ${officialIds.length}.`);
+const allOfficialIds = Object.keys(plan.cases);
+if (allOfficialIds.length !== 38) throw new Error(`CL official P1 drift: expected 38 IDs, found ${allOfficialIds.length}.`);
+
+const requestedStore = String(process.env.CL_QST_STORE || "ALL").trim().toUpperCase();
+if (!["ALL", "BS", "EPP", "BASE_STORE", "BASE-STORE"].includes(requestedStore)) {
+  throw new Error("CL_QST_STORE must be ALL, BS/base-store or EPP.");
+}
+const normalizedStore = ["BS", "BASE_STORE", "BASE-STORE"].includes(requestedStore) ? "BS" : requestedStore;
+const officialIds = normalizedStore === "ALL"
+  ? allOfficialIds
+  : allOfficialIds.filter((id) => plan.cases[id]?.store === normalizedStore);
+
+const expectedScopeCount = normalizedStore === "BS" ? 31 : normalizedStore === "EPP" ? 7 : 38;
+if (officialIds.length !== expectedScopeCount) {
+  throw new Error(`CL ${normalizedStore} scope drift: expected ${expectedScopeCount} IDs, found ${officialIds.length}.`);
+}
 
 const requestedTargetIds = String(process.env.CL_QST_TARGET_IDS || "")
   .split(/[\s,;]+/)
   .map((value) => value.trim().toUpperCase())
   .filter(Boolean);
-const unknown = requestedTargetIds.filter((id) => !officialIds.includes(id));
+const unknown = requestedTargetIds.filter((id) => !allOfficialIds.includes(id));
 if (unknown.length) throw new Error(`Unknown CL_QST_TARGET_IDS: ${unknown.join(", ")}.`);
+const outsideScope = requestedTargetIds.filter((id) => !officialIds.includes(id));
+if (outsideScope.length) {
+  throw new Error(`CL_QST_TARGET_IDS outside ${normalizedStore} scope: ${outsideScope.join(", ")}.`);
+}
 const executionIds = requestedTargetIds.length ? requestedTargetIds : officialIds;
 const targetPattern = `(?:${executionIds.join("|")})\\b`;
 
-const artifactDir = path.resolve(process.env.CL_QST_ARTIFACT_DIR || "test-results/jenkins/cl-qst");
+const defaultArtifactFolder = normalizedStore === "BS" ? "cl-base-store" : normalizedStore === "EPP" ? "cl-epp" : "cl-qst";
+const artifactDir = path.resolve(process.env.CL_QST_ARTIFACT_DIR || `test-results/jenkins/${defaultArtifactFolder}`);
 const reportFile = path.join(artifactDir, "results.json");
 const runtimeSummaryFile = path.join(artifactDir, "runtime-summary.json");
 const executiveDir = path.join(artifactDir, "executive");
 const playwrightReportDir = path.join(artifactDir, "playwright-report");
 const outputDir = path.join(artifactDir, "playwright");
+const storeLabel = normalizedStore === "BS" ? "BASE_STORE" : normalizedStore === "EPP" ? "EPP" : "SMB";
 
 const env = {
   ...process.env,
@@ -35,7 +55,7 @@ const env = {
   SMB_TEST_CARD_FILE: process.env.SMB_TEST_CARD_FILE || path.resolve("playwright/.auth/mx-test-card.json"),
   TEST_ENV: cfg.environmentLabel,
   TEST_MARKET: "CL",
-  TEST_STORE: "SMB",
+  TEST_STORE: storeLabel,
   TEST_SUITE: "P1/QST",
   PLAYWRIGHT_JSON_OUTPUT_FILE: reportFile,
   PLAYWRIGHT_HTML_OUTPUT_DIR: playwrightReportDir,
@@ -63,9 +83,9 @@ if (listOnly) args.push("--list", "--reporter=list");
 else if (process.env.CL_QST_HEADLESS !== "1" && !process.env.CI) args.push("--headed");
 
 console.log("\n============================================================");
-console.log(` SAMSUNG CL ${targetEnvironment} · OFFICIAL QST P1`);
+console.log(` SAMSUNG CL ${targetEnvironment} · OFFICIAL QST P1 · ${storeLabel}`);
 console.log("============================================================");
-console.log(`[cl-qst] Official scope: ${officialIds.length} TCs (31 Base Store + 7 EPP).`);
+console.log(`[cl-qst] Official scope: ${officialIds.length} TCs (${storeLabel}).`);
 console.log(`[cl-qst] Execution: ${requestedTargetIds.length ? `TARGETED ${executionIds.length}` : "FULL"}.`);
 if (requestedTargetIds.length) console.log(`[cl-qst] Target IDs: ${executionIds.join(", ")}`);
 console.log("============================================================\n");
@@ -76,12 +96,12 @@ if (listOnly) process.exit(result.status ?? 1);
 
 if (!fs.existsSync(reportFile)) process.exit(result.status ?? 1);
 const report = JSON.parse(fs.readFileSync(reportFile, "utf8"));
-const titles = Object.fromEntries(Object.entries(plan.cases).map(([id, value]) => [id, value.title]));
+const titles = Object.fromEntries(officialIds.map((id) => [id, plan.cases[id].title]));
 const summary = buildMxQstRuntimeSummary(report, {
   officialIds,
   titles,
   market: "CL",
-  store: "SMB",
+  store: storeLabel,
   environment: cfg.environmentLabel,
   suite: "P1/QST",
 });
@@ -98,7 +118,7 @@ const executive = spawnSync(process.execPath, [
 if (executive.status !== 0) console.error("[cl-qst] Executive dashboard generation failed; runtime summary was preserved.");
 
 console.log("\n============================================================");
-console.log(` SAMSUNG CL ${targetEnvironment} · FINAL RESULT`);
+console.log(` SAMSUNG CL ${targetEnvironment} · FINAL RESULT · ${storeLabel}`);
 console.log("============================================================");
 console.log(` Official : ${summary.summary.official}`);
 console.log(` Executed : ${summary.summary.executed}`);
