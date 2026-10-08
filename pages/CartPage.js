@@ -445,6 +445,12 @@ export default class CartPage extends BasePage {
         await this.continueButton.click();
         await expect(this.page).toHaveURL(/\/pe\/checkout\/one(?:\?|$)/i, { timeout: 30000 });
       }
+      if (/\/cl\/cart(?:\?|$)/i.test(this.page.url()) && new URL(this.cartUrl).pathname === '/cl/cart') {
+        await this.page.reload({ waitUntil: 'domcontentloaded' });
+        await this.continueButton.waitFor({ state: 'visible', timeout: 30000 });
+        await this.continueButton.click();
+        await expect(this.page).toHaveURL(/\/cl\/checkout\/one(?:\?|$)/i, { timeout: 30000 });
+      }
       if (/\/guestlogin\/checkout/i.test(this.page.url()) || await guestEmail.first().isVisible().catch(() => false)) {
         throw new Error('Registered checkout redirected to guest login; the Samsung Account session was not accepted.');
       }

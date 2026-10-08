@@ -211,7 +211,8 @@ test.describe("CL QST - Official P1", () => {
     await expect(page.locator('input[name="phone"], input[formcontrolname="phone"]').first()).toBeVisible();
   });
 
-  test("SAM-24811 @qst @cl @base-store @registered - Add/Edit saved/new address on checkout page", async ({ browser }) => {
+  test("SAM-24811 @destructive @qst @cl @base-store @registered - Add/Edit saved/new address on checkout page", async ({ browser }) => {
+    test.skip(process.env.ALLOW_PROFILE_WRITE !== "1", "Set ALLOW_PROFILE_WRITE=1 for the CL checkout address lifecycle.");
     test.skip(!hasClAuthState(), "CL authenticated state is required.");
     const cfg = config();
     const context = await browser.newContext({ storageState: CL_AUTH_STATE_PATH });
@@ -222,13 +223,60 @@ test.describe("CL QST - Official P1", () => {
       }
     }, { hostname: cfg.baseUrl.hostname, state: sessionState });
     const page = await context.newPage();
+    const marker = `QA AUTOMATION ${String(Date.now() % 1000000).padStart(6, "0").replace(/[0-9]/g, (digit) => "ABCDEFGHIJ"[Number(digit)])}`;
+    const profile = new ProfilePage(page, { origin: cfg.baseUrl.origin, market: "cl" });
     try {
-      const current = await addConfiguredProductToClCart(page, cfg);
+      await bootstrapClStorefront(page, cfg);
+      await page.goto(cfg.cartUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
+      const existingProduct = await page.getByText(cfg.sku, { exact: true }).first()
+        .waitFor({ state: "visible", timeout: 20000 }).then(() => true, () => false);
+      const current = existingProduct
+        ? new CartPage(page, { cartUrl: cfg.cartUrl.href, sku: cfg.sku, productNamePattern: null, checkoutButtonPattern: /^Continuar$/i })
+        : await addConfiguredProductToClCart(page, cfg);
       await current.proceedToAuthenticatedCheckout();
       await expect(page).toHaveURL(/\/cl\/checkout\/one/i, { timeout: 60000 });
-      console.log(`[cl-24811] ${JSON.stringify({ url: page.url(), radios: await page.getByRole("radio").allTextContents(), buttons: await page.getByRole("button").allTextContents() })}`);
       await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i, { timeout: 60000 });
+      await page.getByText(/Direcci[oó]n de despacho/i).filter({ visible: true }).first()
+        .waitFor({ state: "visible", timeout: 60000 });
+      const newAddress = page.getByRole("radio", { name: /A[nñ]adir nueva direcci[oó]n/i });
+      await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
+      await expect(newAddress).toBeChecked();
+      const shipping = page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
+      const select = async (name, option) => {
+        await shipping.locator(`mat-select[name="${name}"]:not([aria-disabled="true"])`).first().click();
+        await page.getByRole("option", { name: option }).first().click();
+      };
+      await select("regionIso", /Metropolitana/i);
+      await select("town", /Alhu[eé]/i);
+      await shipping.locator('input[name="line2"]:visible').first().fill(marker);
+      await shipping.locator('input[name="line1"]:visible').first().fill("123");
+      const save = shipping.locator('input[name="saveInAddressBook"]:visible').first();
+      await expect(save).toBeEnabled();
+      if (!(await save.isChecked())) {
+        await save.locator('xpath=ancestor::mat-checkbox[1]')
+          .getByText(/Guardar direcci[oó]n para una pr[oó]xima compra/i).click();
+      }
+      if (!(await save.isChecked())) {
+        const invalid = await shipping.locator('.ng-invalid[name]').evaluateAll((els) => els.map((el) => ({ name: el.getAttribute("name"), value: el.value })));
+        throw new Error(`CL checkout did not keep Save address checked; invalid=${JSON.stringify(invalid)}`);
+      }
+      const deliveryOption = shipping.locator('input[name="group0delivery_mode_option"]:visible').first();
+      await deliveryOption.locator('xpath=ancestor::mat-radio-button[1]').click();
+      await expect(deliveryOption).toBeChecked();
+      const terms = shipping.locator('input[name="termsAndCondition"]:visible');
+      if (!(await terms.isChecked())) await terms.locator('xpath=ancestor::mat-checkbox[1]').click();
+      await expect(terms).toBeChecked();
+      const continueButton = page.getByRole("button", { name: /Continuar al pago/i });
+      await expect(continueButton).toBeEnabled({ timeout: 30000 });
+      await continueButton.click();
+      await expect(page).toHaveURL(/CHECKOUT_STEP_PAYMENT/i, { timeout: 60000 });
+      console.log(`[cl-24811] Saved QA checkout address reached payment; edit links=${await page.getByText(/^Editar$/i).count()}`);
     } finally {
+      await profile.openAddressManagement().catch(() => {});
+      await profile.expandClAddressesUntil(marker).catch(() => {});
+      if (await page.getByText(marker, { exact: false }).first().isVisible().catch(() => false)) {
+        await profile.deleteQaAddress(marker);
+      }
       await context.close();
     }
   });
