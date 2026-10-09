@@ -14,12 +14,15 @@ Environment (`S1` / `S2`) is runtime configuration. It is not a source-tree taxo
 
 ## 2. Canonical test tree
 
+The conceptual suite order is always **QST first, DST second**:
+
 ```text
 tests/
   markets/
     mx/
       qst/
         base-store/
+        epp/
       dst/
         base-store/
         backoffice/
@@ -35,10 +38,14 @@ tests/
       qst/
         base-store/
         epp/
+      dst/
+        README.md
     cl/
       qst/
         base-store/
         epp/
+      dst/
+        README.md
     shared/
       qst/
         base-store/
@@ -47,11 +54,13 @@ tests/
 
 `tests/markets` is authoritative. The old `tests/s1`, `tests/s2` and `tests/legacy` compatibility roots are removed and must not return.
 
+Every market exposes the same top-level suite contract: `qst/` and `dst/`. A DST root may be structural-only when that market does not yet have official implemented DST browser coverage. Structural presence must never be interpreted as runtime PASS or implemented coverage.
+
 ## 3. Market ownership
 
 ### MX
 
-MX owns current QST Base Store plus canonical DST Base Store/BackOffice automation.
+MX owns current QST Base Store/EPP plus canonical DST Base Store/BackOffice automation.
 
 ### PE
 
@@ -59,11 +68,11 @@ PE owns both current QST and established DST coverage. The previous `tests/legac
 
 ### CO
 
-CO QST is physically separated into Base Store and EPP.
+CO QST is physically separated into Base Store and EPP. `tests/markets/co/dst` is a reserved canonical suite boundary only; it does not claim implemented CO DST coverage yet.
 
 ### CL
 
-CL QST is physically separated into Base Store and EPP. The official plan remains 38 TCs: 31 Base Store and 7 EPP. `scripts/run-cl-qst-p1.cjs` selects the physical store path from `CL_QST_STORE` and still supports the combined official campaign.
+CL QST is physically separated into Base Store and EPP. The official plan remains 38 TCs: 31 Base Store and 7 EPP. `scripts/run-cl-qst-p1.cjs` selects the physical store path from `CL_QST_STORE` and still supports the combined official campaign. `tests/markets/cl/dst` is a reserved canonical suite boundary only; it does not claim implemented CL DST coverage yet.
 
 ## 4. Shared ownership
 
@@ -132,7 +141,7 @@ npm run qst:steps:gate
 npm run repo:refactor:gate
 ```
 
-The architecture validator rejects resurrection of `tests/s1`, `tests/s2` or `tests/legacy` and requires the canonical market/suite/store paths.
+The architecture validator rejects resurrection of `tests/s1`, `tests/s2` or `tests/legacy` and requires canonical QST/DST suite boundaries for MX, PE, CO and CL.
 
 Static/discovery acceptance is not storefront runtime proof. Runtime acceptance must be reported separately.
 
@@ -142,8 +151,9 @@ A new QA should be able to understand the repository from the tree alone:
 
 ```text
 country
-  -> QST or DST
-    -> Base Store / EPP / BackOffice
+  -> QST
+  -> DST
+    -> Base Store / EPP / BackOffice when implemented
 ```
 
-Root `README.md` remains the operator entry point. Detailed documentation belongs under `docs/`; test folders should not accumulate competing onboarding READMEs.
+Root `README.md` remains the operator entry point. Detailed documentation belongs under `docs/`; test folders should not accumulate competing onboarding READMEs except a structural placeholder that explicitly prevents false coverage claims.
