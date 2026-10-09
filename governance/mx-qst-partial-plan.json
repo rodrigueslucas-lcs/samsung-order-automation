@@ -4,11 +4,11 @@
   "source": "governance/mx-qst-coverage.json",
   "policy": "Expected-result-first. This file is an implementation plan only; coverage remains partial until the official Expected Result is proven in the intended store/business path.",
   "summary": {
-    "partialTotal": 18,
+    "partialTotal": 21,
     "quickAssertion": 4,
     "existingFlowExtension": 7,
     "newBusinessFlow": 3,
-    "eppContext": 4
+    "eppContext": 7
   },
   "groups": {
     "quickAssertion": [
@@ -32,10 +32,13 @@
       {"id":"SAM-25006","title":"Rewards","reason":"Historical implementation is retained for traceability only. The copied Colombia PSE path is excluded from active MX scope until Samsung provides a valid MX-specific Rewards execution path."}
     ],
     "eppContext": [
-      {"id":"SAM-25021","title":"Able to add to Cart from PDP","reason":"Base Store behavior is proven, but this official case belongs to EPP and needs EPP execution."},
-      {"id":"SAM-25022","title":"Cart page UI","reason":"Core Base Store cart assertions exist, but this official case requires EPP execution and complete EPP UI assertions."},
-      {"id":"SAM-25034","title":"Step 1: Contact information","reason":"Contact information is proven in Base Store, but the official case requires EPP context."},
-      {"id":"SAM-25045","title":"Payment using credit card with reg user","reason":"Registered card order is proven in Base Store, but the official case requires EPP order placement."}
+      {"id":"SAM-25020","title":"Facets/Filter","reason":"Dedicated MX EPP PLP facet automation now exists, but the official EPP PLP route still needs runtime data and target-environment proof."},
+      {"id":"SAM-25021","title":"Able to add to Cart from PDP","reason":"Dedicated MX EPP PDP/cart automation now exists and needs runtime validation in the official EPP environment."},
+      {"id":"SAM-25022","title":"Cart page UI","reason":"Dedicated MX EPP cart UI automation now exists; runtime proof and full official presentation validation are still pending."},
+      {"id":"SAM-25034","title":"Step 1: Contact information","reason":"Dedicated MX EPP checkout contact-information automation now exists and still requires runtime proof in EPP context."},
+      {"id":"SAM-25044","title":"Back to Top","reason":"Dedicated MX EPP Back to Top automation now exists and still requires runtime proof on the official EPP cart path."},
+      {"id":"SAM-25045","title":"Payment using credit card with reg user","reason":"Official EPP card-payment case is represented but remains blocked pending authenticated EPP checkout, approved card handling and explicit order authorization."},
+      {"id":"SAM-25046","title":"Pay in Cash","reason":"Official MX EPP Pay in Cash case is represented but remains blocked until the EPP payment path is runtime-proven and order submission is explicitly authorized."}
     ]
   },
   "priority": [
@@ -53,9 +56,12 @@
     "SAM-24981",
     "SAM-24991",
     "SAM-25006",
+    "SAM-25020",
     "SAM-25021",
     "SAM-25022",
     "SAM-25034",
-    "SAM-25045"
+    "SAM-25044",
+    "SAM-25045",
+    "SAM-25046"
   ]
 }
