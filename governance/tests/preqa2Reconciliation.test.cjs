@@ -35,13 +35,14 @@ test("reconciliation separates implemented pending TCs from automation gaps", ()
   assert.equal(mx.passAutomationGap.length, 0);
 });
 
-test("reconciliation identifies official PASS without persisted automation", () => {
+test("reconciliation recognizes official PASS for the newly implemented MX EPP lane", () => {
   const sourceLedger = emptyLedger();
   sourceLedger.markets.MX.status = "ACTIVE";
   sourceLedger.markets.MX.results["SAM-25020"] = pass("/mx/epp/");
   const mx = reconcileMarket("MX", { sourceLedger });
   assert.equal(mx.executedCount, 1);
-  assert.ok(mx.passAutomationGap.some((entry) => entry.id === "SAM-25020"));
+  assert.ok(mx.passImplemented.some((entry) => entry.id === "SAM-25020"));
+  assert.ok(!mx.passAutomationGap.some((entry) => entry.id === "SAM-25020"));
 });
 
 test("all-market reconciliation preserves official totals and implementation inventory", () => {
