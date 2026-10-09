@@ -190,6 +190,25 @@ test("SAM-25010 @destructive @qst @mx @base-store - Track Order with email and O
   } catch (error) {
     if (!isKnownMxTrackingBaseSiteDefect(error, orderNumber)) throw error;
 
+    // Preserve the actual storefront defect in the evidence instead of ending
+    // the video/screenshot with the page scrolled below the error banner.
+    const notFoundMessage = page.getByText(/No hemos podido encontrar ning[uú]n pedido/i).first();
+    if (await notFoundMessage.isVisible().catch(() => false)) {
+      await notFoundMessage.scrollIntoViewIfNeeded();
+      await page.waitForTimeout(750);
+      await testInfo.attach("mx-track-order-known-defect-message", {
+        body: await notFoundMessage.screenshot({ animations: "disabled" }),
+        contentType: "image/png",
+      });
+      await testInfo.attach("mx-track-order-known-defect-context", {
+        body: await page.screenshot({ fullPage: false, animations: "disabled" }),
+        contentType: "image/png",
+      });
+      // Keep the defect visible long enough to be clear in the recorded video
+      // before Playwright marks the known-defect scenario as skipped.
+      await page.waitForTimeout(1000);
+    }
+
     const knownDefect =
       `KNOWN DEFECT · MX Guest Track Order accepts OTP but cannot resolve ${orderNumber} in the current BaseSite. ` +
       "Jira bug pending creation/tracking; this known environment defect must not fail the whole QST suite.";
