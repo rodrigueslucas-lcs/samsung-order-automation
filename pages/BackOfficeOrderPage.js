@@ -87,8 +87,8 @@ export default class BackOfficeOrderPage extends BackOfficePage {
     return result;
   }
 
-  async openAdminOrderByCode(orderCode) {
-    const row = await this.searchAdminOrder(orderCode);
+  async openAdminOrderByCode(orderCode, existingRow = null) {
+    const row = existingRow || await this.searchAdminOrder(orderCode);
     const orderNumberControl = this.page
       .locator(`input[value="${orderCode}"]`)
       .filter({ visible: true })

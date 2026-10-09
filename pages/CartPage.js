@@ -482,6 +482,14 @@ export default class CartPage extends BasePage {
       }
       await guestEmail.first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     }
+    if (!(await guestEmail.first().isVisible().catch(() => false)) &&
+        new URL(this.cartUrl).pathname === '/cl/cart' &&
+        /\/cl\/cart(?:\?|$)/i.test(this.page.url())) {
+      await this.page.reload({ waitUntil: 'domcontentloaded' });
+      await this.continueButton.waitFor({ state: 'visible', timeout: 30000 });
+      await this.continueButton.click();
+      await guestEmail.first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    }
     if (!(await guestEmail.first().isVisible().catch(() => false))) {
       throw new Error(`Guest checkout did not reach the email/login surface. URL=${this.page.url()}`);
     }

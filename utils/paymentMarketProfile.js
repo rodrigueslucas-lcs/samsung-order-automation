@@ -20,6 +20,13 @@ const PAYMENT_MARKET_PROFILES = Object.freeze({
     cartPath: "/co/cart",
     artifactSlug: "co",
   }),
+  CL: Object.freeze({
+    code: "CL",
+    label: "CL",
+    orderCodePattern: /\bCL\d{6}-\d{8}(?:_\d+)?\b/i,
+    cartPath: "/cl/cart",
+    artifactSlug: "cl",
+  }),
 });
 
 function getPaymentMarketProfile(market) {
