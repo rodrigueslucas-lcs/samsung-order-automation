@@ -4,10 +4,10 @@ const path = require("node:path");
 const ROOT = path.resolve("tests/markets");
 const MARKETS = ["mx", "pe", "co", "cl"];
 const MARKET_ROOTS = Object.freeze({
-  mx: path.join(ROOT, "mx", "qst", "base-store"),
-  pe: path.join(ROOT, "pe", "qst", "base-store"),
-  co: path.join(ROOT, "co", "qst", "base-store"),
-  cl: path.join(ROOT, "cl", "qst", "base-store"),
+  mx: path.join(ROOT, "mx", "qst"),
+  pe: path.join(ROOT, "pe", "qst"),
+  co: path.join(ROOT, "co", "qst"),
+  cl: path.join(ROOT, "cl", "qst"),
 });
 
 const BUSINESS_FIXTURE_IMPORTS = [
@@ -35,9 +35,7 @@ function collectLiteralTests(source) {
   const tests = [];
   const expression = /\btest(?:\.skip)?\s*\(\s*(["'`])([\s\S]*?)\1\s*,/g;
   let match;
-  while ((match = expression.exec(source))) {
-    tests.push({ title: match[2], index: match.index, bodyStart: expression.lastIndex });
-  }
+  while ((match = expression.exec(source))) tests.push({ title: match[2], index: match.index, bodyStart: expression.lastIndex });
   return tests;
 }
 
@@ -95,7 +93,7 @@ for (const fixture of [
   }
 }
 
-console.log("[qst-business-steps] Business-step audit · active Base Store lanes");
+console.log("[qst-business-steps] Business-step audit · active Base Store + EPP lanes");
 for (const market of MARKETS) {
   const current = summary[market];
   console.log(
@@ -110,4 +108,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log("[qst-business-steps] PASS · executable literal Base Store QST cases expose business-level Playwright steps.");
+console.log("[qst-business-steps] PASS · executable literal Base Store/EPP QST cases expose business-level Playwright steps.");
