@@ -5,6 +5,7 @@ import evidenceContext from "../../../../../reporting/evidence/evidenceContext.j
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import { test, expect } from "../../dst/base-store/mx.auth.fixture";
 import { prepareMxQstCart } from "./mxQstFlows";
+import { continueMxDeliveryToPaymentWithRecovery } from "../../dst/base-store/mxFlows";
 
 const { requireProfileWriteOptIn } = destructiveGuards;
 const { recordBusinessEvidence } = evidenceContext;
@@ -47,46 +48,68 @@ test("SAM-24991 @destructive @qst @mx @base-store @registered - Add or edit save
   const profile = new ProfilePage(page, { origin: mxConfig.baseUrl.origin, market: "mx", addressApiUrl });
   const marker = `QA AUTOMATION MX QST ${Date.now()}`;
   const updatedMarker = marker.replace(" QST ", " EDT ");
-  try {
-    await profile.deleteQaAddressesViaApi(marker).catch(() => 0);
-    const checkout = await reachRegisteredDeliveryViaUi(page, mxConfig);
-    const newAddress = page.getByRole("radio", { name: /Nueva direcci[oó]n|New address/i }).filter({ visible: true }).first();
-    await newAddress.waitFor({ state: "visible", timeout: 60000 });
-    await newAddress.check({ force: true });
-    await expect(newAddress).toBeChecked({ timeout: 30000 });
-    const address = await checkout.fillDelivery({ postalCode: "01000", street: marker, exteriorNumber: "1000" }, { registered: true });
-    expect(address.lookupStatus).toBe(200);
-    const saveAddress = page.getByRole("checkbox", { name: /Guardar detalles para compras futuras|Guardar.*(direcci[oó]n|env[ií]o|Mi cuenta)|Save.*address/i }).filter({ visible: true });
-    await expect(saveAddress.first()).toBeVisible({ timeout: 30000 });
-    await saveAddress.first().check({ force: true });
-    await expect(saveAddress.first()).toBeChecked();
-    await checkout.selectDeliveryAndContinue();
-    await checkout.validatePaymentPage({ postalCode: "01000" });
-    await profile.waitForQaAddressViaApi(marker);
-    const deliverySummary = page.locator(".address-details__delivery-address").filter({ hasText: marker });
-    await expect(deliverySummary, "The saved QA address must appear in the checkout delivery summary.")
-      .toBeVisible({ timeout: 30000 });
-    await page.locator(".delivery-item-actions a.actions__edit").first().click();
-    await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/, { timeout: 30000 });
 
-    const savedAddress = page.getByText(marker, { exact: false }).filter({ visible: true }).first();
-    await expect(savedAddress, "The saved QA address must be available for editing in Delivery.")
-      .toBeVisible({ timeout: 30000 });
-    const savedAddressCard = savedAddress.locator(
-      "xpath=ancestor::*[.//a[contains(@class,'actions__edit')]][1]"
-    );
-    await savedAddressCard.locator("a.actions__edit").click();
-    const street = page.getByRole("textbox", { name: "line2" }).filter({ visible: true }).first();
-    await expect(street, "Editing the saved address must prepopulate its street.")
-      .toHaveValue(marker, { timeout: 30000 });
-    await street.fill(updatedMarker);
-    const saveEdit = page.getByRole("button", { name: /Guardar|Save/i }).filter({ visible: true }).first();
-    await expect(saveEdit, "The saved-address edit form must expose Save.").toBeVisible({ timeout: 30000 });
-    await expect(saveEdit, "The edited address must pass form validation before saving.").toBeEnabled({ timeout: 30000 });
-    await saveEdit.click();
-    await profile.waitForQaAddressViaApi(updatedMarker);
-    await expect(page.getByText(updatedMarker, { exact: false }).filter({ visible: true }).first())
-      .toBeVisible({ timeout: 30000 });
+  try {
+    await test.step("Clean stale QA-only address data and reach registered Delivery", async () => {
+      await profile.deleteQaAddressesViaApi(marker).catch(() => 0);
+    });
+
+    const checkout = await test.step("Prepare authenticated checkout and open a new address form", async () => {
+      const currentCheckout = await reachRegisteredDeliveryViaUi(page, mxConfig);
+      const newAddress = page.getByRole("radio", { name: /Nueva direcci[oó]n|New address/i }).filter({ visible: true }).first();
+      await newAddress.waitFor({ state: "visible", timeout: 60000 });
+      await newAddress.check({ force: true });
+      await expect(newAddress).toBeChecked({ timeout: 30000 });
+      return currentCheckout;
+    });
+
+    const address = await test.step("Fill a valid MX address and opt in to save it", async () => {
+      const currentAddress = await checkout.fillDelivery(
+        { postalCode: "01000", street: marker, exteriorNumber: "1000" },
+        { registered: true }
+      );
+      expect(currentAddress.lookupStatus).toBe(200);
+      const saveAddress = page.getByRole("checkbox", { name: /Guardar detalles para compras futuras|Guardar.*(direcci[oó]n|env[ií]o|Mi cuenta)|Save.*address/i }).filter({ visible: true });
+      await expect(saveAddress.first()).toBeVisible({ timeout: 30000 });
+      await saveAddress.first().check({ force: true });
+      await expect(saveAddress.first()).toBeChecked();
+      return currentAddress;
+    });
+
+    await test.step("Continue to Payment with bounded recovery for a stuck payment skeleton", async () => {
+      await continueMxDeliveryToPaymentWithRecovery(page, checkout, { postalCode: "01000" });
+    });
+
+    await test.step("Prove the saved address persisted and return to Delivery edit mode", async () => {
+      await profile.waitForQaAddressViaApi(marker);
+      const deliverySummary = page.locator(".address-details__delivery-address").filter({ hasText: marker });
+      await expect(deliverySummary, "The saved QA address must appear in the checkout delivery summary.")
+        .toBeVisible({ timeout: 30000 });
+      await page.locator(".delivery-item-actions a.actions__edit").first().click();
+      await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/, { timeout: 30000 });
+    });
+
+    await test.step("Edit the saved address and verify the updated value", async () => {
+      const savedAddress = page.getByText(marker, { exact: false }).filter({ visible: true }).first();
+      await expect(savedAddress, "The saved QA address must be available for editing in Delivery.")
+        .toBeVisible({ timeout: 30000 });
+      const savedAddressCard = savedAddress.locator(
+        "xpath=ancestor::*[.//a[contains(@class,'actions__edit')]][1]"
+      );
+      await savedAddressCard.locator("a.actions__edit").click();
+      const street = page.getByRole("textbox", { name: "line2" }).filter({ visible: true }).first();
+      await expect(street, "Editing the saved address must prepopulate its street.")
+        .toHaveValue(marker, { timeout: 30000 });
+      await street.fill(updatedMarker);
+      const saveEdit = page.getByRole("button", { name: /Guardar|Save/i }).filter({ visible: true }).first();
+      await expect(saveEdit, "The saved-address edit form must expose Save.").toBeVisible({ timeout: 30000 });
+      await expect(saveEdit, "The edited address must pass form validation before saving.").toBeEnabled({ timeout: 30000 });
+      await saveEdit.click();
+      await profile.waitForQaAddressViaApi(updatedMarker);
+      await expect(page.getByText(updatedMarker, { exact: false }).filter({ visible: true }).first())
+        .toBeVisible({ timeout: 30000 });
+    });
+
     recordBusinessEvidence(testInfo, {
       addressMarker: marker,
       persisted: true,
@@ -95,7 +118,9 @@ test("SAM-24991 @destructive @qst @mx @base-store @registered - Add or edit save
       lookupStatus: address.lookupStatus,
     });
   } finally {
-    await profile.deleteQaAddressesViaApi(marker);
-    await profile.deleteQaAddressesViaApi(updatedMarker);
+    await test.step("Cleanup QA-only address data", async () => {
+      await profile.deleteQaAddressesViaApi(marker);
+      await profile.deleteQaAddressesViaApi(updatedMarker);
+    });
   }
 });
