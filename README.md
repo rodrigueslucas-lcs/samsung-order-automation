@@ -2,36 +2,72 @@
 
 Playwright-based QA automation for Samsung LATAM SMB eCommerce on SAP Commerce/Hybris.
 
-This repository supports **MX, PE, CO and CL** and connects the official Samsung QST/DST scope to local execution, Jenkins, Executive Dashboard, Allure and Playwright evidence.
+The repository supports **MX, PE, CO and CL** and connects Samsung QST/DST scope to local execution, Jenkins, Executive Dashboard, Allure and Playwright evidence.
 
-The goal of this README is operational: a QA who has never used the project should understand how to install it, authenticate with their own Samsung Account, run one market, run one TC and read the result.
+The engineer-facing rule is intentionally simple:
 
-## What this project does
+```text
+market -> suite -> store
+```
 
-The automation covers market-specific Base Store/QST flows and supporting BackOffice/payment/authentication scenarios. It is designed to answer four different questions without mixing them:
+Environment (`S1` / `S2`) is runtime configuration, not a source-tree taxonomy.
 
-1. What is the official Samsung scope?
-2. What is automated?
-3. What happened in the current execution?
-4. Is a failure new, known, blocked by environment/test data, or caused by automation?
+## Repository at a glance
 
-The primary result surfaces are:
+```text
+tests/
+  markets/
+    mx/
+      qst/base-store/
+      dst/base-store/
+      dst/backoffice/
+    pe/
+      qst/base-store/
+      qst/epp/
+      dst/base-store/
+      dst/epp/
+      dst/backoffice/
+    co/
+      qst/base-store/
+      qst/epp/
+    cl/
+      qst/base-store/
+      qst/epp/
+    shared/
 
-- **Executive Dashboard** — release/build health and business-oriented status.
-- **Allure** — SAM/Jira-oriented technical drilldown, steps and attachments.
-- **Playwright** — traces, screenshots, video and low-level investigation.
-- **Jenkins** — controlled execution, credentials, gates and publication.
+pages/          Page Objects
+flows/          reusable business flows
+config/         market/runtime configuration
+scripts/        auth, runners, gates and operational CLIs
+utils/          shared runtime/governance helpers
+governance/     official scope and contracts
+reporting/      Executive / Allure / evidence
+docs/           detailed engineering and handoff guides
+```
 
-## Supported markets
+`tests/markets` is authoritative. The old environment-named/legacy test roots are not part of the current architecture.
 
-| Market | Base Store runner | List scope | Authentication | Second account |
+## Supported market commands
+
+| Market | Base Store | List | EPP | Authentication |
 | --- | --- | --- | --- | --- |
-| MX | `npm run qst:mx:base-store` | `npm run qst:mx:list` | `npm run auth:refresh:mx` | Required for specific scenarios |
-| PE | `npm run qst:pe:base-store` | `npm run qst:pe:list` | `npm run auth:refresh:pe` | Not required in current Base Store P1 |
-| CO | `npm run qst:co:base-store` | `npm run qst:co:list` | `npm run auth:refresh:co` | Required for specific scenarios |
-| CL | `npm run qst:cl:base-store` | `npm run qst:cl:base-store:list` | `npm run auth:refresh:cl` | Supported by auth layer; not required in current Base Store P1 |
+| MX | `npm run qst:mx:base-store` | `npm run qst:mx:list` | — | `npm run auth:refresh:mx` |
+| PE | `npm run qst:pe:base-store` | `npm run qst:pe:list` | current PE QST EPP ownership is under `tests/markets/pe/qst/epp` | `npm run auth:refresh:pe` |
+| CO | `npm run qst:co:base-store` | `npm run qst:co:list` | `npm run qst:co:epp` | `npm run auth:refresh:co` |
+| CL | `npm run qst:cl:base-store` | `npm run qst:cl:base-store:list` | `npm run qst:cl:epp` | `npm run auth:refresh:cl` |
 
-Use the list command before a campaign when you want to confirm the current active IDs/count. Do not rely on an old README count as the source of truth.
+CL also supports the combined official campaign with `npm run qst:cl` / `npm run qst:cl:list`.
+
+PE established DST coverage is canonical under `tests/markets/pe/dst` and is exposed by:
+
+```bash
+npm run dst:base-store
+npm run dst:epp
+npm run dst:backoffice
+npm run dst:list
+```
+
+Use list/discovery before a broad campaign after structural changes.
 
 ## First-time setup
 
@@ -39,8 +75,8 @@ Requirements:
 
 - Node.js 24.x
 - npm
-- corporate/VPN/network access required by Samsung staging services
-- Git access to the repository
+- Git access
+- Samsung staging/VPN/network access when required
 
 Install:
 
@@ -49,7 +85,7 @@ npm ci
 npx playwright install chromium
 ```
 
-Then validate the repository:
+Validate the repository:
 
 ```bash
 npm run repo:architecture:validate
@@ -57,26 +93,31 @@ npm run qst:official:gate
 npm run qst:steps:gate
 ```
 
-## The authentication model in plain language
+For structural/refactor acceptance:
 
-The **code is shared**, but the **identity used by the tests is local/private**.
+```bash
+npm run repo:refactor:gate
+```
 
-A new QA does not edit TCs to replace another person's email. Instead:
+A static/discovery gate does **not** prove live storefront behavior.
 
-1. the QA runs the refresh command for a market;
-2. a dedicated Chrome session is opened;
-3. the QA signs in with their own Samsung Account;
-4. CAPTCHA/MFA is completed manually if Samsung requests it;
-5. the automation captures the authenticated browser state;
-6. the state is saved locally under `playwright/.auth/`;
-7. the state is verified;
-8. a CI handoff bundle is generated under `playwright/.session-packages/`.
+## Authentication model
 
-Those directories are ignored by Git. Passwords, cookies and session material must never be committed.
+Code is shared; identity/session state is local/private.
 
-### Manual login — recommended onboarding path
+Conceptually:
 
-Use manual auth when another QA is configuring the project for the first time.
+```text
+refresh
+  -> Samsung Account login
+  -> CAPTCHA / MFA when requested
+  -> export local session
+  -> verify
+  -> package
+  -> optional Jenkins publish
+```
+
+Manual onboarding examples:
 
 ```bash
 MX_QST_ENVIRONMENT=S2 MX_AUTH_MANUAL=1 npm run auth:refresh:mx
@@ -85,55 +126,28 @@ CO_QST_ENVIRONMENT=S2 CO_AUTH_MANUAL=1 npm run auth:refresh:co
 CL_QST_ENVIRONMENT=S2 CL_AUTH_MANUAL=1 npm run auth:refresh:cl
 ```
 
-The operator follows the visible browser and completes Samsung Account login/CAPTCHA/MFA if requested. The command only finishes successfully after the resulting session is verified and packaged.
+CAPTCHA/MFA is a legitimate human security boundary and is never bypassed.
 
-### What `auth:refresh` actually does
+Primary and second identities must remain independent where a TC validates user isolation. Current second-account flows are used by specific MX/CO scenarios.
 
-Conceptually:
+## Jenkins session handoff
 
-```text
-open dedicated browser
-        ↓
-Samsung Account login
-        ↓
-CAPTCHA / MFA when requested
-        ↓
-return authenticated to storefront
-        ↓
-save browser session locally
-        ↓
-verify session
-        ↓
-generate Jenkins session bundle
-```
-
-It does **not** bypass CAPTCHA/MFA and it does **not** make a short-lived Samsung session permanent.
-
-## Second-account authentication
-
-Some business scenarios require two independent users.
-
-Current operational requirement:
-
-```text
-MX -> second account used by specific QST scenarios
-CO -> second account used by specific QST scenarios
-PE -> no second account required for current Base Store P1
-CL -> auth layer supports it, but current Base Store P1 does not require it
-```
-
-Refresh the second account explicitly:
+A verified local session bundle can be published into the protected Jenkins File Credential for each market:
 
 ```bash
-MX_QST_ENVIRONMENT=S2 MX_AUTH_SLOT=second MX_AUTH_MANUAL=1 npm run auth:refresh:mx
-CO_QST_ENVIRONMENT=S2 CO_AUTH_SLOT=second CO_AUTH_MANUAL=1 npm run auth:refresh:co
+MX_QST_ENVIRONMENT=S2 npm run auth:publish:jenkins:mx
+PE_QST_ENVIRONMENT=S2 npm run auth:publish:jenkins:pe
+CO_QST_ENVIRONMENT=S2 npm run auth:publish:jenkins:co
+CL_QST_ENVIRONMENT=S2 npm run auth:publish:jenkins:cl
 ```
 
-Primary and second sessions must represent different users where the business TC expects user isolation.
+Publishing requires local Jenkins API configuration (`JENKINS_URL`, `JENKINS_USER`, `JENKINS_API_TOKEN`). Session bundle contents must never be printed or committed.
 
-## Running a market locally
+Jenkins is the shared CI/release execution layer; it is not required for a QA to learn and run the suite locally.
 
-Examples for S2:
+## Running locally
+
+Typical S2 Base Store campaigns:
 
 ```bash
 MX_QST_ENVIRONMENT=S2 npm run qst:mx:base-store
@@ -142,65 +156,25 @@ CO_QST_ENVIRONMENT=S2 npm run qst:co:base-store
 CL_QST_ENVIRONMENT=S2 npm run qst:cl:base-store
 ```
 
-The recommended operating model is **one market campaign at a time**. Market sessions, test data, payment/order side effects and auth lifetime are isolated operational concerns; do not assume that four full authenticated campaigns should be started together just because Playwright can parallelize processes.
-
-## Running only one TC
-
-Target execution is the safest way to stabilize or investigate a specific case before a full campaign.
-
-Examples:
+Targeted execution is preferred for stabilization before a full campaign. Example:
 
 ```bash
-PE_QST_ENVIRONMENT=S2 PE_QST_TARGET_IDS=SAM-25103 npm run qst:pe:base-store
+MX_QST_ENVIRONMENT=S2 MX_QST_TARGET_IDS=SAM-25010 MX_QST_TRACKING_CREATE_ORDER=1 npm run qst:mx:base-store
 ```
 
-MX/CO/CL runners also support their market target mechanism used by Jenkins. Confirm the current runner/env variable before scripting a new workflow.
+The recommended operating model is one market campaign at a time unless a separately proven orchestrator exists.
 
-## Jenkins session handoff
+## Result semantics
 
-Local auth and Jenkins auth are separate responsibilities.
+Keep these statuses distinct:
 
-The local `auth:refresh:<market>` command creates a verified session bundle. A publisher command then uploads that bundle into the protected Jenkins credential used by the pipeline.
+- **PASS** — expected behavior proven.
+- **FAIL** — unexpected functional/automation failure.
+- **BLOCKED** — a concrete prerequisite prevents meaningful execution.
+- **KNOWN BUG** — current evidence narrowly matches an already known defect signature.
+- **NOT_RUN** — not executed.
 
-Current market-specific publishers:
-
-```bash
-MX_QST_ENVIRONMENT=S2 npm run auth:publish:jenkins:mx
-PE_QST_ENVIRONMENT=S2 npm run auth:publish:jenkins:pe
-CO_QST_ENVIRONMENT=S2 npm run auth:publish:jenkins:co
-```
-
-Publishing requires local Jenkins API configuration (`JENKINS_URL`, `JENKINS_USER`, `JENKINS_API_TOKEN`). The session content must not be printed or committed.
-
-CL already supports refresh/package/install, but a market-specific `auth:publish:jenkins:cl` command is still a handoff-standardization gap and should be treated as pending until implemented and runtime-proven.
-
-Some refresh scripts can publish automatically when `JENKINS_AUTH_PUBLISH=1` is explicitly enabled. For onboarding, keep refresh and publish as two visible steps until the operator understands the lifecycle.
-
-## Session lifetime and CAPTCHA
-
-A successful authentication is reusable, not permanent.
-
-Samsung Account/session state can expire or rotate. The project therefore uses **preflight verification** rather than assuming a session is good because a file exists.
-
-CAPTCHA/MFA is a human security gate. The automation intentionally does not attempt to bypass it.
-
-A good explanation for stakeholders is:
-
-> Human intervention is required only when Samsung Account explicitly requests identity verification. After a valid session is captured and verified, the Jenkins test execution itself is automated.
-
-## Known defects vs automation failures
-
-A known product/environment defect should not be disguised as a new automation regression.
-
-The reporting model is evolving toward explicit categories such as:
-
-- PASS
-- FAIL / unexpected regression
-- BLOCKED / environment or test-data dependency
-- KNOWN BUG / defect already registered and tracked
-- NOT_RUN
-
-When a known defect is intentionally quarantined, the automation must match the known causal signature narrowly. Unrelated errors must still fail.
+Do not convert a real failure into BLOCKED/KNOWN BUG merely to make a suite green.
 
 ## Safety rules
 
@@ -209,73 +183,44 @@ Production is read-only.
 Never:
 
 - submit Production payments/orders;
-- modify Production profile data;
+- mutate Production profiles;
 - run destructive Production BackOffice/CronJob actions;
-- use Production as a fallback when staging is unavailable;
+- use Production as fallback when staging is unavailable;
 - blindly retry an ambiguous payment/order submission;
-- commit auth/session/payment secrets.
+- commit passwords, cookies, tokens, cards or session material.
 
-State-changing non-Production actions remain guarded by explicit runtime flags such as:
+State-changing non-Production actions remain guarded by explicit runtime controls such as `ALLOW_PAYMENT_SUBMIT`, `ALLOW_PROFILE_WRITE` and `ALLOW_CRONJOB_RUN` where applicable.
 
-```text
-ALLOW_PAYMENT_SUBMIT=1
-ALLOW_CRONJOB_RUN=1
-ALLOW_PROFILE_WRITE=1
-```
+## Handoff workflow
 
-## Repository structure
+A new QA should be able to follow this without editing source code:
 
 ```text
-tests/markets/       Current market-owned automation
-pages/               Page Objects
-flows/               Shared/reusable business flows
-config/              Market/runtime configuration
-scripts/             Auth, runners, gates and operational CLIs
-utils/               Shared runtime/governance helpers
-governance/          Official scope, mappings and runtime ledgers
-reporting/           Executive/Allure/evidence/reporting stack
-docs/                Detailed guides and engineering contracts
+clone
+ -> npm ci
+ -> install Chromium
+ -> connect required network/VPN
+ -> choose market/environment
+ -> auth:refresh:<market>
+ -> complete human CAPTCHA/MFA if requested
+ -> list scope
+ -> run one targeted TC
+ -> run intended suite
+ -> inspect Executive / Allure / Playwright evidence
 ```
 
-Rule: **market -> suite -> store**. Environment (S1/S2) is runtime configuration, not the primary source-tree taxonomy.
-
-## Handoff-ready workflow
-
-A new QA should be able to follow this path without editing source code:
-
-```text
-1. clone repository
-2. npm ci
-3. install Playwright Chromium
-4. connect VPN/network
-5. choose market/environment
-6. run auth:refresh:<market> in manual mode
-7. complete Samsung login/CAPTCHA/MFA if requested
-8. run market list command
-9. run a single safe/target TC
-10. run the full intended market campaign
-11. review Executive Dashboard / Allure / Playwright evidence
-```
-
-If this cannot be completed without tribal knowledge, treat it as a documentation/tooling defect.
+If this needs undocumented intervention, treat that as a tooling/documentation defect.
 
 ## Documentation
 
-Start here, then use detailed guides only when needed:
-
-- [`docs/HANDOFF_GUIDE.md`](docs/HANDOFF_GUIDE.md) — first-use and ownership transfer checklist.
-- [`docs/AUTHENTICATION_GUIDE.md`](docs/AUTHENTICATION_GUIDE.md) — primary/second auth, session files and Jenkins handoff.
-- [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) — common auth, environment, Jenkins and Playwright failures.
+- [`docs/HANDOFF_GUIDE.md`](docs/HANDOFF_GUIDE.md) — first use and ownership transfer.
+- [`docs/AUTHENTICATION_GUIDE.md`](docs/AUTHENTICATION_GUIDE.md) — auth/session lifecycle.
+- [`docs/JENKINS_BEGINNER_GUIDE.md`](docs/JENKINS_BEGINNER_GUIDE.md) — operator-oriented Jenkins guide.
 - [`docs/JENKINS_SETUP.md`](docs/JENKINS_SETUP.md) — Jenkins engineering configuration.
-- [`docs/CURRENT_ARCHITECTURE.md`](docs/CURRENT_ARCHITECTURE.md) — architecture details.
-- [`docs/OFFICIAL_SMB_PRIORITY_MODEL.md`](docs/OFFICIAL_SMB_PRIORITY_MODEL.md) — official priority/scope model.
+- [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) — common failures.
+- [`docs/CURRENT_ARCHITECTURE.md`](docs/CURRENT_ARCHITECTURE.md) — canonical architecture contract.
+- [`docs/OFFICIAL_SMB_PRIORITY_MODEL.md`](docs/OFFICIAL_SMB_PRIORITY_MODEL.md) — scope model.
 - [`docs/EXECUTIVE_REPORT_V3.md`](docs/EXECUTIVE_REPORT_V3.md) — reporting contract.
-- [`docs/README.md`](docs/README.md) — complete documentation index.
+- [`docs/README.md`](docs/README.md) — documentation index.
 
-## Documentation policy
-
-There should be **one primary README at repository root**. It is the user/operator entry point.
-
-Additional files should exist only when they have a distinct responsibility. Prefer descriptive names such as `AUTHENTICATION_GUIDE.md` or `TROUBLESHOOTING.md` instead of creating many generic `README.md` files.
-
-Folder-level READMEs are acceptable only when a folder has a specific ownership/compatibility contract that developers need while working inside that folder. They must not compete with this root README as the onboarding source of truth.
+Root `README.md` is the primary operator entry point. Detailed documents should have one clear responsibility and must not compete with it for onboarding ownership.
