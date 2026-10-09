@@ -94,6 +94,27 @@ export default class MxCheckoutPage extends BasePage {
     await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, { timeout: 60000 });
   }
 
+  async waitForRegisteredAddressModes() {
+    const delivery = this.page.getByRole("region", { name: /^2\. M[eé]todo de Entrega$/i });
+    const modes = delivery.getByRole("radio", {
+      name: /^(Direcci[oó]n guardada|Nueva direcci[oó]n|Saved address|New address)$/i,
+    }).filter({ visible: true });
+    const rendered = await modes.first().waitFor({ state: "visible", timeout: 20000 })
+      .then(() => true, () => false);
+    if (!rendered) {
+      if (!/CHECKOUT_STEP_DELIVERY/.test(this.page.url())) {
+        throw new Error("MX saved-address checkout left Delivery before the address modes rendered.");
+      }
+      // The delivery region can open while its dynamic form remains a skeleton.
+      // Reload once before concluding anything about saved-address availability.
+      await this.page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+      await modes.first().waitFor({ state: "visible", timeout: 60000 }).catch(() => {
+        throw new Error("MX Delivery address modes remained unrendered after one reload; saved-address availability could not be determined.");
+      });
+    }
+    return delivery;
+  }
+
   async fillDelivery({ postalCode, street, exteriorNumber }, { registered = false } = {}) {
     const postal = this.page.getByRole("textbox", { name: /postal|c[oó]digo postal/i });
     const rendered = await postal.waitFor({ state: "visible", timeout: 20000 })

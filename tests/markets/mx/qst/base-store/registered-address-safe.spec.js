@@ -39,6 +39,7 @@ async function reachRegisteredDeliveryForSavedAddress(page, mxConfig) {
     phone: "5512345678",
   });
   await checkout.validateCheckoutSummary(mxConfig.sku);
+  await checkout.waitForRegisteredAddressModes();
   return { checkout, cart };
 }
 
@@ -46,11 +47,10 @@ test("SAM-24992 @qst @mx @base-store @safe @registered - Select saved address", 
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24992"));
   const { checkout } = await reachRegisteredDeliveryForSavedAddress(page, mxConfig);
   const savedAddress = page.getByRole("radio", { name: /Direcci[oó]n guardada|Saved address/i }).filter({ visible: true });
-  const savedAddressAvailable = await savedAddress.first().waitFor({ state: "visible", timeout: 60000 }).then(() => true).catch(() => false);
-  test.skip(!savedAddressAvailable, "No saved address is available in the authenticated MX account; safe TC does not create persistent profile data.");
+  const savedAddressAvailable = await savedAddress.count() > 0;
+  test.skip(!savedAddressAvailable, "Saved-address test data is unavailable in the fully rendered MX Delivery form; this TC does not create profile data.");
   await selectAddressMode(page, /Direcci[oó]n guardada|Saved address/i);
-  const checked = page.getByRole("radio", { checked: true }).filter({ visible: true });
-  await expect(checked.first()).toBeVisible({ timeout: 30000 });
+  await expect(savedAddress.first()).toBeChecked({ timeout: 30000 });
   await checkout.validateCheckoutSummary(mxConfig.sku);
   recordBusinessEvidence(testInfo, { savedAddressSelected: true, persistedDataCreated: false });
 });
