@@ -24,6 +24,30 @@ playwright/profiles/
 
 These paths are ignored by Git and must stay that way.
 
+## Shared credential convention
+
+For the primary Samsung Account, the four SMB markets follow the same operator convention:
+
+1. prefer shared environment variables `SAMSUNG_ACCOUNT_EMAIL` and `SAMSUNG_ACCOUNT_PASSWORD`;
+2. keep market-specific variables such as `MX_SAMSUNG_EMAIL`/`PE_SAMSUNG_EMAIL` only as compatibility or explicit market overrides;
+3. prefer one ignored local file, `playwright/.auth/samsung-storefront-user.json`, when credentials are stored locally;
+4. market-specific local files remain compatibility fallbacks, not the recommended handoff path.
+
+Example local file shape:
+
+```json
+{
+  "email": "approved.qa@samsung.example",
+  "password": "<local-only>"
+}
+```
+
+Do not commit this file.
+
+MX historically searched its market-specific credential source first. That behavior has been aligned with the shared SMB convention so a new QA does not need a different credential setup just for Mexico.
+
+Second-account scenarios remain intentionally separate because they represent a different business identity, not a second copy of the primary credential convention.
+
 ## What happens during refresh
 
 When an operator runs `auth:refresh:<market>`, the market script performs this lifecycle:
