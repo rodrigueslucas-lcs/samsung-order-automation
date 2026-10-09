@@ -7,8 +7,7 @@ const MARKET_ROOTS = Object.freeze({
   mx: path.join(ROOT, "mx", "qst", "base-store"),
   pe: path.join(ROOT, "pe", "qst", "base-store"),
   co: path.join(ROOT, "co", "qst", "base-store"),
-  // CL currently keeps Base Store + blocked EPP declarations in one official spec.
-  cl: path.join(ROOT, "cl", "qst"),
+  cl: path.join(ROOT, "cl", "qst", "base-store"),
 });
 
 const BUSINESS_FIXTURE_IMPORTS = [
@@ -86,7 +85,6 @@ for (const market of MARKETS) {
   }
 }
 
-// Guard the two MX fixtures that provide automatic scenario-level steps.
 for (const fixture of [
   "tests/markets/mx/qst/base-store/mxQst.fixture.js",
   "tests/markets/mx/dst/base-store/mx.auth.fixture.js",

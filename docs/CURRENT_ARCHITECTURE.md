@@ -1,185 +1,149 @@
 # Current SMB QA Automation Architecture
 
-This document describes the executable architecture after the repository cleanup and the remaining compatibility debt.
+This document describes the engineer-facing repository contract after the canonical test-tree cleanup.
 
-## 1. Authoritative business scope
+## 1. Navigation rule
 
-The business source of truth is the Samsung priority-template model under `docs/smb_priority_templates/`.
-
-| Market | Base Store | EPP | P1 / QST | P2 / DST only | DST total |
-|---|---:|---:|---:|---:|---:|
-| MX | 56 | 36 | 38 | 54 | 92 |
-| PE | 55 | 37 | 34 | 58 | 92 |
-| CL | 53 | 36 | 38 | 51 | 89 |
-| CO | 54 | 35 | 34 | 55 | 89 |
-| **SMB** | **218** | **144** | **144** | **218** | **362** |
-
-P1 runs in QST + DST; P2 runs in DST only. Base Store and EPP remain independent store contexts.
-
-## 2. Proven MX runtime contract
-
-The active MX Base Store runner selects 29 TCs because `SAM-25006` is preserved as an audited exclusion. Last proven pre-cutover S2 baseline:
+The repository follows one test navigation rule:
 
 ```text
-selected=29
-executed=29
-passed=28
-failed=1
-blocked=0
-notRun=0
+market -> suite -> store
 ```
 
-The only expected current FAIL is `SAM-25010`: Track Order creates the guest order, obtains/accepts OTP, then the current BaseSite cannot resolve the new order.
+Environment (`S1` / `S2`) is runtime configuration. It is not a source-tree taxonomy.
 
-Jenkins Build #52 runtime-validated the canonical MX cutover: 29 selected/executed, 28 PASS, and only the known `SAM-25010` product/environment failure. The accepted MX compatibility tree and the reporting/governance mirrors have therefore been physically removed.
-
-## 3. Canonical engineer-facing repository
+## 2. Canonical test tree
 
 ```text
 tests/
   markets/
     mx/
-      qst/base-store/
-      dst/base-store/
-      dst/backoffice/
+      qst/
+        base-store/
+      dst/
+        base-store/
+        backoffice/
     pe/
+      qst/
+        base-store/
+        epp/
+      dst/
+        base-store/
+        epp/
+        backoffice/
+    co/
+      qst/
+        base-store/
+        epp/
+    cl/
+      qst/
+        base-store/
+        epp/
     shared/
-  legacy/
-    pe-s2/
-
-reporting/
-  evidence/
-  executive/
-  executive-v3/
-  preqa2/
-  tests/
-
-governance/
-  *.json
-  tests/
-
-config/                 runtime/market configuration
-fixtures/               test-data compatibility
-flows/                  reusable business flows
-pages/                  Page Objects
-scripts/                executable CLIs, staged for responsibility split
-utils/                  runtime/governance helpers
+      qst/
+        base-store/
+        backoffice/
 ```
 
-The navigation rule is **market -> suite -> store**. Environment is selected at runtime and is no longer an engineer-facing test taxonomy.
+`tests/markets` is authoritative. The old `tests/s1`, `tests/s2` and `tests/legacy` compatibility roots are removed and must not return.
 
-## 4. Temporary compatibility layer
+## 3. Market ownership
 
-The remaining hidden compatibility roots are limited to PE/shared migration safety nets:
+### MX
+
+MX owns current QST Base Store plus canonical DST Base Store/BackOffice automation.
+
+### PE
+
+PE owns both current QST and established DST coverage. The previous `tests/legacy/pe-s2/dst` generation was migrated without changing its file contents into `tests/markets/pe/dst` so active DST commands no longer depend on a legacy path.
+
+### CO
+
+CO QST is physically separated into Base Store and EPP.
+
+### CL
+
+CL QST is physically separated into Base Store and EPP. The official plan remains 38 TCs: 31 Base Store and 7 EPP. `scripts/run-cl-qst-p1.cjs` selects the physical store path from `CL_QST_STORE` and still supports the combined official campaign.
+
+## 4. Shared ownership
+
+`tests/markets/shared` is for genuinely reusable behavior. It must not become a second executable owner of a market's official SAM ID.
+
+One official SAM ID has one executable ownership location per market.
+
+## 5. Runtime configuration
+
+Market runners select environment through runtime variables such as:
 
 ```text
-tests/s1/pe      <-> tests/markets/pe
-tests/s1/smb     <-> tests/markets/shared
-tests/s2/pe      <-> tests/legacy/pe-s2
+MX_QST_ENVIRONMENT
+PE_QST_ENVIRONMENT
+CO_QST_ENVIRONMENT
+CL_QST_ENVIRONMENT
 ```
 
-The accepted `tests/s1/mx`, `reporters/` and `test-mapping/` compatibility roots have been physically removed.
+Do not create new `tests/s1` or `tests/s2` trees.
 
-VS Code hides compatibility roots by default. The architecture gate checks mirrored pairs byte-for-byte:
+## 6. Operator surface
+
+Primary QST commands:
+
+```text
+npm run qst:mx:base-store
+npm run qst:pe:base-store
+npm run qst:co:base-store
+npm run qst:co:epp
+npm run qst:cl:base-store
+npm run qst:cl:epp
+```
+
+Discovery/list commands are non-destructive and should be used before broad runtime after structural changes.
+
+PE DST commands now resolve canonical paths under `tests/markets/pe/dst`.
+
+## 7. Authentication / Jenkins boundary
+
+Authentication is runtime state, never source ownership.
+
+The market lifecycle is conceptually:
+
+```text
+refresh -> verify -> package -> install -> optional Jenkins publish
+```
+
+CL now has the same Jenkins session-bundle publishing surface as MX/PE/CO through `auth:publish:jenkins:cl`. The publisher validates the CL bundle and publishes the protected file credential without printing session material.
+
+CAPTCHA/MFA remains a legitimate human security boundary and is never bypassed.
+
+## 8. Safety contract
+
+Payment/order/profile mutations remain guarded. Production is not a fallback. Ambiguous order/payment submission is never blindly retried.
+
+PASS, FAIL, BLOCKED, KNOWN BUG and NOT_RUN remain distinct reporting states.
+
+## 9. Architecture gates
+
+Structural changes must preserve:
 
 ```bash
 npm run repo:architecture:validate
+npm run qst:official:gate
+npm run qst:steps:gate
+npm run repo:refactor:gate
 ```
 
-The duplication is transitional and deliberate: active consumers have moved to canonical boundaries, but physical deletion waits for runtime acceptance.
+The architecture validator rejects resurrection of `tests/s1`, `tests/s2` or `tests/legacy` and requires the canonical market/suite/store paths.
 
-## 5. Runtime cutover status
+Static/discovery acceptance is not storefront runtime proof. Runtime acceptance must be reported separately.
 
-Canonical paths are now used by the active execution surface:
+## 10. Engineer handoff model
 
-- MX official P1 runner;
-- MX fast-guest runner;
-- MX DST package commands;
-- Jenkins direct MX authenticated-safe and BackOffice-safe lanes;
-- PE current P1 runner;
-- PE/shared direct package commands;
-- package reporting/governance integrity commands;
-- Playwright evidence reporter;
-- normal VS Code navigation.
-
-The architecture validator now rejects regressions where active CI/runners point back to `tests/s1`, `tests/s2`, `reporters/` or `test-mapping/`.
-
-Playwright auth-priority matching now targets only canonical `tests/markets/mx` paths. Jenkins Build #52 proved that the registered subset remains correctly discovered and executed after the cutover.
-
-## 6. Reporting and governance ownership
-
-Canonical boundaries are:
+A new QA should be able to understand the repository from the tree alone:
 
 ```text
-reporting/
-governance/
+country
+  -> QST or DST
+    -> Base Store / EPP / BackOffice
 ```
 
-The old `reporters/`, `test-mapping/`, `reporter-tests/` and `mapping-tests/` compatibility roots are removed. Integrity tests live only inside canonical ownership (`reporting/tests`, `governance/tests`).
-
-Active package/reporting commands and the MX/PE runners are being resolved through the canonical ownership boundary. Runtime result, automation coverage, official scope and historical evidence remain separate dimensions.
-
-## 7. PE dual-generation problem
-
-PE still has two generations:
-
-- `tests/markets/pe` — canonical current/newer PE QST stabilization generation;
-- `tests/legacy/pe-s2` — explicit older ST2 generation containing older QST plus established DST coverage.
-
-The older tree cannot be deleted based on age. Reconciliation is per TC and per runtime consumer.
-
-## 8. Page Object / flow strategy
-
-`pages/` remains flat while MX and PE generations share imports. Target ownership:
-
-```text
-pages/shared
-pages/mx
-pages/pe
-pages/backoffice
-
-flows/shared
-flows/mx
-flows/pe
-```
-
-Move by responsibility/consumer boundary after the test-path acceptance checkpoint so import churn does not overlap the highest-risk runner cutover.
-
-## 9. Script strategy
-
-`scripts/` still mixes auth, execution, reporting and governance commands. Target:
-
-```text
-scripts/auth
-scripts/ci
-scripts/reporting
-scripts/governance
-```
-
-Script decomposition is the next structural phase after runtime acceptance. Current executable paths remain stable so auth and Jenkins behavior are not simultaneously changed with the test-tree cutover.
-
-## 10. Authentication and payment boundaries
-
-MX auth artifacts are runtime-only under ignored `playwright/.auth/`. MFA/CAPTCHA is never bypassed. The second account is validated only when `SAM-24986` is selected.
-
-Payment data remains intentionally split:
-
-- `fixtures/card.json` — PE/DST compatibility data through `utils/testData.js`;
-- `playwright/.auth/mx-test-card.json` — ignored MX runtime data through `utils/mxTestCard.js`.
-
-Do not collapse these until PE migration proves the generic fixture is unused.
-
-## 11. Architecture acceptance
-
-Every phase must preserve:
-
-- official scope gates;
-- selected TC inventory;
-- destructive guards and zero blind payment retries;
-- auth secret handling;
-- Executive / Allure / Playwright reporting;
-- current MX runtime behavior.
-
-For the MX path cutover, acceptance is the official S2 29-TC campaign reproducing the established baseline: 29 executed, no blocked/not-run caused by architecture, and no new automation failure beyond the known product defect while it remains reproducible.
-
-See `REPOSITORY_AUDIT.md` for completed phases and deletion gates.
+Root `README.md` remains the operator entry point. Detailed documentation belongs under `docs/`; test folders should not accumulate competing onboarding READMEs.

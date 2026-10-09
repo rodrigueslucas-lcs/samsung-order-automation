@@ -1,17 +1,17 @@
 import { test as base, expect } from "@playwright/test";
 import fs from "node:fs";
-import HomePage from "../../../../pages/HomePage";
-import CartPage from "../../../../pages/CartPage";
-import ProfilePage from "../../../../pages/ProfilePage";
-import MyOrdersPage from "../../../../pages/MyOrdersPage";
-import BackOfficeSearchPage from "../../../../pages/BackOfficeSearchPage";
-import MarketPaymentPage from "../../../../pages/MarketPaymentPage";
-import clConfigModule from "../../../../config/markets/cl";
-import clAuthStateModule from "../../../../utils/clAuthState";
-import backofficeCredentialsModule from "../../../../utils/backofficeAdminCredentials";
-import mxTestCard from "../../../../utils/mxTestCard";
-import clSamsungCredentials from "../../../../utils/clSamsungCredentials";
-import { addConfiguredProductToClCart, bootstrapClStorefront } from "./clQstFlows";
+import HomePage from "../../../../../pages/HomePage";
+import CartPage from "../../../../../pages/CartPage";
+import ProfilePage from "../../../../../pages/ProfilePage";
+import MyOrdersPage from "../../../../../pages/MyOrdersPage";
+import BackOfficeSearchPage from "../../../../../pages/BackOfficeSearchPage";
+import MarketPaymentPage from "../../../../../pages/MarketPaymentPage";
+import clConfigModule from "../../../../../config/markets/cl";
+import clAuthStateModule from "../../../../../utils/clAuthState";
+import backofficeCredentialsModule from "../../../../../utils/backofficeAdminCredentials";
+import mxTestCard from "../../../../../utils/mxTestCard";
+import clSamsungCredentials from "../../../../../utils/clSamsungCredentials";
+import { addConfiguredProductToClCart, bootstrapClStorefront } from "../clQstFlows";
 
 const test = base.extend({
   qstBusinessScenario: [async ({}, use, testInfo) => {
@@ -31,7 +31,7 @@ const { getBackOfficeAdminCredentials } = backofficeCredentialsModule;
 const { getMxTestCard } = mxTestCard;
 const checkoutLoginTest = test.extend({ trace: "off", screenshot: "off", video: "off" });
 
-test.describe("CL QST - Official P1", () => {
+test.describe("CL QST - Base Store Official P1", () => {
   test.setTimeout(420000);
 
   const blocked = (reason) => test.skip(true, `CL QST environment prerequisite BLOCKED: ${reason}`);
@@ -110,7 +110,6 @@ test.describe("CL QST - Official P1", () => {
       .toBeVisible({ timeout: 60000 });
   }
 
-  // Base Store · 31 official P1 cases.
   test("SAM-24784 @qst @cl @base-store @registered - Login Home page", async ({ browser }) => {
     const cfg = config();
     const { context, page } = await authenticatedPage(browser, cfg);
@@ -126,6 +125,7 @@ test.describe("CL QST - Official P1", () => {
       await context.close();
     }
   });
+
   test("SAM-24785 @destructive @qst @cl @base-store @registered - Add/edit/delete addresses", async ({ browser }) => {
     test.skip(process.env.ALLOW_PROFILE_WRITE !== "1", "Set ALLOW_PROFILE_WRITE=1 for the CL QA address lifecycle.");
     test.skip(!hasClAuthState(), "CL authenticated state is required.");
@@ -181,6 +181,7 @@ test.describe("CL QST - Official P1", () => {
       await context.close();
     }
   });
+
   test("SAM-24786 @qst @cl @base-store @registered - My Orders page", async ({ browser }) => {
     test.skip(!hasClAuthState(), "CL authenticated state is required.");
     const cfg = config();
@@ -243,15 +244,11 @@ test.describe("CL QST - Official P1", () => {
   });
 
   {
-    // Keep the literal test declaration discoverable by governance inventory.
-    // Credential entry must never be captured by Playwright's automatic artifacts.
     const test = checkoutLoginTest;
     test("SAM-24807 @qst @cl @base-store @registered - Login from Checkout page", async ({ browser }, testInfo) => {
       expect(hasClAuthState(), "Refresh the legitimate CL Samsung Account session before this login scenario.").toBe(true);
       const cfg = config();
       const state = JSON.parse(fs.readFileSync(CL_AUTH_STATE_PATH, "utf8"));
-      // Keep Samsung Account's existing SSO session, but start the storefront
-      // without its authenticated cookies, local storage or session storage.
       const accountHosts = new Set(["account.samsung.com", "sts.secsso.net", "wds.samsung.com"]);
       const context = await browser.newContext({
         storageState: { cookies: state.cookies.filter(cookie => accountHosts.has(cookie.domain.replace(/^\./, ""))), origins: [] },
@@ -329,9 +326,6 @@ test.describe("CL QST - Official P1", () => {
         });
         await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i, { timeout: 60000 });
         await expect(page.getByText(/Direcci[oó]n de despacho/i).filter({ visible: true }).first()).toBeVisible({ timeout: 60000 });
-        // Checkout has a reduced header without the storefront profile menu.
-        // Prove this newly established login on the home page in the same context,
-        // then confirm that the authenticated delivery step remains accessible.
         const checkoutUrl = page.url();
         await bootstrapClStorefront(page, cfg);
         await maximize();
@@ -346,7 +340,6 @@ test.describe("CL QST - Official P1", () => {
         await context.close();
       }
     });
-
   }
 
   test("SAM-24808 @qst @cl @base-store - Checkout button on cart page", async ({ page }) => {
@@ -425,9 +418,6 @@ test.describe("CL QST - Official P1", () => {
         const invalid = await shipping.locator('.ng-invalid[name]').evaluateAll((els) => els.map((el) => ({ name: el.getAttribute("name"), value: el.value })));
         throw new Error(`CL checkout did not keep Save address checked; invalid=${JSON.stringify(invalid)}`);
       }
-      // CL does not always render a selectable delivery mode for this SKU.
-      // When it does, select the first one; otherwise let the checkout CTA
-      // expose the real address-validation outcome instead of timing out here.
       const deliveryOption = shipping.locator('input[name="group0delivery_mode_option"]:visible').first();
       if (await deliveryOption.count()) {
         await deliveryOption.locator('xpath=ancestor::mat-radio-button[1]').click();
@@ -592,11 +582,6 @@ test.describe("CL QST - Official P1", () => {
     await expect(billing.locator('input[name="line1"]:visible')).toHaveValue("124");
   });
 
-  for (const [id, title, reason] of [
-  ]) {
-    test(`${id} @blocked @qst @cl @base-store - ${title}`, async () => blocked(reason));
-  }
-
   test("SAM-24821 @qst @cl @base-store - Verify Back to Top", async ({ page }) => {
     await cart(page);
     await page.setViewportSize({ width: 1920, height: 1080 });
@@ -694,18 +679,5 @@ test.describe("CL QST - Official P1", () => {
     ["SAM-24825", "Payment using Rewards", "Rewards-enabled account/test data is required."],
   ]) {
     test(`${id} @blocked @qst @cl @base-store - ${title}`, async () => blocked(reason));
-  }
-
-  // EPP · 7 official P1 cases. Credential model is shared, but CL-specific storefront/WMC routing must be proven.
-  for (const [id, title] of [
-    ["SAM-24836", "Epp Login"],
-    ["SAM-24840", "Able to add to Cart from PDP"],
-    ["SAM-24841", "Cart page UI"],
-    ["SAM-24851", "Checkout button on cart page"],
-    ["SAM-24864", "Payment using credit / Debit card with reg user"],
-    ["SAM-24865", "Payment using Direct Bank Transfer"],
-    ["SAM-24866", "Order confirmation screen"],
-  ]) {
-    test(`${id} @blocked @qst @cl @epp - ${title}`, async () => blocked("shared credentials are reusable; CL EPP WMC/storefront URL and country-specific routing still need to be supplied/proven."));
   }
 });

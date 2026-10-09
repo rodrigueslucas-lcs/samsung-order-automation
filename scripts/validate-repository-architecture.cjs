@@ -15,12 +15,18 @@ const required = [
   "docs/JENKINS_BEGINNER_GUIDE.md",
   "docs/TROUBLESHOOTING.md",
   "tests/markets/mx/qst/base-store",
-  "tests/markets/co/qst/base-store",
+  "tests/markets/mx/dst/base-store",
+  "tests/markets/mx/dst/backoffice",
   "tests/markets/pe/qst/base-store",
-  "tests/markets/cl/qst",
+  "tests/markets/pe/qst/epp",
+  "tests/markets/pe/dst/base-store",
+  "tests/markets/pe/dst/epp",
+  "tests/markets/pe/dst/backoffice",
+  "tests/markets/co/qst/base-store",
+  "tests/markets/co/qst/epp",
+  "tests/markets/cl/qst/base-store",
+  "tests/markets/cl/qst/epp",
   "tests/markets/shared",
-  "tests/legacy/README.md",
-  "tests/legacy/pe-s2",
   "reporting/README.md",
   "reporting/tests",
   "governance/README.md",
@@ -42,19 +48,16 @@ const forbidden = [
   "fixtures/address.json",
   "fixtures/billingAddress.json",
   "fixtures/customer.json",
-  "tests/s1/mx",
+  "tests/s1",
+  "tests/s2",
+  "tests/legacy",
   "tests/README.md",
   "tests/markets/README.md",
   "tests/markets/pe/README.md",
   "tests/markets/pe/qst/README.md",
+  "tests/markets/cl/qst/official-p1.spec.js",
   "reporters",
   "test-mapping",
-];
-
-const compatibilityRoots = [
-  "tests/s1",
-  "tests/s2",
-  "tests/legacy",
 ];
 
 const missing = required.filter((entry) => !exists(entry));
@@ -69,43 +72,22 @@ function forbidLiteral(file, literals) {
   const source = read(file);
   for (const literal of literals) {
     if (source.includes(literal)) {
-      boundaryFailures.push(`${file}: active consumer must not reference compatibility boundary ${literal}`);
+      boundaryFailures.push(`${file}: active consumer must not reference removed compatibility boundary ${literal}`);
     }
   }
 }
 
-function validateVsCodeCompatibilityHiding() {
-  if (!exists(".vscode/settings.json")) return;
-  let settings;
-  try {
-    settings = JSON.parse(read(".vscode/settings.json"));
-  } catch (error) {
-    boundaryFailures.push(`.vscode/settings.json: invalid JSON (${error.message})`);
-    return;
-  }
+const removedTestRoots = ["tests/s1/", "tests/s2/", "tests/legacy/"];
+const removedOwnershipRoots = ["reporters/", "test-mapping/"];
+const forbiddenConsumers = [...removedTestRoots, ...removedOwnershipRoots];
 
-  for (const rootName of compatibilityRoots) {
-    if (settings["files.exclude"]?.[rootName] !== true) {
-      boundaryFailures.push(`.vscode/settings.json: files.exclude must hide non-canonical root ${rootName}`);
-    }
-    if (settings["search.exclude"]?.[rootName] !== true) {
-      boundaryFailures.push(`.vscode/settings.json: search.exclude must hide non-canonical root ${rootName}`);
-    }
-  }
-}
-
-// Production entry points must stay on canonical market/reporting/governance boundaries.
-forbidLiteral("Jenkinsfile", ["tests/s1/", "tests/s2/", "reporters/", "test-mapping/"]);
-forbidLiteral("scripts/run-mx-qst-safe.cjs", ["tests/s1/", "tests/s2/", "reporters/", "test-mapping/"]);
-forbidLiteral("scripts/run-mx-qst-fast-guest.cjs", ["tests/s1/", "tests/s2/", "reporters/", "test-mapping/"]);
-forbidLiteral("scripts/run-pe-qst-p1.cjs", ["tests/s1/", "tests/s2/", "reporters/", "test-mapping/"]);
-forbidLiteral("scripts/run-co-qst-p1.cjs", ["tests/s1/", "tests/s2/", "reporters/", "test-mapping/"]);
-forbidLiteral("scripts/run-cl-qst-p1.cjs", ["tests/s1/", "tests/s2/", "reporters/", "test-mapping/"]);
-
-// package.json may intentionally expose commands named "legacy", but executable
-// paths must point at tests/legacy or canonical boundaries rather than s1/s2.
-forbidLiteral("package.json", ["tests/s1/", "tests/s2/", "reporters/", "test-mapping/"]);
-validateVsCodeCompatibilityHiding();
+forbidLiteral("Jenkinsfile", forbiddenConsumers);
+forbidLiteral("package.json", forbiddenConsumers);
+forbidLiteral("scripts/run-mx-qst-safe.cjs", forbiddenConsumers);
+forbidLiteral("scripts/run-mx-qst-fast-guest.cjs", forbiddenConsumers);
+forbidLiteral("scripts/run-pe-qst-p1.cjs", forbiddenConsumers);
+forbidLiteral("scripts/run-co-qst-p1.cjs", forbiddenConsumers);
+forbidLiteral("scripts/run-cl-qst-p1.cjs", forbiddenConsumers);
 
 if (missing.length || resurrected.length || boundaryFailures.length) {
   console.error("[repo-architecture] FAIL");
@@ -116,10 +98,10 @@ if (missing.length || resurrected.length || boundaryFailures.length) {
 }
 
 console.log("[repo-architecture] PASS");
-console.log("[repo-architecture] Canonical test navigation is market-first under tests/markets.");
+console.log("[repo-architecture] Canonical test navigation is market -> suite -> store under tests/markets.");
 console.log("[repo-architecture] MX/PE/CO/CL active QST entry points are canonical market paths.");
-console.log("[repo-architecture] Historical PE S2 generation is explicit under tests/legacy/pe-s2 and hidden from normal navigation.");
+console.log("[repo-architecture] PE DST is canonical under tests/markets/pe/dst; legacy and environment-named roots are removed.");
+console.log("[repo-architecture] CL QST is physically separated into base-store and epp ownership.");
 console.log("[repo-architecture] Reporting ownership is canonical under reporting/.");
 console.log("[repo-architecture] Governance ownership is canonical under governance/.");
-console.log("[repo-architecture] Active CI/runners no longer depend on s1/s2, reporters or test-mapping compatibility boundaries.");
-console.log("[repo-architecture] Redundant test-tree README files are removed; operator documentation lives at root/docs.");
+console.log("[repo-architecture] Active CI/runners cannot depend on removed compatibility boundaries.");

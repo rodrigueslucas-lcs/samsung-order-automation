@@ -14,18 +14,8 @@ const ignoredDirs = new Set([
   ".auth",
 ]);
 
-// These paths are the temporary compatibility sources themselves. References
-// *inside* them are irrelevant to the consumer audit because they disappear as
-// a unit after acceptance.
-const ignoredPrefixes = [
-  "tests/s1/",
-  "tests/s2/",
-  "reporters/",
-  "test-mapping/",
-];
-
 const patterns = [
-  { label: "environment-test-tree", regex: /tests\/(?:s1|s2)\//g },
+  { label: "removed-test-tree", regex: /tests\/(?:s1|s2|legacy)\//g },
   { label: "reporting-compatibility", regex: /(?:^|["'`(\s./])reporters\//g },
   { label: "governance-compatibility", regex: /(?:^|["'`(\s./])test-mapping\//g },
 ];
@@ -35,15 +25,23 @@ const textExtensions = new Set([
   ".groovy", ".xml", ".html", ".css", ".ts",
 ]);
 const explicitFiles = new Set(["Jenkinsfile", "package.json", "playwright.config.js"]);
+const selfFiles = new Set([
+  "scripts/audit-legacy-boundaries.cjs",
+  "scripts/validate-test-mirrors.cjs",
+  "scripts/validate-repository-architecture.cjs",
+]);
+const historicalMetadata = new Set([
+  "governance/pe-qst-reuse-plan.json",
+]);
 
 function walk(current, out = []) {
   for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
     if (entry.isDirectory() && ignoredDirs.has(entry.name)) continue;
     const absolute = path.join(current, entry.name);
-    const relative = path.relative(root, absolute).replace(/\\/g, "/");
-    if (ignoredPrefixes.some((prefix) => relative === prefix.slice(0, -1) || relative.startsWith(prefix))) continue;
     if (entry.isDirectory()) walk(absolute, out);
-    else if (entry.isFile() && (explicitFiles.has(entry.name) || textExtensions.has(path.extname(entry.name).toLowerCase()))) out.push({ absolute, relative });
+    else if (entry.isFile() && (explicitFiles.has(entry.name) || textExtensions.has(path.extname(entry.name).toLowerCase()))) {
+      out.push({ absolute, relative: path.relative(root, absolute).replace(/\\/g, "/") });
+    }
   }
   return out;
 }
@@ -56,37 +54,26 @@ for (const { absolute, relative } of walk(root)) {
     for (const pattern of patterns) {
       pattern.regex.lastIndex = 0;
       if (pattern.regex.test(line)) {
-        findings.push({
-          kind: pattern.label,
-          file: relative,
-          line: index + 1,
-          text: line.trim().slice(0, 240),
-        });
+        findings.push({ kind: pattern.label, file: relative, line: index + 1, text: line.trim().slice(0, 240) });
       }
     }
   });
 }
 
-// Markdown is architectural/history documentation, not an executable consumer.
-// Keep it visible in the report so migration debt is searchable, but do not let
-// intentionally documented old paths block deletion readiness. Strict mode is
-// reserved for code/config/data that can actually keep a compatibility root alive.
 const actionable = findings.filter(({ file }) =>
   path.extname(file).toLowerCase() !== ".md" &&
-  !file.endsWith("audit-legacy-boundaries.cjs") &&
-  !file.endsWith("validate-test-mirrors.cjs") &&
-  !file.endsWith("validate-repository-architecture.cjs")
+  !selfFiles.has(file) &&
+  !historicalMetadata.has(file)
 );
 
-console.log("[legacy-boundary-audit] Compatibility references outside hidden mirror roots");
-if (!findings.length) {
-  console.log("[legacy-boundary-audit] none");
-} else {
+console.log("[legacy-boundary-audit] References to removed compatibility boundaries");
+if (!findings.length) console.log("[legacy-boundary-audit] none");
+else {
   const grouped = new Map();
   for (const finding of findings) {
-    const list = grouped.get(finding.kind) || [];
-    list.push(finding);
-    grouped.set(finding.kind, list);
+    const rows = grouped.get(finding.kind) || [];
+    rows.push(finding);
+    grouped.set(finding.kind, rows);
   }
   for (const [kind, rows] of grouped) {
     console.log(`\n${kind} (${rows.length})`);
@@ -96,8 +83,8 @@ if (!findings.length) {
 
 console.log(`\n[legacy-boundary-audit] total=${findings.length} actionable=${actionable.length}`);
 if (actionable.length) {
-  console.log("[legacy-boundary-audit] Actionable runtime/code/data references remain; migrate before physical compatibility deletion.");
+  console.log("[legacy-boundary-audit] Actionable code/config references to removed compatibility paths remain.");
   if (strict) process.exitCode = 1;
 } else {
-  console.log("[legacy-boundary-audit] No actionable runtime/code/data references remain. Documentation may still mention compatibility paths intentionally.");
+  console.log("[legacy-boundary-audit] No actionable code/config references depend on removed compatibility paths.");
 }

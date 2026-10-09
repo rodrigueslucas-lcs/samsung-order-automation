@@ -66,11 +66,17 @@ const env = {
   ALLOW_PROFILE_WRITE: process.env.ALLOW_PROFILE_WRITE ?? "1",
 };
 
+const specTargets = normalizedStore === "BS"
+  ? ["tests/markets/cl/qst/base-store"]
+  : normalizedStore === "EPP"
+    ? ["tests/markets/cl/qst/epp"]
+    : ["tests/markets/cl/qst/base-store", "tests/markets/cl/qst/epp"];
+
 const cli = path.resolve("node_modules/@playwright/test/cli.js");
 const args = [
   cli,
   "test",
-  "tests/markets/cl/qst/official-p1.spec.js",
+  ...specTargets,
   "--project=chromium",
   "--workers=1",
   "--retries=0",
@@ -86,6 +92,7 @@ console.log("\n============================================================");
 console.log(` SAMSUNG CL ${targetEnvironment} · OFFICIAL QST P1 · ${storeLabel}`);
 console.log("============================================================");
 console.log(`[cl-qst] Official scope: ${officialIds.length} TCs (${storeLabel}).`);
+console.log(`[cl-qst] Physical scope: ${specTargets.join(", ")}.`);
 console.log(`[cl-qst] Execution: ${requestedTargetIds.length ? `TARGETED ${executionIds.length}` : "FULL"}.`);
 if (requestedTargetIds.length) console.log(`[cl-qst] Target IDs: ${executionIds.join(", ")}`);
 console.log("============================================================\n");
