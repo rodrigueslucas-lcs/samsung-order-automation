@@ -116,6 +116,19 @@ function enrichAllure() {
   }
 }
 
+function normalizeAllureEvidence() {
+  if (!fs.existsSync(allureResultsDir)) return;
+  const script = path.resolve('scripts/dedupe-allure-evidence.cjs');
+  if (!fs.existsSync(script)) return;
+  const normalized = spawnSync(process.execPath, [script, allureResultsDir], {
+    stdio: 'inherit',
+    env: process.env,
+  });
+  if (normalized.status !== 0) {
+    console.error('[reporting] Allure evidence normalization failed; raw results were preserved.');
+  }
+}
+
 function generateAllure() {
   if (!fs.existsSync(allureResultsDir)) return;
   const allureCli = process.platform === 'win32'
@@ -142,4 +155,5 @@ if (!(fs.existsSync(runtimeSummaryFile) && fs.existsSync(path.join(executiveDir,
 }
 writeAllureEnvironment();
 enrichAllure();
+normalizeAllureEvidence();
 generateAllure();
