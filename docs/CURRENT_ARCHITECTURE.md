@@ -56,6 +56,10 @@ tests/
 
 Every market exposes the same top-level suite contract: `qst/` and `dst/`. A DST root may be structural-only when that market does not yet have official implemented DST browser coverage. Structural presence must never be interpreted as runtime PASS or implemented coverage.
 
+The repository contract treats QST as the primary suite and DST as the secondary suite. File explorers may render `dst` before `qst` because of alphabetical sorting; folder names are not prefixed with artificial numbers only to control UI ordering.
+
+At each market root, only `qst/` and `dst/` are allowed. At each market QST root, only `base-store/` and `epp/` are allowed. Reusable flow modules do not belong loose at these ownership levels.
+
 ## 3. Market ownership
 
 ### MX
@@ -74,9 +78,13 @@ CO QST is physically separated into Base Store and EPP. `tests/markets/co/dst` i
 
 CL QST is physically separated into Base Store and EPP. The official plan remains 38 TCs: 31 Base Store and 7 EPP. `scripts/run-cl-qst-p1.cjs` selects the physical store path from `CL_QST_STORE` and still supports the combined official campaign. `tests/markets/cl/dst` is a reserved canonical suite boundary only; it does not claim implemented CL DST coverage yet.
 
+CL reusable storefront/cart flow logic lives under `flows/cl/qstFlows.js`, not inside the QST ownership root.
+
 ## 4. Shared ownership
 
-`tests/markets/shared` is for genuinely reusable behavior. It must not become a second executable owner of a market's official SAM ID.
+`tests/markets/shared` is for genuinely reusable executable behavior. It must not become a second executable owner of a market's official SAM ID.
+
+Reusable browser/business implementation belongs under `flows/`; market-specific reusable behavior belongs under `flows/<market>/`, while genuinely cross-market behavior may live under a shared SMB flow boundary.
 
 One official SAM ID has one executable ownership location per market.
 
@@ -108,7 +116,7 @@ npm run qst:cl:epp
 
 Discovery/list commands are non-destructive and should be used before broad runtime after structural changes.
 
-PE DST commands now resolve canonical paths under `tests/markets/pe/dst`.
+PE DST commands resolve canonical paths under `tests/markets/pe/dst`.
 
 ## 7. Authentication / Jenkins boundary
 
@@ -120,7 +128,7 @@ The market lifecycle is conceptually:
 refresh -> verify -> package -> install -> optional Jenkins publish
 ```
 
-CL now has the same Jenkins session-bundle publishing surface as MX/PE/CO through `auth:publish:jenkins:cl`. The publisher validates the CL bundle and publishes the protected file credential without printing session material.
+CL has the same Jenkins session-bundle publishing surface as MX/PE/CO through `auth:publish:jenkins:cl`. The publisher validates the CL bundle and publishes the protected file credential without printing session material.
 
 CAPTCHA/MFA remains a legitimate human security boundary and is never bypassed.
 
@@ -141,7 +149,7 @@ npm run qst:steps:gate
 npm run repo:refactor:gate
 ```
 
-The architecture validator rejects resurrection of `tests/s1`, `tests/s2` or `tests/legacy` and requires canonical QST/DST suite boundaries for MX, PE, CO and CL.
+The architecture validator rejects resurrection of `tests/s1`, `tests/s2` or `tests/legacy`, requires canonical QST/DST suite boundaries for MX, PE, CO and CL, and rejects loose files at market/QST ownership roots.
 
 Static/discovery acceptance is not storefront runtime proof. Runtime acceptance must be reported separately.
 
@@ -152,8 +160,9 @@ A new QA should be able to understand the repository from the tree alone:
 ```text
 country
   -> QST
+      -> Base Store / EPP
   -> DST
-    -> Base Store / EPP / BackOffice when implemented
+      -> Base Store / EPP / BackOffice when implemented
 ```
 
-Root `README.md` remains the operator entry point. Detailed documentation belongs under `docs/`; test folders should not accumulate competing onboarding READMEs except a structural placeholder that explicitly prevents false coverage claims.
+Root `README.md` remains the operator entry point. Detailed documentation belongs under `docs/`; test folders should not accumulate competing onboarding READMEs except structural placeholders that explicitly prevent false coverage claims.
