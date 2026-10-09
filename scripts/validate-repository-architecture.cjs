@@ -25,8 +25,10 @@ const required = [
   "tests/markets/pe/dst/backoffice",
   "tests/markets/co/qst/base-store",
   "tests/markets/co/qst/epp",
+  "tests/markets/co/dst",
   "tests/markets/cl/qst/base-store",
   "tests/markets/cl/qst/epp",
+  "tests/markets/cl/dst",
   "tests/markets/shared",
   "reporting/README.md",
   "reporting/tests",
@@ -100,7 +102,9 @@ if (missing.length || resurrected.length || boundaryFailures.length) {
 
 console.log("[repo-architecture] PASS");
 console.log("[repo-architecture] Canonical test navigation is market -> suite -> store under tests/markets.");
+console.log("[repo-architecture] MX/PE/CO/CL expose canonical qst and dst suite boundaries.");
 console.log("[repo-architecture] MX/PE/CO/CL QST ownership exposes both base-store and epp lanes where official scope exists.");
+console.log("[repo-architecture] CL/CO DST roots are structural reservations only until official runtime coverage is implemented and proven.");
 console.log("[repo-architecture] PE DST is canonical under tests/markets/pe/dst; legacy and environment-named roots are removed.");
 console.log("[repo-architecture] EPP runtime access data is centralized under config/markets/epp.js while test ownership remains market-specific.");
 console.log("[repo-architecture] Reporting ownership is canonical under reporting/.");
