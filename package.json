@@ -31,6 +31,7 @@
     "auth:refresh:cl": "node scripts/auth-refresh-cl.cjs",
     "auth:package:cl": "node scripts/auth-package-cl.cjs",
     "auth:install:cl": "node scripts/auth-install-cl-package.cjs",
+    "auth:publish:jenkins:cl": "node scripts/auth-publish-jenkins-cl.cjs",
     "dst:base-store": "playwright test tests/legacy/pe-s2/dst/base-store --project=chromium --workers=1 --grep-invert @destructive",
     "dst:backoffice": "playwright test tests/legacy/pe-s2/dst/backoffice --project=chromium --workers=1 --grep-invert \"@destructive|TC73|TC75\"",
     "dst:epp": "playwright test tests/legacy/pe-s2/dst/epp --project=chromium --workers=1 --grep-invert @destructive",
