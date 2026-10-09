@@ -12,7 +12,8 @@
     "**/allure-results": true,
     "**/playwright/.auth": true,
     "tests/s1": true,
-    "tests/s2": true
+    "tests/s2": true,
+    "tests/legacy": true
   },
   "search.exclude": {
     "**/node_modules": true,
@@ -22,6 +23,7 @@
     "**/allure-results": true,
     "**/playwright/.auth": true,
     "tests/s1": true,
-    "tests/s2": true
+    "tests/s2": true,
+    "tests/legacy": true
   }
 }
