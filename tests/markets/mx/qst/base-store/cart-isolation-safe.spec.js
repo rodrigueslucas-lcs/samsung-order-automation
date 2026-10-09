@@ -6,7 +6,7 @@ import authStateModule from "../../../../../utils/authState";
 import evidenceContext from "../../../../../reporting/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import { test, expect } from "../../dst/base-store/mx.auth.fixture";
-import { prepareMxQstCart } from "./mxQstFlows";
+import { prepareMxQstCart, resetMxCartViaUi, mxQstCart } from "./mxQstFlows";
 
 const { createAuthState } = authStateModule;
 const { recordBusinessEvidence } = evidenceContext;
@@ -98,6 +98,11 @@ test("SAM-24986 @qst @mx @base-store @safe @registered - Cart is isolated from a
 
   const { context: secondContext, secondPage } = secondAccount;
   try {
+    await test.step("Start the second account with an empty cart", async () => {
+      await resetMxCartViaUi(secondPage, mxConfig);
+      const { productEntries } = await mxQstCart(secondPage, mxConfig).loadMxCartState();
+      expect(productEntries, "Second-account baseline must be empty.").toHaveLength(0);
+    });
     await test.step("Prepare a controlled cart for the first authenticated account", async () => {
       const firstCart = await prepareMxQstCart(page, mxConfig);
       await firstCart.validateControlledSingleSku(mxConfig.sku);
@@ -110,11 +115,17 @@ test("SAM-24986 @qst @mx @base-store @safe @registered - Cart is isolated from a
         .getByText(mxConfig.sku, { exact: true })
         .filter({ visible: true });
       await expect(carriedSku).toHaveCount(0, { timeout: 30000 });
+      const { productEntries } = await mxQstCart(secondPage, mxConfig).loadMxCartState();
+      expect(productEntries, "First-account cart mutations must not appear in the second account.").toHaveLength(0);
     });
 
     await test.step("Create and validate an independent cart for the second account", async () => {
       const secondCart = await prepareMxQstCart(secondPage, mxConfig);
       await secondCart.validateControlledSingleSku(mxConfig.sku);
+    });
+
+    await test.step("Verify second-account mutations did not change the first cart", async () => {
+      await mxQstCart(page, mxConfig).validateControlledSingleSku(mxConfig.sku);
     });
 
     recordBusinessEvidence(testInfo, {

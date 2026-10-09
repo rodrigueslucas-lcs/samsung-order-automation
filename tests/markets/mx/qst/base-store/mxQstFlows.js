@@ -85,7 +85,7 @@ async function cartDiagnostic(page) {
   };
 }
 
-async function resetMxCartViaUi(page, config) {
+export async function resetMxCartViaUi(page, config) {
   await page.goto(config.cartUrl.toString(), { waitUntil: "domcontentloaded", timeout: 60000 });
   const main = page.getByRole("main");
   await main.waitFor({ state: "attached", timeout: 30000 });
@@ -143,13 +143,13 @@ async function resetMxCartViaUi(page, config) {
   throw new Error("MX cart reset exceeded the 20-item safety limit.");
 }
 
-async function normalizeControlledQuantity(item, quantity) {
+async function normalizeControlledQuantity(page, item, quantity) {
   let current = Number(await quantity.inputValue());
   if (!Number.isInteger(current) || current < 1) {
     throw new Error(`Controlled MX cart rendered invalid quantity: ${await quantity.inputValue()}.`);
   }
 
-  if (current === 1) return;
+  if (current === 1) return false;
 
   const minus = item.getByRole("button", { name: "-", exact: true });
   await expect(minus).toBeVisible({ timeout: 30000 });
@@ -157,10 +157,17 @@ async function normalizeControlledQuantity(item, quantity) {
   while (current > 1) {
     await expect(minus).toBeEnabled({ timeout: 30000 });
     const expected = String(current - 1);
-    await minus.click();
+    const update = page.waitForResponse(response => {
+      const request = response.request();
+      return ["POST", "PUT", "PATCH"].includes(request.method()) &&
+        /\/v2\/mx\/users\/current\/carts\/[^/]+\/entries(?:\/|$)/.test(new URL(response.url()).pathname);
+    }, { timeout: 30000 });
+    const [response] = await Promise.all([update, minus.click()]);
+    expect(response.ok(), "MX cart quantity update must succeed before continuing.").toBe(true);
     await expect(quantity).toHaveValue(expected, { timeout: 30000 });
     current -= 1;
   }
+  return true;
 }
 
 async function validateControlledCartUi(page, config) {
@@ -173,7 +180,12 @@ async function validateControlledCartUi(page, config) {
   );
   const quantity = item.getByRole("textbox", { name: "Quantity" });
   await expect(quantity).toBeVisible({ timeout: 30000 });
-  await normalizeControlledQuantity(item, quantity);
+  const normalized = await normalizeControlledQuantity(page, item, quantity);
+  if (normalized) {
+    // The input updates optimistically. Confirm the server retained quantity 1
+    // before another navigation can restore an earlier quantity.
+    await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+  }
   await expect(quantity).toHaveValue("1", { timeout: 30000 });
   await expect(main.getByRole("button", { name: /^Remove$/i })).toHaveCount(1, { timeout: 30000 });
 }
