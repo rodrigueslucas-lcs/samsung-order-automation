@@ -1,16 +1,27 @@
 # Business Flows
 
-`flows/` contains reusable browser/business flows that sit above individual Page Objects.
+`flows/` contains reusable browser/business flows that sit above individual Page Objects and outside executable test ownership.
 
-Current `flows/smb/` helpers are shared presentation/access behaviors used across SMB automation.
+Canonical ownership rule:
 
-Target structure:
+```text
+tests/markets/<market>/<suite>/<store>/  -> executable specs / local fixtures
+flows/<market>/                          -> market-specific reusable business flows
+flows/smb/                               -> genuinely cross-market SMB flows
+```
+
+Current structure:
 
 ```text
 flows/
-  shared/
-  mx/
-  pe/
+  cl/
+    qstFlows.js
+  smb/
+    cartPresentation.js
+    storefrontAccess.js
+  eppStorefront.js
 ```
 
-A flow belongs in `shared/` only when its business behavior is genuinely cross-market. Market-specific checkout/payment/address behavior should remain market-owned rather than being generalized solely to reduce file count.
+A flow belongs in a shared location only when its behavior is genuinely cross-market. Market-specific checkout, payment, address or authentication behavior stays market-owned rather than being generalized only to reduce file count.
+
+Do not leave reusable `*Flows.js` modules loose at `tests/markets/<market>/qst` suite roots. The test tree is for ownership/navigation; reusable implementation belongs under `flows/`.
