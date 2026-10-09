@@ -127,15 +127,19 @@ test("SAM-25000 @qst @mx @base-store @safe @registered - Switch saved and new ad
   await reachRegisteredDeliveryForSavedAddress(page, mxConfig);
   const saved = page.getByRole("radio", { name: /Direcci[oó]n guardada|Saved address/i }).filter({ visible: true });
   const fresh = page.getByRole("radio", { name: /Nueva direcci[oó]n|New address/i }).filter({ visible: true });
-  const [savedAvailable, freshAvailable] = await Promise.all([
-    saved.first().waitFor({ state: "visible", timeout: 60000 }).then(() => true).catch(() => false),
-    fresh.first().waitFor({ state: "visible", timeout: 60000 }).then(() => true).catch(() => false),
-  ]);
-  test.skip(!savedAvailable || !freshAvailable, "Both saved-address and new-address modes are required to prove switching without creating persistent data.");
+  test.skip(await saved.count() === 0, "Saved-address test data is unavailable in the fully rendered MX Delivery form; switching requires an existing address.");
+  await expect(saved).toBeVisible({ timeout: 30000 });
+  await expect(fresh).toBeVisible({ timeout: 30000 });
   await selectAddressMode(page, /Direcci[oó]n guardada|Saved address/i);
   await expect(saved).toBeChecked();
   await selectAddressMode(page, /Nueva direcci[oó]n|New address/i);
   await expect(fresh).toBeChecked();
   await expect(saved).not.toBeChecked();
-  recordBusinessEvidence(testInfo, { switchedSavedToNew: true, profileWritePerformed: false });
+  const postalCode = page.getByRole("textbox", { name: "postalCode", exact: true }).filter({ visible: true });
+  await expect(postalCode, "New-address mode must expose its address form.").toBeVisible({ timeout: 30000 });
+  await selectAddressMode(page, /Direcci[oó]n guardada|Saved address/i);
+  await expect(saved).toBeChecked();
+  await expect(fresh).not.toBeChecked();
+  await expect(postalCode, "Returning to saved-address mode must close the new-address form.").toBeHidden({ timeout: 30000 });
+  recordBusinessEvidence(testInfo, { switchedSavedToNew: true, switchedNewToSaved: true, newAddressFormVisible: true, profileWritePerformed: false });
 });
