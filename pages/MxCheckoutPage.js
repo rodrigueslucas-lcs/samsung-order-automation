@@ -260,7 +260,7 @@ export default class MxCheckoutPage extends BasePage {
     } else {
       // S2 can expose a single already-applied delivery mode (for example
       // "Pre Venta") without a radio/label. Prove the mode is both present in
-      // the delivery list and reflected in the order summary before continuing.
+      // the delivery list and its active delivery region before continuing.
       const deliveryOptions = this.page
         .getByRole("listitem")
         .filter({ hasText: /(?:Pre Venta|Entrega Est[aá]ndar)[\s\S]*(?:Recibir[aá]s|Enviaremos)/i })
@@ -276,7 +276,7 @@ export default class MxCheckoutPage extends BasePage {
         throw new Error(`MX Delivery option was not recognized: ${optionText}`);
       }
       const summaryMode = this.page
-        .getByRole("region", { name: /Accordion Panel Header/i })
+        .getByRole("region", { name: /^2\. M[eé]todo de Entrega$/i })
         .getByText(new RegExp(selectedDeliveryMode, "i"))
         .filter({ visible: true });
       await summaryMode.first().waitFor({ state: "visible", timeout: 30000 });
@@ -385,7 +385,7 @@ export default class MxCheckoutPage extends BasePage {
         (card) => Boolean(card.control?.checked || card.querySelector('input[type="radio"]')?.checked)
       )
       : await this.page
-        .getByRole("region", { name: /Accordion Panel Header/i })
+        .getByRole("region", { name: /^2\. M[eé]todo de Entrega$/i })
         .getByText(new RegExp(selectedDeliveryMode, "i"))
         .filter({ visible: true })
         .first()
