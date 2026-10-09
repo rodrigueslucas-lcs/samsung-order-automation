@@ -24,6 +24,12 @@ function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
+function isPeQstCandidate(candidate) {
+  if (!candidate || typeof candidate !== "string") return false;
+  const normalized = candidate.replace(/\\/g, "/").toLowerCase();
+  return normalized.startsWith("tests/") && normalized.includes("/pe") && normalized.includes("/qst/");
+}
+
 function validatePeQstReusePlan({
   registryPath = DEFAULT_REGISTRY_PATH,
   planPath = DEFAULT_PLAN_PATH,
@@ -75,8 +81,8 @@ function validatePeQstReusePlan({
       if (entry.candidate !== null) {
         throw new Error(`${id} is missing and must not point to a candidate spec.`);
       }
-    } else if (!entry.candidate || !String(entry.candidate).startsWith("tests/legacy/pe-s2/qst/")) {
-      throw new Error(`${id} reuse candidate must point to the explicit PE S2 legacy QST tree.`);
+    } else if (!isPeQstCandidate(entry.candidate)) {
+      throw new Error(`${id} reuse candidate must point to an explicit PE QST test path.`);
     }
     counts[entry.reuse] += 1;
   }
