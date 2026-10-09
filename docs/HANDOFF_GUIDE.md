@@ -4,9 +4,44 @@ This guide is for a QA who did not build the repository and needs to start using
 
 ## Objective
 
-A new operator should be able to reach a first valid market execution without editing source code or receiving private credentials from another QA.
+A new operator should be able to reach a first valid market execution without editing source code, without receiving private credentials from another QA and without knowing Jenkins on day one.
 
 Target onboarding time: approximately 15–30 minutes once machine/VPN access is already available.
+
+## Two onboarding tracks
+
+The project should be teachable in two layers:
+
+### Track A — Local QA operator
+
+This is mandatory for every QA who will develop, stabilize or investigate automation.
+
+They must know how to:
+
+- clone/install the repository;
+- choose market/environment;
+- authenticate locally;
+- list scope;
+- run one TC or one market campaign;
+- inspect Dashboard/Allure/Playwright evidence;
+- distinguish automation failure, environment blocker and product defect.
+
+**Jenkins is not a prerequisite for Track A.**
+
+### Track B — Jenkins / CI operator
+
+This is required only for people who will operate shared CI/release execution.
+
+They additionally learn how to:
+
+- open the configured Jenkins job;
+- choose build parameters;
+- understand stages;
+- find logs/reports/artifacts;
+- refresh/publish protected auth bundles when authorized;
+- identify whether a failure happened before the tests or inside a TC.
+
+A QA can be productive locally before receiving Jenkins access.
 
 ## What the new QA needs
 
@@ -17,7 +52,7 @@ Target onboarding time: approximately 15–30 minutes once machine/VPN access is
 - access to Jenkins only if they will operate CI;
 - knowledge of which market/environment they are responsible for.
 
-## First use
+## First use — local path
 
 ### 1. Clone and install
 
@@ -102,7 +137,8 @@ Responsible for:
 - authenticating when the session needs renewal;
 - completing CAPTCHA/MFA when requested;
 - validating targeted changes;
-- generating a verified session bundle.
+- reproducing failures with full browser visibility when necessary;
+- generating a verified session bundle when they are also a CI operator.
 
 ### Jenkins
 
@@ -115,6 +151,8 @@ Responsible for:
 - publishing evidence/reports.
 
 Jenkins should not attempt interactive CAPTCHA/MFA renewal in the background.
+
+The existence of Jenkins must not make local execution impossible. Local execution is the debugging/development path; Jenkins is the repeatable shared orchestration path.
 
 ## Primary and second accounts
 
@@ -135,6 +173,30 @@ CO_QST_ENVIRONMENT=S2 CO_AUTH_SLOT=second CO_AUTH_MANUAL=1 npm run auth:refresh:
 ```
 
 Do not use the same business user for both slots when the TC validates user/cart isolation.
+
+## When to introduce Jenkins
+
+Do not teach Jenkins before the QA understands one local execution.
+
+Recommended order:
+
+```text
+local install
+  ↓
+local auth
+  ↓
+list scope
+  ↓
+run one TC
+  ↓
+read evidence
+  ↓
+run market locally
+  ↓
+then Jenkins
+```
+
+When Jenkins is introduced, use `docs/JENKINS_BEGINNER_GUIDE.md` first. `docs/JENKINS_SETUP.md` is the deeper administrator/maintainer reference.
 
 ## Before a release campaign
 
@@ -164,10 +226,24 @@ They should not need to understand cookie schemas, storageState internals, ZK in
 
 ## Handoff acceptance test
 
+### Local acceptance
+
 Give the repository to a QA who did not develop it and ask them to perform the following with only this documentation:
 
 ```text
 clone -> install -> authenticate PE S2 -> list scope -> run one TC -> find evidence
 ```
 
-If they need undocumented commands or developer intervention, capture the missing step and improve the documentation/tooling before declaring the project handoff-ready.
+If they cannot do that without Jenkins, the local handoff is incomplete.
+
+### CI acceptance
+
+After the local path is understood, give the QA Jenkins access and ask them to:
+
+```text
+open job -> choose PE/S2 -> identify official-p1 parameters -> start/inspect a controlled build -> find Executive Dashboard/Allure -> explain where a failure occurred
+```
+
+They do not need to administer Jenkins itself to operate the configured job.
+
+If either exercise requires undocumented developer intervention, capture the missing step and improve the documentation/tooling before declaring the project handoff-ready.
