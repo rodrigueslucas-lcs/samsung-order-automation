@@ -45,7 +45,7 @@ test('generic Jenkins finalizer normalizes Allure evidence for every non-MX-spec
   assert.match(finalizer, /normalizeAllureEvidence\(\);\s*\ngenerateAllure\(\);/);
 });
 
-test('Allure evidence policy publishes at most one primary screenshot, video, trace and context per test', () => {
+test('Allure evidence dedupe removes byte-identical copies but preserves distinct multi-page media', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'smb-allure-evidence-'));
   try {
     const write = (name, size, byte) => {
@@ -53,22 +53,21 @@ test('Allure evidence policy publishes at most one primary screenshot, video, tr
       return name;
     };
     const resultFile = path.join(dir, 'sample-result.json');
+    const storefrontVideo = write('storefront.webm', 500, 5);
+    const mailinatorVideo = write('mailinator.webm', 300, 6);
+    const duplicateStorefrontVideo = write('storefront-copy.webm', 500, 5);
     const result = {
-      name: 'SAM-TEST',
+      name: 'SAM-25010',
       attachments: [
-        { name: 'screenshot', type: 'image/png', source: write('generic.png', 100, 1) },
-        { name: 'video', type: 'video/webm', source: write('helper.webm', 100, 2) },
-        { name: 'trace', type: 'application/zip', source: write('trace-a.zip', 80, 3) },
+        { name: 'video', type: 'video/webm', source: storefrontVideo },
+        { name: 'video', type: 'video/webm', source: mailinatorVideo },
+        { name: 'screenshot', type: 'image/png', source: write('final.png', 100, 1) },
       ],
       steps: [
         {
-          name: 'business step',
+          name: 'nested reporter copy',
           attachments: [
-            { name: 'mx-known-defect-context', type: 'image/png', source: write('defect.png', 250, 4) },
-            { name: 'video', type: 'video/webm', source: write('main.webm', 500, 5) },
-            { name: 'trace', type: 'application/zip', source: write('trace-b.zip', 120, 6) },
-            { name: 'error-context', type: 'text/markdown', source: write('error.md', 60, 7) },
-            { name: 'error-context-copy', type: 'text/markdown', source: write('error-copy.md', 70, 8) },
+            { name: 'video', type: 'video/webm', source: duplicateStorefrontVideo },
           ],
           steps: [],
         },
@@ -93,14 +92,10 @@ test('Allure evidence policy publishes at most one primary screenshot, video, tr
     collect(normalized.attachments);
     visit(normalized.steps);
 
-    const count = (pattern) => all.filter((item) => pattern.test(`${item.name} ${item.type} ${item.source}`)).length;
-    assert.equal(count(/Screenshot · Final state|image\//i), 1);
-    assert.equal(count(/Video · Execution|video\//i), 1);
-    assert.equal(count(/Playwright Trace|application\/zip/i), 1);
-    assert.equal(count(/Error Context|\.md$/i), 1);
-
-    assert.equal(all.find((item) => item.name === 'Screenshot · Final state')?.source, 'defect.png');
-    assert.equal(all.find((item) => item.name === 'Video · Execution')?.source, 'main.webm');
+    const videos = all.filter((item) => /video\//i.test(item.type || ''));
+    assert.equal(videos.length, 2);
+    assert.deepEqual(new Set(videos.map((item) => item.source)), new Set([storefrontVideo, mailinatorVideo]));
+    assert.equal(all.filter((item) => /image\//i.test(item.type || '')).length, 1);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
