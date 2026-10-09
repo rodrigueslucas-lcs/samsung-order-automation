@@ -30,6 +30,7 @@ const required = [
   "tests/markets/cl/qst/epp",
   "tests/markets/cl/dst",
   "tests/markets/shared",
+  "flows/cl/qstFlows.js",
   "reporting/README.md",
   "reporting/tests",
   "governance/README.md",
@@ -56,8 +57,10 @@ const forbidden = [
   "tests/legacy",
   "tests/README.md",
   "tests/markets/README.md",
+  "tests/markets/mx/README.md",
   "tests/markets/pe/README.md",
   "tests/markets/pe/qst/README.md",
+  "tests/markets/cl/qst/clQstFlows.js",
   "tests/markets/cl/qst/official-p1.spec.js",
   "reporters",
   "test-mapping",
@@ -80,6 +83,20 @@ function forbidLiteral(file, literals) {
   }
 }
 
+function requireDirectoryShape(relativePath, allowedNames) {
+  if (!exists(relativePath)) {
+    boundaryFailures.push(`${relativePath}: required architecture directory is missing`);
+    return;
+  }
+  const entries = fs.readdirSync(path.join(root, relativePath), { withFileTypes: true });
+  const unexpected = entries
+    .filter((entry) => !entry.isDirectory() || !allowedNames.includes(entry.name))
+    .map((entry) => entry.name);
+  if (unexpected.length) {
+    boundaryFailures.push(`${relativePath}: only ${allowedNames.join(", ")} directories are allowed at this ownership level; found ${unexpected.join(", ")}`);
+  }
+}
+
 const removedTestRoots = ["tests/s1/", "tests/s2/", "tests/legacy/"];
 const removedOwnershipRoots = ["reporters/", "test-mapping/"];
 const forbiddenConsumers = [...removedTestRoots, ...removedOwnershipRoots];
@@ -92,6 +109,11 @@ forbidLiteral("scripts/run-pe-qst-p1.cjs", forbiddenConsumers);
 forbidLiteral("scripts/run-co-qst-p1.cjs", forbiddenConsumers);
 forbidLiteral("scripts/run-cl-qst-p1.cjs", forbiddenConsumers);
 
+for (const market of ["mx", "pe", "co", "cl"]) {
+  requireDirectoryShape(`tests/markets/${market}`, ["qst", "dst"]);
+  requireDirectoryShape(`tests/markets/${market}/qst`, ["base-store", "epp"]);
+}
+
 if (missing.length || resurrected.length || boundaryFailures.length) {
   console.error("[repo-architecture] FAIL");
   if (missing.length) console.error(`Missing required architecture paths: ${missing.join(", ")}`);
@@ -102,8 +124,8 @@ if (missing.length || resurrected.length || boundaryFailures.length) {
 
 console.log("[repo-architecture] PASS");
 console.log("[repo-architecture] Canonical test navigation is market -> suite -> store under tests/markets.");
-console.log("[repo-architecture] MX/PE/CO/CL expose canonical qst and dst suite boundaries.");
-console.log("[repo-architecture] MX/PE/CO/CL QST ownership exposes both base-store and epp lanes where official scope exists.");
+console.log("[repo-architecture] MX/PE/CO/CL expose exactly qst and dst at market ownership level.");
+console.log("[repo-architecture] MX/PE/CO/CL QST roots expose exactly base-store and epp; reusable flow code lives outside test ownership roots.");
 console.log("[repo-architecture] CL/CO DST roots are structural reservations only until official runtime coverage is implemented and proven.");
 console.log("[repo-architecture] PE DST is canonical under tests/markets/pe/dst; legacy and environment-named roots are removed.");
 console.log("[repo-architecture] EPP runtime access data is centralized under config/markets/epp.js while test ownership remains market-specific.");
