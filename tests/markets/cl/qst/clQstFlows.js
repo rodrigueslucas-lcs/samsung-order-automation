@@ -1,10 +1,12 @@
 import ProductPage from "../../../../pages/ProductPage";
 import CartPage from "../../../../pages/CartPage";
 import clAuthStateModule from "../../../../utils/clAuthState";
+import clStorefrontOverlays from "../../../../utils/clStorefrontOverlays";
 
 const { CL_AUTH_STATE_PATH, getClAuthState, hasClAuthState } = clAuthStateModule;
 
 export async function bootstrapClStorefront(page, config) {
+  await clStorefrontOverlays.installClChatNoticeDismissal(page);
   if (config.setupUrl) {
     await page.goto(config.setupUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.getByText(/you can access pages now/i)

@@ -9,6 +9,7 @@ export default class HomePage extends BasePage {
       : options.setupUrl;
     this.homeUrl = options.homeUrl || "https://stg2.shop.samsung.com/pe/";
     this.footerHeadingPattern = options.footerHeadingPattern || "Tienda";
+    this.homeLinkName = options.homeLinkName || "Homepage";
 
     this.header = page.getByRole("banner");
     this.footer = page.getByRole("contentinfo");
@@ -80,7 +81,7 @@ export default class HomePage extends BasePage {
  }
   async validateHomepageAttributes() {
     await this.header
-      .getByRole("link", { name: "Homepage" })
+      .getByRole("link", { name: this.homeLinkName })
       .waitFor({
         state: "visible",
         timeout: 30000,

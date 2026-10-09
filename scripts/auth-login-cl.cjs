@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { getClQstConfig } = require("../config/markets/cl");
 const { writeJsonAtomically } = require("../utils/atomicJson");
+const { installClChatNoticeDismissal } = require("../utils/clStorefrontOverlays");
 
 const config = getClQstConfig();
 const slot = String(process.env.CL_AUTH_SLOT || "primary").toLowerCase();
@@ -70,6 +71,15 @@ async function dismissNotificationTutorial(page) {
 }
 
 async function accountState(page) {
+  await installClChatNoticeDismissal(page);
+  await page.bringToFront();
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    const { windowId } = await cdp.send("Browser.getWindowForTarget");
+    await cdp.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "maximized" } });
+  } finally {
+    await cdp.detach();
+  }
   await dismissNotificationTutorial(page);
   const profile = profileButton(page);
   await profile.waitFor({ state: "visible", timeout: 120000 });
@@ -78,20 +88,25 @@ async function accountState(page) {
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     await dismissNotificationTutorial(page);
-    await profile.hover().catch(() => {});
-    await profile.click({ timeout: 10000 }).catch(() => {});
+    await page.mouse.move(0, 0);
+    await profile.hover();
     const { login, logout } = accountActions(page);
-    const state = await Promise.any([
-      logout.waitFor({ state: "visible", timeout: attempt === 1 ? 6000 : 10000 }).then(() => "authenticated"),
-      login.waitFor({ state: "visible", timeout: attempt === 1 ? 6000 : 10000 }).then(() => "signed-out"),
+    const waitForActions = (timeout) => Promise.any([
+      logout.waitFor({ state: "visible", timeout }).then(() => "authenticated"),
+      login.waitFor({ state: "visible", timeout }).then(() => "signed-out"),
     ]).catch(() => null);
+    let state = await waitForActions(6000);
+    if (!state) {
+      await profile.click({ timeout: 10000 });
+      state = await waitForActions(10000);
+    }
     if (state) return { state, login, logout };
     if (attempt < 3) {
       await page.keyboard.press("Escape").catch(() => {});
       await page.waitForTimeout(750);
     }
   }
-  throw new Error("CL profile control is visible, but login/logout actions did not render after click retries.");
+  throw new Error("CL profile control is visible, but login/logout actions did not render after maximized hover/click retries.");
 }
 
 async function findAccountPage(context, timeoutMs = 60000) {
@@ -140,6 +155,7 @@ async function exportState(context, page) {
   });
   let page = context.pages()[0] || await context.newPage();
   try {
+    await installClChatNoticeDismissal(page);
     page.setDefaultTimeout(120000);
     if (config.setupUrl) {
       await page.goto(config.setupUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });

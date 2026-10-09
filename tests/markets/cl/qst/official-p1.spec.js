@@ -226,10 +226,12 @@ test.describe("CL QST - Official P1", () => {
   test("SAM-24804 @blocked @qst @cl @base-store - SC+ on cart page", async () => blocked("eligible CL Samsung Care+ SKU/test data is required."));
 
   test("SAM-24806 @qst @cl @base-store - UI validation in desktop view", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     const cfg = await home(page);
     const homepage = new HomePage(page, {
       setupUrl: null,
       homeUrl: cfg.baseUrl.href,
+      homeLinkName: "Página Principal",
       footerHeadingPattern: /Samsung|Tienda|Shop/i,
     });
     const attributes = await homepage.validateHomepageAttributes();
