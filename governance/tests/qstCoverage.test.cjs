@@ -9,7 +9,8 @@ const { getSharedCandidateSummary } = require("../../utils/qstSharedCandidates")
 const { validatePeQstReusePlan } = require("../../utils/qstPeReusePlan");
 const { getPeQstEvidenceMetadata } = require("../../utils/qstPeEvidenceMetadata");
 const { validateS1OfficialImplementation } = require("../../utils/qstS1Implementation");
-const { getPeS1QstConfig, PROVEN_PE_QST_ST2_SKU } = require("../../config/markets/pe");
+const { getPeQstConfig, PROVEN_PE_QST_ST2_SKU } = require("../../config/markets/pe");
+const { getMarketConfig } = require("../../config/markets");
 
 test("SMB registry keeps the official 144-case market totals", () => {
   const result = validateQstMapping();
@@ -76,7 +77,7 @@ test("PE reuse plan classifies all 34 official cases without claiming coverage",
   );
 });
 
-test("S1 implementation inventory only binds official IDs to the correct market", () => {
+test("canonical implementation inventory only binds official IDs to the correct market", () => {
   const inventory = validateS1OfficialImplementation();
 
   assert.ok(inventory.MX.implementedCount >= 10);
@@ -88,11 +89,13 @@ test("S1 implementation inventory only binds official IDs to the correct market"
   assert.ok(inventory.PE.implementedIds.includes("SAM-25056"));
   assert.ok(inventory.PE.implementedIds.includes("SAM-25090"));
   assert.ok(inventory.CL.implementedIds.includes("SAM-24830"));
+  assert.ok(inventory.CL.implementedIds.includes("SAM-24807"));
   assert.ok(inventory.CO.implementedIds.includes("SAM-24920"));
 });
 
-test("PE S1 config stays runtime-driven and market-scoped", () => {
-  const config = getPeS1QstConfig({
+test("PE config stays runtime-driven and market-scoped", () => {
+  const config = getPeQstConfig({
+    PE_QST_ENVIRONMENT: "S2",
     PE_STOREFRONT_URL: "https://staging.example.test/pe/",
     PE_SETUP_URL: "https://staging.example.test/getcookie.html",
     PE_QST_SKU: "PE-SKU",
@@ -101,7 +104,7 @@ test("PE S1 config stays runtime-driven and market-scoped", () => {
       "https://api.example.test/tokocommercewebservices/v2/pe/users/current/addresses",
   });
   assert.equal(config.market, "PE");
-  assert.equal(config.environment, "S1");
+  assert.equal(config.environment, "S2");
   assert.equal(config.baseUrl.href, "https://staging.example.test/pe/");
   assert.equal(config.cartUrl.href, "https://staging.example.test/pe/cart");
   assert.equal(config.sku, "PE-SKU");
@@ -111,7 +114,7 @@ test("PE S1 config stays runtime-driven and market-scoped", () => {
     "https://api.example.test/tokocommercewebservices/v2/pe/users/current/addresses"
   );
 
-  const defaultProduct = getPeS1QstConfig({
+  const defaultProduct = getPeQstConfig({
     PE_STOREFRONT_URL: "https://staging.example.test/pe/",
   });
   assert.equal(defaultProduct.sku, PROVEN_PE_QST_ST2_SKU);
@@ -121,12 +124,12 @@ test("PE S1 config stays runtime-driven and market-scoped", () => {
   );
 
   assert.throws(
-    () => getPeS1QstConfig({ PE_STOREFRONT_URL: "https://staging.example.test/mx/" }),
+    () => getPeQstConfig({ PE_STOREFRONT_URL: "https://staging.example.test/mx/" }),
     /PE storefront root/
   );
   assert.throws(
     () =>
-      getPeS1QstConfig({
+      getPeQstConfig({
         PE_STOREFRONT_URL: "https://staging.example.test/pe/",
         PE_QST_PDP_URL: "https://other.example.test/pe/p/PE-SKU",
       }),
@@ -134,12 +137,22 @@ test("PE S1 config stays runtime-driven and market-scoped", () => {
   );
   assert.throws(
     () =>
-      getPeS1QstConfig({
+      getPeQstConfig({
         PE_STOREFRONT_URL: "https://staging.example.test/pe/",
         PE_ADDRESS_API_URL: "https://api.example.test/not-addresses",
       }),
     /users\/current\/addresses/
   );
+  for (const environment of ["S1", "S2"]) {
+    const runtime = getPeQstConfig({ PE_QST_ENVIRONMENT: environment });
+    assert.equal(runtime.environment, environment);
+    assert.equal(runtime.baseUrl.hostname, environment === "S2" ? "stg2.shop.samsung.com" : "stg.shop.samsung.com");
+    assert.equal(runtime.sku, PROVEN_PE_QST_ST2_SKU);
+    assert.equal(getMarketConfig("PE", { PE_QST_ENVIRONMENT: environment }).baseUrl.href, runtime.baseUrl.href);
+  }
+  assert.throws(() => getPeQstConfig({ PE_QST_ENVIRONMENT: "S3" }), /Unsupported PE QST environment/);
+  assert.throws(() => getPeQstConfig({ PE_STOREFRONT_URL: "http://staging.example.test/pe/" }), /must use https/);
+  assert.throws(() => getPeQstConfig({ PE_QST_PDP_URL: "https://stg.shop.samsung.com/mx/p/PE-SKU" }), /inside the \/pe\/ storefront route/);
 });
 
 test("PE evidence metadata comes from the official reuse plan without claiming coverage", () => {

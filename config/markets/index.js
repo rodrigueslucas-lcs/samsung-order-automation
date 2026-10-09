@@ -4,7 +4,7 @@ const coConfigModule = require("./co");
 const clConfigModule = require("./cl");
 
 const { getMxConfig } = mxConfigModule;
-const { getPeS1QstConfig } = peConfigModule;
+const { getPeQstConfig } = peConfigModule;
 const { getCoQstConfig } = coConfigModule;
 const { getClQstConfig } = clConfigModule;
 
@@ -41,7 +41,7 @@ function getMarketConfig(value, environment = process.env) {
     return { ...getCoQstConfig(environment), ...definition, market: code };
   }
   if (code === "PE") {
-    return { ...getPeS1QstConfig(environment), ...definition, market: code };
+    return { ...getPeQstConfig(environment), ...definition, market: code };
   }
 
   throw new Error(`Unsupported SMB market: ${code}`);

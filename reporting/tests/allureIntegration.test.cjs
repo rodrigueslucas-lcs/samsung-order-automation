@@ -11,7 +11,9 @@ test('Allure reporter is opt-in and isolated from list discovery', () => {
   assert.match(config, /process\.env\.ENABLE_ALLURE === '1'/);
   assert.match(config, /'allure-playwright'/);
   assert.match(config, /ALLURE_RESULTS_DIR/);
-  assert.match(config, /detail: false/);
+  // Detailed execution steps are enabled intentionally; reporter activation
+  // and list isolation remain controlled separately by ENABLE_ALLURE/--reporter.
+  assert.match(config, /detail: true/);
   assert.match(runner, /ENABLE_ALLURE: process\.env\.ENABLE_ALLURE \|\| "0"/);
   assert.match(runner, /allure-results/);
   assert.match(runner, /"--list", "--reporter=list"/);

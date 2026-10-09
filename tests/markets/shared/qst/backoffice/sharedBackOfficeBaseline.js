@@ -11,9 +11,9 @@ const credentials = {
   password: process.env.BACKOFFICE_PASSWORD,
 };
 
-test.use({ screenshot: "off", video: "off", trace: "off" });
-
-async function runBackOfficeBaseline({ page, testInfo, market, zephyrId, orderEnv }) {
+// Legacy read-only reuse helper. Official SAM tests belong to market specs.
+// Callers must disable authentication artifacts on their own test fixture.
+export async function runBackOfficeBaseline({ page, testInfo, market, zephyrId, orderEnv }) {
   test.setTimeout(300000);
   test.skip(
     (process.env.BACKOFFICE_ENV || "").toLowerCase() !== "s1",
@@ -50,22 +50,3 @@ async function runBackOfficeBaseline({ page, testInfo, market, zephyrId, orderEn
   });
 }
 
-test("SAM-24830 @qst @cl @backoffice @safe @reuse - Backoffice search baseline", async ({ page }, testInfo) => {
-  await runBackOfficeBaseline({
-    page,
-    testInfo,
-    market: "CL",
-    zephyrId: "SAM-24830",
-    orderEnv: "CL_QST_ORDER_CODE",
-  });
-});
-
-test("SAM-24920 @qst @co @backoffice @safe @reuse - Backoffice search baseline", async ({ page }, testInfo) => {
-  await runBackOfficeBaseline({
-    page,
-    testInfo,
-    market: "CO",
-    zephyrId: "SAM-24920",
-    orderEnv: "CO_QST_ORDER_CODE",
-  });
-});
