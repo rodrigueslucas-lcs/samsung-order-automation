@@ -121,6 +121,9 @@ async function waitForPreQaAddToCart(page, testInfo) {
 }
 
 test.describe.configure({ timeout: 420000 });
+// This test drives a separate authenticated CDP tab. The default page fixture
+// stays on S2, so its automatic screenshot is unrelated to the BC scenario.
+test.use({ screenshot: "off" });
 
 test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({}, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24969"));
@@ -168,10 +171,17 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
 
     await test.step("Add the product and validate the minicart API mutation", async () => {
       await page.getByRole("button", { name: /No, gracias/i }).first().click();
+      // Declining Galaxy Canje does not resolve the mandatory Care+ choice.
+      // Explicitly opt out so the buying tool enables this product's CTA.
+      const noCare = page.getByRole("tab", { name: /Sin protecci[oó]n para mi Galaxy/i });
+      await expect(noCare).toBeVisible({ timeout: 30000 });
+      await noCare.click();
       await expect(page.locator('[canaddtocart="true"]').filter({ visible: true }).first(),
-        "The configured PreQA product must become purchasable after declining Galaxy Canje.")
+        "The configured PreQA product must become purchasable after declining Galaxy Canje and Care+.")
         .toBeVisible({ timeout: 30000 });
       const addToCart = await waitForPreQaAddToCart(page, testInfo);
+      await expect(addToCart).toHaveAttribute("data-modelcode", PRE_QA_MODEL_CODE);
+      await expect(addToCart).toHaveAttribute("canaddtocart", "true");
       const addResponsePromise = page.waitForResponse((response) =>
         response.request().method() === "POST" &&
         new URL(response.url()).pathname.endsWith("/addToCart/multi/"),
@@ -219,8 +229,17 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
       cartCountAfter,
       addToCartStatus: addResponse?.status() ?? null,
       addedFromPdp: true,
+      careProtectionDeclined: true,
     });
   } finally {
+    // Capture the actual CDP page before closing it, on success or failure.
+    // Do not capture a WMC/login screen if the authenticated session expired.
+    if (["p6-pre-qa2.samsung.com", "stg2.shop.samsung.com"].includes(new URL(page.url()).hostname)) {
+      await page.screenshot({ fullPage: false }).then(body => testInfo.attach("preqa-bc-screenshot", {
+        body,
+        contentType: "image/png",
+      })).catch(() => {});
+    }
     await page.close().catch(() => {});
     await cdpBrowser.close().catch(() => {});
   }
