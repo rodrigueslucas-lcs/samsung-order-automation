@@ -15,6 +15,7 @@ const required = [
   "docs/JENKINS_BEGINNER_GUIDE.md",
   "docs/TROUBLESHOOTING.md",
   "tests/markets/mx/qst/base-store",
+  "tests/markets/mx/qst/epp",
   "tests/markets/mx/dst/base-store",
   "tests/markets/mx/dst/backoffice",
   "tests/markets/pe/qst/base-store",
@@ -99,9 +100,9 @@ if (missing.length || resurrected.length || boundaryFailures.length) {
 
 console.log("[repo-architecture] PASS");
 console.log("[repo-architecture] Canonical test navigation is market -> suite -> store under tests/markets.");
-console.log("[repo-architecture] MX/PE/CO/CL active QST entry points are canonical market paths.");
+console.log("[repo-architecture] MX/PE/CO/CL QST ownership exposes both base-store and epp lanes where official scope exists.");
 console.log("[repo-architecture] PE DST is canonical under tests/markets/pe/dst; legacy and environment-named roots are removed.");
-console.log("[repo-architecture] CL QST is physically separated into base-store and epp ownership.");
+console.log("[repo-architecture] EPP runtime access data is centralized under config/markets/epp.js while test ownership remains market-specific.");
 console.log("[repo-architecture] Reporting ownership is canonical under reporting/.");
 console.log("[repo-architecture] Governance ownership is canonical under governance/.");
 console.log("[repo-architecture] Active CI/runners cannot depend on removed compatibility boundaries.");
