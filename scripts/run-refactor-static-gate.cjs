@@ -6,7 +6,11 @@ const checks = [
   ['Legacy consumer audit', ['run', 'repo:legacy:audit:strict']],
   ['PE generation audit', ['run', 'repo:pe:audit']],
   ['Official SMB scope gate', ['run', 'qst:official:gate']],
+  ['QST business-step gate', ['run', 'qst:steps:gate']],
   ['MX S2 official P1 discovery', ['run', 'qst:mx:list'], { MX_QST_ENVIRONMENT: 'S2' }],
+  ['PE S2 official P1 discovery', ['run', 'qst:pe:list'], { PE_QST_ENVIRONMENT: 'S2' }],
+  ['CO S2 official P1 discovery', ['run', 'qst:co:list'], { CO_QST_ENVIRONMENT: 'S2' }],
+  ['CL S2 Base Store discovery', ['run', 'qst:cl:base-store:list'], { CL_QST_ENVIRONMENT: 'S2' }],
   ['Governance integrity', ['run', 'preqa2:validation:test']],
   ['Executive V2 reporting integrity', ['run', 'reporting:executive:test']],
   ['MX runtime/reporting integrity', ['run', 'reporting:mx-runtime:test']],
@@ -43,4 +47,4 @@ for (const [label, args, extraEnv = {}] of checks) {
   console.log(`[refactor-static-gate] ${label}: PASS`);
 }
 
-console.log('\n[refactor-static-gate] PASS - repository is ready for the canonical-path Jenkins runtime acceptance gate.');
+console.log('\n[refactor-static-gate] PASS - canonical four-market structure passed static/discovery acceptance.');
