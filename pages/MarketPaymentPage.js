@@ -9,6 +9,10 @@ export default class MarketPaymentPage extends PaymentPage {
   constructor(page, { market } = {}) {
     super(page);
     this.marketProfile = getPaymentMarketProfile(market);
+    if (this.marketProfile.code === "CL") {
+      this.installmentsCombobox = page.getByRole("combobox", { name: /Intereses/i })
+        .filter({ visible: true });
+    }
   }
 
   async navigateBackToCart() {
@@ -61,6 +65,13 @@ export default class MarketPaymentPage extends PaymentPage {
 
   async selectCreditCard() {
     const directCard = this.creditCardOption.filter({ visible: true }).first();
+
+    if (this.marketProfile.code === "CL") {
+      // CL renders its card accordion asynchronously. Never route it through
+      // the MX digital-wallet fallback while payment methods are loading.
+      await directCard.waitFor({ state: "visible", timeout: 90000 });
+      return super.selectCreditCard();
+    }
 
     if (this.marketProfile.code === "CO") {
       await directCard.waitFor({ state: "visible", timeout: 90000 }).catch(() => {
