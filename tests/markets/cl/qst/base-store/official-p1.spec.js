@@ -11,7 +11,7 @@ import clAuthStateModule from "../../../../../utils/clAuthState";
 import backofficeCredentialsModule from "../../../../../utils/backofficeAdminCredentials";
 import mxTestCard from "../../../../../utils/mxTestCard";
 import clSamsungCredentials from "../../../../../utils/clSamsungCredentials";
-import { addConfiguredProductToClCart, bootstrapClStorefront } from "../clQstFlows";
+import { addConfiguredProductToClCart, bootstrapClStorefront } from "../../../../../flows/cl/qstFlows";
 
 const test = base.extend({
   qstBusinessScenario: [async ({}, use, testInfo) => {
