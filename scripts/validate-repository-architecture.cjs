@@ -10,13 +10,16 @@ const required = [
   "docs/README.md",
   "docs/REPOSITORY_AUDIT.md",
   "docs/CURRENT_ARCHITECTURE.md",
-  "tests/README.md",
-  "tests/markets/README.md",
-  "tests/legacy/README.md",
+  "docs/HANDOFF_GUIDE.md",
+  "docs/AUTHENTICATION_GUIDE.md",
+  "docs/JENKINS_BEGINNER_GUIDE.md",
+  "docs/TROUBLESHOOTING.md",
   "tests/markets/mx/qst/base-store",
-  "tests/markets/mx/dst/base-store",
+  "tests/markets/co/qst/base-store",
   "tests/markets/pe/qst/base-store",
+  "tests/markets/cl/qst",
   "tests/markets/shared",
+  "tests/legacy/README.md",
   "tests/legacy/pe-s2",
   "reporting/README.md",
   "reporting/tests",
@@ -40,6 +43,10 @@ const forbidden = [
   "fixtures/billingAddress.json",
   "fixtures/customer.json",
   "tests/s1/mx",
+  "tests/README.md",
+  "tests/markets/README.md",
+  "tests/markets/pe/README.md",
+  "tests/markets/pe/qst/README.md",
   "reporters",
   "test-mapping",
 ];
@@ -47,6 +54,7 @@ const forbidden = [
 const compatibilityRoots = [
   "tests/s1",
   "tests/s2",
+  "tests/legacy",
 ];
 
 const missing = required.filter((entry) => !exists(entry));
@@ -78,20 +86,21 @@ function validateVsCodeCompatibilityHiding() {
 
   for (const rootName of compatibilityRoots) {
     if (settings["files.exclude"]?.[rootName] !== true) {
-      boundaryFailures.push(`.vscode/settings.json: files.exclude must hide temporary compatibility root ${rootName}`);
+      boundaryFailures.push(`.vscode/settings.json: files.exclude must hide non-canonical root ${rootName}`);
     }
     if (settings["search.exclude"]?.[rootName] !== true) {
-      boundaryFailures.push(`.vscode/settings.json: search.exclude must hide temporary compatibility root ${rootName}`);
+      boundaryFailures.push(`.vscode/settings.json: search.exclude must hide non-canonical root ${rootName}`);
     }
   }
 }
 
-// These are production entry points, not compatibility mirrors. Once cut over,
-// they must stay on the canonical market/reporting/governance boundaries.
+// Production entry points must stay on canonical market/reporting/governance boundaries.
 forbidLiteral("Jenkinsfile", ["tests/s1/", "tests/s2/", "reporters/", "test-mapping/"]);
 forbidLiteral("scripts/run-mx-qst-safe.cjs", ["tests/s1/", "tests/s2/", "reporters/", "test-mapping/"]);
 forbidLiteral("scripts/run-mx-qst-fast-guest.cjs", ["tests/s1/", "tests/s2/", "reporters/", "test-mapping/"]);
 forbidLiteral("scripts/run-pe-qst-p1.cjs", ["tests/s1/", "tests/s2/", "reporters/", "test-mapping/"]);
+forbidLiteral("scripts/run-co-qst-p1.cjs", ["tests/s1/", "tests/s2/", "reporters/", "test-mapping/"]);
+forbidLiteral("scripts/run-cl-qst-p1.cjs", ["tests/s1/", "tests/s2/", "reporters/", "test-mapping/"]);
 
 // package.json may intentionally expose commands named "legacy", but executable
 // paths must point at tests/legacy or canonical boundaries rather than s1/s2.
@@ -101,16 +110,16 @@ validateVsCodeCompatibilityHiding();
 if (missing.length || resurrected.length || boundaryFailures.length) {
   console.error("[repo-architecture] FAIL");
   if (missing.length) console.error(`Missing required architecture paths: ${missing.join(", ")}`);
-  if (resurrected.length) console.error(`Legacy paths must not return: ${resurrected.join(", ")}`);
+  if (resurrected.length) console.error(`Removed/redundant paths must not return: ${resurrected.join(", ")}`);
   for (const failure of boundaryFailures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
 console.log("[repo-architecture] PASS");
 console.log("[repo-architecture] Canonical test navigation is market-first under tests/markets.");
-console.log("[repo-architecture] Historical PE S2 generation is explicit under tests/legacy/pe-s2.");
+console.log("[repo-architecture] MX/PE/CO/CL active QST entry points are canonical market paths.");
+console.log("[repo-architecture] Historical PE S2 generation is explicit under tests/legacy/pe-s2 and hidden from normal navigation.");
 console.log("[repo-architecture] Reporting ownership is canonical under reporting/.");
 console.log("[repo-architecture] Governance ownership is canonical under governance/.");
 console.log("[repo-architecture] Active CI/runners no longer depend on s1/s2, reporters or test-mapping compatibility boundaries.");
-console.log("[repo-architecture] Accepted MX/reporting/governance compatibility roots are physically removed.");
-console.log("[repo-architecture] VS Code hides only the remaining PE/shared compatibility roots from normal engineer navigation/search.");
+console.log("[repo-architecture] Redundant test-tree README files are removed; operator documentation lives at root/docs.");
