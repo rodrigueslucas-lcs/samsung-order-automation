@@ -29,12 +29,12 @@ test("MX coverage classifies every official case consistently as evidence evolve
 
 test("MX partial plan contains every current Partial exactly once", () => {
   const result = validateMxPartialPlan();
-  assert.equal(result.partialTotal, 18);
+  assert.equal(result.partialTotal, 21);
   assert.deepEqual(result.groups, {
     quickAssertion: 4,
     existingFlowExtension: 7,
     newBusinessFlow: 3,
-    eppContext: 4,
+    eppContext: 7,
   });
 });
 
