@@ -374,7 +374,7 @@ export default class CartPage extends BasePage {
     await this.screenshot('cart-checkout-button');
   }
 
-  async clickCheckoutAndResolveInterceptors({ registered = false } = {}) {
+  async clickCheckoutAndResolveInterceptors({ registered = false, recoverMxCart = true } = {}) {
     await this.continueButton.waitFor({ state: 'visible', timeout: 30000 });
     await this.continueButton.scrollIntoViewIfNeeded();
 
@@ -439,6 +439,17 @@ export default class CartPage extends BasePage {
     }
 
     if (registered) {
+      const cartTarget = new URL(this.cartUrl);
+      const current = new URL(this.page.url());
+      if (recoverMxCart && cartTarget.pathname === '/mx/cart' &&
+          current.origin === cartTarget.origin && current.pathname === cartTarget.pathname) {
+        // MX S2 can leave the first checkout click on an otherwise healthy
+        // cart. Reload once and use the same interceptor handling on retry.
+        // A second no-op still fails; a guest-login redirect is never retried.
+        console.log('[mx-checkout] Registered checkout remained on cart; reloading once before retrying.');
+        await this.page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
+        return this.clickCheckoutAndResolveInterceptors({ registered: true, recoverMxCart: false });
+      }
       if (/\/pe\/cart(?:\?|$)/i.test(this.page.url()) && new URL(this.cartUrl).pathname === '/pe/cart') {
         await this.page.reload({ waitUntil: 'domcontentloaded' });
         await this.continueButton.waitFor({ state: 'visible', timeout: 30000 });
