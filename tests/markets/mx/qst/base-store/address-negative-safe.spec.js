@@ -11,26 +11,32 @@ test.describe.configure({ timeout: 420000 });
 test("SAM-24999 @qst @mx @base-store @safe - Invalid address is rejected", async ({ page, mxConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24999"));
 
-  await reachMxGuestDelivery(
-    page,
-    mxConfig,
-    "mx.qst.invalid.address@example.com"
-  );
+  await test.step("Reach guest Delivery with valid customer information", async () => {
+    await reachMxGuestDelivery(
+      page,
+      mxConfig,
+      "mx.qst.invalid.address@example.com"
+    );
+    await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i);
+  });
 
   const postal = page.getByRole("textbox", { name: /postal|c[oó]digo postal/i });
-  await expect(postal).toBeVisible({ timeout: 60000 });
-
   const invalidPostalCode = "00000";
-  const responsePromise = page.waitForResponse(
-    (response) =>
-      response.url().includes("getAddressForWardPostCode") &&
-      response.url().includes(`postCode=${invalidPostalCode}`),
-    { timeout: 60000 }
-  );
+  let response;
 
-  await postal.fill(invalidPostalCode);
-  await postal.press("Tab");
-  const response = await responsePromise;
+  await test.step("Submit an invalid MX postal code", async () => {
+    await expect(postal).toBeVisible({ timeout: 60000 });
+    const responsePromise = page.waitForResponse(
+      (candidate) =>
+        candidate.url().includes("getAddressForWardPostCode") &&
+        candidate.url().includes(`postCode=${invalidPostalCode}`),
+      { timeout: 60000 }
+    );
+
+    await postal.fill(invalidPostalCode);
+    await postal.press("Tab");
+    response = await responsePromise;
+  });
 
   const colonia = page.getByRole("combobox", { name: /Colonia/i });
   const continueButton = page
@@ -51,15 +57,19 @@ test("SAM-24999 @qst @mx @base-store @safe - Invalid address is rejected", async
       !(await continueButton.first().isEnabled().catch(() => false)),
   });
 
-  await expect
-    .poll(async () => Object.values(await readRejection()).some(Boolean), {
-      timeout: 30000,
-      message: "Invalid postal code should produce an observable validation barrier.",
-    })
-    .toBeTruthy();
+  let rejection;
+  await test.step("Validate the invalid address is blocked on Delivery", async () => {
+    await expect
+      .poll(async () => Object.values(await readRejection()).some(Boolean), {
+        timeout: 30000,
+        message: "Invalid postal code should produce an observable validation barrier.",
+      })
+      .toBeTruthy();
 
-  const rejection = await readRejection();
-  await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i);
+    rejection = await readRejection();
+    await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i);
+  });
+
   recordBusinessEvidence(testInfo, {
     invalidPostalCode,
     lookupStatus: response.status(),
