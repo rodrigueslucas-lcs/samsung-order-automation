@@ -14,12 +14,18 @@ test.describe.configure({ timeout: 420000 });
 test("SAM-25016 @qst @mx @base-store @safe @mobile - Mobile Sticky checkout", async ({ page, mxConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-25016"));
 
-  const cart = await prepareMxQstCart(page, mxConfig);
-  const cartCheckout = page
-    .getByRole("button", { name: /Finalizar Compra/i })
-    .filter({ visible: true })
-    .first();
-  await validateStickyControl(cartCheckout, "Cart checkout button");
+  await test.step("Prepare the MX cart in the official mobile viewport", async () => {
+    await prepareMxQstCart(page, mxConfig);
+    expect(page.viewportSize()).toEqual(mobileViewport);
+  });
+
+  await test.step("Validate the sticky mobile Checkout CTA remains usable", async () => {
+    const cartCheckout = page
+      .getByRole("button", { name: /Finalizar Compra/i })
+      .filter({ visible: true })
+      .first();
+    await validateStickyControl(cartCheckout, "Cart checkout button");
+  });
 
   testInfo.annotations.push({
     type: "qst-reuse-note",
