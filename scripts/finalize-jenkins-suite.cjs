@@ -129,6 +129,19 @@ function normalizeAllureEvidence() {
   }
 }
 
+function annotateKnownDefects() {
+  if (!fs.existsSync(runtimeSummaryFile) || !fs.existsSync(path.join(executiveDir, 'index.html'))) return;
+  const script = path.resolve('scripts/annotate-known-defects-dashboard.cjs');
+  if (!fs.existsSync(script)) return;
+  const annotated = spawnSync(process.execPath, [script, artifactDir], {
+    stdio: 'inherit',
+    env: process.env,
+  });
+  if (annotated.status !== 0) {
+    console.error('[reporting] Known-defect dashboard annotation failed; the original dashboard was preserved.');
+  }
+}
+
 function generateAllure() {
   if (!fs.existsSync(allureResultsDir)) return;
   const allureCli = process.platform === 'win32'
@@ -156,4 +169,5 @@ if (!(fs.existsSync(runtimeSummaryFile) && fs.existsSync(path.join(executiveDir,
 writeAllureEnvironment();
 enrichAllure();
 normalizeAllureEvidence();
+annotateKnownDefects();
 generateAllure();
