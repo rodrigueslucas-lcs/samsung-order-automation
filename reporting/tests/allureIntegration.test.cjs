@@ -40,9 +40,18 @@ test('Jenkins enables, archives and publishes Allure beside Executive and Playwr
   assert.match(jenkins, /Playwright/);
 });
 
-test('generic Jenkins finalizer normalizes Allure evidence for every non-MX-specialized market path', () => {
+test('generic Jenkins finalizer normalizes Allure evidence before generating the HTML report', () => {
   assert.match(finalizer, /dedupe-allure-evidence\.cjs/);
-  assert.match(finalizer, /normalizeAllureEvidence\(\);\s*\ngenerateAllure\(\);/);
+  const normalizeAt = finalizer.indexOf('normalizeAllureEvidence();');
+  const annotateAt = finalizer.indexOf('annotateKnownDefects();');
+  const generateAt = finalizer.indexOf('generateAllure();');
+  assert.ok(normalizeAt >= 0, 'generic finalizer must normalize Allure evidence');
+  assert.ok(generateAt >= 0, 'generic finalizer must generate the Allure HTML report');
+  assert.ok(normalizeAt < generateAt, 'Allure evidence must be normalized before HTML generation');
+  if (annotateAt >= 0) {
+    assert.ok(normalizeAt < annotateAt, 'evidence normalization should happen before dashboard annotation');
+    assert.ok(annotateAt < generateAt, 'dashboard annotation should complete before Allure HTML generation');
+  }
 });
 
 test('Allure evidence dedupe removes byte-identical copies but preserves distinct multi-page media', () => {
