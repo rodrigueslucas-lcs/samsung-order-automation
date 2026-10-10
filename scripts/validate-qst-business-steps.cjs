@@ -56,6 +56,16 @@ function collectStepHelpers(source, seed = new Set()) {
   return helpers;
 }
 
+function collectSteppedClassMethods(source) {
+  const methods = new Set();
+  const expression = /\basync\s+(\w+)\s*\([^)]*\)\s*\{([\s\S]*?)\n\s*\}/g;
+  let match;
+  while ((match = expression.exec(source))) {
+    if (/\btest\.step\s*\(/.test(match[2])) methods.add(match[1]);
+  }
+  return methods;
+}
+
 function resolveImport(fromFile, request) {
   if (!request.startsWith(".")) return null;
   const base = path.resolve(path.dirname(fromFile), request);
@@ -87,6 +97,19 @@ function collectImportedSteppedHelpers(file, source) {
   return stepped;
 }
 
+function collectImportedSteppedMethods(file, source) {
+  const methods = new Set();
+  const importExpression = /import\s+\w+\s+from\s*["']([^"']+)["']/g;
+  let match;
+  while ((match = importExpression.exec(source))) {
+    const target = resolveImport(file, match[1]);
+    if (!target) continue;
+    const importedSource = fs.readFileSync(target, "utf8");
+    for (const method of collectSteppedClassMethods(importedSource)) methods.add(method);
+  }
+  return methods;
+}
+
 function collectLiteralTests(source) {
   const tests = [];
   const expression = /\btest(?:\.skip)?\s*\(\s*(["'`])([\s\S]*?)\1\s*,/g;
@@ -111,6 +134,7 @@ for (const market of MARKETS) {
     const source = fs.readFileSync(file, "utf8");
     const importedStepHelpers = collectImportedSteppedHelpers(file, source);
     const localStepHelpers = collectStepHelpers(source, importedStepHelpers);
+    const importedStepMethods = collectImportedSteppedMethods(file, source);
     const tests = collectLiteralTests(source);
 
     for (let index = 0; index < tests.length; index += 1) {
@@ -131,14 +155,17 @@ for (const market of MARKETS) {
       const callsSteppedHelper = [...localStepHelpers].some((helper) =>
         new RegExp(`\\b${helper}\\s*\\(`).test(testSource)
       );
+      const callsSteppedMethod = [...importedStepMethods].some((method) =>
+        new RegExp(`\\.\\s*${method}\\s*\\(`).test(testSource)
+      );
 
-      if (explicitStep || callsSteppedHelper) {
+      if (explicitStep || callsSteppedHelper || callsSteppedMethod) {
         summary[market].covered += 1;
         continue;
       }
 
       const samId = title.match(/SAM-\d+/i)?.[0] || "UNKNOWN";
-      errors.push(`${market.toUpperCase()} ${samId}: no report-visible business test.step in the TC or a proven stepped helper (${relative(file)}).`);
+      errors.push(`${market.toUpperCase()} ${samId}: no report-visible business test.step in the TC, stepped helper, or stepped page-object method (${relative(file)}).`);
     }
   }
 }
