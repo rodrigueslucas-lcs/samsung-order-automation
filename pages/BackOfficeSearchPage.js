@@ -1,4 +1,4 @@
-import { expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import BackOfficeOrderPage from "./BackOfficeOrderPage";
 import BackOfficeCatalogPage from "./BackOfficeCatalogPage";
 
@@ -37,47 +37,51 @@ export default class BackOfficeSearchPage extends BackOfficeOrderPage {
   }
 
   async searchAdminOrderAdvanced(orderCode) {
-    await this.openAdvancedSearch();
+    return test.step(`BackOffice · Search order ${orderCode} with Advanced Search`, async () => {
+      await this.openAdvancedSearch();
 
-    const advancedSearch = this.page.locator(".yw-advancedsearch:visible").first();
-    await advancedSearch.waitFor({ state: "visible", timeout: 30000 });
+      const advancedSearch = this.page.locator(".yw-advancedsearch:visible").first();
+      await advancedSearch.waitFor({ state: "visible", timeout: 30000 });
 
-    // In Jenkins/headless the first textbox in Advanced Search is the
-    // read-only comparator combobox ("Contains"), not the Order Nr. value.
-    // Anchor on the visible Order Nr. label and take the first editable text
-    // input that follows it, which is the actual value field for that row.
-    const orderLabel = advancedSearch
-      .getByText("Order Nr.", { exact: true })
-      .filter({ visible: true })
-      .first();
-    await orderLabel.waitFor({ state: "visible", timeout: 30000 });
+      // In Jenkins/headless the first textbox in Advanced Search is the
+      // read-only comparator combobox ("Contains"), not the Order Nr. value.
+      // Anchor on the visible Order Nr. label and take the first editable text
+      // input that follows it, which is the actual value field for that row.
+      const orderLabel = advancedSearch
+        .getByText("Order Nr.", { exact: true })
+        .filter({ visible: true })
+        .first();
+      await orderLabel.waitFor({ state: "visible", timeout: 30000 });
 
-    const orderField = orderLabel.locator(
-      'xpath=following::input[@type="text" and not(@readonly) and not(@aria-readonly="true")][1]'
-    );
-    await orderField.waitFor({ state: "visible", timeout: 30000 });
-    await expect(orderField).toBeEditable({ timeout: 30000 });
-    await orderField.fill(orderCode);
+      const orderField = orderLabel.locator(
+        'xpath=following::input[@type="text" and not(@readonly) and not(@aria-readonly="true")][1]'
+      );
+      await orderField.waitFor({ state: "visible", timeout: 30000 });
+      await expect(orderField).toBeEditable({ timeout: 30000 });
+      await orderField.fill(orderCode);
 
-    const searchButton = this.page
-      .getByRole("button", { name: "Search", exact: true })
-      .filter({ visible: true })
-      .last();
-    await this.waitForZkUpdate(() => searchButton.click());
+      const searchButton = this.page
+        .getByRole("button", { name: "Search", exact: true })
+        .filter({ visible: true })
+        .last();
+      await this.waitForZkUpdate(() => searchButton.click());
 
-    const result = this.page.getByRole("row", {
-      name: new RegExp(`Order Nr\\.: ${this.escapeRegExp(orderCode)}(?:,|$)`),
+      const result = this.page.getByRole("row", {
+        name: new RegExp(`Order Nr\\.: ${this.escapeRegExp(orderCode)}(?:,|$)`),
+      });
+      await expect(result).toBeVisible({ timeout: 30000 });
+      return result;
     });
-    await expect(result).toBeVisible({ timeout: 30000 });
-    return result;
   }
 
   async validateProductBasicAndAdvancedSearch(productCode) {
-    const catalog = new BackOfficeCatalogPage(this.page, { url: this.url });
-    await catalog.openAdminProducts();
-    await catalog.searchAdminProductBasic(productCode);
+    return test.step(`BackOffice · Validate basic and advanced product search for ${productCode}`, async () => {
+      const catalog = new BackOfficeCatalogPage(this.page, { url: this.url });
+      await catalog.openAdminProducts();
+      await catalog.searchAdminProductBasic(productCode);
 
-    await catalog.openAdminProducts();
-    await catalog.searchAdminProductAdvanced(productCode);
+      await catalog.openAdminProducts();
+      await catalog.searchAdminProductAdvanced(productCode);
+    });
   }
 }
