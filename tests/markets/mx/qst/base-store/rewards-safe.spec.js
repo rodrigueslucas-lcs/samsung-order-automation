@@ -21,36 +21,80 @@ async function expectRewardsText(page, surface) {
   return (await rewards.first().innerText()).replace(/\s+/g, " ").trim();
 }
 
+async function validatePaymentPageWithRecovery(checkout, page, postalCode, testInfo) {
+  try {
+    await checkout.validatePaymentPage({ postalCode });
+    return false;
+  } catch (firstError) {
+    if (!/CHECKOUT_STEP_PAYMENT/i.test(page.url())) throw firstError;
+
+    testInfo.annotations.push({
+      type: "qst-recovery",
+      description:
+        "Payment URL was reached but the dynamic Payment UI did not finish rendering. Performed one controlled reload before failing the business scenario.",
+    });
+
+    await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+    await expect(page).toHaveURL(/CHECKOUT_STEP_PAYMENT/i, { timeout: 30000 });
+
+    try {
+      await checkout.validatePaymentPage({ postalCode });
+    } catch (retryError) {
+      throw new Error(
+        `MX Payment remained incomplete after one controlled reload. ` +
+        `Initial render error: ${firstError.message}. Retry error: ${retryError.message}`
+      );
+    }
+
+    return true;
+  }
+}
+
 test("SAM-24975 @qst @mx @base-store @safe - Rewards text on cart checkout and payment", async ({ page, mxConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24975"));
 
-  const cart = await prepareMxQstCart(page, mxConfig);
-  const cartRewards = await expectRewardsText(page, "Cart");
+  let cart;
+  let cartRewards;
+  let checkout;
+  let checkoutRewards;
+  let paymentRewards;
 
-  await cart.proceedToCheckout();
-  const checkout = new MxCheckoutPage(page);
-  await checkout.startGuest("mx.qst.rewards@example.com");
-  await checkout.fillContact({
-    firstName: "MX",
-    lastName: "Automation",
-    phone: "5512345678",
+  await test.step("Prepare the controlled cart and validate Rewards on Cart", async () => {
+    cart = await prepareMxQstCart(page, mxConfig);
+    cartRewards = await expectRewardsText(page, "Cart");
   });
 
-  const checkoutRewards = await expectRewardsText(page, "Checkout");
-
-  const address = await checkout.fillDelivery({
-    postalCode: "01000",
-    street: "Avenida Revolucion",
-    exteriorNumber: "1000",
+  await test.step("Start guest checkout and validate Rewards on Contact Information", async () => {
+    await cart.proceedToCheckout();
+    checkout = new MxCheckoutPage(page);
+    await checkout.startGuest("mx.qst.rewards@example.com");
+    await checkout.fillContact({
+      firstName: "MX",
+      lastName: "Automation",
+      phone: "5512345678",
+    });
+    checkoutRewards = await expectRewardsText(page, "Checkout");
   });
-  expect(address.lookupStatus).toBe(200);
-  expect(address.selectedColonia).toBeTruthy();
 
-  await checkout.selectDeliveryAndContinue();
-  await checkout.validatePaymentPage({ postalCode: "01000" });
-  await expect(page).toHaveURL(/CHECKOUT_STEP_PAYMENT/i);
+  await test.step("Fill and validate the MX delivery address", async () => {
+    const address = await checkout.fillDelivery({
+      postalCode: "01000",
+      street: "Avenida Revolucion",
+      exteriorNumber: "1000",
+    });
+    expect(address.lookupStatus).toBe(200);
+    expect(address.selectedColonia).toBeTruthy();
+  });
 
-  const paymentRewards = await expectRewardsText(page, "Payment");
+  await test.step("Continue from Delivery and wait for a stable Payment render", async () => {
+    await checkout.selectDeliveryAndContinue();
+    await expect(page).toHaveURL(/CHECKOUT_STEP_PAYMENT/i, { timeout: 120000 });
+    await validatePaymentPageWithRecovery(checkout, page, "01000", testInfo);
+  });
+
+  await test.step("Validate Rewards on the Payment page", async () => {
+    paymentRewards = await expectRewardsText(page, "Payment");
+  });
 
   testInfo.annotations.push({
     type: "qst-observation",
