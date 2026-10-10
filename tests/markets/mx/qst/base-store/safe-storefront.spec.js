@@ -25,25 +25,37 @@ test("MX QST 05 @qst @mx @base-store @safe - PDP variants other than color", asy
 
 test("SAM-24981 @qst @mx @base-store @safe - Add Samsung Care+", async ({ page, mxConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24981"));
-  await prepareMxQstCart(page, mxConfig);
-  await openMxService(page, "Samsung Care\\+");
-  const careText = page.getByText(/Samsung Care\+/i).filter({ visible: true });
-  await expect(careText.last()).toBeVisible();
-  const checkedOption = page.getByRole("radio", { checked: true }).filter({ visible: true });
-  await expect(checkedOption.first()).toBeVisible({ timeout: 30000 });
-  const terms = page.getByRole("checkbox").filter({ visible: true });
-  expect(await terms.count()).toBeGreaterThan(0);
-  for (let index = 0; index < await terms.count(); index += 1) {
-    const checkbox = terms.nth(index);
-    if (!(await checkbox.isChecked())) {
-      await checkbox.locator("..").click();
-      await expect(checkbox).toBeChecked();
+
+  await test.step("Prepare the controlled MX cart", async () => {
+    await prepareMxQstCart(page, mxConfig);
+  });
+
+  await test.step("Open Samsung Care+ and validate the available protection option", async () => {
+    await openMxService(page, "Samsung Care\\+");
+    const careText = page.getByText(/Samsung Care\+/i).filter({ visible: true });
+    await expect(careText.last()).toBeVisible();
+    const checkedOption = page.getByRole("radio", { checked: true }).filter({ visible: true });
+    await expect(checkedOption.first()).toBeVisible({ timeout: 30000 });
+  });
+
+  await test.step("Accept Samsung Care+ terms and add the service to the cart", async () => {
+    const terms = page.getByRole("checkbox").filter({ visible: true });
+    expect(await terms.count()).toBeGreaterThan(0);
+    for (let index = 0; index < await terms.count(); index += 1) {
+      const checkbox = terms.nth(index);
+      if (!(await checkbox.isChecked())) {
+        await checkbox.locator("..").click();
+        await expect(checkbox).toBeChecked();
+      }
     }
-  }
-  const add = page.getByRole("button", { name: /Agregar al carrito/i }).filter({ visible: true }).last();
-  await expect(add).toBeEnabled({ timeout: 30000 });
-  await add.click();
-  await expect(page.getByRole("main").getByText(/Samsung Care\+/i).filter({ visible: true }).last()).toBeVisible({
-    timeout: 30000,
+    const add = page.getByRole("button", { name: /Agregar al carrito/i }).filter({ visible: true }).last();
+    await expect(add).toBeEnabled({ timeout: 30000 });
+    await add.click();
+  });
+
+  await test.step("Validate Samsung Care+ is attached to the cart item", async () => {
+    await expect(page.getByRole("main").getByText(/Samsung Care\+/i).filter({ visible: true }).last()).toBeVisible({
+      timeout: 30000,
+    });
   });
 });
