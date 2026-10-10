@@ -17,6 +17,10 @@ const { getMxTestCard } = mxTestCard;
 
 test.describe.configure({ timeout: 1200000, retries: 0 });
 const guestOrderRuntimeFile = path.resolve("test-results/mx-qst/latest-guest-order.json");
+const trackingDefect = {
+  ticket: "RT-738525",
+  url: "https://jira.secext.samsung.net/browse/RT-738525",
+};
 
 // Proven reusable guest prerequisite from the 2026-09-16 tracking diagnosis.
 // Keep env/runtime overrides first; this fallback prevents SAM-25010 from
@@ -196,7 +200,7 @@ test("SAM-25010 @destructive @qst @mx @base-store - Track Order with email and O
   } catch (error) {
     if (!isKnownMxTrackingBaseSiteDefect(error, orderNumber)) throw error;
 
-    await test.step("Capture evidence for the known MX Track Order BaseSite defect", async () => {
+    await test.step(`Capture evidence for known defect ${trackingDefect.ticket}`, async () => {
       const notFoundMessage = page.getByText(/No hemos podido encontrar ning[uú]n pedido/i).first();
       if (await notFoundMessage.isVisible().catch(() => false)) {
         await notFoundMessage.scrollIntoViewIfNeeded();
@@ -213,19 +217,21 @@ test("SAM-25010 @destructive @qst @mx @base-store - Track Order with email and O
       }
 
       const knownDefect =
-        `KNOWN DEFECT · MX Guest Track Order accepts OTP but cannot resolve ${orderNumber} in the current BaseSite. ` +
-        "Jira bug pending creation/tracking; this known environment defect must not fail the whole QST suite.";
+        `KNOWN DEFECT ${trackingDefect.ticket} · MX Guest Track Order accepts OTP but cannot resolve ${orderNumber} in the current BaseSite. ` +
+        "The functional defect is tracked in Jira and must not be reported as an automation failure.";
 
       testInfo.annotations.push(
         { type: "known-defect", description: knownDefect },
-        { type: "known-defect-ticket", description: "PENDING" }
+        { type: "known-defect-ticket", description: trackingDefect.ticket },
+        { type: "known-defect-url", description: trackingDefect.url }
       );
       recordBusinessEvidence(testInfo, {
         orderNumber,
         email,
         knownDefect: true,
         knownDefectReason: "OTP accepted, but guest order lookup returns not found in current BaseSite.",
-        bugTicket: "PENDING",
+        bugTicket: trackingDefect.ticket,
+        bugUrl: trackingDefect.url,
       });
 
       test.skip(true, knownDefect);
