@@ -10,7 +10,7 @@ async function openAuthenticatedMenu(page) {
   await expect(profileButton).toBeVisible({ timeout: 60000 });
   await profileButton.hover();
 
-  let menu = page
+  const menu = page
     .locator('[role="menu"].profile-menu')
     .filter({ visible: true })
     .last();
@@ -21,12 +21,17 @@ async function openAuthenticatedMenu(page) {
 test("SAM-24962 @qst @mx @base-store @safe @registered - Login Home page", async ({ page, mxConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24962"));
 
-  const currentUrl = new URL(page.url());
-  expect(currentUrl.hostname).toBe(mxConfig.hostname);
-  expect(currentUrl.pathname).toMatch(/^\/mx\/?$/i);
+  let currentUrl;
+  await test.step("Validate the registered session lands on the MX Home page", async () => {
+    currentUrl = new URL(page.url());
+    expect(currentUrl.hostname).toBe(mxConfig.hostname);
+    expect(currentUrl.pathname).toMatch(/^\/mx\/?$/i);
+  });
 
-  const profileButton = page.getByRole("button", { name: "My Profile", exact: true });
-  await expect(profileButton).toBeVisible({ timeout: 60000 });
+  await test.step("Validate the authenticated profile entry is available", async () => {
+    const profileButton = page.getByRole("button", { name: "My Profile", exact: true });
+    await expect(profileButton).toBeVisible({ timeout: 60000 });
+  });
 
   recordBusinessEvidence(testInfo, {
     authenticated: true,
@@ -38,19 +43,21 @@ test("SAM-24962 @qst @mx @base-store @safe @registered - Login Home page", async
 test("SAM-24963 @qst @mx @base-store @safe @registered - Validate My account menu", async ({ page }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24963"));
 
-  let menu = await openAuthenticatedMenu(page);
-
-  // MX may expose only the compact Home dropdown initially.
-  // If account options are not present, enter My Account and reopen the menu.
-  if (!(await menu.getByText(/My page|Mi p[aá]gina|My Account|Mi cuenta/i).count())) {
-    await page.goto(new URL("/mx/mypage/", page.url()).toString(), {
-      waitUntil: "domcontentloaded",
-      timeout: 60000,
-    });
-    await page.waitForURL(/\/mx\/mypage\/?(?:[?#].*)?$/, { timeout: 60000 });
-
+  let menu;
+  await test.step("Open the authenticated My Account menu", async () => {
     menu = await openAuthenticatedMenu(page);
-  }
+
+    // MX may expose only the compact Home dropdown initially.
+    // If account options are not present, enter My Account and reopen the menu.
+    if (!(await menu.getByText(/My page|Mi p[aá]gina|My Account|Mi cuenta/i).count())) {
+      await page.goto(new URL("/mx/mypage/", page.url()).toString(), {
+        waitUntil: "domcontentloaded",
+        timeout: 60000,
+      });
+      await page.waitForURL(/\/mx\/mypage\/?(?:[?#].*)?$/, { timeout: 60000 });
+      menu = await openAuthenticatedMenu(page);
+    }
+  });
 
   const expectedOptions = [
     /My page|Mi p[aá]gina|My Account|Mi cuenta/i,
@@ -62,13 +69,16 @@ test("SAM-24963 @qst @mx @base-store @safe @registered - Validate My account men
     /Logout|Cerrar Sesi[oó]n/i,
   ];
 
-  const menuText = (await menu.innerText()).replace(/\s+/g, " ").trim();
-  for (const option of expectedOptions) {
-    await expect(
-      menu.getByText(option).first(),
-      `Expected My Account option ${option} to be visible. Current menu: ${menuText}`
-    ).toBeVisible({ timeout: 30000 });
-  }
+  let menuText;
+  await test.step("Validate the expected My Account navigation options", async () => {
+    menuText = (await menu.innerText()).replace(/\s+/g, " ").trim();
+    for (const option of expectedOptions) {
+      await expect(
+        menu.getByText(option).first(),
+        `Expected My Account option ${option} to be visible. Current menu: ${menuText}`
+      ).toBeVisible({ timeout: 30000 });
+    }
+  });
 
   recordBusinessEvidence(testInfo, {
     menuValidated: true,
