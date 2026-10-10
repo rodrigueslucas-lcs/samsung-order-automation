@@ -1,3 +1,4 @@
+import { test } from "@playwright/test";
 import BasePage from "./BasePage";
 
 export const BACKOFFICE_AUTHORITIES = {
@@ -98,20 +99,73 @@ export default class BackOfficePage extends BasePage {
   }
 
   async login({ username, password, authority }) {
-    if (!username || !password) {
-      throw new Error("BACKOFFICE_USERNAME and BACKOFFICE_PASSWORD are required at runtime.");
-    }
-    const authorityLabel = BACKOFFICE_AUTHORITIES[authority];
-    if (!authorityLabel) throw new Error(`Unsupported BackOffice authority: ${authority}`);
+    return test.step(`BackOffice · Authenticate as ${authority}`, async () => {
+      if (!username || !password) {
+        throw new Error("BACKOFFICE_USERNAME and BACKOFFICE_PASSWORD are required at runtime.");
+      }
+      const authorityLabel = BACKOFFICE_AUTHORITIES[authority];
+      if (!authorityLabel) throw new Error(`Unsupported BackOffice authority: ${authority}`);
 
-    const { surface, usernameInput, passwordInput, directPerspective } = await this.openLoginSurface();
+      const { surface, usernameInput, passwordInput, directPerspective } = await this.openLoginSurface();
 
-    if (surface === "direct-admin") {
-      if (authority !== "admin") {
+      if (surface === "direct-admin") {
+        if (authority !== "admin") {
+          throw new Error(
+            "BackOffice opened directly in Administration Cockpit; an agent authority is unavailable."
+          );
+        }
+        await this.expectPerspective(authority);
+        const expectedHost = new URL(this.url).hostname;
+        if (new URL(this.page.url()).hostname !== expectedHost) {
+          throw new Error(
+            `BackOffice redirected to the wrong environment: expected ${expectedHost}, got ${new URL(this.page.url()).hostname}.`
+          );
+        }
+        return;
+      }
+
+      await usernameInput.click();
+      await usernameInput.pressSequentially(username, { delay: 35 });
+      await usernameInput.press("Tab");
+      await passwordInput.pressSequentially(password, { delay: 35 });
+      await passwordInput.press("Tab");
+      await this.page.waitForFunction(() => !window.zk || !zk.processing, null, { timeout: 10000 }).catch(() => {});
+      await this.page.getByRole("button", { name: "Sign In", exact: true }).click();
+
+      const proceedButton = this.page.getByRole("button", { name: "PROCEED", exact: true });
+      // A timed-out loser must not reject the whole login while another
+      // legitimate outcome is still loading (ZK often redirects via custom-login).
+      const loginOutcome = await Promise.any([
+        proceedButton
+          .waitFor({ state: "visible", timeout: 60000 })
+          .then(() => "authority"),
+        directPerspective
+          .waitFor({ state: "visible", timeout: 60000 })
+          .then(() => "direct-admin"),
+        this.page
+          .waitForURL(/login\.zul\?login_error=1/, { timeout: 60000 })
+          .then(() => "rejected"),
+      ]).catch(() => {
         throw new Error(
-          "BackOffice opened directly in Administration Cockpit; an agent authority is unavailable."
+          `BackOffice login did not reach an authenticated perspective or authority selector; current URL: ${this.page.url()}`
+        );
+      });
+      if (loginOutcome === "rejected") {
+        throw new Error(
+          `BackOffice rejected the runtime credentials (login_error=1): ${this.url}`
         );
       }
+      if (loginOutcome === "authority") {
+        const authorityText = this.page.getByText(authorityLabel, { exact: true });
+        await authorityText.waitFor({ state: "visible", timeout: 30000 });
+        await authorityText.click();
+        await proceedButton.click();
+      } else if (authority !== "admin") {
+        throw new Error(
+          "BackOffice logged in directly to Administration Cockpit; an agent authority is unavailable."
+        );
+      }
+
       await this.expectPerspective(authority);
       const expectedHost = new URL(this.url).hostname;
       if (new URL(this.page.url()).hostname !== expectedHost) {
@@ -119,58 +173,7 @@ export default class BackOfficePage extends BasePage {
           `BackOffice redirected to the wrong environment: expected ${expectedHost}, got ${new URL(this.page.url()).hostname}.`
         );
       }
-      return;
-    }
-
-    await usernameInput.click();
-    await usernameInput.pressSequentially(username, { delay: 35 });
-    await usernameInput.press("Tab");
-    await passwordInput.pressSequentially(password, { delay: 35 });
-    await passwordInput.press("Tab");
-    await this.page.waitForFunction(() => !window.zk || !zk.processing, null, { timeout: 10000 }).catch(() => {});
-    await this.page.getByRole("button", { name: "Sign In", exact: true }).click();
-
-    const proceedButton = this.page.getByRole("button", { name: "PROCEED", exact: true });
-    // A timed-out loser must not reject the whole login while another
-    // legitimate outcome is still loading (ZK often redirects via custom-login).
-    const loginOutcome = await Promise.any([
-      proceedButton
-        .waitFor({ state: "visible", timeout: 60000 })
-        .then(() => "authority"),
-      directPerspective
-        .waitFor({ state: "visible", timeout: 60000 })
-        .then(() => "direct-admin"),
-      this.page
-        .waitForURL(/login\.zul\?login_error=1/, { timeout: 60000 })
-        .then(() => "rejected"),
-    ]).catch(() => {
-      throw new Error(
-        `BackOffice login did not reach an authenticated perspective or authority selector; current URL: ${this.page.url()}`
-      );
     });
-    if (loginOutcome === "rejected") {
-      throw new Error(
-        `BackOffice rejected the runtime credentials (login_error=1): ${this.url}`
-      );
-    }
-    if (loginOutcome === "authority") {
-      const authorityText = this.page.getByText(authorityLabel, { exact: true });
-      await authorityText.waitFor({ state: "visible", timeout: 30000 });
-      await authorityText.click();
-      await proceedButton.click();
-    } else if (authority !== "admin") {
-      throw new Error(
-        "BackOffice logged in directly to Administration Cockpit; an agent authority is unavailable."
-      );
-    }
-
-    await this.expectPerspective(authority);
-    const expectedHost = new URL(this.url).hostname;
-    if (new URL(this.page.url()).hostname !== expectedHost) {
-      throw new Error(
-        `BackOffice redirected to the wrong environment: expected ${expectedHost}, got ${new URL(this.page.url()).hostname}.`
-      );
-    }
   }
 
   async expectPerspective(authority) {
