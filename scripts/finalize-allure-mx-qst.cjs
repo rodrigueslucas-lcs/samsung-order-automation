@@ -45,6 +45,14 @@ const dedupe = spawnSync(process.execPath, [
 ], { stdio: "inherit", env: process.env });
 if (dedupe.status !== 0) process.exit(dedupe.status || 1);
 
+const knownDefects = spawnSync(process.execPath, [
+  path.resolve("scripts/annotate-known-defects-dashboard.cjs"),
+  artifactDir,
+], { stdio: "inherit", env: process.env });
+if (knownDefects.status !== 0) {
+  console.error("[reporting] Known-defect dashboard annotation failed; the original dashboard was preserved.");
+}
+
 const allureCli = process.platform === "win32"
   ? path.resolve("node_modules/.bin/allure.cmd")
   : path.resolve("node_modules/.bin/allure");
