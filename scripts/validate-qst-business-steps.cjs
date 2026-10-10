@@ -21,8 +21,8 @@ function walk(root) {
   return files;
 }
 
-function collectStepHelpers(source) {
-  const helpers = new Set();
+function collectFunctions(source) {
+  const functions = new Map();
   const patterns = [
     /(?:export\s+)?async\s+function\s+(\w+)\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/g,
     /(?:export\s+)?function\s+(\w+)\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/g,
@@ -30,8 +30,27 @@ function collectStepHelpers(source) {
   ];
   for (const pattern of patterns) {
     let match;
-    while ((match = pattern.exec(source))) {
-      if (/\btest\.step\s*\(/.test(match[2])) helpers.add(match[1]);
+    while ((match = pattern.exec(source))) functions.set(match[1], match[2]);
+  }
+  return functions;
+}
+
+function collectStepHelpers(source, seed = new Set()) {
+  const helpers = new Set(seed);
+  const functions = collectFunctions(source);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const [name, body] of functions) {
+      if (helpers.has(name)) continue;
+      const directStep = /\btest\.step\s*\(/.test(body);
+      const callsSteppedHelper = [...helpers].some((helper) =>
+        new RegExp(`\\b${helper}\\s*\\(`).test(body)
+      );
+      if (directStep || callsSteppedHelper) {
+        helpers.add(name);
+        changed = true;
+      }
     }
   }
   return helpers;
@@ -90,8 +109,8 @@ const summary = Object.fromEntries(MARKETS.map((market) => [market, { audited: 0
 for (const market of MARKETS) {
   for (const file of walk(MARKET_ROOTS[market])) {
     const source = fs.readFileSync(file, "utf8");
-    const localStepHelpers = collectStepHelpers(source);
     const importedStepHelpers = collectImportedSteppedHelpers(file, source);
+    const localStepHelpers = collectStepHelpers(source, importedStepHelpers);
     const tests = collectLiteralTests(source);
 
     for (let index = 0; index < tests.length; index += 1) {
@@ -109,7 +128,7 @@ for (const market of MARKETS) {
       const nextIndex = tests[index + 1]?.index ?? source.length;
       const testSource = source.slice(current.index, nextIndex);
       const explicitStep = /\btest\.step\s*\(/.test(testSource);
-      const callsSteppedHelper = [...localStepHelpers, ...importedStepHelpers].some((helper) =>
+      const callsSteppedHelper = [...localStepHelpers].some((helper) =>
         new RegExp(`\\b${helper}\\s*\\(`).test(testSource)
       );
 
