@@ -31,6 +31,21 @@ function hasAutoBusinessFixture(source) {
   return BUSINESS_FIXTURE_IMPORTS.some((pattern) => pattern.test(source));
 }
 
+function collectStepHelpers(source) {
+  const helpers = new Set();
+  const patterns = [
+    /async\s+function\s+(\w+)\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/g,
+    /const\s+(\w+)\s*=\s*async\s*\([^)]*\)\s*=>\s*\{([\s\S]*?)\n\};/g,
+  ];
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(source))) {
+      if (/\btest\.step\s*\(/.test(match[2])) helpers.add(match[1]);
+    }
+  }
+  return helpers;
+}
+
 function collectLiteralTests(source) {
   const tests = [];
   const expression = /\btest(?:\.skip)?\s*\(\s*(["'`])([\s\S]*?)\1\s*,/g;
@@ -54,6 +69,7 @@ for (const market of MARKETS) {
   for (const file of walk(MARKET_ROOTS[market])) {
     const source = fs.readFileSync(file, "utf8");
     const autoCovered = hasAutoBusinessFixture(source);
+    const stepHelpers = collectStepHelpers(source);
     const tests = collectLiteralTests(source);
 
     for (let index = 0; index < tests.length; index += 1) {
@@ -71,14 +87,25 @@ for (const market of MARKETS) {
       const nextIndex = tests[index + 1]?.index ?? source.length;
       const testSource = source.slice(current.index, nextIndex);
       const explicitStep = /\btest\.step\s*\(/.test(testSource);
+      const steppedLocalHelper = [...stepHelpers].some((helper) =>
+        new RegExp(`\\b${helper}\\s*\\(`).test(testSource)
+      );
 
-      if (autoCovered || explicitStep) {
+      // MX is the presentation/reference campaign. Its Allure contract must be
+      // backed by real business steps in the TC body or a local stepped helper;
+      // importing the automatic fixture alone is not enough because that only
+      // proves a wrapper exists, not that the report is useful to a reviewer.
+      const covered = market === "mx"
+        ? explicitStep || steppedLocalHelper
+        : autoCovered || explicitStep || steppedLocalHelper;
+
+      if (covered) {
         summary[market].covered += 1;
         continue;
       }
 
       const samId = title.match(/SAM-\d+/i)?.[0] || "UNKNOWN";
-      errors.push(`${market.toUpperCase()} ${samId}: no business test.step or auto business fixture (${relative(file)}).`);
+      errors.push(`${market.toUpperCase()} ${samId}: no real business test.step in the TC or a local stepped helper (${relative(file)}).`);
     }
   }
 }
@@ -108,4 +135,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log("[qst-business-steps] PASS · executable literal Base Store/EPP QST cases expose business-level Playwright steps.");
+console.log("[qst-business-steps] PASS · executable literal Base Store/EPP QST cases expose business-level Playwright steps; MX requires real report-visible steps, not fixture-only coverage.");
