@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "defects": [
+    {
+      "market": "MX",
+      "environment": "S2",
+      "store": "BASE_STORE",
+      "samId": "SAM-25010",
+      "jira": "RT-738525",
+      "url": "https://jira.secext.samsung.net/browse/RT-738525",
+      "title": "SMB Cluster MX Track Order Does Not Complete After Valid OTP Verification",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "Critical",
+      "rootCause": "Environment Issue",
+      "notes": "Track Order accepts a valid OTP but the MX S2 BaseSite does not resolve the order."
+    }
+  ]
+}
