@@ -1,4 +1,4 @@
-import { expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import MyAccountPage from "./MyAccountPage";
 
 function marketOrderCodePattern(market) {
@@ -26,9 +26,11 @@ export default class MyOrdersPage extends MyAccountPage {
   }
 
   async openMyOrders() {
-    await this.openRoute(this.routes.orders);
-    await this.page.getByRole("heading", { name: /Mis pedidos|Pedidos|My Orders/i })
-      .first().waitFor({ state: "visible", timeout: 30000 });
+    return test.step("Open My Orders and wait for the order-history page", async () => {
+      await this.openRoute(this.routes.orders);
+      await this.page.getByRole("heading", { name: /Mis pedidos|Pedidos|My Orders/i })
+        .first().waitFor({ state: "visible", timeout: 30000 });
+    });
   }
 
   async waitForOrder(orderCode, { attempts = 12, intervalMs = 15000 } = {}) {
