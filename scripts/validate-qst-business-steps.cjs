@@ -10,11 +10,6 @@ const MARKET_ROOTS = Object.freeze({
   cl: path.join(ROOT, "cl", "qst"),
 });
 
-const BUSINESS_FIXTURE_IMPORTS = [
-  /from\s+["']\.\/mxQst\.fixture["']/,
-  /from\s+["']\.\.\/\.\.\/dst\/base-store\/mx\.auth\.fixture["']/,
-];
-
 function walk(root) {
   if (!fs.existsSync(root)) return [];
   const files = [];
@@ -24,11 +19,6 @@ function walk(root) {
     else if (/\.spec\.[cm]?js$/i.test(entry.name)) files.push(target);
   }
   return files;
-}
-
-function hasAutoBusinessFixture(source) {
-  if (/qstBusinessScenario\s*:\s*\[/.test(source) && /\bbase\.step\s*\(/.test(source)) return true;
-  return BUSINESS_FIXTURE_IMPORTS.some((pattern) => pattern.test(source));
 }
 
 function collectStepHelpers(source) {
@@ -68,7 +58,6 @@ const summary = Object.fromEntries(MARKETS.map((market) => [market, { audited: 0
 for (const market of MARKETS) {
   for (const file of walk(MARKET_ROOTS[market])) {
     const source = fs.readFileSync(file, "utf8");
-    const autoCovered = hasAutoBusinessFixture(source);
     const stepHelpers = collectStepHelpers(source);
     const tests = collectLiteralTests(source);
 
@@ -91,32 +80,14 @@ for (const market of MARKETS) {
         new RegExp(`\\b${helper}\\s*\\(`).test(testSource)
       );
 
-      // MX is the presentation/reference campaign. Its Allure contract must be
-      // backed by real business steps in the TC body or a local stepped helper;
-      // importing the automatic fixture alone is not enough because that only
-      // proves a wrapper exists, not that the report is useful to a reviewer.
-      const covered = market === "mx"
-        ? explicitStep || steppedLocalHelper
-        : autoCovered || explicitStep || steppedLocalHelper;
-
-      if (covered) {
+      if (explicitStep || steppedLocalHelper) {
         summary[market].covered += 1;
         continue;
       }
 
       const samId = title.match(/SAM-\d+/i)?.[0] || "UNKNOWN";
-      errors.push(`${market.toUpperCase()} ${samId}: no real business test.step in the TC or a local stepped helper (${relative(file)}).`);
+      errors.push(`${market.toUpperCase()} ${samId}: no report-visible business test.step in the TC or a local stepped helper (${relative(file)}).`);
     }
-  }
-}
-
-for (const fixture of [
-  "tests/markets/mx/qst/base-store/mxQst.fixture.js",
-  "tests/markets/mx/dst/base-store/mx.auth.fixture.js",
-]) {
-  const source = fs.readFileSync(path.resolve(fixture), "utf8");
-  if (!/qstBusinessScenario\s*:\s*\[/.test(source) || !/\bbase\.step\s*\(/.test(source)) {
-    errors.push(`MX business fixture lost its automatic QST step: ${fixture}.`);
   }
 }
 
@@ -135,4 +106,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log("[qst-business-steps] PASS · executable literal Base Store/EPP QST cases expose business-level Playwright steps; MX requires real report-visible steps, not fixture-only coverage.");
+console.log("[qst-business-steps] PASS · every executable literal QST case exposes report-visible business steps; fixture-only wrappers are not accepted for any market.");
