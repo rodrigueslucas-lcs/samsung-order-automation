@@ -45,25 +45,49 @@ async function reachRegisteredDeliveryForSavedAddress(page, mxConfig) {
 
 test("SAM-24992 @qst @mx @base-store @safe @registered - Select saved address", async ({ page, mxConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24992"));
-  const { checkout } = await reachRegisteredDeliveryForSavedAddress(page, mxConfig);
-  const savedAddress = page.getByRole("radio", { name: /Direcci[oó]n guardada|Saved address/i }).filter({ visible: true });
-  const savedAddressAvailable = await savedAddress.count() > 0;
-  test.skip(!savedAddressAvailable, "Saved-address test data is unavailable in the fully rendered MX Delivery form; this TC does not create profile data.");
-  await selectAddressMode(page, /Direcci[oó]n guardada|Saved address/i);
-  await expect(savedAddress.first()).toBeChecked({ timeout: 30000 });
-  await checkout.validateCheckoutSummary(mxConfig.sku);
+
+  let checkout;
+  await test.step("Reach registered Delivery and load address modes", async () => {
+    ({ checkout } = await reachRegisteredDeliveryForSavedAddress(page, mxConfig));
+  });
+
+  await test.step("Select the existing saved address", async () => {
+    const savedAddress = page.getByRole("radio", { name: /Direcci[oó]n guardada|Saved address/i }).filter({ visible: true });
+    const savedAddressAvailable = await savedAddress.count() > 0;
+    test.skip(!savedAddressAvailable, "Saved-address test data is unavailable in the fully rendered MX Delivery form; this TC does not create profile data.");
+    await selectAddressMode(page, /Direcci[oó]n guardada|Saved address/i);
+    await expect(savedAddress.first()).toBeChecked({ timeout: 30000 });
+  });
+
+  await test.step("Validate checkout summary remains healthy with the saved address", async () => {
+    await checkout.validateCheckoutSummary(mxConfig.sku);
+  });
+
   recordBusinessEvidence(testInfo, { savedAddressSelected: true, persistedDataCreated: false });
 });
 
 test("SAM-24993 @qst @mx @base-store @safe @registered - Save shipping and billing address option is available", async ({ page, mxConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24993"));
-  const { checkout } = await reachMxRegisteredDelivery(page, mxConfig);
-  await openNewAddressMode(page);
-  const address = await checkout.fillDelivery({ postalCode: "01000", street: "Avenida Revolucion", exteriorNumber: "1000" }, { registered: true });
-  expect(address.lookupStatus).toBe(200);
-  expect(address.selectedColonia).toBeTruthy();
-  const saveAddress = page.getByRole("checkbox", { name: saveAddressName }).filter({ visible: true });
-  await expect(saveAddress.first(), "Registered MX checkout should expose the Save-address option after a valid new address is populated.").toBeVisible({ timeout: 30000 });
+
+  let checkout;
+  await test.step("Reach registered Delivery and open New address mode", async () => {
+    ({ checkout } = await reachMxRegisteredDelivery(page, mxConfig));
+    await openNewAddressMode(page);
+  });
+
+  let address;
+  await test.step("Fill a valid MX delivery address", async () => {
+    address = await checkout.fillDelivery({ postalCode: "01000", street: "Avenida Revolucion", exteriorNumber: "1000" }, { registered: true });
+    expect(address.lookupStatus).toBe(200);
+    expect(address.selectedColonia).toBeTruthy();
+  });
+
+  let saveAddress;
+  await test.step("Validate the registered Save-address option is available", async () => {
+    saveAddress = page.getByRole("checkbox", { name: saveAddressName }).filter({ visible: true });
+    await expect(saveAddress.first(), "Registered MX checkout should expose the Save-address option after a valid new address is populated.").toBeVisible({ timeout: 30000 });
+  });
+
   recordBusinessEvidence(testInfo, {
     saveOptionVisible: true,
     saveOptionDefaultChecked: await saveAddress.first().isChecked(),
@@ -92,54 +116,79 @@ test("SAM-24994 @qst @mx @base-store @safe @registered - Checkout accepts a new 
       observe({ checkpoint: "cart-post-failed", path: new URL(request.url()).pathname, failure: request.failure()?.errorText });
     }
   };
-  page.on("pageerror", onPageError);
-  page.on("console", onConsole);
-  page.on("request", onRequest);
-  page.on("requestfailed", onRequestFailed);
+
   let checkout;
-  try {
-    ({ checkout } = await reachMxRegisteredDelivery(page, mxConfig, { addToCartDiagnostics }));
-  } finally {
-    page.off("pageerror", onPageError);
-    page.off("console", onConsole);
-    page.off("request", onRequest);
-    page.off("requestfailed", onRequestFailed);
-    await testInfo.attach("sam-24994-add-to-cart-diagnostics", {
-      body: JSON.stringify(addToCartDiagnostics, null, 2),
-      contentType: "application/json",
-    });
-  }
-  await openNewAddressMode(page);
-  const address = await checkout.fillDelivery({ postalCode: "01000", street: "Avenida Revolucion", exteriorNumber: "1000" }, { registered: true });
-  expect(address.lookupStatus).toBe(200);
-  expect(address.selectedColonia).toBeTruthy();
-  const saveAddress = page.getByRole("checkbox", { name: saveAddressName }).filter({ visible: true });
-  if (await saveAddress.count()) {
-    const checkbox = saveAddress.first();
-    if (await checkbox.isChecked()) await checkbox.uncheck({ force: true });
-    await expect(checkbox, "The new checkout address must remain unsaved for this TC.").not.toBeChecked();
-  }
+  await test.step("Reach registered Delivery with Add-to-Cart diagnostics enabled", async () => {
+    page.on("pageerror", onPageError);
+    page.on("console", onConsole);
+    page.on("request", onRequest);
+    page.on("requestfailed", onRequestFailed);
+    try {
+      ({ checkout } = await reachMxRegisteredDelivery(page, mxConfig, { addToCartDiagnostics }));
+    } finally {
+      page.off("pageerror", onPageError);
+      page.off("console", onConsole);
+      page.off("request", onRequest);
+      page.off("requestfailed", onRequestFailed);
+      await testInfo.attach("sam-24994-add-to-cart-diagnostics", {
+        body: JSON.stringify(addToCartDiagnostics, null, 2),
+        contentType: "application/json",
+      });
+    }
+  });
+
+  let address;
+  await test.step("Fill a valid new address and keep it unsaved", async () => {
+    await openNewAddressMode(page);
+    address = await checkout.fillDelivery({ postalCode: "01000", street: "Avenida Revolucion", exteriorNumber: "1000" }, { registered: true });
+    expect(address.lookupStatus).toBe(200);
+    expect(address.selectedColonia).toBeTruthy();
+    const saveAddress = page.getByRole("checkbox", { name: saveAddressName }).filter({ visible: true });
+    if (await saveAddress.count()) {
+      const checkbox = saveAddress.first();
+      if (await checkbox.isChecked()) await checkbox.uncheck({ force: true });
+      await expect(checkbox, "The new checkout address must remain unsaved for this TC.").not.toBeChecked();
+    }
+  });
+
+  await test.step("Validate the unsaved address remains accepted in Delivery", async () => {
+    await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i);
+    await checkout.validateCheckoutSummary(mxConfig.sku);
+  });
+
   recordBusinessEvidence(testInfo, { newAddressAccepted: true, lookupStatus: address.lookupStatus, profileWritePerformed: false });
 });
 
 test("SAM-25000 @qst @mx @base-store @safe @registered - Switch saved and new address modes", async ({ page, mxConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-25000"));
-  await reachRegisteredDeliveryForSavedAddress(page, mxConfig);
+
+  await test.step("Reach registered Delivery with saved/new address modes", async () => {
+    await reachRegisteredDeliveryForSavedAddress(page, mxConfig);
+  });
+
   const saved = page.getByRole("radio", { name: /Direcci[oó]n guardada|Saved address/i }).filter({ visible: true });
   const fresh = page.getByRole("radio", { name: /Nueva direcci[oó]n|New address/i }).filter({ visible: true });
   test.skip(await saved.count() === 0, "Saved-address test data is unavailable in the fully rendered MX Delivery form; switching requires an existing address.");
-  await expect(saved).toBeVisible({ timeout: 30000 });
-  await expect(fresh).toBeVisible({ timeout: 30000 });
-  await selectAddressMode(page, /Direcci[oó]n guardada|Saved address/i);
-  await expect(saved).toBeChecked();
-  await selectAddressMode(page, /Nueva direcci[oó]n|New address/i);
-  await expect(fresh).toBeChecked();
-  await expect(saved).not.toBeChecked();
-  const postalCode = page.getByRole("textbox", { name: "postalCode", exact: true }).filter({ visible: true });
-  await expect(postalCode, "New-address mode must expose its address form.").toBeVisible({ timeout: 30000 });
-  await selectAddressMode(page, /Direcci[oó]n guardada|Saved address/i);
-  await expect(saved).toBeChecked();
-  await expect(fresh).not.toBeChecked();
-  await expect(postalCode, "Returning to saved-address mode must close the new-address form.").toBeHidden({ timeout: 30000 });
+
+  await test.step("Switch from saved address to a new address", async () => {
+    await expect(saved).toBeVisible({ timeout: 30000 });
+    await expect(fresh).toBeVisible({ timeout: 30000 });
+    await selectAddressMode(page, /Direcci[oó]n guardada|Saved address/i);
+    await expect(saved).toBeChecked();
+    await selectAddressMode(page, /Nueva direcci[oó]n|New address/i);
+    await expect(fresh).toBeChecked();
+    await expect(saved).not.toBeChecked();
+    const postalCode = page.getByRole("textbox", { name: "postalCode", exact: true }).filter({ visible: true });
+    await expect(postalCode, "New-address mode must expose its address form.").toBeVisible({ timeout: 30000 });
+  });
+
+  await test.step("Return to saved address and close the new-address form", async () => {
+    const postalCode = page.getByRole("textbox", { name: "postalCode", exact: true }).filter({ visible: true });
+    await selectAddressMode(page, /Direcci[oó]n guardada|Saved address/i);
+    await expect(saved).toBeChecked();
+    await expect(fresh).not.toBeChecked();
+    await expect(postalCode, "Returning to saved-address mode must close the new-address form.").toBeHidden({ timeout: 30000 });
+  });
+
   recordBusinessEvidence(testInfo, { switchedSavedToNew: true, switchedNewToSaved: true, newAddressFormVisible: true, profileWritePerformed: false });
 });
