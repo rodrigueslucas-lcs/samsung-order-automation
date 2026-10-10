@@ -23,86 +23,102 @@ test("SAM-24985 @qst @mx @base-store @safe - Extended Warranty on Cart", async (
     pdpUrl: new URL(`/mx/p/${warrantySku}`, mxConfig.baseUrl.origin),
   };
   const cart = mxQstCart(page, warrantyConfig);
-  await cart.clearMxCartAndConfirmEmpty();
-  const product = new ProductPage(page, {
-    setupUrl: warrantyConfig.bootstrapUrl.toString(),
-    sku: warrantySku,
-    pdpUrl: warrantyConfig.pdpUrl.toString(),
-    cartUrl: warrantyConfig.cartUrl.toString(),
+  let totalBefore;
+  let productCard;
+
+  await test.step("Prepare an eligible appliance cart and capture the original total", async () => {
+    await cart.clearMxCartAndConfirmEmpty();
+    const product = new ProductPage(page, {
+      setupUrl: warrantyConfig.bootstrapUrl.toString(),
+      sku: warrantySku,
+      pdpUrl: warrantyConfig.pdpUrl.toString(),
+      cartUrl: warrantyConfig.cartUrl.toString(),
+    });
+    await product.addConfiguredPdpToCart({ waitForCartMutation: true });
+    await cart.validateControlledSingleSku(warrantySku);
+
+    const totalHeading = page.getByRole("heading", { name: /Total con IVA/i });
+    await expect(totalHeading).toBeVisible({ timeout: 30000 });
+    totalBefore = parseMxCurrency(await totalHeading.locator("..").innerText());
+    expect(totalBefore).not.toBeNull();
+    productCard = page.locator("div.cart-item", { hasText: warrantySku }).filter({ visible: true }).first();
   });
-  await product.addConfiguredPdpToCart({ waitForCartMutation: true });
-  await cart.validateControlledSingleSku(warrantySku);
 
-  const totalHeading = page.getByRole("heading", { name: /Total con IVA/i });
-  await expect(totalHeading).toBeVisible({ timeout: 30000 });
-  const totalBefore = parseMxCurrency(await totalHeading.locator("..").innerText());
-  expect(totalBefore).not.toBeNull();
+  let careSurface;
+  let selectedPlan;
+  let planSku;
+  let planPrice;
+  await test.step("Open Servicios Adicionales and select the eligible protection plan", async () => {
+    const warrantyAction = productCard.locator('button[data-an-la="add service:warranty"]');
+    await expect(warrantyAction, "The eligible appliance must expose Servicios Adicionales.").toBeVisible();
+    await warrantyAction.click();
+    careSurface = page.getByRole("dialog", { name: /Servicios Adicionales/i }).filter({ visible: true }).first();
+    await expect(careSurface).toBeVisible({ timeout: 30000 });
 
-  const productCard = page.locator("div.cart-item", { hasText: warrantySku }).filter({ visible: true }).first();
-  const warrantyAction = productCard.locator('button[data-an-la="add service:warranty"]');
-  await expect(warrantyAction, "The eligible appliance must expose Servicios Adicionales.").toBeVisible();
-  await warrantyAction.click();
-  const careSurface = page.getByRole("dialog", { name: /Servicios Adicionales/i }).filter({ visible: true }).first();
-  await expect(careSurface).toBeVisible({ timeout: 30000 });
-  // Keep the legacy Service Pack label, and recognize S2's Select AI plan.
-  // Do not select the unrelated ultrasonic-maintenance option.
-  const planRadio = careSurface.getByRole("radio", {
-    name: /Service Pack|Select AI:\s*Suscripci[oó]n mensual por 36 meses/i,
+    const planRadio = careSurface.getByRole("radio", {
+      name: /Service Pack|Select AI:\s*Suscripci[oó]n mensual por 36 meses/i,
+    });
+    await expect(planRadio).toHaveCount(1, { timeout: 30000 });
+    await expect(planRadio).toBeVisible({ timeout: 30000 });
+    const planOption = planRadio.locator("xpath=ancestor::mat-radio-button[1]");
+    selectedPlan = (await planOption.locator(".option-box__name").innerText()).trim();
+    planSku = (await planOption.locator(".option-box__code").innerText()).trim();
+    const priceText = await planOption.locator(".option-box__price").innerText();
+    planPrice = parseMxCurrency(priceText.match(/\$\s*[\d,.]+/g)?.at(-1));
+    expect(planSku, "The selected service must identify its SKU.").toBeTruthy();
+    expect(planPrice, "The selected service must expose a positive price.").toBeGreaterThan(0);
+    await planRadio.check({ force: true });
+    await expect(planRadio).toBeChecked({ timeout: 10000 });
   });
-  await expect(planRadio).toHaveCount(1, { timeout: 30000 });
-  await expect(planRadio).toBeVisible({ timeout: 30000 });
-  const planOption = planRadio.locator("xpath=ancestor::mat-radio-button[1]");
-  const selectedPlan = (await planOption.locator(".option-box__name").innerText()).trim();
-  const planSku = (await planOption.locator(".option-box__code").innerText()).trim();
-  const priceText = await planOption.locator(".option-box__price").innerText();
-  const planPrice = parseMxCurrency(priceText.match(/\$\s*[\d,.]+/g)?.at(-1));
-  expect(planSku, "The selected service must identify its SKU.").toBeTruthy();
-  expect(planPrice, "The selected service must expose a positive price.").toBeGreaterThan(0);
-  await planRadio.check({ force: true });
-  await expect(planRadio).toBeChecked({ timeout: 10000 });
 
-  const termsSection = careSurface.getByText(/T[eé]rminos y condiciones de nuestros Servicios Adicionales/i).first();
-  await expect(termsSection).toBeVisible({ timeout: 30000 });
+  await test.step("Accept service terms and add the protection plan to the cart", async () => {
+    const termsSection = careSurface.getByText(/T[eé]rminos y condiciones de nuestros Servicios Adicionales/i).first();
+    await expect(termsSection).toBeVisible({ timeout: 30000 });
 
-  const confirm = careSurface
-    .getByRole("button", { name: /Agregar al carrito|Añadir al carrito/i })
-    .filter({ visible: true })
-    .last();
-  await expect(confirm).toBeDisabled();
-  const consents = careSurface.getByRole("checkbox").filter({ visible: true });
-  expect(await consents.count(), "Servicios Adicionales must require its legal consents.").toBeGreaterThanOrEqual(3);
-  for (let index = 0; index < await consents.count(); index += 1) {
-    const consent = consents.nth(index);
-    await consent.check();
-    await expect(consent).toBeChecked({ timeout: 10000 });
-  }
+    const confirm = careSurface
+      .getByRole("button", { name: /Agregar al carrito|Añadir al carrito/i })
+      .filter({ visible: true })
+      .last();
+    await expect(confirm).toBeDisabled();
+    const consents = careSurface.getByRole("checkbox").filter({ visible: true });
+    expect(await consents.count(), "Servicios Adicionales must require its legal consents.").toBeGreaterThanOrEqual(3);
+    for (let index = 0; index < await consents.count(); index += 1) {
+      const consent = consents.nth(index);
+      await consent.check();
+      await expect(consent).toBeChecked({ timeout: 10000 });
+    }
 
-  await expect(confirm).toBeVisible({ timeout: 30000 });
-  await expect(confirm).toBeEnabled({ timeout: 30000 });
-  await confirm.click();
+    await expect(confirm).toBeVisible({ timeout: 30000 });
+    await expect(confirm).toBeEnabled({ timeout: 30000 });
+    await confirm.click();
+    await expect(careSurface).toBeHidden({ timeout: 30000 });
+  });
 
-  await expect(careSurface).toBeHidden({ timeout: 30000 });
-
-  const summary = page.getByRole("heading", { name: /Resumen de tu pedido/i }).locator("..");
-  const summaryWarranty = summary.getByText(selectedPlan, { exact: true });
-  const assertAddedPlan = async () => {
-    await expect(summaryWarranty).toBeVisible({ timeout: 30000 });
-    await expect.poll(async () =>
-      parseMxCurrency(await summaryWarranty.locator("..").innerText()),
-      { message: "The order summary must charge the selected plan price.", timeout: 30000 }
-    ).toBe(planPrice);
-    await expect(productCard.getByRole("button", { name: /Remove Servicios Adicionales/i }))
-      .toBeVisible({ timeout: 30000 });
-    await expect(productCard.getByRole("textbox", { name: "Quantity", exact: true })).toHaveValue("1");
-    await expect.poll(async () =>
-      parseMxCurrency(await totalHeading.locator("..").innerText()),
-      { message: "The cart total must increase by exactly the selected service price.", timeout: 30000 }
-    ).toBeCloseTo(totalBefore + planPrice, 2);
-  };
-  await assertAddedPlan();
-  const totalAfter = parseMxCurrency(await totalHeading.locator("..").innerText());
-  await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
-  await assertAddedPlan();
+  let totalAfter;
+  await test.step("Validate the plan price, cart total and persistence after reload", async () => {
+    const totalHeading = page.getByRole("heading", { name: /Total con IVA/i });
+    const summary = page.getByRole("heading", { name: /Resumen de tu pedido/i }).locator("..");
+    const summaryWarranty = summary.getByText(selectedPlan, { exact: true });
+    const assertAddedPlan = async () => {
+      await expect(summaryWarranty).toBeVisible({ timeout: 30000 });
+      await expect.poll(async () =>
+        parseMxCurrency(await summaryWarranty.locator("..").innerText()),
+        { message: "The order summary must charge the selected plan price.", timeout: 30000 }
+      ).toBe(planPrice);
+      await expect(productCard.getByRole("button", { name: /Remove Servicios Adicionales/i }))
+        .toBeVisible({ timeout: 30000 });
+      await expect(productCard.getByRole("textbox", { name: "Quantity", exact: true })).toHaveValue("1");
+      await expect.poll(async () =>
+        parseMxCurrency(await totalHeading.locator("..").innerText()),
+        { message: "The cart total must increase by exactly the selected service price.", timeout: 30000 }
+      ).toBeCloseTo(totalBefore + planPrice, 2);
+    };
+    await assertAddedPlan();
+    totalAfter = parseMxCurrency(await totalHeading.locator("..").innerText());
+    await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+    productCard = page.locator("div.cart-item", { hasText: warrantySku }).filter({ visible: true }).first();
+    await assertAddedPlan();
+  });
 
   recordBusinessEvidence(testInfo, {
     configuredSku: warrantySku,
