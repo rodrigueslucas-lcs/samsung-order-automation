@@ -24,7 +24,8 @@ function walk(root) {
 function collectStepHelpers(source) {
   const helpers = new Set();
   const patterns = [
-    /async\s+function\s+(\w+)\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/g,
+    /(?:export\s+)?async\s+function\s+(\w+)\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/g,
+    /(?:export\s+)?function\s+(\w+)\s*\([^)]*\)\s*\{([\s\S]*?)\n\}/g,
     /const\s+(\w+)\s*=\s*async\s*\([^)]*\)\s*=>\s*\{([\s\S]*?)\n\};/g,
   ];
   for (const pattern of patterns) {
@@ -34,6 +35,37 @@ function collectStepHelpers(source) {
     }
   }
   return helpers;
+}
+
+function resolveImport(fromFile, request) {
+  if (!request.startsWith(".")) return null;
+  const base = path.resolve(path.dirname(fromFile), request);
+  const candidates = [base, `${base}.js`, `${base}.cjs`, `${base}.mjs`, path.join(base, "index.js")];
+  return candidates.find((candidate) => fs.existsSync(candidate) && fs.statSync(candidate).isFile()) || null;
+}
+
+function collectImportedSteppedHelpers(file, source) {
+  const stepped = new Set();
+  const importExpression = /import\s*\{([^}]+)\}\s*from\s*["']([^"']+)["']/g;
+  let match;
+  while ((match = importExpression.exec(source))) {
+    const target = resolveImport(file, match[2]);
+    if (!target) continue;
+    const importedSource = fs.readFileSync(target, "utf8");
+    const exportedStepped = collectStepHelpers(importedSource);
+    const names = match[1]
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean)
+      .map((value) => {
+        const parts = value.split(/\s+as\s+/i).map((part) => part.trim());
+        return { exported: parts[0], local: parts[1] || parts[0] };
+      });
+    for (const { exported, local } of names) {
+      if (exportedStepped.has(exported)) stepped.add(local);
+    }
+  }
+  return stepped;
 }
 
 function collectLiteralTests(source) {
@@ -58,7 +90,8 @@ const summary = Object.fromEntries(MARKETS.map((market) => [market, { audited: 0
 for (const market of MARKETS) {
   for (const file of walk(MARKET_ROOTS[market])) {
     const source = fs.readFileSync(file, "utf8");
-    const stepHelpers = collectStepHelpers(source);
+    const localStepHelpers = collectStepHelpers(source);
+    const importedStepHelpers = collectImportedSteppedHelpers(file, source);
     const tests = collectLiteralTests(source);
 
     for (let index = 0; index < tests.length; index += 1) {
@@ -76,17 +109,17 @@ for (const market of MARKETS) {
       const nextIndex = tests[index + 1]?.index ?? source.length;
       const testSource = source.slice(current.index, nextIndex);
       const explicitStep = /\btest\.step\s*\(/.test(testSource);
-      const steppedLocalHelper = [...stepHelpers].some((helper) =>
+      const callsSteppedHelper = [...localStepHelpers, ...importedStepHelpers].some((helper) =>
         new RegExp(`\\b${helper}\\s*\\(`).test(testSource)
       );
 
-      if (explicitStep || steppedLocalHelper) {
+      if (explicitStep || callsSteppedHelper) {
         summary[market].covered += 1;
         continue;
       }
 
       const samId = title.match(/SAM-\d+/i)?.[0] || "UNKNOWN";
-      errors.push(`${market.toUpperCase()} ${samId}: no report-visible business test.step in the TC or a local stepped helper (${relative(file)}).`);
+      errors.push(`${market.toUpperCase()} ${samId}: no report-visible business test.step in the TC or a proven stepped helper (${relative(file)}).`);
     }
   }
 }
@@ -106,4 +139,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log("[qst-business-steps] PASS · every executable literal QST case exposes report-visible business steps; fixture-only wrappers are not accepted for any market.");
+console.log("[qst-business-steps] PASS · every executable literal QST case exposes report-visible business steps; fixture-only wrappers are rejected in all markets.");
