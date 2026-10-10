@@ -8,7 +8,10 @@ import {
   validateMxCheckoutSummaryPresentation,
   validateMxExternalServicesPresentation,
 } from "./mxQstFlows";
-import { reachMxGuestDelivery } from "../../dst/base-store/mxFlows";
+import {
+  reachMxGuestDelivery,
+  continueMxDeliveryToPaymentWithRecovery,
+} from "../../dst/base-store/mxFlows";
 
 const { recordBusinessEvidence } = evidenceContext;
 const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
@@ -107,9 +110,8 @@ test("SAM-24989 @qst @mx @base-store @safe - Order Summary on checkout page", as
     expect(address.selectedColonia).toBeTruthy();
   });
 
-  await test.step("Continue to Payment and validate the payment page", async () => {
-    await checkout.selectDeliveryAndContinue();
-    await checkout.validatePaymentPage({ postalCode: "01000" });
+  await test.step("Continue to Payment with bounded recovery and validate the payment page", async () => {
+    await continueMxDeliveryToPaymentWithRecovery(page, checkout, { postalCode: "01000" });
     await expect(page).toHaveURL(/CHECKOUT_STEP_PAYMENT/i);
   });
 });
