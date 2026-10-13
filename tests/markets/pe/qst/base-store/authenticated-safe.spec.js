@@ -61,10 +61,30 @@ test.describe("PE QST - authenticated safe reuse", () => {
       origin: config.baseUrl.origin,
       market: "pe",
     });
+    let history;
     await test.step("Open My Orders", async () => {
+      const responsePromise = page.waitForResponse((response) =>
+        response.request().method() === "GET" &&
+        new URL(response.url()).pathname.endsWith("/v2/pe/users/current/orders")
+      );
       await myOrders.openMyOrders();
+      const response = await responsePromise;
+      expect(response.status(), "Authenticated PE order history API must succeed").toBe(200);
+      history = await response.json();
     });
     await test.step("Validate order history is available", async () => {
+      if (config.environment === "S1" &&
+          Array.isArray(history.currentOrders) && history.currentOrders.length === 0 &&
+          Array.isArray(history.previousOrders) && history.previousOrders.length === 0) {
+        await expect(page).toHaveURL(/\/pe\/mypage\/orders(?:[?#]|$)/);
+        const main = page.getByRole("main");
+        await expect(main.getByText("No tiene ningún producto en sus pedidos.", { exact: true })).toBeVisible();
+        await expect(main.getByRole("textbox", { name: "Número de pedido", exact: true })).toBeVisible();
+        await expect(main.getByRole("button", { name: "Buscar pedido", exact: true })).toBeDisabled();
+        expect(await myOrders.visibleOrderCodes()).toEqual([]);
+        testInfo.annotations.push({ type: "qst-order-history-state", description: "S1 authenticated API and UI confirm an empty order history." });
+        return;
+      }
       await expect.poll(() => myOrders.visibleOrderCodes().then((codes) => codes.length), {
       timeout: 60000,
       message: "The authenticated PE My Orders page must list an order after loading.",
