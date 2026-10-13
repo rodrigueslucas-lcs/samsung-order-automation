@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const { writeJsonAtomically } = require("../utils/atomicJson");
 const path = require("node:path");
 const { resolveMxEnvironment } = require("../utils/mxConfig");
+const { hasMxAccountReturned, waitForMxAccountField, redactMxAuthError } = require("../utils/mxAuthLoginStep.cjs");
 
 const TARGET = resolveMxEnvironment();
 const HOSTNAME = TARGET.hostname;
@@ -122,7 +123,26 @@ async function findRenderedMxPage(context, preferredPage = null) {
   return null;
 }
 
+async function prepareMxWindow(page, closeDevTools = false) {
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    if (closeDevTools) {
+      const { targetInfos } = await cdp.send("Target.getTargets");
+      for (const target of targetInfos) {
+        if (target.url.startsWith("devtools://")) await cdp.send("Target.closeTarget", { targetId: target.targetId });
+      }
+    }
+    const { windowId, bounds } = await cdp.send("Browser.getWindowForTarget");
+    if (["minimized", "fullscreen"].includes(bounds.windowState)) {
+      await cdp.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "normal" } });
+    }
+    if (bounds.windowState !== "maximized") await cdp.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "maximized" } });
+  } finally { await cdp.detach(); }
+  await page.bringToFront();
+}
+
 async function waitForProfileMenu(page) {
+  await prepareMxWindow(page);
   const profile = page.getByRole("button", { name: "My Profile", exact: true });
   await profile.waitFor({ state: "visible", timeout: 120000 });
   await profile.hover();
@@ -176,26 +196,35 @@ async function waitForSamsungAccountPage(context, currentPage) {
     try {
       if (new URL(currentPage.url()).hostname === ACCOUNT_HOSTNAME) return currentPage;
     } catch {}
+    // Warm Samsung SSO can complete before an Account page is observed.
+    if (isMxStorefront(currentPage) && await isAuthenticated(currentPage)) return null;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   throw new Error("Samsung Account page did not open within 120 seconds.");
 }
 
 async function fillSamsungAccount(page, credentials) {
-  const email = page.locator('input[type="email"], input[name="email"], #iptLgnPlnID').first();
-  await email.waitFor({ state: "visible", timeout: 120000 });
-  await email.fill(credentials.email);
+  try {
+    await prepareMxWindow(page, true);
+    const stepOptions = { hostname: HOSTNAME, timeout: interactiveTimeout };
+    const email = page.locator('input[type="email"], input[name="email"], #iptLgnPlnID, #account').filter({ visible: true }).first();
+    if (await waitForMxAccountField(page, email, stepOptions) === "returned") return;
+    await email.fill(credentials.email);
 
-  const password = page.locator('input[type="password"], input[name="password"], #iptLgnPlnPD').first();
-  if (!(await password.isVisible().catch(() => false))) {
-    const next = page.getByRole("button", { name: /Siguiente|Next|Continuar/i }).first();
-    if (await next.isVisible().catch(() => false)) await next.click();
+    const password = page.locator('input[type="password"], input[name="password"], #iptLgnPlnPD').filter({ visible: true }).first();
+    if (!(await password.isVisible().catch(() => false))) {
+      const next = page.getByRole("button", { name: /Siguiente|Next|Continuar/i }).first();
+      if (await next.isVisible().catch(() => false)) await next.click();
+    }
+    if (await waitForMxAccountField(page, password, stepOptions) === "returned") return;
+    await password.fill(credentials.password);
+
+    const signIn = page.getByRole("button", { name: /Iniciar sesi[oó]n|Sign in/i }).first();
+    await signIn.click();
+  } catch (error) {
+    // A redirect during fill/click also hands off to positive auth verification.
+    if (!hasMxAccountReturned(page, HOSTNAME)) throw error;
   }
-  await password.waitFor({ state: "visible", timeout: 120000 });
-  await password.fill(credentials.password);
-
-  const signIn = page.getByRole("button", { name: /Iniciar sesi[oó]n|Sign in/i }).first();
-  await signIn.click();
 }
 
 async function waitForAuthenticatedStorefront(context, preferredPage) {
@@ -225,6 +254,7 @@ async function exportState(context, page) {
     if (!context) throw new Error("Dedicated MX Chrome has no browser context.");
 
     let page = context.pages()[0] || await context.newPage();
+    await prepareMxWindow(page, true);
     await goToMxStorefront(page);
 
     if (await isAuthenticated(page)) {
@@ -235,17 +265,17 @@ async function exportState(context, page) {
     await startLogin(page);
     const accountPage = await waitForSamsungAccountPage(context, page);
 
-    if (!manualLogin) {
+    if (accountPage && !manualLogin) {
       const credentials = resolveRuntimeCredentials();
       await fillSamsungAccount(accountPage, credentials);
-    } else {
+    } else if (accountPage) {
       console.log("[auth:login:mx] manual mode active; complete Samsung Account login/CAPTCHA/MFA in the opened Chrome.");
     }
 
     page = await waitForAuthenticatedStorefront(context, page);
     await exportState(context, page);
   } catch (error) {
-    console.error(`[auth:login:mx] ${error.stack || error.message || error}`);
+    console.error(`[auth:login:mx] ${redactMxAuthError(error)}`);
     process.exitCode = 1;
   } finally {
     await browser?.close().catch(() => {});
