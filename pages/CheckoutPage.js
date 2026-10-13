@@ -160,10 +160,15 @@ export default class CheckoutPage extends BasePage {
       name: "Nueva dirección",
       exact: true,
     });
-    await newAddress.waitFor({ state: "visible", timeout: 30000 });
-    await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
-    if (!(await newAddress.isChecked())) {
-      throw new Error("New shipping address did not remain selected.");
+    const addressForm = deliveryPanel.getByRole("heading", { name: "Completa tu dirección de entrega", exact: true });
+    await newAddress.or(addressForm).first().waitFor({ state: "visible", timeout: 30000 });
+    if (await newAddress.isVisible()) {
+      await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
+      if (!(await newAddress.isChecked())) {
+        throw new Error("New shipping address did not remain selected.");
+      }
+    } else {
+      await addressForm.waitFor({ state: "visible", timeout: 30000 });
     }
     await this.fillAddress(address);
     const saveAddress = deliveryPanel.getByRole("checkbox", {
