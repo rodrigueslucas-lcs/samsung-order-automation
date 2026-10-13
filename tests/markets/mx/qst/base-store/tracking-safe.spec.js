@@ -7,6 +7,7 @@ import MailinatorPage from "../../../../../pages/MailinatorPage";
 import MarketPaymentPage from "../../../../../pages/MarketPaymentPage";
 import destructiveGuards from "../../../../../utils/destructiveGuards";
 import mxTestCard from "../../../../../utils/mxTestCard.js";
+import mxTrackingPrerequisite from "../../../../../utils/mxTrackingPrerequisite.cjs";
 import { reachMxGuestPayment } from "../../dst/base-store/mxFlows";
 import { test, expect } from "./mxQst.fixture";
 
@@ -14,6 +15,7 @@ const { recordBusinessEvidence } = evidenceContext;
 const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
 const { requirePaymentSubmitOptIn } = destructiveGuards;
 const { getMxTestCard } = mxTestCard;
+const { normalizeMxOrderCode, getMxTrackingPrerequisite } = mxTrackingPrerequisite;
 
 test.describe.configure({ timeout: 1200000, retries: 0 });
 const guestOrderRuntimeFile = path.resolve("test-results/mx-qst/latest-guest-order.json");
@@ -31,10 +33,6 @@ const provenTrackingPrerequisite = {
   inbox: "mx-qst-1789499434831",
 };
 
-function normalizeMxOrderCode(value) {
-  return String(value || "").match(/\bMX\d{6}-\d{8}(?:_\d+)?\b/i)?.[0] || null;
-}
-
 function isKnownMxTrackingBaseSiteDefect(error, orderNumber) {
   const message = String(error?.message || error || "");
   return message.includes("Guest Track Order accepted the OTP but could not find") &&
@@ -42,19 +40,12 @@ function isKnownMxTrackingBaseSiteDefect(error, orderNumber) {
     message.includes("in the current BaseSite");
 }
 
-function readGuestOrderRuntime() {
+function readGuestOrderRuntime(environment) {
   if (!fs.existsSync(guestOrderRuntimeFile)) return null;
 
   try {
     const value = JSON.parse(fs.readFileSync(guestOrderRuntimeFile, "utf8"));
-    const orderNumber = normalizeMxOrderCode(value.orderNumber);
-    const email = String(value.email || "").trim().toLowerCase();
-    const inbox = String(value.inbox || "").trim();
-
-    const confirmed = value.confirmed === true || /confirmed|confirmation/i.test(String(value.status || value.outcome || ""));
-    return confirmed && orderNumber && email && inbox
-      ? { orderNumber, email, inbox }
-      : null;
+    return getMxTrackingPrerequisite(value, environment);
   } catch {
     return null;
   }
@@ -131,7 +122,7 @@ test("SAM-25010 @destructive @qst @mx @base-store - Track Order with email and O
     }
 
     if (!orderNumber || !email || !inbox) {
-      const causalOrder = readGuestOrderRuntime();
+      const causalOrder = readGuestOrderRuntime(mxConfig.environment);
       if (causalOrder) ({ orderNumber, email, inbox } = causalOrder);
     }
 
@@ -168,10 +159,12 @@ test("SAM-25010 @destructive @qst @mx @base-store - Track Order with email and O
   let mailPage;
   let mailinator;
   let baselineMessageIds;
+  let baselineOtpCodes;
   await test.step("Open the Mailinator inbox and capture the OTP baseline", async () => {
     mailPage = await context.newPage();
     mailinator = new MailinatorPage(mailPage, inbox);
     await mailinator.openInbox();
+    baselineOtpCodes = await mailinator.snapshotOtpCodes();
     baselineMessageIds = await mailinator.snapshotMessageIds();
   });
 
@@ -187,7 +180,7 @@ test("SAM-25010 @destructive @qst @mx @base-store - Track Order with email and O
   let otpEmail;
   await test.step("Wait for the new OTP email and capture the verification code", async () => {
     await mailPage.bringToFront();
-    otpEmail = await mailinator.waitForOtpEmail({ baselineMessageIds });
+    otpEmail = await mailinator.waitForOtpEmail({ baselineMessageIds, baselineOtpCodes });
   });
 
   let result;
