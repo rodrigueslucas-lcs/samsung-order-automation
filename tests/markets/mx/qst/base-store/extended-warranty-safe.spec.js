@@ -48,6 +48,7 @@ test("SAM-24985 @qst @mx @base-store @safe - Extended Warranty on Cart", async (
   let selectedPlan;
   let planSku;
   let planPrice;
+  let consentCount = 0;
   await test.step("Open Servicios Adicionales and select the eligible protection plan", async () => {
     const warrantyAction = productCard.locator('button[data-an-la="add service:warranty"]');
     await expect(warrantyAction, "The eligible appliance must expose Servicios Adicionales.").toBeVisible();
@@ -56,7 +57,9 @@ test("SAM-24985 @qst @mx @base-store @safe - Extended Warranty on Cart", async (
     await expect(careSurface).toBeVisible({ timeout: 30000 });
 
     const planRadio = careSurface.getByRole("radio", {
-      name: /Service Pack|Select AI:\s*Suscripci[oó]n mensual por 36 meses/i,
+      name: mxConfig.environment === "S1"
+        ? /^Extensi[oó]n de Garant[ií]a de 12 meses m[aá]s/i
+        : /Service Pack|Select AI:\s*Suscripci[oó]n mensual por 36 meses/i,
     });
     await expect(planRadio).toHaveCount(1, { timeout: 30000 });
     await expect(planRadio).toBeVisible({ timeout: 30000 });
@@ -79,10 +82,16 @@ test("SAM-24985 @qst @mx @base-store @safe - Extended Warranty on Cart", async (
       .getByRole("button", { name: /Agregar al carrito|Añadir al carrito/i })
       .filter({ visible: true })
       .last();
-    await expect(confirm).toBeDisabled();
+    if (mxConfig.environment !== "S1") await expect(confirm).toBeDisabled();
     const consents = careSurface.getByRole("checkbox").filter({ visible: true });
-    expect(await consents.count(), "Servicios Adicionales must require its legal consents.").toBeGreaterThanOrEqual(3);
-    for (let index = 0; index < await consents.count(); index += 1) {
+    consentCount = await consents.count();
+    if (mxConfig.environment !== "S1") {
+      expect(consentCount, "The subscription must require its legal consents.").toBeGreaterThanOrEqual(3);
+    }
+    // The S1 one-off warranty currently displays static terms without consent
+    // controls. Accept every control if offered, without inventing a disabled gate.
+    if (mxConfig.environment === "S1" && consentCount > 0) await expect(confirm).toBeDisabled();
+    for (let index = 0; index < consentCount; index += 1) {
       const consent = consents.nth(index);
       await consent.check();
       await expect(consent).toBeChecked({ timeout: 10000 });
@@ -126,7 +135,9 @@ test("SAM-24985 @qst @mx @base-store @safe - Extended Warranty on Cart", async (
     plan: selectedPlan,
     planSku,
     planPrice,
-    acceptedCareTerms: true,
+    careTermsDisplayed: true,
+    careConsentCount: consentCount,
+    acceptedCareTerms: consentCount > 0,
     totalBefore,
     totalAfter,
     priceChanged: true,
