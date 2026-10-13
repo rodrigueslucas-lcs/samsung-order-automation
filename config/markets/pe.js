@@ -41,9 +41,7 @@ function getPeQstConfig(environment = process.env) {
     requireHttpsUrl(environment.PE_STOREFRONT_URL || defaultBase, "PE_STOREFRONT_URL", envName),
     "PE_STOREFRONT_URL"
   );
-  const defaultSetupUrl = envName === "S2"
-    ? new URL("/getcookie.html", baseUrl.origin).href
-    : null;
+  const defaultSetupUrl = new URL("/getcookie.html", baseUrl.origin).href;
   const setupUrl = optionalHttpsUrl(
     environment.PE_SETUP_URL || defaultSetupUrl,
     "PE_SETUP_URL",

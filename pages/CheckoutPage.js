@@ -150,7 +150,7 @@ export default class CheckoutPage extends BasePage {
     }
   }
 
-  async saveNewAuthenticatedAddress(address) {
+  async selectNewAuthenticatedAddress() {
     const deliveryPanel = this.page.getByRole("tabpanel", {
       name: "Envío",
       exact: true,
@@ -170,6 +170,11 @@ export default class CheckoutPage extends BasePage {
     } else {
       await addressForm.waitFor({ state: "visible", timeout: 30000 });
     }
+  }
+
+  async saveNewAuthenticatedAddress(address) {
+    await this.selectNewAuthenticatedAddress();
+    const deliveryPanel = this.page.getByRole("tabpanel", { name: "Envío", exact: true });
     await this.fillAddress(address);
     const saveAddress = deliveryPanel.getByRole("checkbox", {
       name: /Guardar datos de env[ií]o en Mi cuenta/i,

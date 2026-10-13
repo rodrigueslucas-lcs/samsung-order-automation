@@ -4,6 +4,7 @@ import peConfigModule from "../../../../../config/markets/pe";
 import evidenceContext from "../../../../../reporting/evidence/evidenceContext";
 import peEvidenceMetadata from "../../../../../utils/qstPeEvidenceMetadata";
 import { testData } from "../../../../../utils/testData";
+import ProfilePage from "../../../../../pages/ProfilePage";
 import { reachPeRegisteredDelivery } from "./peQstFlows";
 
 const {
@@ -39,23 +40,44 @@ test.describe("PE QST - registered checkout safe reuse", () => {
     });
 
     const config = getPeQstConfig();
-    const { checkout } = await reachPeRegisteredDelivery(page, config);
-    const savedAddressMode = page.getByRole("radio", {
-      name: "Dirección guardada",
-      exact: true,
-    });
-    test.skip(
-      !(await savedAddressMode.waitFor({ state: "visible", timeout: 30000 }).then(() => true, () => false)),
-      "No saved address is available in the authenticated PE account; do not create persistent data in this safe TC."
-    );
+    const profile = new ProfilePage(page, { origin: config.baseUrl.origin, market: "pe", addressApiUrl: config.addressApiUrl.href });
+    let provisionedAddress;
+    try {
+      // Optional guarded QA fixture; the default safe lane remains read-only.
+      if (process.env.ALLOW_PROFILE_WRITE === "1") {
+        const saved = await profile.inspectSavedAddressesApi();
+        expect(saved.status).toBe(200);
+        if (saved.count === 0) {
+          provisionedAddress = profile.qaAddress(`SAVED SELECT ${Date.now()}`, testData.address);
+          Object.assign(provisionedAddress, { number: "297", phone: testData.customer.phone, documentNumber: testData.customer.documentNumber });
+          await test.step("Provision isolated QA saved-address prerequisite", async () => {
+            await profile.createQaAddress(provisionedAddress);
+            await profile.waitForQaAddressViaApi(provisionedAddress.street);
+          });
+        }
+      }
+      const { checkout } = await reachPeRegisteredDelivery(page, config);
+      const savedAddressMode = page.getByRole("radio", {
+        name: "Dirección guardada",
+        exact: true,
+      });
+      test.skip(
+        !(await savedAddressMode.waitFor({ state: "visible", timeout: 30000 }).then(() => true, () => false)),
+        "No saved address is available in the authenticated PE account; enable guarded QA provisioning with ALLOW_PROFILE_WRITE=1."
+      );
 
-    await test.step("Select and validate saved delivery address", async () => {
-      await checkout.selectSavedAddressAndValidate();
-    });
-    testInfo.annotations.push({
-      type: "qst-reuse-note",
-      description: "Read-only selection of an already-existing saved address. No address is created or edited by this safe test.",
-    });
+      await test.step("Select and validate saved delivery address", async () => {
+        await checkout.selectSavedAddressAndValidate();
+      });
+      testInfo.annotations.push({
+        type: "qst-reuse-note",
+        description: provisionedAddress
+          ? "Saved-address selection uses an isolated QA prerequisite under ALLOW_PROFILE_WRITE=1; only that address is removed in finally."
+          : "Read-only selection of an already-existing saved address. No address is created or edited.",
+      });
+    } finally {
+      if (provisionedAddress) await profile.deleteQaAddressesViaApi(provisionedAddress.street);
+    }
   });
 
   test("SAM-25086 @qst @pe @base-store @safe @registered @reuse - Save option for registered user", async ({ page }, testInfo) => {
@@ -69,16 +91,9 @@ test.describe("PE QST - registered checkout safe reuse", () => {
     });
 
     const config = getPeQstConfig();
-    await reachPeRegisteredDelivery(page, config);
-
-    const newAddress = page.getByRole("tabpanel", { name: "Envío", exact: true }).getByRole("radio", {
-      name: "Nueva dirección",
-      exact: true,
-    });
+    const { checkout } = await reachPeRegisteredDelivery(page, config);
     await test.step("Select new-address mode", async () => {
-      await newAddress.waitFor({ state: "visible", timeout: 30000 });
-      await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
-      await expect(newAddress).toBeChecked({ timeout: 30000 });
+      await checkout.selectNewAuthenticatedAddress();
     });
 
     const saveAddress = page.getByRole("checkbox", {
@@ -106,13 +121,7 @@ test.describe("PE QST - registered checkout safe reuse", () => {
 
     const config = getPeQstConfig();
     const { checkout } = await reachPeRegisteredDelivery(page, config);
-    const newAddress = page.getByRole("tabpanel", { name: "Envío", exact: true }).getByRole("radio", {
-      name: "Nueva dirección",
-      exact: true,
-    });
-    await newAddress.waitFor({ state: "visible", timeout: 30000 });
-    await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
-    await expect(newAddress).toBeChecked({ timeout: 30000 });
+    await test.step("Select new-address form", () => checkout.selectNewAuthenticatedAddress());
 
     await test.step("Fill and validate new delivery address", async () => {
       await checkout.fillAddress(testData.address);

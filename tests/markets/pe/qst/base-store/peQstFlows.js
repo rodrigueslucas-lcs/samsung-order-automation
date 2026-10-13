@@ -36,8 +36,11 @@ export async function addConfiguredProductToPeCart(page, config) {
   });
 }
 
-export async function reachPeGuestDelivery(page, config) {
+export async function reachPeGuestDelivery(page, config, options = {}) {
   const cart = await addConfiguredProductToPeCart(page, config);
+  if (options.requireQuantityOne) {
+    await test.step("Verify controlled PE order cart contains quantity one", () => cart.validateQuantityLowerBoundary());
+  }
   await test.step("Continue from cart to guest checkout", async () => {
     await cart.proceedToCheckout();
   });
@@ -55,7 +58,7 @@ export async function reachPeGuestDelivery(page, config) {
 }
 
 export async function reachPeGuestPayment(page, config, options = {}) {
-  const { cart, checkout } = await reachPeGuestDelivery(page, config);
+  const { cart, checkout } = await reachPeGuestDelivery(page, config, options);
   await test.step("Complete delivery address", async () => {
     await checkout.fillAddress(options.address || testData.address);
   });
@@ -106,14 +109,8 @@ export async function reachPeRegisteredDelivery(page, config) {
 
 export async function reachPeRegisteredPayment(page, config, options = {}) {
   const { cart, checkout } = await reachPeRegisteredDelivery(page, config);
-  const newAddress = page.getByRole("tabpanel", { name: "Envío", exact: true }).getByRole("radio", {
-    name: "Nueva dirección",
-    exact: true,
-  });
   await test.step("Delivery · Select new address", async () => {
-    await newAddress.waitFor({ state: "visible", timeout: 30000 });
-    await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
-    if (!(await newAddress.isChecked())) throw new Error("PE delivery did not switch to the new-address mode.");
+    await checkout.selectNewAuthenticatedAddress();
   });
   await test.step("Delivery · Fill shipping address", () =>
     checkout.fillAddress(options.address || testData.address)

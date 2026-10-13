@@ -1,4 +1,9 @@
 const PE_BACKOFFICE_TEST_DATA = Object.freeze({
+  // Verified read-only in S1 BackOffice on 2026-10-13: Shipping Requested.
+  S1: Object.freeze({
+    orderCode: "PE261013-63986039",
+    productCode: "SM-F741BLBKPEO",
+  }),
   S2: Object.freeze({
     orderCode: "PE260926-77211976",
     productCode: "SM-F741BLBKPEO",

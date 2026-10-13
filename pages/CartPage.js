@@ -852,7 +852,7 @@ export default class CartPage extends BasePage {
     await continueButton.click();
   }
 
-  async completeTradeInJourney() {
+  async completeTradeInJourney({ modelName = "Galaxy S25", capacity = "256GB", valuation = "S/ 1,100.00" } = {}) {
     const dialog = this.page.getByRole("dialog").filter({ visible: true });
 
     await dialog
@@ -891,7 +891,7 @@ export default class CartPage extends BasePage {
     // Model - dropdown already expanded; click the real option text element
     const galaxyS25Option = dialog
       .locator("span.option-brand", {
-        hasText: "Galaxy S25",
+        hasText: modelName,
       })
       .first();
 
@@ -904,7 +904,7 @@ export default class CartPage extends BasePage {
 
     // Capacity is automatically populated for Galaxy S25.
     await dialog
-      .getByText("256GB", { exact: true })
+      .getByText(capacity, { exact: true })
       .first()
       .waitFor({
         state: "visible",
@@ -913,7 +913,7 @@ export default class CartPage extends BasePage {
 
     const selectedDeviceCard = dialog
       .getByRole("heading", {
-        name: "Galaxy S25 | 256GB",
+        name: `${modelName} | ${capacity}`,
         exact: true,
       })
       .locator("..");
@@ -926,12 +926,13 @@ export default class CartPage extends BasePage {
       });
 
     await selectedDeviceCard
-      .getByText("S/ 1,100.00", { exact: true })
+      .getByText(valuation, { exact: true })
       .waitFor({
         state: "visible",
         timeout: 30000,
       });
 
+    this.tradeInFixture = { deviceLabel: `${modelName} | ${capacity}`, valuation };
     await this.clickTradeInContinue(dialog);
 
     // IMEI
@@ -1063,6 +1064,7 @@ export default class CartPage extends BasePage {
   }
 
   async validateTradeInAdded() {
+    const fixture = this.tradeInFixture || { deviceLabel: "Galaxy S25 | 256GB", valuation: "S/ 1,100.00" };
     const main = this.page.getByRole("main");
 
     const tradeInBlock = main
@@ -1073,14 +1075,14 @@ export default class CartPage extends BasePage {
       .locator("..");
 
     await tradeInBlock
-      .getByText("Galaxy S25 | 256GB", { exact: true })
+      .getByText(fixture.deviceLabel, { exact: true })
       .waitFor({
         state: "visible",
         timeout: 30000,
       });
 
     await tradeInBlock
-      .getByText("-S/ 1,100.00", { exact: true })
+      .getByText(`-${fixture.valuation}`, { exact: true })
       .waitFor({
         state: "visible",
         timeout: 30000,
@@ -1097,11 +1099,13 @@ export default class CartPage extends BasePage {
   }
 
   async validateTradeInSummaryAmount() {
+    const fixture = this.tradeInFixture || { deviceLabel: "Galaxy S25 | 256GB", valuation: "S/ 1,100.00" };
+    const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const main = this.page.getByRole("main");
 
     await main
       .getByText(
-        /El valor estimado de tu Galaxy S25\s*\|\s*256GB es de hasta S\/\s*1,100\.00/i
+        new RegExp(`El valor estimado de tu ${escape(fixture.deviceLabel)} es de hasta ${escape(fixture.valuation)}`, "i")
       )
       .waitFor({
         state: "visible",
@@ -1109,7 +1113,7 @@ export default class CartPage extends BasePage {
       });
 
     await main
-      .getByText("- S/ 1,100.00", {
+      .getByText(`- ${fixture.valuation}`, {
         exact: true,
       })
       .waitFor({

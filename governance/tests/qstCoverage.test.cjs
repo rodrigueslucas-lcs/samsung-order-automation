@@ -148,6 +148,7 @@ test("PE config stays runtime-driven and market-scoped", () => {
     assert.equal(runtime.environment, environment);
     assert.equal(runtime.baseUrl.hostname, environment === "S2" ? "stg2.shop.samsung.com" : "stg.shop.samsung.com");
     assert.equal(runtime.sku, PROVEN_PE_QST_ST2_SKU);
+    assert.equal(runtime.setupUrl.href, new URL("/getcookie.html", runtime.baseUrl.origin).href);
     assert.equal(getMarketConfig("PE", { PE_QST_ENVIRONMENT: environment }).baseUrl.href, runtime.baseUrl.href);
   }
   assert.throws(() => getPeQstConfig({ PE_QST_ENVIRONMENT: "S3" }), /Unsupported PE QST environment/);

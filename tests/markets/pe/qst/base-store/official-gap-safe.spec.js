@@ -107,7 +107,9 @@ test.describe("PE QST - official safe gap reconciliation", () => {
     );
     await test.step("Open and complete Trade-in journey", async () => {
       await cart.openTradeInJourney();
-      await cart.completeTradeInJourney();
+      await cart.completeTradeInJourney(cfg.environment === "S1"
+        ? { modelName: "GALAXY S24 ULTRA 5G", capacity: "Otros", valuation: "S/ 2,200.00" }
+        : {});
     });
     await test.step("Validate Trade-in was added to cart", async () => {
       await cart.validateTradeInAdded();
@@ -157,7 +159,7 @@ test.describe("PE QST - official safe gap reconciliation", () => {
     requirePaymentSubmitOptIn();
     evidence(testInfo, "SAM-25099");
     const cfg = config();
-    const { payment } = await reachPeGuestPayment(page, cfg, { expectedPaymentMode: /^Banca por Internet\b/i });
+    const { payment } = await reachPeGuestPayment(page, cfg, { expectedPaymentMode: /^Banca por Internet\b/i, requireQuantityOne: true });
     await test.step("Select Internet Banking", async () => {
       await payment.selectBancaPorInternet();
     });
@@ -168,11 +170,15 @@ test.describe("PE QST - official safe gap reconciliation", () => {
       expect(result.orderCode, `Authorized PE order submit produced no observable order code. Outcome: ${result.type}`).toMatch(/^PE\d{6}-\d{8}(?:_\d+)?$/i);
     });
 
-    if (/confirmation|confirmacion|order-confirmation|checkout\/order|success/i.test(page.url())) {
+    await test.step("Validate visible new order confirmation screen", async () => {
+      const outcomeUrl = new URL(result.finalUrl);
+      if (outcomeUrl.hostname !== cfg.baseUrl.hostname) {
+        throw new Error(`PE order ${result.orderCode} reached ${outcomeUrl.origin}${outcomeUrl.pathname}; Samsung confirmation remains unproven. Resume the existing attempt before any new submission.`);
+      }
       const confirmation = new OrderConfirmationPage(page);
       const confirmationOrder = await confirmation.validateOrderCreated();
       expect(confirmationOrder).toContain(result.orderCode.replace(/^PE/i, ""));
-    }
+    });
 
     recordBusinessEvidence(testInfo, {
       orderCode: result.orderCode,
