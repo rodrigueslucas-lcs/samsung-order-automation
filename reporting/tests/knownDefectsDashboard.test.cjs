@@ -64,6 +64,12 @@ test('dashboard visually separates a mapped defect without rewriting raw runtime
     assert.match(html, /known-defect-registry/);
     assert.match(html, /class="defect"/);
     assert.doesNotMatch(html, /<i class="blocked"><\/i><b>1<\/b> BLOCKED/);
+
+    const defectStyle = html.match(/<style id="known-defect-style">([\s\S]*?)<\/style>/)?.[1] || '';
+    assert.match(defectStyle, /--defect:#7047c7/);
+    assert.match(defectStyle, /\.runtime-kpis\{grid-template-columns:repeat\(auto-fit,minmax\(150px,1fr\)\)!important\}/);
+    assert.doesNotMatch(defectStyle, /\.hero-kpis/,
+      'Known-defect styling must not override the executive overview 4x2 responsive KPI grid.');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
