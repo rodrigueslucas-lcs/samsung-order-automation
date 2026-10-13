@@ -310,7 +310,7 @@ pipeline {
     }
 
     stage('07 · PreQA2 CDP Preflight') {
-      when { expression { return params.MARKET == 'MX' && params.TEST_SUITE == 'official-p1' } }
+      when { expression { return params.MARKET == 'MX' && params.ENVIRONMENT == 'S2' && params.TEST_SUITE == 'official-p1' } }
       steps {
         script {
           def preflightStatus = isUnix()
@@ -427,7 +427,43 @@ pipeline {
               env.MX_SESSION_CREDENTIAL = params.ENVIRONMENT == 'S2' ? 'samsung-mx-s2-session-storage' : 'samsung-mx-s1-session-storage'
               env.MX_AUTH_SUFFIX = params.ENVIRONMENT.toLowerCase()
 
-              if (params.ENVIRONMENT == 'S2' && params.AUTH_SOURCE == 'session-bundle') {
+              if (params.ENVIRONMENT == 'S1' && params.AUTH_SOURCE == 'session-bundle') {
+                withCredentials([
+                  file(credentialsId: 'samsung-mx-s1-session-bundle', variable: 'MX_SESSION_BUNDLE_SECRET'),
+                  file(credentialsId: 'samsung-mx-test-card', variable: 'MX_TEST_CARD_SECRET')
+                ]) {
+                  if (isUnix()) {
+                    sh '''
+                      set -eu
+                      mkdir -p playwright/.auth
+                      cp "$MX_SESSION_BUNDLE_SECRET" /tmp/samsung-mx-session-bundle.json
+                      chmod 600 /tmp/samsung-mx-session-bundle.json || true
+                      MX_SESSION_BUNDLE=/tmp/samsung-mx-session-bundle.json node scripts/auth-install-mx-package.cjs
+                      cp "$MX_TEST_CARD_SECRET" playwright/.auth/mx-test-card.json
+                      chmod 600 playwright/.auth/*.json || true
+                      CI=1 npm run auth:doctor:mx
+                      CI=1 MX_AUTH_SLOT=second npm run auth:doctor:mx
+                      rm -f /tmp/samsung-mx-session-bundle.json
+                      npx -y node@22 scripts/run-mx-qst-safe.cjs
+                    '''
+                  } else {
+                    bat '''@echo off
+                      if not exist playwright\\.auth mkdir playwright\\.auth
+                      copy /Y "%MX_SESSION_BUNDLE_SECRET%" "%TEMP%\\samsung-mx-session-bundle.json" >nul || exit /b 2
+                      set "MX_SESSION_BUNDLE=%TEMP%\\samsung-mx-session-bundle.json"
+                      call node scripts/auth-install-mx-package.cjs || exit /b 20
+                      copy /Y "%MX_TEST_CARD_SECRET%" "playwright\\.auth\\mx-test-card.json" >nul || exit /b 2
+                      set CI=1
+                      call npm run auth:doctor:mx || exit /b 20
+                      set MX_AUTH_SLOT=second
+                      call npm run auth:doctor:mx || exit /b 20
+                      set MX_AUTH_SLOT=
+                      del /Q "%TEMP%\\samsung-mx-session-bundle.json" 2>nul
+                      call npx -y node@22 scripts/run-mx-qst-safe.cjs
+                    '''
+                  }
+                }
+              } else if (params.ENVIRONMENT == 'S2' && params.AUTH_SOURCE == 'session-bundle') {
                 withCredentials([
                   file(credentialsId: 'samsung-mx-s2-session-bundle', variable: 'MX_SESSION_BUNDLE_SECRET'),
                   file(credentialsId: 'samsung-mx-test-card', variable: 'MX_TEST_CARD_SECRET'),
