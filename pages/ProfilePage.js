@@ -182,6 +182,8 @@ export default class ProfilePage extends MyAccountPage {
     await this.fillAddressForm(address);
     const save = this.market === "cl"
       ? this.page.getByRole("dialog", { name: /Agregar nueva direcci[oó]n/i }).getByRole("button", { name: "Guardar", exact: true })
+      : this.market === "pe"
+      ? this.page.getByRole("dialog", { name: /direcci[oó]n/i }).filter({ visible: true }).getByRole("button", { name: /^(Guardar|Save)$/i })
       : this.page.getByRole("button", { name: /Guardar|Save/i });
     if (this.market === "cl" && !(await save.isEnabled())) {
       const invalid = await this.page.getByRole("dialog", { name: /Agregar nueva direcci[oó]n/i })
@@ -215,6 +217,8 @@ export default class ProfilePage extends MyAccountPage {
     await this.fillAddressForm(updatedAddress);
     await (this.market === "cl"
       ? this.page.getByRole("dialog", { name: /Editar direcci[oó]n/i }).last().getByRole("button", { name: "Guardar", exact: true })
+      : this.market === "pe"
+      ? this.page.getByRole("dialog", { name: /direcci[oó]n/i }).filter({ visible: true }).getByRole("button", { name: /^(Guardar|Actualizar|Save|Update)$/i })
       : this.page.getByRole("button", { name: /Guardar|Actualizar|Save|Update/i })).click();
     if (this.market === "cl") {
       await this.expectQaAddress(updatedAddress.street);
