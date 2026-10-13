@@ -269,7 +269,9 @@ async function exportState(context, page) {
       const credentials = resolveRuntimeCredentials();
       await fillSamsungAccount(accountPage, credentials);
     } else if (accountPage) {
-      console.log("[auth:login:mx] manual mode active; complete Samsung Account login/CAPTCHA/MFA in the opened Chrome.");
+      try { await prepareMxWindow(accountPage, true); }
+      catch (error) { if (!hasMxAccountReturned(accountPage, HOSTNAME)) throw error; }
+      console.log(`[auth:login:mx] manual mode for ${ENV_NAME} ${accountSlot}; complete this account's Samsung Account login/CAPTCHA/MFA in the maximized Chrome.`);
     }
 
     page = await waitForAuthenticatedStorefront(context, page);

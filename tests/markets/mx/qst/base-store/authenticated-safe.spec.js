@@ -8,13 +8,18 @@ const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
 async function openAuthenticatedMenu(page) {
   const profileButton = page.getByRole("button", { name: "My Profile", exact: true });
   await expect(profileButton).toBeVisible({ timeout: 60000 });
+  await page.mouse.move(20, 500);
+  await page.keyboard.press("Escape");
+  await expect(page.locator('[role="menu"].profile-menu').filter({ visible: true })).toHaveCount(0);
   await profileButton.hover();
 
   const menu = page
-    .locator('[role="menu"].profile-menu')
+    .locator('[role="menu"].profile-menu:not(.mat-menu-panel-exit-animation):not(.mat-menu-panel-animating)')
     .filter({ visible: true })
     .last();
   await expect(menu).toBeVisible({ timeout: 30000 });
+  // Keep the pointer on the profile trigger: entering the overlay can dispatch
+  // the header's mouseleave handler and close the Angular menu.
   return menu;
 }
 
@@ -71,6 +76,7 @@ test("SAM-24963 @qst @mx @base-store @safe @registered - Validate My account men
 
   let menuText;
   await test.step("Validate the expected My Account navigation options", async () => {
+    menu = await openAuthenticatedMenu(page);
     menuText = (await menu.innerText()).replace(/\s+/g, " ").trim();
     for (const option of expectedOptions) {
       await expect(

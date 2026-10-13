@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process";
 import authStateModule from "../../../../../utils/authState";
 import evidenceContext from "../../../../../reporting/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
-import { test, expect } from "../../dst/base-store/mx.auth.fixture";
+import { test, expect, maximizeMxWindow } from "../../dst/base-store/mx.auth.fixture";
 import { prepareMxQstCart, resetMxCartViaUi, mxQstCart } from "./mxQstFlows";
 
 const { createAuthState } = authStateModule;
@@ -38,7 +38,22 @@ function authFingerprint(filePath) {
   return crypto.createHash("sha256").update(raw).digest("hex");
 }
 
-test("SAM-24986 @qst @mx @base-store @safe @registered - Cart is isolated from a second account", async ({ page, browser, mxConfig }, testInfo) => {
+async function readAuthenticatedIdentity(page, mxConfig) {
+  const currentUser = page.waitForResponse(response => {
+    const url = new URL(response.url());
+    return response.request().method() === "GET" && /\/v2\/mx\/users\/current$/.test(url.pathname);
+  }, { timeout: 60000 });
+  await page.goto(mxConfig.baseUrl.href, { waitUntil: "domcontentloaded" });
+  const response = await currentUser;
+  expect(response.status(), "Authenticated identity service must accept the session.").toBe(200);
+  const { uid } = await response.json();
+  // Keep account identifiers out of assertion output and business evidence.
+  expect(typeof uid === "string" && uid.trim().length > 0 && uid.toLowerCase() !== "anonymous",
+    "Cart isolation requires a positively identified registered account.").toBeTruthy();
+  return uid.trim().toLowerCase();
+}
+
+test("SAM-24986 @qst @mx @base-store @safe @registered - Cart is isolated from a second account", async ({ page, browser, mxConfig, headless }, testInfo) => {
   testInfo.setTimeout(1200000);
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24986"));
 
@@ -72,11 +87,12 @@ test("SAM-24986 @qst @mx @base-store @safe @registered - Cart is isolated from a
   async function openSecondAccount() {
     const context = await browser.newContext({
       storageState: path.resolve(secondState),
-      viewport: { width: 1440, height: 900 },
+      viewport: headless ? { width: 1440, height: 900 } : null,
     });
     try {
       await secondAuth.applyAuthSessionStorage(context);
       const secondPage = await context.newPage();
+      if (!headless) await maximizeMxWindow(secondPage);
       await secondAuth.validateAuthenticatedSession(secondPage);
       return { context, secondPage };
     } catch (error) {
@@ -98,6 +114,12 @@ test("SAM-24986 @qst @mx @base-store @safe @registered - Cart is isolated from a
 
   const { context: secondContext, secondPage } = secondAccount;
   try {
+    await test.step("Confirm the two authenticated sessions belong to distinct accounts", async () => {
+      const firstIdentity = await readAuthenticatedIdentity(page, mxConfig);
+      const secondIdentity = await readAuthenticatedIdentity(secondPage, mxConfig);
+      expect(firstIdentity !== secondIdentity,
+        "Primary and second sessions must belong to different registered accounts before either cart is modified.").toBeTruthy();
+    });
     await test.step("Start the second account with an empty cart", async () => {
       await resetMxCartViaUi(secondPage, mxConfig);
       const { productEntries } = await mxQstCart(secondPage, mxConfig).loadMxCartState();
@@ -132,8 +154,9 @@ test("SAM-24986 @qst @mx @base-store @safe @registered - Cart is isolated from a
       firstAccountSku: mxConfig.sku,
       secondAccountInheritedFirstCart: false,
       dedicatedSecondAuthArtifact: true,
+      distinctAuthenticatedIdentities: true,
       secondAccountCheckoutSku: mxConfig.sku,
-      note: "Cart isolation is proven by two separately validated auth artifacts plus independent cart state; checkout email rendering is not a prerequisite of this TC.",
+      note: "Cart isolation is proven by distinct authenticated identities plus independent cart state; checkout email rendering is not a prerequisite of this TC.",
     });
   } finally {
     await secondContext.close();

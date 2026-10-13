@@ -94,7 +94,12 @@ export async function resetMxCartViaUi(page, config) {
 
   for (let removed = 0; removed < 20; removed += 1) {
     const state = await waitForMxCartUiState(page, 30000);
-    if (state.kind === "empty") return;
+    if (state.kind === "empty") {
+      // Empty UI can be optimistic while an entry deletion is still pending.
+      const { productEntries } = await mxQstCart(page, config).loadMxCartState();
+      if (!productEntries.length) return;
+      continue;
+    }
 
     if (state.kind === "pending") {
       if (recoveryReloads < 1) {
@@ -116,7 +121,7 @@ export async function resetMxCartViaUi(page, config) {
     try {
       await removeButton.click();
     } catch (error) {
-      if ((await readMxCartUiState(page)).kind === "empty") return;
+      if ((await readMxCartUiState(page)).kind === "empty") continue;
       throw error;
     }
 
@@ -134,10 +139,16 @@ export async function resetMxCartViaUi(page, config) {
       .first();
     await confirm.waitFor({ state: "visible", timeout: 30000 });
 
-    await Promise.all([
+    const removal = page.waitForResponse(response => {
+      return response.request().method() === "DELETE" &&
+        /\/v2\/mx\/users\/current\/carts\/[^/]+\/entries(?:\/|$)/.test(new URL(response.url()).pathname);
+    }, { timeout: 30000 });
+    const [response] = await Promise.all([
+      removal,
       dialog.waitFor({ state: "hidden", timeout: 30000 }),
       confirm.click(),
     ]);
+    expect(response.ok(), "MX cart entry deletion must succeed before another navigation.").toBe(true);
   }
 
   throw new Error("MX cart reset exceeded the 20-item safety limit.");

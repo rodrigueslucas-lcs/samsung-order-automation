@@ -18,6 +18,20 @@ const {
 } = mxAuthState;
 const { assertMxStagingPage } = mxStagingGuard;
 
+export async function maximizeMxWindow(page) {
+  const cdp = await page.context().newCDPSession(page);
+  try {
+    const { windowId, bounds } = await cdp.send("Browser.getWindowForTarget");
+    if (["minimized", "fullscreen"].includes(bounds.windowState)) {
+      await cdp.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "normal" } });
+    }
+    if (bounds.windowState !== "maximized") await cdp.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "maximized" } });
+    await expect.poll(async () => (await cdp.send("Browser.getWindowBounds", { windowId })).bounds.windowState,
+      { message: "MX desktop authentication requires a maximized browser window.", timeout: 5000 }).toBe("maximized");
+  } finally { await cdp.detach(); }
+  await page.bringToFront();
+}
+
 function isRecoverableAuthFailure(error) {
   const message = String(error?.message || error || "");
   return /session is expired|access\/auth state is not usable|setup cookie is no longer valid/i.test(message);
@@ -79,7 +93,12 @@ export const test = base.extend({
     });
   }, { auto: true }],
   storageState: hasAuthState() ? AUTH_STATE_PATH : undefined,
-  viewport: { width: 1440, height: 900 },
+  viewport: async ({ headless }, use) => {
+    await use(headless ? { width: 1440, height: 900 } : null);
+  },
+  deviceScaleFactor: async ({ headless }, use) => {
+    await use(headless ? 1 : undefined);
+  },
   launchOptions: { args: ["--start-maximized"] },
 });
 
@@ -96,10 +115,11 @@ test.beforeAll(async () => {
   }
 });
 
-test.beforeEach(async ({ context, page, mxConfig }, testInfo) => {
+test.beforeEach(async ({ context, page, mxConfig, headless }, testInfo) => {
   testInfo.setTimeout(780000);
   test.skip(!hasAuthState(), "Dedicated MX authenticated state is required.");
   await applyAuthSessionStorage(context);
+  if (!headless) await maximizeMxWindow(page);
 
   try {
     await validateAuthenticatedSession(page);
