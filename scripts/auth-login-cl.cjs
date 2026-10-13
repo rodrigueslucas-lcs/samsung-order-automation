@@ -4,6 +4,7 @@ const path = require("node:path");
 const { getClQstConfig } = require("../config/markets/cl");
 const { writeJsonAtomically } = require("../utils/atomicJson");
 const { installClChatNoticeDismissal } = require("../utils/clStorefrontOverlays");
+const { waitForClAuthenticatedReturn, assertClSsoConfiguration, validatedClSsoLoginUrl } = require("../utils/clAuthLoginReturn.cjs");
 
 const config = getClQstConfig();
 const slot = String(process.env.CL_AUTH_SLOT || "primary").toLowerCase();
@@ -70,8 +71,7 @@ async function dismissNotificationTutorial(page) {
   console.log("[auth:login:cl] dismissed storefront notification tutorial");
 }
 
-async function accountState(page) {
-  await installClChatNoticeDismissal(page);
+async function maximizeClWindow(page) {
   await page.bringToFront();
   const cdp = await page.context().newCDPSession(page);
   try {
@@ -80,6 +80,11 @@ async function accountState(page) {
   } finally {
     await cdp.detach();
   }
+}
+
+async function accountState(page) {
+  await installClChatNoticeDismissal(page);
+  await maximizeClWindow(page);
   await dismissNotificationTutorial(page);
   const profile = profileButton(page);
   await profile.waitFor({ state: "visible", timeout: 120000 });
@@ -123,6 +128,22 @@ async function findAccountPage(context, timeoutMs = 60000) {
   return null;
 }
 
+async function openOfficialClLogin(page, ssoInfo, target) {
+  const loginUrl = validatedClSsoLoginUrl(ssoInfo, target);
+  await page.waitForFunction(() => typeof window.samsung?.account?.signIn === "function", null, { timeout: 30000 });
+  // Match the storefront's IAM v3 service, including its SDK-managed return.
+  // A direct navigation to signInGate skips that browser-side initialization.
+  await page.evaluate(url => {
+    const parameters = new URL(url).searchParams;
+    window.samsung.account.signIn({
+      clientId: parameters.get("client_id"),
+      redirectUri: encodeURIComponent(parameters.get("redirect_uri")),
+      responseType: parameters.get("response_type"),
+      state: parameters.get("state"),
+    }, { locale: `${parameters.get("locale").split("_")[0]}-${parameters.get("countryCode")}` });
+  }, loginUrl);
+}
+
 async function exportState(context, page) {
   const full = await context.storageState({ indexedDB: true });
   const hostname = config.baseUrl.hostname;
@@ -151,21 +172,75 @@ async function exportState(context, page) {
     channel: "chrome",
     headless: false,
     viewport: null,
-    args: ["--start-maximized", "--disable-background-mode"],
+    args: ["--start-maximized", "--disable-background-mode", "--hide-crash-restore-bubble"],
   });
   let page = context.pages()[0] || await context.newPage();
+  const observePage = candidate => {
+    candidate.on("response", async response => {
+      const url = new URL(response.url());
+      if (url.hostname === config.baseUrl.hostname && /^\/cl\/login\//.test(url.pathname)) {
+        console.log(`[auth:login:cl] SSO callback: HTTP ${response.status()} ${url.pathname}`);
+        const headers = await response.headersArray().catch(() => []);
+        const cookieNames = headers.filter(header => header.name.toLowerCase() === "set-cookie")
+          .map(header => header.value.split("=", 1)[0]).filter(name => /^[A-Za-z0-9_-]+$/.test(name));
+        console.log(`[auth:login:cl] SSO callback cookie names only: ${cookieNames.join(",") || "none"}`);
+        const location = await response.headerValue("location").catch(() => null);
+        if (location) {
+          const destination = new URL(location, url);
+          console.log(`[auth:login:cl] SSO redirect: ${destination.hostname}${destination.pathname}; parameter names: ${[...destination.searchParams.keys()].join(",") || "none"}`);
+        }
+      }
+      if (url.hostname.endsWith(".ecom-stg.samsung.com") && /\/(?:currentConfig|users\/current|token)$/.test(url.pathname)) {
+        console.log(`[auth:login:cl] storefront auth service: HTTP ${response.status()} ${url.pathname}`);
+      }
+    });
+    candidate.on("framenavigated", frame => {
+      if (frame !== candidate.mainFrame()) return;
+      const url = new URL(frame.url());
+      if (url.hostname === config.baseUrl.hostname && /^\/cl(?:\/|$)/.test(url.pathname)) {
+        console.log(`[auth:login:cl] storefront return: ${url.pathname}`);
+      }
+    });
+  };
+  context.pages().forEach(observePage);
+  context.on("page", observePage);
   try {
+    console.log(`[auth:login:cl] ${config.environment} ${slot}: Chrome opened; preparing storefront`);
     await installClChatNoticeDismissal(page);
     page.setDefaultTimeout(120000);
     if (config.setupUrl) {
       await page.goto(config.setupUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
       await page.getByText(/You can access pages now/i).waitFor({ timeout: 60000 });
     }
+    const configuration = page.waitForResponse(response => {
+      return new URL(response.url()).pathname.endsWith("/v2/cl/currentConfig");
+    }, { timeout: 30000 }).then(async response => {
+      const body = await response.json().catch(() => ({}));
+      return { status: response.status(), errorType: body.errors?.[0]?.type };
+    }).catch(() => null);
+    const ssoInfo = page.waitForResponse(response => {
+      return new URL(response.url()).pathname.endsWith("/v2/cl/ssoInfo");
+    }, { timeout: 30000 }).then(response => response.ok() ? response.json() : null).catch(() => null);
     await page.goto(config.baseUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
+    console.log("[auth:login:cl] storefront loaded; maximizing and checking profile actions");
     await dismissNotificationTutorial(page);
     let state = await accountState(page);
+    console.log(`[auth:login:cl] storefront profile state: ${state.state}`);
 
     if (state.state !== "authenticated") {
+      const observedConfiguration = await configuration;
+      let observedSso = await ssoInfo;
+      if (!observedSso?.ssoLoginUrl) {
+        const api = `https://${suffix}-smb-api-cdn.ecom-stg.samsung.com`;
+        const response = await context.request.get(`${api}/tokocommercewebservices/v2/cl/ssoInfo`, {
+          params: { page: "homepage", lang: "es_CL", curr: "CLP" },
+          timeout: 30000,
+        });
+        console.log(`[auth:login:cl] official CL ssoInfo bootstrap: HTTP ${response.status()}`);
+        if (response.ok()) observedSso = await response.json();
+      }
+      const ssoTarget = { hostname: config.baseUrl.hostname, environment: config.environment };
+      assertClSsoConfiguration(observedConfiguration, observedSso, ssoTarget);
       const credentials = manual ? null : readCredentials();
       if (!manual && (!credentials.email || !credentials.password)) {
         throw new Error(slot === "second"
@@ -173,49 +248,67 @@ async function exportState(context, page) {
           : "Global Samsung Account credentials are unavailable. Configure SAMSUNG_ACCOUNT_EMAIL/SAMSUNG_ACCOUNT_PASSWORD or playwright/.auth/samsung-storefront-user.json.");
       }
 
-      await state.login.click({ timeout: 10000 }).catch(async () => {
-        await state.login.evaluate((element) => element.click());
-      });
-
-      const accountPage = await findAccountPage(context, 60000);
+      let accountPage;
+      if (observedConfiguration?.status >= 400) {
+        console.log("[auth:login:cl] home configuration is degraded; opening the official CL IAM SDK login supplied by ssoInfo");
+        await openOfficialClLogin(page, observedSso, ssoTarget);
+        accountPage = await findAccountPage(context, 15000);
+      } else {
+        console.log("[auth:login:cl] opening Samsung Account from the profile menu");
+        await state.login.click({ timeout: 10000 });
+        accountPage = await findAccountPage(context, 15000);
+        if (!accountPage && new URL(page.url()).hostname === config.baseUrl.hostname && (await accountState(page)).state !== "authenticated") {
+          console.log("[auth:login:cl] profile action did not navigate; using the validated backend CL login URL");
+          await openOfficialClLogin(page, observedSso, ssoTarget);
+          accountPage = await findAccountPage(context, 15000);
+        }
+      }
+      console.log(`[auth:login:cl] Samsung Account tab ${accountPage ? "detected" : "not detected; checking storefront return"}`);
+      if (!accountPage && (await accountState(page)).state !== "authenticated") {
+        const error = new Error("CL profile login action did not open Samsung Account or authenticate the storefront. Check the staging SSO configuration; no credentials were submitted.");
+        error.exitCode = 78;
+        throw error;
+      }
       if (accountPage) {
         page = accountPage;
         page.setDefaultTimeout(120000);
+        await maximizeClWindow(page);
       }
 
       if (manual) {
         console.log("[auth:login:cl] Complete Samsung Account login/CAPTCHA/MFA manually in the opened browser.");
       } else if (new URL(page.url()).hostname === accountHostname) {
+        console.log("[auth:login:cl] Samsung Account: completing configured login; CAPTCHA/MFA remains manual if requested");
         const emailInput = page.locator('input#account, input[type="email"], input[name="userId"], input[name="email"]').filter({ visible: true }).first();
         await emailInput.waitFor({ state: "visible", timeout: 60000 });
         await emailInput.fill(credentials.email);
         const next = page.getByRole("button", { name: /Siguiente|Continuar|Next|Sign in/i }).filter({ visible: true }).first();
         if (await next.isVisible().catch(() => false)) await next.click();
         const passwordInput = page.locator('input[type="password"]').filter({ visible: true }).first();
-        await passwordInput.waitFor({ state: "visible", timeout: 60000 });
+        const passwordReady = await passwordInput.waitFor({ state: "visible", timeout: 15000 }).then(() => true, () => false);
+        if (!passwordReady) {
+          const captcha = await page.locator('iframe[title*="reCAPTCHA"]').evaluateAll(frames => frames.some(frame => {
+            const bounds = frame.getBoundingClientRect();
+            return bounds.width > 0 && bounds.height > 0;
+          }));
+          if (!captcha) throw new Error("Samsung Account did not show the password step after email submission; inspect the login window.");
+          if (process.env.CI) throw new Error("Samsung Account requires a human CAPTCHA; CI cannot complete this verification.");
+          await page.bringToFront();
+          console.log("[auth:login:cl] CAPTCHA visible. Complete it in this Chrome window and click Siguiente; the refresh will continue automatically.");
+          await passwordInput.waitFor({ state: "visible", timeout: interactiveTimeout });
+        }
         await passwordInput.fill(credentials.password);
         const signIn = page.getByRole("button", { name: /Iniciar sesi[oó]n|Sign in|Continuar/i }).filter({ visible: true }).last();
         await signIn.click();
       }
 
-      const deadline = Date.now() + interactiveTimeout;
-      let storefrontPage = null;
-      while (Date.now() < deadline) {
-        storefrontPage = context.pages().find((candidate) => {
-          try {
-            const url = new URL(candidate.url());
-            return url.hostname === config.baseUrl.hostname && (url.pathname === "/cl" || url.pathname.startsWith("/cl/"));
-          } catch { return false; }
-        });
-        if (storefrontPage) break;
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
-      if (!storefrontPage) throw new Error(`Samsung Account did not return to the CL ${config.environment} storefront within the allowed time.`);
-      page = storefrontPage;
-      await page.goto(config.baseUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
-      await dismissNotificationTutorial(page);
-      state = await accountState(page);
-      if (state.state !== "authenticated") throw new Error(`CL ${config.environment} Samsung Account login did not become authenticated.`);
+      console.log("[auth:login:cl] waiting for authenticated CL return; leaving the login window intact");
+      page = await waitForClAuthenticatedReturn(context, {
+        hostname: config.baseUrl.hostname,
+        accountPage,
+        readAccountState: accountState,
+        timeout: interactiveTimeout,
+      });
     }
 
     await exportState(context, page);
@@ -223,6 +316,12 @@ async function exportState(context, page) {
     await context.close();
   }
 })().catch((error) => {
-  console.error(`[auth:login:cl] ${error.message}`);
-  process.exitCode = 1;
+  if (/Opening in existing browser session|ProcessSingleton|profile.*already in use/i.test(String(error.message))) {
+    console.error("[auth:login:cl] Dedicated CL profile is already in use. Finish/close its current refresh before starting another; no session files were removed.");
+    process.exitCode = 73;
+  } else {
+    const message = String(error.message).split("\n", 1)[0].replace(/https:\/\/account\.samsung\.com\/\S+/g, "https://account.samsung.com/[redacted]");
+    console.error(`[auth:login:cl] ${message}`);
+    process.exitCode = error.exitCode || 1;
+  }
 });

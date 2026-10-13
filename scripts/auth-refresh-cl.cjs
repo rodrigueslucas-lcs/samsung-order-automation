@@ -23,6 +23,12 @@ function run(label, script, { attempts = 1, retryDelayMs = 2500 } = {}) {
     const result = spawnSync(process.execPath, [script], { env: baseEnv, stdio: "inherit" });
     lastStatus = result.status;
     if (result.status === 0) return;
+    if (result.status === 73) {
+      throw new Error("CL auth profile is occupied by another Chrome/refresh. Stop the conflicting run before retrying; automatic retries cannot release the profile.");
+    }
+    if (result.status === 78) {
+      throw new Error("CL login prerequisite failed; see the specific configuration/SSO error above. Automatic retries are disabled for this failure.");
+    }
     if (attempt < attempts) {
       console.warn(`[auth:refresh:cl] ${label} failed with exit code ${result.status ?? "unknown"}; retrying in ${retryDelayMs}ms.`);
       sleep(retryDelayMs);
@@ -31,9 +37,14 @@ function run(label, script, { attempts = 1, retryDelayMs = 2500 } = {}) {
   throw new Error(`${label} failed after ${attempts} attempt(s) with exit code ${lastStatus ?? "unknown"}.`);
 }
 
-const slotLabel = accountSlot === "second" ? " second account" : "";
-run(`Refreshing Samsung Account${slotLabel} session for ${environment}`, "scripts/auth-login-cl.cjs", { attempts: 3 });
-run(`Verifying Samsung Account${slotLabel} session for ${environment}`, "scripts/auth-verify-cl.cjs");
-run(`Packaging verified CL ${environment} session for CI handoff`, "scripts/auth-package-cl.cjs");
-console.log(`\n[auth:refresh:cl] READY · CL ${environment}${slotLabel} authenticated session refreshed, verified and packaged.`);
-console.log("[auth:refresh:cl] CAPTCHA/MFA remains a human security gate when Samsung Account requests it.");
+try {
+  const slotLabel = accountSlot === "second" ? " second account" : "";
+  run(`Refreshing Samsung Account${slotLabel} session for ${environment}`, "scripts/auth-login-cl.cjs", { attempts: 3 });
+  run(`Verifying Samsung Account${slotLabel} session for ${environment}`, "scripts/auth-verify-cl.cjs");
+  run(`Packaging verified CL ${environment} session for CI handoff`, "scripts/auth-package-cl.cjs");
+  console.log(`\n[auth:refresh:cl] READY · CL ${environment}${slotLabel} authenticated session refreshed, verified and packaged.`);
+  console.log("[auth:refresh:cl] CAPTCHA/MFA remains a human security gate when Samsung Account requests it.");
+} catch (error) {
+  console.error(`[auth:refresh:cl] FAILED · ${String(error.message).split("\n", 1)[0]}`);
+  process.exitCode = 1;
+}
