@@ -18,6 +18,7 @@ import cartPresentation from "../../../../../flows/smb/cartPresentation";
 import authStateModule from "../../../../../utils/authState";
 import coTrackingPrerequisite from "../../../../../utils/coTrackingPrerequisite.cjs";
 import atomicJson from "../../../../../utils/atomicJson";
+import authBrowserWindow from "../../../../../utils/authBrowserWindow.cjs";
 
 const test = base.extend({
   qstBusinessScenario: [async ({}, use, testInfo) => {
@@ -43,7 +44,30 @@ const {createAuthState}=authStateModule;
 const productCases=new Set(["SAM-24880","SAM-24882","SAM-24883","SAM-24886","SAM-24892","SAM-24893","SAM-24896","SAM-24898","SAM-24899","SAM-24900","SAM-24901","SAM-24902","SAM-24903","SAM-24904","SAM-24905","SAM-24909","SAM-24910","SAM-24911","SAM-24912","SAM-24915","SAM-24919","SAM-24920","SAM-24925"]);
 function evidence(info,id){recordBusinessEvidence(info,getCoQstEvidenceMetadata(id));}
 async function home(page,cfg){await bootstrapCoStorefront(page,cfg);await page.goto(cfg.baseUrl.href,{waitUntil:"domcontentloaded"});await expect(page.getByRole("button",{name:"My Profile",exact:true})).toBeVisible({timeout:60000});}
-async function authenticatedPage(browser,cfg){test.skip(!hasCoAuthState(),"CO authenticated state is required.");const context=await browser.newContext({storageState:CO_AUTH_STATE_PATH});await getCoAuthState().applyAuthSessionStorage(context);const page=await context.newPage();await home(page,cfg);return {context,page};}
+async function authenticatedPage(browser,cfg,{desktopProfile=false}={}){
+  test.skip(!hasCoAuthState(),"CO authenticated state is required.");
+  const headed=test.info().project.use.headless===false;
+  const context=await browser.newContext({
+    storageState:CO_AUTH_STATE_PATH,
+    ...(desktopProfile?{viewport:headed?null:{width:1920,height:1080},...(headed?{deviceScaleFactor:undefined}:{})}:{}),
+  });
+  const auth=getCoAuthState();
+  let page;
+  if(desktopProfile){
+    // The normal newPage guard validates auth immediately. Prepare the native
+    // window first, then perform that same validation explicitly before reuse.
+    page=await context.newPage();
+    if(headed) await authBrowserWindow.prepareAuthBrowserWindow(page);
+    await auth.applyAuthSessionStorage(context);
+    await auth.validateAuthenticatedSession(page);
+    await page.keyboard.press("Escape");
+  } else {
+    await auth.applyAuthSessionStorage(context);
+    page=await context.newPage();
+  }
+  await home(page,cfg);
+  return {context,page};
+}
 async function cart(page,cfg){const c=await addConfiguredProductToCoCart(page,cfg);await c.validateProductInCart();return c;}
 async function clearCoCartForPayment(page,cfg){
   await page.goto(cfg.cartUrl.href,{waitUntil:"domcontentloaded",timeout:60000});
@@ -263,8 +287,29 @@ async function coSelectSavedAddress(page,delivery,kind){
 }
 test.describe("CO QST - Base Store official P1",()=>{test.describe.configure({timeout:420000});
 test("SAM-24806 @qst @co @base-store @safe - UI validation in desktop view",async({page},i)=>{evidence(i,"SAM-24806");const c=getCoQstConfig();await home(page,c);const h=new HomePage(page,{setupUrl:null,homeUrl:c.baseUrl.href,footerHeadingPattern:/Tienda|Shop|Samsung/i});const a=await h.validateHomepageAttributes();expect(a.headerVisible).toBe(true);expect(a.footerVisible).toBe(true);expect(await page.locator("img").count()).toBeGreaterThan(0);});
-test("SAM-24873 @qst @co @base-store @registered - Login Home page",async({browser},i)=>{evidence(i,"SAM-24873");const c=getCoQstConfig();const {context,page}=await authenticatedPage(browser,c);await page.getByRole("button",{name:"My Profile",exact:true}).hover();await expect(page.getByText(/Cerrar Sesi[oó]n/i).filter({visible:true}).first()).toBeVisible({timeout:30000});await context.close();});
-test("SAM-24874 @qst @co @base-store @registered - Validate My account menu",async({browser},i)=>{evidence(i,"SAM-24874");const c=getCoQstConfig();const {context,page}=await authenticatedPage(browser,c);await page.getByRole("button",{name:"My Profile",exact:true}).hover();for(const x of [/My page|Mi p[aá]gina/i,/My Orders|Mis pedidos/i,/Wishlist|Lista de deseos/i,/Cerrar Sesi[oó]n/i]) await expect(page.getByText(x).filter({visible:true}).first()).toBeVisible({timeout:30000});await context.close();});
+test("SAM-24873 @qst @co @base-store @registered - Login Home page",async({browser},i)=>{
+  evidence(i,"SAM-24873");
+  const {context,page}=await authenticatedPage(browser,getCoQstConfig(),{desktopProfile:true});
+  try {
+    await test.step("Open the desktop profile menu and prove authenticated logout",async()=>{
+      await getCoAuthState().validateCurrentPageAuthenticated(page);
+    });
+  } finally {await context.close();}
+});
+test("SAM-24874 @qst @co @base-store @registered - Validate My account menu",async({browser},i)=>{
+  evidence(i,"SAM-24874");
+  const {context,page}=await authenticatedPage(browser,getCoQstConfig(),{desktopProfile:true});
+  try {
+    await test.step("Open the authenticated desktop account menu and validate all four actions",async()=>{
+      await getCoAuthState().validateCurrentPageAuthenticated(page);
+      const menu=page.locator('[role="menu"]').filter({visible:true}).last();
+      await expect(menu).toBeVisible();
+      for(const action of [/My page|Mi p[aá]gina/i,/My Orders|Mis pedidos/i,/Wishlist|Lista de deseos/i,/Cerrar Sesi[oó]n/i]) {
+        await expect(menu.getByText(action).first()).toBeVisible({timeout:30000});
+      }
+    });
+  } finally {await context.close();}
+});
 test("SAM-24875 @qst @co @base-store @safe - GNB menu",async({page},i)=>{evidence(i,"SAM-24875");const c=getCoQstConfig();await home(page,c);await expect(page.locator("header").first()).toBeVisible();await expect(page.locator("header a").first()).toBeVisible();});
 test("SAM-24879 @qst @co @base-store @safe - Facets Filter on PLP",async({page},i)=>{evidence(i,"SAM-24879");const c=getCoQstConfig();await home(page,c);const nav=page.getByRole("link",{name:/Galaxy|Smartphone|TV|Televisores/i}).filter({visible:true}).first();await nav.click();await expect(page.getByText(/Filtrar|Filtro|Filter/i).filter({visible:true}).first()).toBeVisible({timeout:60000});});
 async function runCanonicalCase(id,page,info){evidence(info,id);const cfg=getCoQstConfig();
