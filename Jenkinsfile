@@ -129,7 +129,6 @@ pipeline {
           if (!['MX', 'PE', 'CL', 'CO'].contains(params.MARKET)) error('Unsupported market. Select MX, PE, CL or CO.')
           if (!['S1', 'S2'].contains(params.ENVIRONMENT)) error('Unsupported environment. Select S1 or S2.')
           if (params.MARKET == 'CO' && params.ENVIRONMENT != 'S2') error('CO official QST is currently limited to S2/STG2, matching the supplied Samsung QST source and WMC route.')
-          if (params.MARKET == 'PE' && params.ENVIRONMENT != 'S2') error('PE phase 1 is intentionally limited to S2/STG2 while the existing PE QST automation is stabilized.')
           if (params.MARKET == 'CL' && params.ENVIRONMENT != 'S2') error('CL official QST is currently enabled only for S2/STG2 while the Chile runtime baseline is stabilized.')
           if (params.MARKET == 'PE' && params.TEST_SUITE != 'official-p1') error('PE phase 1 currently exposes the coverage-aware official-p1 stabilization lane only.')
           if (params.MARKET == 'CO' && params.TEST_SUITE != 'official-p1') error('CO currently exposes the coverage-aware official-p1 lane; EPP remains available from the repository command.')
