@@ -70,6 +70,34 @@
       "priority": "Major",
       "rootCause": "Storefront Issue",
       "notes": "Back to Top / Volver al inicio control is not rendered after scrolling, preventing the official Back to Top validation."
+    },
+    {
+      "market": "PE",
+      "environment": "S1",
+      "store": "BASE_STORE",
+      "samId": "SAM-25062",
+      "jira": "SAM-25146",
+      "url": "https://jira.secext.samsung.net/browse/SAM-25146",
+      "title": "QST STG1 SMB CO/PE BS and EPP Footer Section Missing on PDP/Checkout/Cart Page",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "Medium",
+      "rootCause": "TBD",
+      "notes": "Footer section is missing in STG1, blocking the official Cart page UI footer validation. Component: UI/UX; functional area: Footer."
+    },
+    {
+      "market": "PE",
+      "environment": "S1",
+      "store": "BASE_STORE",
+      "samId": "SAM-25079",
+      "jira": "SAM-25146",
+      "url": "https://jira.secext.samsung.net/browse/SAM-25146",
+      "title": "QST STG1 SMB CO/PE BS and EPP Footer Section Missing on PDP/Checkout/Cart Page",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "Medium",
+      "rootCause": "TBD",
+      "notes": "Footer section is missing in STG1, blocking the official desktop UI/footer validation. Component: UI/UX; functional area: Footer."
     }
   ]
 }
