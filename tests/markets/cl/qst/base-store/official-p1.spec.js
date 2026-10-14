@@ -136,13 +136,6 @@ test.describe("CL QST - Base Store Official P1", () => {
     await page.locator('input[name="phone"]').first().fill("987654321");
     const document = page.locator('input[name="vatNumber"]:visible');
     if (await document.count()) await document.first().fill("12345678-5");
-    await page.getByRole("button", { name: /Compra como invitad/i }).filter({ visible: true }).first().click();
-    await expect(page).toHaveURL(/CHECKOUT_STEP_CONTACT_INFO/i, { timeout: 60000 });
-    await page.locator('input[name="firstName"]').first().fill("Cliente");
-    await page.locator('input[name="lastName"]').first().fill("Prueba");
-    await page.locator('input[name="phone"]').first().fill("987654321");
-    const document2 = page.locator('input[name="vatNumber"]:visible');
-    if (await document2.count()) await document2.first().fill("12345678-5");
     await page.getByRole("button", { name: /Continuar a despacho/i }).filter({ visible: true }).first().click();
     await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i, { timeout: 60000 });
     await page.getByText(/Direcci[oó]n de despacho/i).filter({ visible: true }).first()
