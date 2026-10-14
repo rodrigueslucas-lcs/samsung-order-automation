@@ -173,7 +173,11 @@ test.describe("PE QST - official safe gap reconciliation", () => {
         await payment.validateCreditCardReady(testData.card);
       });
       result = await test.step("Submit the authorized PE card payment once", () =>
-        payment.placeOrderAndCapture({ orderCodePattern: /\bPE\d{6}-\d{8}(?:_\d+)?\b/i })
+        payment.placeOrderAndCapture({
+          // The gateway adds a transaction suffix; Samsung displays the base order code.
+          orderCodePattern: /\bPE\d{6}-\d{8}(?=_|\b)/i,
+          orderResponsePathPattern: /\/users\/[^/]+\/orders(?:\/|$)/i,
+        })
       );
     } else {
       await test.step("Select Internet Banking", () => payment.selectBancaPorInternet());

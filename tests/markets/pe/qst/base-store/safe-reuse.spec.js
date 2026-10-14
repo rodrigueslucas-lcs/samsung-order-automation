@@ -219,9 +219,13 @@ test("SAM-25090 @qst @pe @base-store @safe @guest @reuse - Validate home deliver
     await expect(delivery).toBeVisible({ timeout: 30000 });
     await delivery.click();
   });
-  const summary = page.getByRole("heading", { name: "Resumen de la orden", exact: true }).locator("..");
+  const selectedDelivery = (await delivery.innerText()).match(/Env[ií]o\s+regular\s+(?:Gratis|S\/\.?\s*[\d,.]+)/i)?.[0];
+  expect(selectedDelivery, "The selected delivery option must expose its delivery fee.").toBeTruthy();
   await test.step("Validate regular delivery in order summary", async () => {
-    await expect(summary.getByText(/Envío Regular Gratis/i).first()).toBeVisible({ timeout: 30000 });
+    await expect(page.getByRole("heading", { name: "Resumen de la orden", exact: true })).toBeVisible();
+    const summaryDelivery = page.getByRole("region").filter({ hasText: /Env[ií]o\s+regular/i }).first();
+    await expect(summaryDelivery).toBeVisible({ timeout: 30000 });
+    await expect(summaryDelivery).toContainText(selectedDelivery);
   });
 
   testInfo.annotations.push({

@@ -551,7 +551,10 @@ export default class PaymentPage extends BasePage {
   }
   }
 
-  async placeOrderAndCapture({ orderCodePattern = /\bMX\d{6}-\d{8}(?:_\d+)?\b/i } = {}) {
+  async placeOrderAndCapture({
+    orderCodePattern = /\bMX\d{6}-\d{8}(?:_\d+)?\b/i,
+    orderResponsePathPattern = null,
+  } = {}) {
     requirePaymentSubmitOptIn();
     await this.placeOrderButton.scrollIntoViewIfNeeded();
     await this.placeOrderButton.waitFor({ state: "visible", timeout: 30000 });
@@ -580,6 +583,11 @@ export default class PaymentPage extends BasePage {
         status: response.status(),
         endpoint: new URL(response.url()).origin + new URL(response.url()).pathname,
       });
+      // A replacement cart can contain a new order-shaped code after checkout.
+      // Market callers can restrict identity evidence to the actual orders API.
+      if (orderResponsePathPattern && (
+        !response.ok() || !orderResponsePathPattern.test(new URL(response.url()).pathname)
+      )) return;
       const body = response.text().catch(() => "");
       responseBodies.push(body);
       body.then((text) => {
