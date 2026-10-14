@@ -338,7 +338,7 @@ pipeline {
               env.ALLOW_PAYMENT_SUBMIT = params.EXECUTION_MODE == 'authorized-destructive' ? '1' : '0'
               env.ALLOW_PROFILE_WRITE = params.EXECUTION_MODE == 'authorized-destructive' ? '1' : '0'
               env.CL_SESSION_BUNDLE_CREDENTIAL = "samsung-cl-${params.ENVIRONMENT.toLowerCase()}-session-bundle"
-              env.CL_BACKOFFICE_ADMIN_CREDENTIAL = 'samsung-mx-s2-backoffice-admin'
+              env.CL_BACKOFFICE_ADMIN_CREDENTIAL = params.ENVIRONMENT == 'S1' ? 'samsung-mx-s1-backoffice-admin' : 'samsung-mx-s2-backoffice-admin'
               withCredentials([
                 file(credentialsId: env.CL_SESSION_BUNDLE_CREDENTIAL, variable: 'CL_SESSION_BUNDLE'),
                 file(credentialsId: env.CL_BACKOFFICE_ADMIN_CREDENTIAL, variable: 'CL_BACKOFFICE_ADMIN_SECRET'),
@@ -399,7 +399,7 @@ pipeline {
               }
             } else if (params.MARKET == 'PE') {
               env.PE_SESSION_BUNDLE_CREDENTIAL = "samsung-pe-${params.ENVIRONMENT.toLowerCase()}-session-bundle"
-              env.PE_BACKOFFICE_ADMIN_CREDENTIAL = 'samsung-mx-s2-backoffice-admin'
+              env.PE_BACKOFFICE_ADMIN_CREDENTIAL = params.ENVIRONMENT == 'S1' ? 'samsung-mx-s1-backoffice-admin' : 'samsung-mx-s2-backoffice-admin'
               withCredentials([
                 file(credentialsId: env.PE_SESSION_BUNDLE_CREDENTIAL, variable: 'PE_SESSION_BUNDLE'),
                 file(credentialsId: env.PE_BACKOFFICE_ADMIN_CREDENTIAL, variable: 'PE_BACKOFFICE_ADMIN_SECRET')
