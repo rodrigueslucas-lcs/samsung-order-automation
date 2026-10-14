@@ -24,11 +24,9 @@ export default class OrderConfirmationPage extends BasePage {
       timeout: 60000
     });
 
-    const bodyText = await this.orderNumberCandidate.innerText();
-
-    const match = bodyText.match(
-      /(número de pedido|número de orden|pedido|orden|order)\s*[:#]?\s*([0-9]{6,}|[A-Z0-9-]{8,})/i
-    );
+    const orderPattern = /(número de pedido|número de orden|pedido|orden|order)\s*[:#]?\s*([0-9]{6,}|[A-Z0-9-]{8,}(?:_\d+)?)/i;
+    await expect(this.orderNumberCandidate).toContainText(orderPattern, { timeout: 30000 });
+    const match = (await this.orderNumberCandidate.innerText()).match(orderPattern);
 
     if (!match?.[2]) {
       await this.screenshot('12-order-confirmation-no-order-number');

@@ -5,6 +5,7 @@ import peEvidenceMetadata from "../../../../../utils/qstPeEvidenceMetadata";
 import destructiveGuards from "../../../../../utils/destructiveGuards";
 import PaymentPage from "../../../../../pages/PaymentPage";
 import OrderConfirmationPage from "../../../../../pages/OrderConfirmationPage";
+import { testData } from "../../../../../utils/testData";
 import { addConfiguredProductToPeCart, reachPeGuestPayment } from "./peQstFlows";
 
 const { getPeQstConfig } = peConfigModule;
@@ -159,15 +160,27 @@ test.describe("PE QST - official safe gap reconciliation", () => {
     requirePaymentSubmitOptIn();
     evidence(testInfo, "SAM-25099");
     const cfg = config();
-    const { payment } = await reachPeGuestPayment(page, cfg, { expectedPaymentMode: /^Banca por Internet\b/i, requireQuantityOne: true });
-    await test.step("Select Internet Banking", async () => {
-      await payment.selectBancaPorInternet();
+    const useCard = cfg.environment === "S1";
+    const { payment } = await reachPeGuestPayment(page, cfg, {
+      expectedPaymentMode: useCard ? /Tarjeta de Crédito \/ Débito/i : /^Banca por Internet\b/i,
+      requireQuantityOne: true,
     });
-    const result = await test.step("Submit authorized payment", () =>
-      payment.submitSelectedPaymentMode()
-    );
+    let result;
+    if (useCard) {
+      await test.step("Prepare known PE test card and validate readiness", async () => {
+        await payment.selectCreditCard();
+        await payment.fillCardData(testData.card);
+        await payment.validateCreditCardReady(testData.card);
+      });
+      result = await test.step("Submit the authorized PE card payment once", () =>
+        payment.placeOrderAndCapture({ orderCodePattern: /\bPE\d{6}-\d{8}(?:_\d+)?\b/i })
+      );
+    } else {
+      await test.step("Select Internet Banking", () => payment.selectBancaPorInternet());
+      result = await test.step("Submit authorized payment", () => payment.submitSelectedPaymentMode());
+    }
     await test.step("Validate created PE order code", async () => {
-      expect(result.orderCode, `Authorized PE order submit produced no observable order code. Outcome: ${result.type}`).toMatch(/^PE\d{6}-\d{8}(?:_\d+)?$/i);
+      expect(result.orderCode, `Authorized PE order submit produced no observable order code. Outcome: ${result.outcome ?? result.type}`).toMatch(/^PE\d{6}-\d{8}(?:_\d+)?$/i);
     });
 
     await test.step("Validate visible new order confirmation screen", async () => {
@@ -182,8 +195,8 @@ test.describe("PE QST - official safe gap reconciliation", () => {
 
     recordBusinessEvidence(testInfo, {
       orderCode: result.orderCode,
-      outcome: result.type,
-      paymentMode: "Banca por Internet",
+      outcome: result.outcome ?? result.type,
+      paymentMode: useCard ? "Tarjeta de Crédito / Débito" : "Banca por Internet",
       authorizedSubmit: true,
     });
   });

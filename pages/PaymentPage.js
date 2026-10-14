@@ -1,3 +1,4 @@
+import { expect } from "@playwright/test";
 import BasePage from "./BasePage";
 import destructiveGuards from "../utils/destructiveGuards";
 
@@ -464,9 +465,8 @@ export default class PaymentPage extends BasePage {
     }
 
     await this.placeOrderButton.waitFor({ state: "visible", timeout: 30000 });
-    if (!(await this.placeOrderButton.isEnabled())) {
-      throw new Error("Credit card data was filled, but Realizar pedido remained disabled.");
-    }
+    await expect(this.placeOrderButton, "Credit card data was filled, but Realizar pedido remained disabled.")
+      .toBeEnabled({ timeout: 30000 });
 
     await this.screenshot("10-credit-card-ready-before-submit");
   }
