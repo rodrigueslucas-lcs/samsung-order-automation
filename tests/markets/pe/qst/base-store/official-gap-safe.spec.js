@@ -177,6 +177,7 @@ test.describe("PE QST - official safe gap reconciliation", () => {
           // The gateway adds a transaction suffix; Samsung displays the base order code.
           orderCodePattern: /\bPE\d{6}-\d{8}(?=_|\b)/i,
           orderResponsePathPattern: /\/users\/[^/]+\/orders(?:\/|$)/i,
+          submitResponsePathPattern: /\/users\/[^/]+\/carts\/[^/]+\/paymentmodes\/pe-mercadoCC\/submitOrder$/i,
         })
       );
     } else {

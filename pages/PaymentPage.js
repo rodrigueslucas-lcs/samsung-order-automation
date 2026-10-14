@@ -554,6 +554,7 @@ export default class PaymentPage extends BasePage {
   async placeOrderAndCapture({
     orderCodePattern = /\bMX\d{6}-\d{8}(?:_\d+)?\b/i,
     orderResponsePathPattern = null,
+    submitResponsePathPattern = null,
   } = {}) {
     requirePaymentSubmitOptIn();
     await this.placeOrderButton.scrollIntoViewIfNeeded();
@@ -576,6 +577,10 @@ export default class PaymentPage extends BasePage {
     const responseOrderCode = new Promise((resolve) => {
       resolveResponseOrderCode = resolve;
     });
+    let resolveSubmitRejection;
+    const submitRejection = new Promise((resolve) => {
+      resolveSubmitRejection = resolve;
+    });
     const recordResponse = (response) => {
       if (!/payment|checkout|order|placeorder|transaction/i.test(response.url())) return;
       responses.push({
@@ -583,6 +588,18 @@ export default class PaymentPage extends BasePage {
         status: response.status(),
         endpoint: new URL(response.url()).origin + new URL(response.url()).pathname,
       });
+      // HTTP 200 can carry an explicit payment rejection. Inspect only the
+      // caller's submit endpoint; keep it separate from order identity evidence.
+      if (submitResponsePathPattern && response.ok() &&
+        response.request().method() === "POST" &&
+        submitResponsePathPattern.test(new URL(response.url()).pathname)) {
+        response.text().then((text) => {
+          const data = JSON.parse(text);
+          if (data.type === "submitOrderDataWsDto" && String(data.code) === "601") {
+            resolveSubmitRejection({ type: "PAYMENT_REJECTED", businessCode: "601" });
+          }
+        }).catch(() => {});
+      }
       // A replacement cart can contain a new order-shaped code after checkout.
       // Market callers can restrict identity evidence to the actual orders API.
       if (orderResponsePathPattern && (
@@ -602,6 +619,7 @@ export default class PaymentPage extends BasePage {
     await this.placeOrderButton.click();
 
     const outcome = await Promise.race([
+      submitRejection,
       this.page.waitForURL(/confirmation|confirmacion|order-confirmation|checkout\/order|success/i, {
         timeout: 120000,
       }).then(() => ({ type: "CONFIRMATION" })).catch(() => ({ type: "TIMEOUT" })),
@@ -640,6 +658,11 @@ export default class PaymentPage extends BasePage {
     }
 
     await this.screenshot(`11-after-mx-registered-card-${outcome.type.toLowerCase()}`);
+    if (outcome.type === "PAYMENT_REJECTED") {
+      throw new Error(
+        `Payment submit returned submitOrderDataWsDto business code ${outcome.businessCode} despite HTTP success. Samsung confirmation was not proven. Do not retry blindly.`
+      );
+    }
     if (!orderCode) {
       throw new Error(
         `The single registered-card submit completed with ${outcome.type}, but no order number was observable. Do not retry blindly. Payment network failures: ${JSON.stringify(paymentNetworkFailures.slice(-10))}. Network evidence: ${JSON.stringify(responses.slice(-20))}`
