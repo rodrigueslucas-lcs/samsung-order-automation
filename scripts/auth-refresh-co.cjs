@@ -1,7 +1,14 @@
 const { spawnSync } = require("node:child_process");
 const environment = String(process.env.CO_QST_ENVIRONMENT || process.env.ENVIRONMENT || "S2").toUpperCase();
 if (!["S1", "S2"].includes(environment)) throw new Error(`Unsupported CO auth environment: ${environment}.`);
-const accountSlot = String(process.env.CO_AUTH_SLOT || "primary").toLowerCase();
+if (process.env.CO_AUTH_SLOT && process.env.MX_AUTH_SLOT &&
+    process.env.CO_AUTH_SLOT.toLowerCase() !== process.env.MX_AUTH_SLOT.toLowerCase()) {
+  throw new Error("Conflicting auth slots: use CO_AUTH_SLOT explicitly and unset MX_AUTH_SLOT.");
+}
+const accountSlot = String(process.env.CO_AUTH_SLOT || process.env.MX_AUTH_SLOT || "primary").toLowerCase();
+if (!process.env.CO_AUTH_SLOT && process.env.MX_AUTH_SLOT) {
+  console.log(`[auth:refresh:co] MX_AUTH_SLOT alias resolved to CO_AUTH_SLOT=${accountSlot}; prefer CO_AUTH_SLOT.`);
+}
 if (!["primary", "second"].includes(accountSlot)) throw new Error(`Unsupported CO auth slot: ${accountSlot}.`);
 const baseEnv = {
   ...process.env,
@@ -33,7 +40,7 @@ function run(label, script, { attempts = 1, retryDelayMs = 2500 } = {}) {
 }
 
 const slotLabel = accountSlot === "second" ? " second account" : "";
-run(`Refreshing Samsung Account${slotLabel} session for ${environment}`, "scripts/auth-login-co.cjs", { attempts: 3 });
+run(`Refreshing Samsung Account${slotLabel} session for ${environment}`, "scripts/auth-login-co.cjs", { attempts: baseEnv.CO_AUTH_MANUAL === "1" ? 1 : 3 });
 run(`Verifying Samsung Account${slotLabel} session for ${environment}`, "scripts/auth-verify-co.cjs");
 run(`Packaging verified CO ${environment} session for CI handoff`, "scripts/auth-package-co.cjs");
 

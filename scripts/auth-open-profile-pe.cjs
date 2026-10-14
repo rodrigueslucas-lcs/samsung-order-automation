@@ -15,6 +15,10 @@ const chromeArguments = [
   "--remote-debugging-port=0",
   "--disable-background-mode",
   "--start-maximized",
+  "--no-first-run",
+  "--no-default-browser-check",
+  "--hide-crash-restore-bubble",
+  "--new-window",
   launchUrl,
 ];
 

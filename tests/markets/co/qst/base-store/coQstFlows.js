@@ -46,7 +46,7 @@ export async function addConfiguredProductToCoCart(page, config) {
       summaryProductPattern:/1\s+Producto/i,
       checkoutButtonPattern:/^Continuar con la compra$/i,
       guestEmailPattern:/Escribe tu correo electr[oó]nico para tramitar el pedido/i,
-      footerAccountPattern:/^Account$/i,
+      footerAccountPattern:config.environment==="S1"?/^Sobre nosotros$/i:/^Account$/i,
     });
   });
 }

@@ -143,6 +143,7 @@ async function findAccountLoginPage(context, timeoutMs = 60000) {
 }
 
 async function waitForProfileMenu(page) {
+  await require("../utils/authBrowserWindow.cjs").prepareAuthBrowserWindow(page);
   const profile = page.getByRole("button", { name: "My Profile", exact: true });
   await profile.waitFor({ state: "visible", timeout: 120000 });
   await profile.hover();
@@ -162,6 +163,7 @@ async function waitForProfileMenu(page) {
 }
 
 async function openPeHome(page, context) {
+  await require("../utils/authBrowserWindow.cjs").prepareAuthBrowserWindow(page);
   const renderedBeforeNavigation = await findRenderedPePage(context, page);
   if (renderedBeforeNavigation) {
     console.log(`[auth:login:pe] reusing an already rendered PE ${ENV_NAME} storefront tab`);
@@ -289,7 +291,10 @@ async function loginPeSamsungAccount() {
           page.setDefaultTimeout(120000);
         }
       }
-      if (menuState === "signed-out") assertAllowedHost(page, [ACCOUNT_HOSTNAME], "Samsung Account login");
+      if (menuState === "signed-out") {
+        await require("../utils/authBrowserWindow.cjs").prepareAuthBrowserWindow(page);
+        assertAllowedHost(page, [ACCOUNT_HOSTNAME], "Samsung Account login");
+      }
 
       if (menuState === "signed-out" && manualLogin) {
         console.log(`[auth:login:pe] Samsung Account login is ready in the visible Chrome. Complete login/CAPTCHA/MFA manually; automation will resume after the authenticated PE ${ENV_NAME} return.`);

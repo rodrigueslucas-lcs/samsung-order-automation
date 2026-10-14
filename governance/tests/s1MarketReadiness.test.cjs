@@ -29,3 +29,11 @@ for (const [market, factory, environment, routePrefix] of CASES) {
     assert.ok(config.cartUrl.pathname.startsWith(routePrefix));
   });
 }
+
+test('CO staging bootstrap applies to both environments and rejects cross-origin overrides', () => {
+  for (const environment of ['S1', 'S2']) {
+    const config = getCoQstConfig({ CO_QST_ENVIRONMENT: environment });
+    assert.equal(config.setupUrl.href, new URL('/getcookie.html', config.baseUrl.origin).href);
+  }
+  assert.throws(() => getCoQstConfig({ CO_QST_ENVIRONMENT: 'S1', CO_SETUP_URL: 'https://other.example.test/getcookie.html' }), /storefront origin/);
+});

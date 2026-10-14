@@ -72,14 +72,7 @@ async function dismissNotificationTutorial(page) {
 }
 
 async function maximizeClWindow(page) {
-  await page.bringToFront();
-  const cdp = await page.context().newCDPSession(page);
-  try {
-    const { windowId } = await cdp.send("Browser.getWindowForTarget");
-    await cdp.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "maximized" } });
-  } finally {
-    await cdp.detach();
-  }
+  await require("../utils/authBrowserWindow.cjs").prepareAuthBrowserWindow(page);
 }
 
 async function accountState(page) {

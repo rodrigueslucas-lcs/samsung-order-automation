@@ -123,28 +123,8 @@ async function findRenderedMxPage(context, preferredPage = null) {
   return null;
 }
 
-async function prepareMxWindow(page, closeDevTools = true) {
-  if (closeDevTools) {
-    // Docked DevTools can be an "other" target outside the page's CDP scope.
-    const browserCdp = await page.context().browser().newBrowserCDPSession();
-    try {
-      const { targetInfos } = await browserCdp.send("Target.getTargets", { filter: [{ exclude: false }] });
-      for (const target of targetInfos) {
-        if (target.url.startsWith("devtools://") && ["page", "other"].includes(target.type)) {
-          await browserCdp.send("Target.closeTarget", { targetId: target.targetId });
-        }
-      }
-    } finally { await browserCdp.detach(); }
-  }
-  const cdp = await page.context().newCDPSession(page);
-  try {
-    const { windowId, bounds } = await cdp.send("Browser.getWindowForTarget");
-    if (["minimized", "fullscreen"].includes(bounds.windowState)) {
-      await cdp.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "normal" } });
-    }
-    if (bounds.windowState !== "maximized") await cdp.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "maximized" } });
-  } finally { await cdp.detach(); }
-  await page.bringToFront();
+async function prepareMxWindow(page) {
+  await require("../utils/authBrowserWindow.cjs").prepareAuthBrowserWindow(page);
 }
 
 async function waitForProfileMenu(page) {

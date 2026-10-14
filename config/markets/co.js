@@ -25,7 +25,12 @@ function getCoQstConfig(environment = process.env) {
     throw new Error("CO_STOREFRONT_URL must point to /co/.");
   }
 
-  const setupUrl = envName === "S2" ? new URL("/getcookie.html", baseUrl.origin) : null;
+  const setupUrl = environment.CO_SETUP_URL
+    ? httpsUrl(environment.CO_SETUP_URL, "CO_SETUP_URL")
+    : new URL("/getcookie.html", baseUrl.origin);
+  if (setupUrl.origin !== baseUrl.origin) {
+    throw new Error("CO_SETUP_URL must stay on the CO storefront origin.");
+  }
   const sku = String(environment.CO_QST_SKU || DEFAULT_CO_QST_SKU).trim();
   if (!sku) throw new Error(`CO_QST_SKU is required for CO ${envName} Base Store execution.`);
 

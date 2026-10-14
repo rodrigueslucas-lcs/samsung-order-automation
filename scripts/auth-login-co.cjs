@@ -1,4 +1,5 @@
 const { chromium } = require("@playwright/test");
+const { prepareAuthBrowserWindow, hasNativeAuthWindow } = require("../utils/authBrowserWindow.cjs");
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const { writeJsonAtomically } = require("../utils/atomicJson");
@@ -70,7 +71,18 @@ async function connectDedicatedChrome() {
   const existingPort = readDevToolsPort();
   if (existingPort) {
     const existing = await chromium.connectOverCDP(`http://127.0.0.1:${existingPort}`).catch(() => null);
-    if (existing) return existing;
+    if (existing) {
+      if (await hasNativeAuthWindow(existing)) return existing;
+      console.log("[auth:login:co] dedicated Chrome has only onboarding/background targets; opening its storefront window");
+      const launcher = spawnSync(process.execPath, [path.resolve("scripts/auth-open-profile-co.cjs")], { stdio: "inherit" });
+      if (launcher.status !== 0) throw new Error("Dedicated CO Chrome window could not be opened.");
+      const deadline = Date.now() + 30000;
+      while (Date.now() < deadline) {
+        if (await hasNativeAuthWindow(existing)) return existing;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+      throw new Error("Dedicated CO Chrome did not expose a native storefront window within 30 seconds.");
+    }
   }
 
   fs.rmSync(devToolsActivePortFile, { force: true });
@@ -163,18 +175,7 @@ async function dismissCoNotificationTutorial(page) {
 }
 
 async function maximizeDedicatedChrome(page) {
-  const session = await page.context().newCDPSession(page);
-  try {
-    const { windowId, bounds } = await session.send("Browser.getWindowForTarget");
-    if (bounds.windowState !== "maximized") {
-      if (bounds.windowState === "minimized" || bounds.windowState === "fullscreen") {
-        await session.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "normal" } });
-      }
-      await session.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "maximized" } });
-    }
-  } finally {
-    await session.detach();
-  }
+  await prepareAuthBrowserWindow(page);
 }
 
 async function closeDedicatedDevTools(context) {
@@ -346,6 +347,7 @@ async function exportAuthenticatedState(context, page) {
 async function findAuthenticatedPreQaCoPage(context) {
   for (const page of context.pages().slice().reverse()) {
     if (!isCoStorefront(page)) continue;
+    await prepareAuthBrowserWindow(page);
     const profile = page.locator("button.nv00-gnb-v4__utility-user").filter({ visible: true }).first();
     if (!(await profile.isVisible().catch(() => false))) continue;
     const logout = page.getByText(/Cerrar Sesi[oó]n/i).filter({ visible: true }).first();
@@ -472,7 +474,10 @@ async function loginCoSamsungAccount() {
           }
         }
       }
-      if (menuState === "signed-out") assertAllowedHost(page, [ACCOUNT_HOSTNAME], "Samsung Account login");
+      if (menuState === "signed-out") {
+        await prepareAuthBrowserWindow(page);
+        assertAllowedHost(page, [ACCOUNT_HOSTNAME], "Samsung Account login");
+      }
 
       if (menuState === "signed-out" && manualLogin) {
         console.log(`[auth:login:co] Samsung Account login is ready in the visible Chrome. Complete login/CAPTCHA/MFA manually; automation will resume after the authenticated CO ${ENV_NAME} return.`);

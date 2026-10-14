@@ -16,6 +16,8 @@ import destructiveGuards from "../../../../../utils/destructiveGuards.js";
 import { addConfiguredProductToCoCart, bootstrapCoStorefront } from "./coQstFlows";
 import cartPresentation from "../../../../../flows/smb/cartPresentation";
 import authStateModule from "../../../../../utils/authState";
+import coTrackingPrerequisite from "../../../../../utils/coTrackingPrerequisite.cjs";
+import atomicJson from "../../../../../utils/atomicJson";
 
 const test = base.extend({
   qstBusinessScenario: [async ({}, use, testInfo) => {
@@ -120,12 +122,20 @@ async function fillCoGuestContact(page,{recoverStalledTransition=false,guestEmai
   });
   await coClick(page,page.getByRole("option").filter({hasText:/Pasaporte/i}).first());
   await page.getByRole("textbox",{name:"vatNumber",exact:true}).fill("AB1234567");
-  await page.getByRole("checkbox",{name:"Persona Natural",exact:true}).check();
-  await page.locator('input[name="purchaseCompany"]').check();
-  await page.getByRole("textbox",{name:"companyEmail",exact:true}).fill("co-qst-company@mailinator.com");
-  await page.getByRole("textbox",{name:"companyName",exact:true}).fill("QA Automation");
-  await page.getByRole("textbox",{name:"companyId",exact:true}).fill("9001234567");
-  await page.getByRole("textbox",{name:"companyPhone",exact:true}).fill("3001234567");
+  const naturalPerson=page.getByRole("checkbox",{name:"Persona Natural",exact:true});
+  const purchaseCompany=page.locator('input[name="purchaseCompany"]');
+  if(await naturalPerson.isVisible().catch(()=>false)){
+    await naturalPerson.check();
+    await purchaseCompany.check();
+    await page.getByRole("textbox",{name:"companyEmail",exact:true}).fill("co-qst-company@mailinator.com");
+    await page.getByRole("textbox",{name:"companyName",exact:true}).fill("QA Automation");
+    await page.getByRole("textbox",{name:"companyId",exact:true}).fill("9001234567");
+    await page.getByRole("textbox",{name:"companyPhone",exact:true}).fill("3001234567");
+  }else{
+    await expect(purchaseCompany).toBeVisible();
+    await purchaseCompany.uncheck();
+    await expect(purchaseCompany).not.toBeChecked();
+  }
   const next=page.getByRole("button",{name:/Continuar con el m[eé]todo de env[ií]o/i});
   await expect(next).toBeEnabled();
   await next.click();
@@ -201,7 +211,12 @@ async function coFillNewShipping(page,delivery,secondaryNumber="113-43"){
 async function coFillNewBilling(page,delivery,secondaryNumber="113-43"){
   await coDismissReminder(page);
   await delivery.locator('input[name="sameAsShipping"]').uncheck();
-  await coSelectAddressMode(page,delivery,"Billing","NEW_ADDRESS");
+  const newBillingMode=delivery.locator('input[name="addressOptionBilling"][value="NEW_ADDRESS"]');
+  if(await newBillingMode.isEnabled().catch(()=>false)){
+    await coSelectAddressMode(page,delivery,"Billing","NEW_ADDRESS");
+  }else{
+    await expect(delivery.locator('mat-select[name="departmentBilling"]')).toBeVisible();
+  }
   await coSelectOption(page,delivery,"departmentBilling","Bogota, D.C.");
   await coSelectOption(page,delivery,"municipalityBilling","BOGOTA, D.C.");
   await delivery.locator('input[name="line1"]').fill(`Carrera 7 #${secondaryNumber}, Oficina 607, Usaquen`);
@@ -272,6 +287,7 @@ if(id==="SAM-24912"){
   await clearCoCartForPayment(page,cfg);
   const registeredCart=await cart(page,cfg);
   await expect(page.getByText(/Tienes\s+1\s+Producto\(s\)\s+en\s+tu\s+carrito/i)).toBeVisible({timeout:30000});
+  await expect(page.getByRole("textbox",{name:"Quantity",exact:true})).toHaveValue("1");
   await registeredCart.proceedToAuthenticatedCheckout();
   await page.waitForURL(/CHECKOUT_STEP_(CONTACT_INFO|DELIVERY)/,{waitUntil:"domcontentloaded",timeout:60000});
 
@@ -300,8 +316,10 @@ if(id==="SAM-24912"){
   await payment.selectCreditCard();
   await payment.fillCardData(card);
   await payment.validateCreditCardReady(card);
-  const result=await payment.placeOrderAndCapture();
+  const result=await payment.placeOrderAndCapture({orderResponsePathPattern:/\/users\/[^/]+\/orders(?:\/|$)/i});
   expect(result.orderCode).toMatch(/^CO\d{6}-\d{8}(?:_\d+)?$/i);
+  await expect(page).toHaveURL(/confirmation|confirmacion|order-confirmation|checkout\/order|success/i,{timeout:90000});
+  await expect(page.getByText(new RegExp(result.orderCode.split("_")[0])).filter({visible:true}).first()).toBeVisible({timeout:90000});
   console.log("CO_QST_REGISTERED_ORDER",JSON.stringify({orderCode:result.orderCode,paymentMode:"co-mercadoCC",outcome:result.outcome}));
   return;
 }
@@ -354,7 +372,7 @@ if(id==="SAM-24911"){
     window.scrollTo(0,document.documentElement.scrollHeight);
     return /Volver al inicio|Back to top|Volver arriba|Ir arriba|Subir/i.test(document.body.innerText);
   },null,{timeout:20000,polling:"raf"}).then(()=>true,()=>false);
-  if(!controlRendered)throw new Error("CO S2 cart footer loaded, but no Back to Top control rendered. Verify manually on /co/cart after scrolling to the bottom.");
+  if(!controlRendered)throw new Error(`CO ${cfg.environment} cart footer loaded, but no Back to Top control rendered. Verify manually on /co/cart after scrolling to the bottom.`);
   const backToTop=page.getByRole("button",{name:/Volver al inicio|Back to top|Volver arriba|Ir arriba|Subir/i})
     .or(page.getByRole("link",{name:/Volver al inicio|Back to top|Volver arriba|Ir arriba|Subir/i})).filter({visible:true}).first();
   await expect(backToTop).toBeVisible({timeout:30000});
@@ -386,6 +404,10 @@ test("SAM-24880 @qst @co @base-store - Add product from BC Page",async({page},i)
     await expect(refrigerators,"CO BC refrigerator category must be discoverable from the home navigation.").toBeVisible({timeout:30000});
     bcUrl=new URL(await refrigerators.getAttribute("href"),cfg.baseUrl);
   }
+  if(bcUrl.hostname!==cfg.baseUrl.hostname){
+    throw new Error(`CO ${cfg.environment} BC navigation points outside staging (${bcUrl.hostname}). Set CO_QST_BC_URL to a verified same-origin staging BC category before adding a product.`);
+  }
+  bcUrl.protocol="https:";
   await page.goto(bcUrl.href,{waitUntil:"domcontentloaded",timeout:60000});
   await expect(page).toHaveURL(bcUrl.href,{timeout:30000});
   const productCard=page.getByRole("listitem")
@@ -592,17 +614,31 @@ test("SAM-24910 @qst @co @base-store @registered - Validate switching delivery m
     await expect(fresh).not.toBeChecked();
   }finally{await context.close();}
 });
-test("SAM-24911 @blocked @qst @co @base-store - Verify Back to Top",async({},i)=>{evidence(i,"SAM-24911");test.skip(true,"BLOCKED: known CO STG2 storefront issue. Back to Top is currently failing and is being handled internally; re-enable after the storefront fix.");});
+test("SAM-24911 @blocked @qst @co @base-store - Verify Back to Top",async({page},i)=>{
+  const cfg=getCoQstConfig();
+  test.skip(cfg.environment==="S2","BLOCKED: known CO STG2 storefront issue. Back to Top is currently failing and is being handled internally; re-enable after the storefront fix.");
+  await runCanonicalCase("SAM-24911",page,i);
+});
 test("SAM-24912 @destructive @qst @co @base-store @registered - Payment using credit card with reg user",async({page},i)=>runCanonicalCase("SAM-24912",page,i));
 test("SAM-24915 @blocked @qst @co @base-store - Payment using Rewards",async({page},i)=>runCanonicalCase("SAM-24915",page,i));
 test("SAM-24919 @destructive @qst @co @base-store - Track Order",async({page,context},i)=>{
   test.setTimeout(900000);
   evidence(i,"SAM-24919");
   const cfg=getCoQstConfig();
-  requirePaymentSubmitOptIn();
-  const email=`co-qst-${Date.now()}@mailinator.com`;
+  const fixturePath=path.resolve(`playwright/.auth/co-${cfg.environment.toLowerCase()}-guest-tracking.json`);
+  let existingOrder=null;
+  if(cfg.environment==="S1" && process.env.CO_QST_TRACKING_CREATE_ORDER!=="1"){
+    test.skip(!fs.existsSync(fixturePath),"CO S1 Tracking requires a confirmed CO S1 guest order with matching Mailinator inbox. Supply the ignored co-s1-guest-tracking.json fixture, or explicitly enable CO_QST_TRACKING_CREATE_ORDER=1 after payment prerequisites are valid.");
+    existingOrder=coTrackingPrerequisite.getCoTrackingPrerequisite(JSON.parse(fs.readFileSync(fixturePath,"utf8")),cfg.environment,cfg.sku);
+    expect(existingOrder,"The CO tracking fixture must match market, environment, SKU and confirmed order/mailbox identity.").toBeTruthy();
+  }
+  let email=existingOrder?.email || `co-qst-${Date.now()}@mailinator.com`;
+  let orderNumber=existingOrder?.orderNumber;
   const inbox=email.split("@")[0];
+  if(!existingOrder){
+  requirePaymentSubmitOptIn();
   const guestCart=await cart(page,cfg);
+  await expect(page.getByRole("textbox",{name:"Quantity",exact:true})).toHaveValue("1");
   await coGuestCheckout(page,guestCart,email);
   await fillCoGuestContact(page,{recoverStalledTransition:true,guestEmail:email});
   const delivery=page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
@@ -614,7 +650,7 @@ test("SAM-24919 @destructive @qst @co @base-store - Track Order",async({page,con
   await payment.selectCreditCard();
   await payment.fillCardData(card);
   await payment.validateCreditCardReady(card);
-  const created=await payment.placeOrderAndCapture();
+  const created=await payment.placeOrderAndCapture({orderResponsePathPattern:/\/users\/[^/]+\/orders(?:\/|$)/i});
   await expect(page,"The newly submitted CO order must reach a confirmation page, not just return an order code in an API response.")
     .toHaveURL(/confirmation|confirmacion|order-confirmation|checkout\/order|success/i,{timeout:90000});
   const confirmationText=await expect.poll(async()=>{
@@ -622,13 +658,19 @@ test("SAM-24919 @destructive @qst @co @base-store - Track Order",async({page,con
     return /N[uú]mero de pedido:\s*CO\d{6}-\d{8}/i.test(text)?text:null;
   },{timeout:90000,message:"CO confirmation did not hydrate its public order number."}).toBeTruthy()
     .then(()=>page.locator("body").innerText());
-  const orderNumber=confirmationText.match(/N[uú]mero de pedido:\s*(CO\d{6}-\d{8})/i)?.[1];
+  orderNumber=confirmationText.match(/N[uú]mero de pedido:\s*(CO\d{6}-\d{8})/i)?.[1];
   expect(orderNumber,"CO confirmation must display the public order number used by Track Order.").toBeTruthy();
   expect(created.orderCode.startsWith(orderNumber),"The confirmation order must match the submitted checkout response.").toBe(true);
   // CO intermittently omits the email from the confirmation copy; the OTP
   // request below verifies the actual order/email association.
   console.log(`[co-tracking] fresh guest order ${orderNumber} confirmed for ${email}`);
   i.annotations.push({type:"co-tracking-created-order",description:`Fresh guest order ${orderNumber} for ${email}`});
+  fs.mkdirSync(path.dirname(fixturePath),{recursive:true});
+  atomicJson.writeJsonAtomically(fixturePath,{market:"CO",environment:cfg.environment,confirmed:true,sku:cfg.sku,orderNumber,email,inbox});
+  }else{
+    await bootstrapCoStorefront(page,cfg);
+    recordBusinessEvidence(i,{orderCode:orderNumber,existingConfirmedOrder:true});
+  }
   const ordersUrl=new URL("/co/mypage/orders",cfg.baseUrl.origin).toString();
   let tracking;
   for(let attempt=1;attempt<=3;attempt++){
