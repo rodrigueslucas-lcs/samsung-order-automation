@@ -98,6 +98,20 @@
       "priority": "Medium",
       "rootCause": "TBD",
       "notes": "Footer section is missing in STG1, blocking the official desktop UI/footer validation. Component: UI/UX; functional area: Footer."
+    },
+    {
+      "market": "CL",
+      "environment": "S1",
+      "store": "BASE_STORE",
+      "samId": "SAM-25075",
+      "jira": "SAM-25150",
+      "url": "https://jira.secext.samsung.net/browse/SAM-25150",
+      "title": "QST STG1 SMB CL When Applying Trade-In on Cart Page, the Trade Amount Is Not Appearing",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "High",
+      "rootCause": "TBD",
+      "notes": "In CL STG1, after completing the trade-in wizard, the cart does not retain/display the expected trade-in amount and device/model information. Component: Product/UI/UX; functional area: Cart."
     }
   ]
 }
