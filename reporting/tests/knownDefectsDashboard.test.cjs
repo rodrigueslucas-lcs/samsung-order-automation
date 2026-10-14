@@ -40,6 +40,28 @@ function backToTopRuntime({ market, environment, status = 'FAIL' }) {
   };
 }
 
+function peFooterRuntime({ environment = 'S1/STG1', status = 'FAIL' } = {}) {
+  const blocked = ['BLOCKED', 'SKIPPED-BLOCKED'].includes(status) ? 2 : 0;
+  return {
+    market: 'PE',
+    environment,
+    store: 'BASE_STORE',
+    suite: 'P1/QST',
+    summary: {
+      official: 28,
+      executed: status === 'SKIPPED-BLOCKED' ? 0 : 2,
+      passed: status === 'PASS' ? 2 : 0,
+      failed: status === 'FAIL' ? 2 : 0,
+      blocked,
+      notRun: 0,
+    },
+    tests: [
+      { samId: 'SAM-25062', title: 'Cart page UI', status, failureType: 'FUNCTIONAL_DEFECT' },
+      { samId: 'SAM-25079', title: 'UI validation in desktop view', status, failureType: 'FUNCTIONAL_DEFECT' },
+    ],
+  };
+}
+
 function dashboardHtml() {
   return `<!doctype html><html><head></head><body>
   <div class="hero-kpis"><article class="kpi warn"><small>Blocked</small><b>1</b><span>Known prerequisites</span></article></div>
@@ -80,6 +102,24 @@ test('RT-746043 maps PE and CO Back to Top in S1 and S2 only when actionable', (
 
   assert.equal(activeKnownDefects(backToTopRuntime({ market: 'PE', environment: 'S1/STG1', status: 'PASS' }), registry).length, 0);
   assert.equal(activeKnownDefects(backToTopRuntime({ market: 'CO', environment: 'S2/STG2', status: 'PASS' }), registry).length, 0);
+});
+
+test('SAM-25146 maps PE S1 footer defect to SAM-25062 and SAM-25079 only when actionable', () => {
+  for (const status of ['FAIL', 'BLOCKED', 'SKIPPED-BLOCKED']) {
+    const active = activeKnownDefects(peFooterRuntime({ status }), registry);
+    assert.equal(active.length, 2, `PE S1 footer defect must map both official TCs for ${status}.`);
+    assert.deepEqual(active.map(({ defect }) => defect.samId).sort(), ['SAM-25062', 'SAM-25079']);
+    for (const { defect } of active) {
+      assert.equal(defect.jira, 'SAM-25146');
+      assert.equal(defect.url, 'https://jira.secext.samsung.net/browse/SAM-25146');
+      assert.equal(defect.classification, 'KNOWN_DEFECT');
+    }
+  }
+
+  assert.equal(activeKnownDefects(peFooterRuntime({ environment: 'S2/STG2' }), registry).length, 0,
+    'STG1 footer defect must not leak into PE S2 reporting.');
+  assert.equal(activeKnownDefects(peFooterRuntime({ status: 'PASS' }), registry).length, 0,
+    'Passing footer TCs must remain PASS and must not be relabeled as known defects.');
 });
 
 test('dashboard visually separates a mapped defect without rewriting raw runtime truth', () => {
