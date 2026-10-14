@@ -62,6 +62,26 @@ function peFooterRuntime({ environment = 'S1/STG1', status = 'FAIL' } = {}) {
   };
 }
 
+function clTradeInRuntime({ environment = 'S1/STG1', status = 'FAIL' } = {}) {
+  return {
+    market: 'CL',
+    environment,
+    store: 'BASE_STORE',
+    suite: 'P1/QST',
+    summary: {
+      official: 38,
+      executed: status === 'SKIPPED-BLOCKED' ? 0 : 1,
+      passed: status === 'PASS' ? 1 : 0,
+      failed: status === 'FAIL' ? 1 : 0,
+      blocked: ['BLOCKED', 'SKIPPED-BLOCKED'].includes(status) ? 1 : 0,
+      notRun: 0,
+    },
+    tests: [
+      { samId: 'SAM-25075', title: 'Verify Trade-in on cart page', status, failureType: 'FUNCTIONAL_DEFECT' },
+    ],
+  };
+}
+
 function dashboardHtml() {
   return `<!doctype html><html><head></head><body>
   <div class="hero-kpis"><article class="kpi warn"><small>Blocked</small><b>1</b><span>Known prerequisites</span></article></div>
@@ -120,6 +140,22 @@ test('SAM-25146 maps PE S1 footer defect to SAM-25062 and SAM-25079 only when ac
     'STG1 footer defect must not leak into PE S2 reporting.');
   assert.equal(activeKnownDefects(peFooterRuntime({ status: 'PASS' }), registry).length, 0,
     'Passing footer TCs must remain PASS and must not be relabeled as known defects.');
+});
+
+test('SAM-25150 maps CL S1 trade-in defect to SAM-25075 only when actionable', () => {
+  for (const status of ['FAIL', 'BLOCKED', 'SKIPPED-BLOCKED']) {
+    const active = activeKnownDefects(clTradeInRuntime({ status }), registry);
+    assert.equal(active.length, 1, `CL S1 trade-in defect must map SAM-25075 for ${status}.`);
+    assert.equal(active[0].defect.samId, 'SAM-25075');
+    assert.equal(active[0].defect.jira, 'SAM-25150');
+    assert.equal(active[0].defect.url, 'https://jira.secext.samsung.net/browse/SAM-25150');
+    assert.equal(active[0].defect.classification, 'KNOWN_DEFECT');
+  }
+
+  assert.equal(activeKnownDefects(clTradeInRuntime({ environment: 'S2/STG2' }), registry).length, 0,
+    'CL STG1 trade-in defect must not leak into CL S2 reporting.');
+  assert.equal(activeKnownDefects(clTradeInRuntime({ status: 'PASS' }), registry).length, 0,
+    'Passing CL trade-in TC must remain PASS and must not be relabeled as a known defect.');
 });
 
 test('dashboard visually separates a mapped defect without rewriting raw runtime truth', () => {
