@@ -19,6 +19,27 @@ function runtime(status = 'SKIPPED-BLOCKED') {
   };
 }
 
+function backToTopRuntime({ market, environment, status = 'FAIL' }) {
+  const samId = market === 'PE' ? 'SAM-25094' : 'SAM-24911';
+  return {
+    market,
+    environment,
+    store: 'BASE_STORE',
+    suite: 'P1/QST',
+    summary: {
+      official: market === 'PE' ? 28 : 29,
+      executed: status === 'SKIPPED-BLOCKED' ? 0 : 1,
+      passed: 0,
+      failed: status === 'FAIL' ? 1 : 0,
+      blocked: status === 'SKIPPED-BLOCKED' ? 1 : 0,
+      notRun: 0,
+    },
+    tests: [
+      { samId, title: 'Verify Back to Top', status, failureType: 'FUNCTIONAL_DEFECT' },
+    ],
+  };
+}
+
 function dashboardHtml() {
   return `<!doctype html><html><head></head><body>
   <div class="hero-kpis"><article class="kpi warn"><small>Blocked</small><b>1</b><span>Known prerequisites</span></article></div>
@@ -38,6 +59,27 @@ test('known-defect registry maps SAM-25010 to the created RT', () => {
   assert.equal(defect.classification, 'KNOWN_DEFECT');
   assert.equal(normalizeEnvironment('S2/STG2'), 'S2');
   assert.equal(activeKnownDefects(runtime(), registry).length, 1);
+});
+
+test('RT-746043 maps PE and CO Back to Top in S1 and S2 only when actionable', () => {
+  const scenarios = [
+    { market: 'PE', environment: 'S1/STG1', samId: 'SAM-25094' },
+    { market: 'PE', environment: 'S2/STG2', samId: 'SAM-25094' },
+    { market: 'CO', environment: 'S1/STG1', samId: 'SAM-24911' },
+    { market: 'CO', environment: 'S2/STG2', samId: 'SAM-24911', status: 'SKIPPED-BLOCKED' },
+  ];
+
+  for (const scenario of scenarios) {
+    const active = activeKnownDefects(backToTopRuntime(scenario), registry);
+    assert.equal(active.length, 1, `${scenario.market} ${scenario.environment} must map exactly one Back to Top defect.`);
+    assert.equal(active[0].defect.samId, scenario.samId);
+    assert.equal(active[0].defect.jira, 'RT-746043');
+    assert.equal(active[0].defect.url, 'https://jira.secext.samsung.net/browse/RT-746043');
+    assert.equal(active[0].defect.classification, 'KNOWN_DEFECT');
+  }
+
+  assert.equal(activeKnownDefects(backToTopRuntime({ market: 'PE', environment: 'S1/STG1', status: 'PASS' }), registry).length, 0);
+  assert.equal(activeKnownDefects(backToTopRuntime({ market: 'CO', environment: 'S2/STG2', status: 'PASS' }), registry).length, 0);
 });
 
 test('dashboard visually separates a mapped defect without rewriting raw runtime truth', () => {
