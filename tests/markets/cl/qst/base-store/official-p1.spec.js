@@ -136,6 +136,13 @@ test.describe("CL QST - Base Store Official P1", () => {
     await page.locator('input[name="phone"]').first().fill("987654321");
     const document = page.locator('input[name="vatNumber"]:visible');
     if (await document.count()) await document.first().fill("12345678-5");
+    await page.getByRole("button", { name: /Compra como invitad/i }).filter({ visible: true }).first().click();
+    await expect(page).toHaveURL(/CHECKOUT_STEP_CONTACT_INFO/i, { timeout: 60000 });
+    await page.locator('input[name="firstName"]').first().fill("Cliente");
+    await page.locator('input[name="lastName"]').first().fill("Prueba");
+    await page.locator('input[name="phone"]').first().fill("987654321");
+    const document2 = page.locator('input[name="vatNumber"]:visible');
+    if (await document2.count()) await document2.first().fill("12345678-5");
     await page.getByRole("button", { name: /Continuar a despacho/i }).filter({ visible: true }).first().click();
     await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i, { timeout: 60000 });
     await page.getByText(/Direcci[oó]n de despacho/i).filter({ visible: true }).first()
@@ -253,7 +260,36 @@ test.describe("CL QST - Base Store Official P1", () => {
     await expect(page.getByText(/Samsung Rewards|Rewards|puntos/i).filter({ visible: true }).first()).toBeVisible({ timeout: 30000 });
   });
 
-  test("SAM-24797 @blocked @qst @cl @base-store - Verify BOGO product on cart page", async () => blocked("eligible CL BOGO SKU/test data is required."));
+  test("SAM-24797 @qst @cl @base-store - Verify BOGO product on cart page", async ({ page }) => {
+    const cfg = config();
+    const defaultBogoSku = cfg.environment === "S1" ? "SM-S926BLBKLTL" : "";
+    const bogoSku = String(process.env.CL_QST_BOGO_SKU || defaultBogoSku).trim();
+    const bogoPdp = process.env.CL_QST_BOGO_PDP_URL ||
+      (bogoSku ? new URL(`/cl/p/${bogoSku}`, cfg.baseUrl.origin).href : "");
+    test.skip(!bogoPdp || !bogoSku, "A currently eligible CL BOGO product is required for this environment.");
+
+    const target = new URL(bogoPdp);
+    if (target.hostname !== cfg.baseUrl.hostname || !target.pathname.startsWith("/cl/")) {
+      throw new Error("CL_QST_BOGO_PDP_URL must stay on the configured CL staging storefront.");
+    }
+    const bogoCfg = { ...cfg, pdpUrl: target, sku: bogoSku };
+
+    await test.step("Add eligible CL BOGO product to cart", () =>
+      addConfiguredProductToClCart(page, bogoCfg)
+    );
+    await test.step("Validate BOGO source product in cart", async () => {
+      const sourceSku = page.getByText(bogoSku, { exact: true }).filter({ visible: true });
+      await expect(sourceSku.first(), "CL BOGO cart must contain the eligible source SKU.").toBeVisible({ timeout: 30000 });
+      expect(await sourceSku.count(), "CL BOGO campaign may repeat the source SKU in paid and promotional cart entries.").toBeGreaterThanOrEqual(1);
+    });
+    await test.step("Validate promotional BOGO gift in cart", async () => {
+      const cartSurface = page.getByRole("main");
+      const giftLabels = cartSurface.getByText(/BOGO\s*Gift|BOGO|Producto\s+de\s+regalo|Regalo|Gratis/i)
+        .filter({ visible: true });
+      await expect(giftLabels.first(), "CL BOGO cart must expose a promotional gift indicator.").toBeVisible({ timeout: 30000 });
+      expect(await giftLabels.count(), "CL BOGO cart should expose at least one promotional gift indicator.").toBeGreaterThanOrEqual(1);
+    });
+  });
   test("SAM-24803 @blocked @qst @cl @base-store - Verify Recycle & Save Trade-in on cart page", async () => blocked("eligible CL Trade-in SKU/test data is required."));
   test("SAM-24804 @blocked @qst @cl @base-store - SC+ on cart page", async () => blocked("eligible CL Samsung Care+ SKU/test data is required."));
 
