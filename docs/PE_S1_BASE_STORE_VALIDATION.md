@@ -57,6 +57,27 @@ TC PASS.
 
 ## Payment safety — SAM-25099
 
+### Latest local validation — PASS, 2026-10-14
+
+After explicit operator authorization, one new quantity-one order was submitted
+using the existing PE test card. SAM-25099 passed end to end, headless, one worker,
+zero retries: Samsung displayed `¡Muchas gracias por tu compra!` and the visible
+new order number **PE261014-64013107**. No runtime code or assertion change was
+needed for this successful execution. This does not establish the root cause or
+permanent resolution of the earlier intermittent backend rejection.
+
+```bash
+PE_QST_ENVIRONMENT=S1 PE_QST_TARGET_IDS=SAM-25099 \
+PE_QST_ARTIFACT_DIR=test-results/pe-s1-confirmation-e2e \
+MX_QST_HEADLESS=1 PW_TRACE=1 ALLOW_PAYMENT_SUBMIT=1 npm run qst:pe:base-store
+```
+
+Result: one passed, zero failed/skipped/flaky; runner exit 0. Raw results and
+the final confirmation screenshot are under `test-results/pe-s1-confirmation-e2e/`.
+No additional payment was submitted after that confirmation.
+
+### Historical build #131 rejection
+
 The archived Jenkins trace shows HTTP 200 for the PE Mercado Pago
 `submitOrder` POST with this business response:
 
@@ -72,11 +93,10 @@ excluding replacement cart codes. The PE caller now separately recognizes the
 exact `submitOrderDataWsDto` rejection code 601 on its card-submit endpoint and
 fails immediately with a business rejection diagnostic. Arbitrary response
 bodies are not logged. Other markets and order identity filtering are unchanged.
-The final Samsung confirmation and matching order number remain mandatory;
-the payment TC has not passed in this follow-up.
+The final Samsung confirmation and matching order number remain mandatory.
 
-No payment was resubmitted during this follow-up. An accepted PE S1 sandbox
-payment response is required before confirmation can be proven.
+The initial build #131 investigation did not resubmit payment. The later
+explicitly authorized successful execution is recorded above.
 Quantity-one and destructive opt-in protections remain intact.
 
 ## Services
