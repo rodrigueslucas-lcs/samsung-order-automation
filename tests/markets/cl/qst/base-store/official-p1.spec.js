@@ -44,7 +44,7 @@ test.describe("CL QST - Base Store Official P1", () => {
   }
 
   async function authenticatedPage(browser, cfg) {
-    test.skip(!hasClAuthState(), "CL authenticated state is required. Run CL_QST_ENVIRONMENT=S2 npm run auth:refresh:cl first.");
+    test.skip(!hasClAuthState(), `CL authenticated state is required. Run CL_QST_ENVIRONMENT=${cfg.environment} npm run auth:refresh:cl first.`);
     const context = await browser.newContext({ storageState: CL_AUTH_STATE_PATH });
     await getClAuthState().applyAuthSessionStorage(context);
     const page = await context.newPage();
@@ -58,6 +58,39 @@ test.describe("CL QST - Base Store Official P1", () => {
     const current = await addConfiguredProductToClCart(page, cfg);
     await current.validateProductInCart();
     return { cfg, cart: current };
+  }
+
+  async function completeClRegisteredContact(page) {
+    await expect(page).toHaveURL(/CHECKOUT_STEP_(CONTACT_INFO|DELIVERY)/i, { timeout: 60000 });
+    if (!/CHECKOUT_STEP_CONTACT_INFO/i.test(page.url())) return;
+    await test.step("Complete required registered contact details before delivery", async () => {
+      const contact = page.locator('[data-activestepname="CHECKOUT_STEP_CONTACT_INFO"]');
+      for (const [name, fallback] of [["firstName", "Cliente"], ["lastName", "Prueba"], ["phone", "987654321"]]) {
+        const field = contact.locator(`input[name="${name}"]:visible`).first();
+        if (!(await field.inputValue()).trim()) await field.fill(fallback);
+      }
+      const document = contact.locator('input[name="vatNumber"]:visible').first();
+      if (await document.count()) {
+        const value = (await document.inputValue()).replace(/\./g, "");
+        if (!/^\d{7,8}-[\dkK]$/.test(value)) await document.fill("12345678-5");
+      }
+      await contact.getByRole("button", { name: /Continuar a despacho/i }).click();
+      await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i, { timeout: 60000 });
+    });
+  }
+
+  async function selectClNewAddress(page) {
+    await test.step("Open the registered new shipping address form", async () => {
+      const shipping = page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
+      const fresh = page.getByRole("radio", { name: /A[nñ]adir nueva direcci[oó]n/i });
+      const directForm = shipping.locator('input[name="line2"]:visible').first();
+      await fresh.or(directForm).first().waitFor({ state: "visible", timeout: 30000 });
+      if (await fresh.isVisible()) {
+        await fresh.locator("xpath=ancestor::mat-radio-button[1]").click();
+        await expect(fresh).toBeChecked();
+      }
+      await expect(directForm).toBeVisible();
+    });
   }
 
   async function clRegisteredDelivery(browser, { singleItem = false } = {}) {
@@ -83,6 +116,7 @@ test.describe("CL QST - Base Store Official P1", () => {
       await expect(quantity).toHaveValue("1");
     }
     await current.proceedToAuthenticatedCheckout();
+    await completeClRegisteredContact(page);
     await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i, { timeout: 60000 });
     await page.getByText(/Direcci[oó]n de despacho/i).filter({ visible: true }).first()
       .waitFor({ state: "visible", timeout: 60000 });
@@ -130,7 +164,6 @@ test.describe("CL QST - Base Store Official P1", () => {
     test.skip(process.env.ALLOW_PROFILE_WRITE !== "1", "Set ALLOW_PROFILE_WRITE=1 for the CL QA address lifecycle.");
     test.skip(!hasClAuthState(), "CL authenticated state is required.");
     const cfg = config();
-    test.skip(!cfg.setupUrl, "The CL profile-address lifecycle is configured for S2 only.");
     const context = await browser.newContext({ storageState: CL_AUTH_STATE_PATH });
     const sessionState = JSON.parse(fs.readFileSync(CL_AUTH_SESSION_STORAGE_PATH, "utf8"));
     await context.addInitScript(({ hostname, state }) => {
@@ -165,10 +198,6 @@ test.describe("CL QST - Base Store Official P1", () => {
         .waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
       await profile.openAddressManagement();
       await expect(page.locator('button[data-an-la="address:add"]')).toBeVisible({ timeout: 30000 });
-      await profile.expandClAddressesUntil("QA AUTOMATION NEVER MATCH THIS SENTINEL");
-      const staleMarkers = [...new Set((await page.getByText(/QA AUTOMATION [A-J]{6}/).allTextContents())
-        .flatMap((text) => text.match(/QA AUTOMATION [A-J]{6}/g) || []))];
-      for (const marker of staleMarkers) await profile.deleteQaAddress(marker);
       await test.step("Create QA-only CL address", () => profile.createQaAddress(created));
       await test.step("Edit QA-only CL address", () => profile.editQaAddress(created.street, updated));
       await test.step("Delete QA-only CL address", () => profile.deleteQaAddress(updated.street));
@@ -392,20 +421,19 @@ test.describe("CL QST - Base Store Official P1", () => {
         ? new CartPage(page, { cartUrl: cfg.cartUrl.href, sku: cfg.sku, productNamePattern: null, checkoutButtonPattern: /^Continuar$/i })
         : await addConfiguredProductToClCart(page, cfg);
       await current.proceedToAuthenticatedCheckout();
+      await completeClRegisteredContact(page);
       await expect(page).toHaveURL(/\/cl\/checkout\/one/i, { timeout: 60000 });
       await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i, { timeout: 60000 });
       await page.getByText(/Direcci[oó]n de despacho/i).filter({ visible: true }).first()
         .waitFor({ state: "visible", timeout: 60000 });
-      const newAddress = page.getByRole("radio", { name: /A[nñ]adir nueva direcci[oó]n/i });
-      await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
-      await expect(newAddress).toBeChecked();
+      await selectClNewAddress(page);
       const shipping = page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
       const select = async (name, option) => {
         await shipping.locator(`mat-select[name="${name}"]:not([aria-disabled="true"])`).first().click();
-        await page.getByRole("option", { name: option }).first().click();
+        await page.getByRole("option", { name: option, exact: typeof option === "string" }).first().click();
       };
       await select("regionIso", /Metropolitana/i);
-      await select("town", /Alhu[eé]/i);
+      await select("town", cfg.checkoutCommune);
       await shipping.locator('input[name="line2"]:visible').first().fill(marker);
       await shipping.locator('input[name="line1"]:visible').first().fill("123");
       const save = shipping.locator('input[name="saveInAddressBook"]:visible').first();
@@ -465,9 +493,7 @@ test.describe("CL QST - Base Store Official P1", () => {
     test.skip(!hasClAuthState(), "CL authenticated state is required.");
     const { context, page } = await clRegisteredDelivery(browser);
     try {
-      const newAddress = page.getByRole("radio", { name: /A[nñ]adir nueva direcci[oó]n/i });
-      await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
-      await expect(newAddress).toBeChecked();
+      await selectClNewAddress(page);
       await expect(page.getByRole("checkbox", { name: /Guardar direcci[oó]n para una pr[oó]xima compra/i }))
         .toBeVisible({ timeout: 30000 });
     } finally {
@@ -479,14 +505,12 @@ test.describe("CL QST - Base Store Official P1", () => {
     test.skip(!hasClAuthState(), "CL authenticated state is required.");
     const { context, page } = await clRegisteredDelivery(browser);
     try {
-      const newAddress = page.getByRole("radio", { name: /A[nñ]adir nueva direcci[oó]n/i });
-      await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
-      await expect(newAddress).toBeChecked();
+      await selectClNewAddress(page);
       const shipping = page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
       await shipping.locator('mat-select[name="regionIso"]:not([aria-disabled="true"])').first().click();
       await page.getByRole("option", { name: /Metropolitana/i }).first().click();
       await shipping.locator('mat-select[name="town"]:not([aria-disabled="true"])').first().click();
-      await page.getByRole("option", { name: /Alhu[eé]/i }).first().click();
+      await page.getByRole("option", { name: config().checkoutCommune, exact: true }).first().click();
       await shipping.locator('input[name="line2"]:visible').first().fill("QA AUTOMATION CHECKOUT");
       await shipping.locator('input[name="line1"]:visible').first().fill("123");
       const save = shipping.locator('input[name="saveInAddressBook"]:visible').first();
@@ -535,11 +559,18 @@ test.describe("CL QST - Base Store Official P1", () => {
   test("SAM-24817 @qst @cl @base-store @guest - Validate home delivery", async ({ page }) => {
     await clGuestDelivery(page);
     const shipping = page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
-    const homeDelivery = shipping.getByText(/^Env[ií]o$/i).filter({ visible: true }).first();
-    await expect(homeDelivery).toBeVisible();
-    await homeDelivery.click();
-    await expect(shipping.locator('input[name="line2"]:visible').first()).toBeVisible();
-    await expect(shipping.locator('mat-select[name="regionIso"]:visible').first()).toBeVisible();
+    await test.step("Select home delivery and validate its address fields", async () => {
+      if (config().environment === "S1") {
+        // S1 exposes home delivery directly; it has no delivery-mode tab to click.
+        await expect(shipping.getByRole("tabpanel", { name: "Envío", exact: true })).toBeVisible();
+      } else {
+        const homeDelivery = shipping.getByText(/^Env[ií]o$/i).filter({ visible: true }).first();
+        await expect(homeDelivery).toBeVisible();
+        await homeDelivery.click();
+      }
+      await expect(shipping.locator('input[name="line2"]:visible').first()).toBeVisible();
+      await expect(shipping.locator('mat-select[name="regionIso"]:visible').first()).toBeVisible();
+    });
   });
 
   test("SAM-24818 @qst @cl @base-store @guest - Validate store pick up delivery option is available on checkout page", async ({ page }) => {
@@ -573,7 +604,15 @@ test.describe("CL QST - Base Store Official P1", () => {
     await billing.locator('mat-select[name="regionIso"]:visible').click();
     await page.getByRole("option", { name: /Metropolitana/i }).first().click();
     await billing.locator('mat-select[name="town"]:visible').click();
-    await page.getByRole("option", { name: /Alhu[eé]/i }).first().click();
+    const billingCommune = page.getByRole("option", { name: /Alhu[eé]/i }).first();
+    if (config().environment === "S1") {
+      // The long S1 option panel can place this option outside the viewport.
+      // Use its normal keyboard selection and prove the selected value.
+      await billingCommune.press("Enter");
+    } else {
+      await billingCommune.click();
+    }
+    await expect(billing.locator('mat-select[name="town"]:visible')).toContainText(/Alhu[eé]/i);
     await billing.locator('input[name="line2"]:visible').fill("QA AUTOMATION BILLING");
     await billing.locator('input[name="line1"]:visible').fill("124");
     await expect(sameAsShipping).not.toBeChecked();
@@ -618,7 +657,7 @@ test.describe("CL QST - Base Store Official P1", () => {
     await backOffice.openAdminOrderByCode(orderCode);
     expect(await backOffice.readOpenAdminOrderStatus(orderCode)).toBeTruthy();
     await backOffice.validateProductBasicAndAdvancedSearch(cfg.sku);
-    console.log(`[cl-qst] S2 BackOffice order and product search validated: ${orderCode}`);
+    console.log(`[cl-qst] ${cfg.environment} BackOffice order and product search validated: ${orderCode}`);
   });
 
   test("SAM-24831 @qst @cl @base-store @backoffice - Order Process", async ({ page }) => {
@@ -627,7 +666,8 @@ test.describe("CL QST - Base Store Official P1", () => {
     process.env.BACKOFFICE_ENV = environment;
     const credentials = getBackOfficeAdminCredentials({ ...process.env, BACKOFFICE_ENV: environment });
     test.skip(!credentials.password, `Shared ${cfg.environment} BackOffice Admin credentials are required.`);
-    const orderCode = String(process.env.CL_QST_ORDER_CODE || "CL261008-78229903").trim();
+    const orderCode = String(process.env.CL_QST_ORDER_CODE || (cfg.environment === "S2" ? "CL261008-78229903" : "")).trim();
+    test.skip(!orderCode, "Set CL_QST_ORDER_CODE to a verified CL S1 order in SHIPPING_REQUESTED; the S2 reference must not be reused in S1.");
     expect(orderCode).toMatch(/^CL\d{6}-\d{8}(?:_\d+)?$/i);
     const backOffice = new BackOfficeSearchPage(page);
     await backOffice.login({ ...credentials, authority: "admin" });
@@ -636,7 +676,7 @@ test.describe("CL QST - Base Store Official P1", () => {
     const row = await backOffice.searchAdminOrderAdvanced(orderCode);
     await backOffice.openAdminOrderByCode(orderCode, row);
     const status = await backOffice.readOpenAdminOrderStatus(orderCode);
-    console.log(`[cl-qst] S2 BackOffice order ${orderCode} status: ${status}`);
+    console.log(`[cl-qst] ${cfg.environment} BackOffice order ${orderCode} status: ${status}`);
     expect(status.replace(/_/g, " ").trim().toLowerCase()).toBe("shipping requested");
   });
 

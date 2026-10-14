@@ -37,3 +37,17 @@ test('CO staging bootstrap applies to both environments and rejects cross-origin
   }
   assert.throws(() => getCoQstConfig({ CO_QST_ENVIRONMENT: 'S1', CO_SETUP_URL: 'https://other.example.test/getcookie.html' }), /storefront origin/);
 });
+
+test('CL staging bootstrap applies to both environments and rejects unsafe overrides', () => {
+  for (const environment of ['S1', 'S2']) {
+    const config = getClQstConfig({ CL_QST_ENVIRONMENT: environment });
+    assert.equal(config.setupUrl.href, new URL('/getcookie.html', config.baseUrl.origin).href);
+    assert.equal(config.checkoutCommune, 'Alhué');
+    const custom = getClQstConfig({ CL_QST_ENVIRONMENT: environment, CL_SETUP_URL: `${config.baseUrl.origin}/getcookie.html` });
+    assert.equal(custom.setupUrl.origin, custom.baseUrl.origin);
+    assert.equal(getClQstConfig({ CL_QST_ENVIRONMENT: environment, CL_QST_COMMUNE: 'Providencia' }).checkoutCommune, 'Providencia');
+  }
+  assert.throws(() => getClQstConfig({ CL_QST_ENVIRONMENT: 'S1', CL_SETUP_URL: 'https://other.example.test/getcookie.html' }), /storefront origin/);
+  assert.throws(() => getClQstConfig({ CL_QST_ENVIRONMENT: 'S1', CL_SETUP_URL: 'http://stg.shop.samsung.com/getcookie.html' }), /https/);
+  assert.throws(() => getClQstConfig({ CL_QST_ENVIRONMENT: 'S1', CL_QST_COMMUNE: ' ' }), /must not be empty/);
+});

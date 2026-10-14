@@ -19,6 +19,7 @@ pipeline {
     choice(name: 'EVIDENCE_MODE', choices: ['screenshots-trace', 'screenshots-trace-video'], description: 'Evidence capture. Video requires FFmpeg on the Jenkins agent.')
     choice(name: 'AUTH_SOURCE', choices: ['session-bundle', 'legacy-files'], description: 'MX authenticated session source. session-bundle is the default and consumes the single ephemeral bundle managed by auth:refresh:mx + auth:publish:jenkins; legacy-files remains available only as a fallback.')
     string(name: 'P1_TARGET_IDS', defaultValue: '', description: 'Optional MX/PE/CL/CO official-p1 stabilization filter. Comma/space separated active SAM IDs. Leave empty for the full market P1.')
+    string(name: 'CL_ORDER_CODE', defaultValue: '', description: 'Optional CL order from the selected environment, verified in SHIPPING_REQUESTED, for SAM-24831. Never reuse an S2 order as S1 test data.')
   }
 
   environment {
@@ -38,7 +39,7 @@ pipeline {
           def targetedIds = params.P1_TARGET_IDS?.trim()
             ? params.P1_TARGET_IDS.split(/[\\s,;]+/).findAll { it?.trim() }
             : []
-          def p1Count = params.MARKET == 'MX' ? '29' : params.MARKET == 'PE' ? '28' : params.MARKET == 'CO' ? '29' : params.MARKET == 'CL' ? '38' : '—'
+          def p1Count = params.MARKET == 'MX' ? '29' : params.MARKET == 'PE' ? '28' : params.MARKET == 'CO' ? '29' : params.MARKET == 'CL' ? '31' : '—'
           def suiteLabel = [
             'fast-guest': 'FAST',
             'authenticated-safe': 'AUTH SAFE',
@@ -74,6 +75,8 @@ pipeline {
           env.PE_QST_ENVIRONMENT = params.ENVIRONMENT
           env.CO_QST_ENVIRONMENT = params.ENVIRONMENT
           env.CL_QST_ENVIRONMENT = params.ENVIRONMENT
+          env.CL_QST_STORE = 'BS'
+          env.CL_QST_ORDER_CODE = params.CL_ORDER_CODE?.trim() ?: ''
           env.BACKOFFICE_ENV = params.ENVIRONMENT.toLowerCase()
           env.MX_QST_HEADLESS = params.BROWSER_MODE == 'headless' ? '1' : '0'
           env.CL_QST_HEADLESS = params.BROWSER_MODE == 'headless' ? '1' : '0'
@@ -129,7 +132,6 @@ pipeline {
           if (!['MX', 'PE', 'CL', 'CO'].contains(params.MARKET)) error('Unsupported market. Select MX, PE, CL or CO.')
           if (!['S1', 'S2'].contains(params.ENVIRONMENT)) error('Unsupported environment. Select S1 or S2.')
           if (params.MARKET == 'CO' && params.ENVIRONMENT != 'S2') error('CO official QST is currently limited to S2/STG2, matching the supplied Samsung QST source and WMC route.')
-          if (params.MARKET == 'CL' && params.ENVIRONMENT != 'S2') error('CL official QST is currently enabled only for S2/STG2 while the Chile runtime baseline is stabilized.')
           if (params.MARKET == 'PE' && params.TEST_SUITE != 'official-p1') error('PE phase 1 currently exposes the coverage-aware official-p1 stabilization lane only.')
           if (params.MARKET == 'CO' && params.TEST_SUITE != 'official-p1') error('CO currently exposes the coverage-aware official-p1 lane; EPP remains available from the repository command.')
           if (params.MARKET == 'CL' && params.TEST_SUITE != 'official-p1') error('CL currently exposes the coverage-aware official-p1 lane only.')
@@ -333,8 +335,10 @@ pipeline {
         catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
           script {
             if (params.MARKET == 'CL') {
+              env.ALLOW_PAYMENT_SUBMIT = params.EXECUTION_MODE == 'authorized-destructive' ? '1' : '0'
+              env.ALLOW_PROFILE_WRITE = params.EXECUTION_MODE == 'authorized-destructive' ? '1' : '0'
               env.CL_SESSION_BUNDLE_CREDENTIAL = "samsung-cl-${params.ENVIRONMENT.toLowerCase()}-session-bundle"
-              env.CL_BACKOFFICE_ADMIN_CREDENTIAL = "samsung-mx-${params.ENVIRONMENT.toLowerCase()}-backoffice-admin"
+              env.CL_BACKOFFICE_ADMIN_CREDENTIAL = 'samsung-mx-s2-backoffice-admin'
               withCredentials([
                 file(credentialsId: env.CL_SESSION_BUNDLE_CREDENTIAL, variable: 'CL_SESSION_BUNDLE'),
                 file(credentialsId: env.CL_BACKOFFICE_ADMIN_CREDENTIAL, variable: 'CL_BACKOFFICE_ADMIN_SECRET'),

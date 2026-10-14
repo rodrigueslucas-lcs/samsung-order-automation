@@ -18,7 +18,14 @@ function getClQstConfig(environment = process.env) {
   const baseUrl = httpsUrl(environment.CL_STOREFRONT_URL || defaultBase, "CL_STOREFRONT_URL");
   if (baseUrl.pathname.replace(/\/+$/, "") !== "/cl") throw new Error("CL_STOREFRONT_URL must point to /cl/.");
 
-  const setupUrl = envName === "S2" ? new URL("/getcookie.html", baseUrl.origin) : null;
+  const setupUrl = environment.CL_SETUP_URL
+    ? httpsUrl(environment.CL_SETUP_URL, "CL_SETUP_URL")
+    : new URL("/getcookie.html", baseUrl.origin);
+  if (setupUrl.origin !== baseUrl.origin) {
+    throw new Error("CL_SETUP_URL must stay on the CL storefront origin.");
+  }
+  const checkoutCommune = String(environment.CL_QST_COMMUNE ?? "Alhué").trim();
+  if (!checkoutCommune) throw new Error("CL_QST_COMMUNE must not be empty.");
 
   // Verified Chile Base Store product supplied for QST stabilization.
   // Any CL scenario that only needs a generic sellable product must use this
@@ -47,6 +54,7 @@ function getClQstConfig(environment = process.env) {
     sku,
     pdpUrl,
     cartUrl: new URL("/cl/cart", baseUrl),
+    checkoutCommune,
     eppUrl,
   });
 }

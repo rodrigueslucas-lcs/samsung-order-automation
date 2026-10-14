@@ -343,8 +343,12 @@ export default class ProfilePage extends MyAccountPage {
           const offered = await options.first().waitFor({ state: "visible", timeout: 4000 })
             .then(() => true, () => false);
           if (!offered) continue;
-          const preferred = options.filter({ hasText: new RegExp(name === "Alhué" ? "Alhu[eé]" : "Metropolitana", "i") }).first();
-          await (await preferred.isVisible().catch(() => false) ? preferred : options.first()).click();
+          const requestedName = name === "Alhué" ? /Alhu[eé]/i
+            : name === "Metropolitana de Santiago" ? /Metropolitana/i : name;
+          const preferred = options.filter({ hasText: requestedName }).first();
+          await expect(preferred, `CL ${field} must offer the requested address option`).toBeVisible({ timeout: 4000 });
+          await preferred.click();
+          await expect(control).toContainText(requestedName);
           return;
         }
         throw new Error(`CL ${field} did not offer options after 3 attempts; control=${(await control.evaluate((el) => el.outerHTML)).slice(0, 700)}`);
