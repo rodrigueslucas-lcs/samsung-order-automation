@@ -131,6 +131,16 @@ and traces. One failed, one skipped; no payment was involved.
 
 ## Scope
 
+## Build 140 — SAM-25096 and SC+ follow-up (2026-10-15)
+
+The archived SAM-25096 trace and screenshot prove that the registered delivery UI replaced the `Nueva dirección` radio with the direct address form between visibility inspection and click. `CheckoutPage.selectNewAuthenticatedAddress` now uses an already visible form and accepts a failed radio click only if the radio disappeared and the form is visible. Other click failures and an unchecked radio still fail; readiness of the address form remains required.
+
+After a legitimate PE S1 refresh with operator CAPTCHA and fresh-context authentication proof, the isolated official SAM-25096 passed: `1 passed (2.8m)`. It reached and selected Pago Efectivo without payment submission. Command: `PE_QST_ENVIRONMENT=S1 PE_QST_TARGET_IDS=SAM-25096 PE_QST_ARTIFACT_DIR=test-results/pe-build140/local-25096-ready PE_AUTH_AUTO_RENEW=0 ALLOW_PAYMENT_SUBMIT=0 ENABLE_ALLURE=0 npm run qst:pe:base-store`. This proves the existing safe checkpoint, not completion of a cash payment or creation of an order.
+
+The SAM-25074 title was already SC+. The dashboard category now renders `MISSING SC+ PRODUCT` instead of spelling out PLUS; its internal `MISSING_SC_PLUS_PRODUCT` code and the missing-product blocker remain unchanged. No KPI layout/count or official inventory changes were made.
+
+Validation: 28 focused address-selection/reporting/runtime-summary tests passed, including protected known-defect KPI regressions. Architecture and official gates passed. Refactor stopped at the same 16 pre-existing CL business-step gaps. Build 140 itself remains historical; no new Jenkins build was dispatched. Archived diagnosis and local runtime evidence are under ignored `test-results/pe-build140/`.
+
 BOGO SAM-25068 remains excluded from this follow-up per the earlier operator
 instruction. The official inventory and reporting KPI layout are unchanged.
 

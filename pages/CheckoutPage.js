@@ -162,14 +162,20 @@ export default class CheckoutPage extends BasePage {
     });
     const addressForm = deliveryPanel.getByRole("heading", { name: "Completa tu dirección de entrega", exact: true });
     await newAddress.or(addressForm).first().waitFor({ state: "visible", timeout: 30000 });
-    if (await newAddress.isVisible()) {
-      await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click();
-      if (!(await newAddress.isChecked())) {
+    if (!(await addressForm.isVisible()) && await newAddress.isVisible()) {
+      try {
+        await newAddress.locator("xpath=ancestor::mat-radio-button[1]").click({ timeout: 5000 });
+      } catch (error) {
+        // PE can finish loading its addresses between the visibility check and
+        // click, replacing the radio group with the direct new-address form.
+        // Accept only that proven transition; unrelated click failures still fail.
+        if (await newAddress.isVisible() || !(await addressForm.isVisible())) throw error;
+      }
+      if (await newAddress.isVisible() && !(await newAddress.isChecked())) {
         throw new Error("New shipping address did not remain selected.");
       }
-    } else {
-      await addressForm.waitFor({ state: "visible", timeout: 30000 });
     }
+    await addressForm.waitFor({ state: "visible", timeout: 30000 });
   }
 
   async saveNewAuthenticatedAddress(address) {

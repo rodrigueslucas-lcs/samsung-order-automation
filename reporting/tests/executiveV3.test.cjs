@@ -46,6 +46,16 @@ function buildExecution29() {
   };
 }
 
+test('SC+ missing-product category uses the product name without altering the internal type', () => {
+  const execution = buildExecution29();
+  execution.tests.at(-1).failureType = 'MISSING_SC_PLUS_PRODUCT';
+  execution.tests.at(-1).title = 'SC+ on cart page';
+  const html = render(buildDashboardModel({ ledger: ledger(), execution }));
+  assert.match(html, /MISSING SC\+ PRODUCT/);
+  assert.doesNotMatch(html, /MISSING SC PLUS PRODUCT/);
+  assert.equal(execution.tests.at(-1).failureType, 'MISSING_SC_PLUS_PRODUCT');
+});
+
 test('historical 144-ID registry stays preserved while MX active runner has 29 TCs', () => {
   const model = buildDashboardModel({ ledger: ledger() });
   assert.equal(model.totals.official, 144);

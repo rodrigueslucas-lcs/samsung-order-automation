@@ -82,6 +82,7 @@ function renderAttachments(execution, attachments = []) {
   return links.join('') || '<span class="no-evidence">See reason</span>';
 }
 function blockerCategory(test) {
+  if (test?.failureType === "MISSING_SC_PLUS_PRODUCT") return "MISSING SC+ PRODUCT";
   if (test?.failureType) return String(test.failureType).replaceAll("_", " ");
   const text = `${test?.blockedReason || ''} ${test?.error || ''}`;
   if (/executable doesn.t exist|browser.*executable|ms-playwright|ffmpeg|spawn (eperm|enoent)|playwright.*install/i.test(text)) return 'Infrastructure / Playwright';
