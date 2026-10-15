@@ -382,6 +382,7 @@ test.describe("CL QST - Base Store Official P1", () => {
             throw new Error(`Samsung Account did not return to CL checkout. Safe login diagnostics: ${JSON.stringify(status)}`);
           });
         });
+        await completeClRegisteredContact(page);
         await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i, { timeout: 60000 });
         await expect(page.getByText(/Direcci[oó]n de despacho/i).filter({ visible: true }).first()).toBeVisible({ timeout: 60000 });
         const checkoutUrl = page.url();

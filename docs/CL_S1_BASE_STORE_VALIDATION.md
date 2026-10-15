@@ -39,6 +39,21 @@ Uma fixture `QA AUTOMATION CL BASESTORE`, comuna Santiago, foi criada pela UI e 
 
 ## Reexecução
 
+### SAM-24807 — revalidação em 2026-10-15
+
+PASS local, sem skip: o login legítimo iniciado pelo checkout retornou a `CHECKOUT_STEP_CONTACT_INFO`. O teste agora reutiliza `completeClRegisteredContact` antes de exigir despacho; mantém a comprovação de logout disponível na home autenticada e o retorno ao checkout de despacho.
+
+Comando executado em PowerShell:
+
+```powershell
+$env:CL_QST_ENVIRONMENT='S1'; $env:CL_AUTH_AUTO_RENEW='0'; $env:ALLOW_PAYMENT_SUBMIT='0'; $env:ENABLE_ALLURE='0'
+npx playwright test tests/markets/cl/qst/base-store/official-p1.spec.js --project=chromium --workers=1 --retries=0 --grep SAM-24807 --headed --reporter=list --output=test-results/cl-s1-payment-followup/checkout-login-contact-fix
+```
+
+Resultado: `1 passed (4.1m)`, exit 0. CAPTCHA concluído pelo operador na janela maximizada. Nenhum pagamento enviado. Evidência local ignorada: diretório acima, incluindo `.last-run.json`. Este resultado substitui o bloqueio histórico do SAM-24807 descrito anteriormente; não comprova execução autônoma em Jenkins, pois o provedor solicitou verificação humana.
+
+Os SAM-24822–24826 não foram promovidos a PASS por essa validação. A inspeção separada não chegou ao pagamento: o rádio de novo endereço ficou selecionado, mas o campo `line2` não apareceu. Isso não comprova rejeição de cartão nem confirmação de ordem. Nenhuma nova ordem foi enviada nessa investigação.
+
 ```bash
 CL_QST_ENVIRONMENT=S1 npm run auth:refresh:cl
 CL_QST_ENVIRONMENT=S1 npm run qst:cl:base-store:list
