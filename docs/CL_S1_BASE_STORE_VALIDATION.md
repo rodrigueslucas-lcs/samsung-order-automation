@@ -39,6 +39,14 @@ Uma fixture `QA AUTOMATION CL BASESTORE`, comuna Santiago, foi criada pela UI e 
 
 ## Reexecução
 
+### Pagamento — investigação em 2026-10-15
+
+O SAM-24826 foi executado com `ALLOW_PAYMENT_SUBMIT=1`, sessão renovada/READY e quantidade 1. A opção de entrega esperada não apareceu. Na inspeção seguinte, aceitar os termos e clicar em Continuar al pago com a fixture salva de Santiago produziu a rejeição explícita: “Desafortunadamente, el despacho no esta disponible en tu región y comuna”. O checkout permaneceu em DELIVERY, antes do cartão; nenhum pagamento ou pedido foi enviado. Evidências locais: `test-results/cl-s1-payment-orders/confirmation-ready` e `test-results/cl-s1-payment-followup/payment-inspection`.
+
+Assim, SAM-24822/24824/24826 continuam sem confirmação de pagamento nesta massa. Mastercard de sandbox está disponível localmente, mas a etapa de cartão não foi alcançada. Revalidar após disponibilizar SKU/endereço com despacho no CL S1.
+
+SAM-24825 permanece BLOCKED por **Missing Rewards test data**, classificado `TEST_DATA_BLOCKED`, sem confundir falta de saldo/massa elegível com autenticação. O runner direcionado (`CL_QST_ENVIRONMENT=S1 CL_QST_TARGET_IDS=SAM-24825 npm run qst:cl:base-store`) retornou exit 0, 0 FAIL e 1 BLOCKED. Evidência: `test-results/cl-s1-payment-orders/rewards-blocked/runtime-summary.json`. Isso não é PASS de pagamento Rewards.
+
 ### SAM-24807 — revalidação em 2026-10-15
 
 PASS local, sem skip: o login legítimo iniciado pelo checkout retornou a `CHECKOUT_STEP_CONTACT_INFO`. O teste agora reutiliza `completeClRegisteredContact` antes de exigir despacho; mantém a comprovação de logout disponível na home autenticada e o retorno ao checkout de despacho.

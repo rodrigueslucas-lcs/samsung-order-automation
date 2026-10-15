@@ -746,7 +746,7 @@ test.describe("CL QST - Base Store Official P1", () => {
     ["SAM-24822", "Payment using Credit / Debit card with reg user", "registered auth is wired; approved CL card-submit path/test data is still required."],
     ["SAM-24823", "Payment using Direct Bank Transfer", "Direct Bank Transfer includes a CS/BackOffice approval dependency."],
     ["SAM-24824", "Payment using Interest-free installments - Credit card / Debit Card", "CL installments payment path must be proven before destructive automation."],
-    ["SAM-24825", "Payment using Rewards", "Rewards-enabled account/test data is required."],
+    ["SAM-24825", "Payment using Rewards", "Missing Rewards test data: a verified eligible points balance and redemption fixture are required before payment validation."],
   ]) {
     test(`${id} @blocked @qst @cl @base-store - ${title}`, async () => blocked(reason));
   }
