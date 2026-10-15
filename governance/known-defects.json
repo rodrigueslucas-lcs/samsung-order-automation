@@ -114,6 +114,20 @@
       "notes": "In STG1, after completing the trade-in wizard, the cart returns without the expected device/model and valuation amount. The same functional symptom blocks the PE official Trade-in cart validation."
     },
     {
+      "market": "PE",
+      "environment": "S1",
+      "store": "BASE_STORE",
+      "samId": "SAM-25084",
+      "jira": "SAM-25155",
+      "url": "https://jira.secext.samsung.net/browse/SAM-25155",
+      "title": "QST SMB STG PE Shipping Address Getting Saved to Billing Address Also on Checkout Page",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "Medium",
+      "rootCause": "TBD",
+      "notes": "PE STG registered checkout address persistence is affected: a newly saved shipping address is also visible in saved billing addresses, blocking the official saved-address validation."
+    },
+    {
       "market": "CL",
       "environment": "S1",
       "store": "BASE_STORE",
