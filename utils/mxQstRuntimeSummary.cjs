@@ -6,12 +6,16 @@ const { sanitize } = require("../reporting/evidence/sanitizer");
 const TERMINAL_FAILURES = new Set(["failed", "timedOut", "interrupted"]);
 const BLOCKED_PATTERN = /SystemParking|maintenance|auth(?:enticated)? state|credentials? (?:are|is) required|EPERM|environment prerequisite/i;
 const AUTH_FAILURE_PATTERN = /auth|session|login|logged|credential|account/i;
-const ENVIRONMENT_FAILURE_PATTERN = /environment|backend|server|maintenance|unavailable|endpoint|cdp|network|(?:response body|request).*timed out|timeout.*(?:api|backend|delivery)|5\\d\\d\\b/i;
-const AUTOMATION_FAILURE_PATTERN = /locator|selector|strict mode|element.*(?:not found|not visible)|playwright|executable doesn.t exist|spawn (?:EPERM|ENOENT)|fixture|test timeout of \\d+ms exceeded/i;
+const ENVIRONMENT_FAILURE_PATTERN = /environment|backend|server|maintenance|unavailable|endpoint|cdp|network|(?:response body|request).*timed out|timeout.*(?:api|backend|delivery)|5\d\d\b/i;
+const AUTOMATION_FAILURE_PATTERN = /locator|selector|strict mode|element.*(?:not found|not visible)|playwright|executable doesn.t exist|spawn (?:EPERM|ENOENT)|fixture|test timeout of \d+ms exceeded/i;
 const TEST_DATA_BLOCKED_PATTERN = /bogo|eligible|campaign|sku|product|test data|order code|address data|prerequisite/i;
+const BOGO_BLOCKED_PATTERN = /bogo.*(?:eligible|product|sku)|(?:eligible|product|sku).*bogo/i;
+const SC_PLUS_BLOCKED_PATTERN = /(?:Samsung Care\+|SC\+).*(?:eligible|expose|required|configured)|(?:eligible|expose|required|configured).*(?:Samsung Care\+|SC\+)/i;
 
 function classifyFailure(status, reason = "") {
   if (status === "SKIPPED-BLOCKED") {
+    if (BOGO_BLOCKED_PATTERN.test(reason)) return "MISSING_BOGO_PRODUCT";
+    if (SC_PLUS_BLOCKED_PATTERN.test(reason)) return "MISSING_SC_PLUS_PRODUCT";
     if (AUTH_FAILURE_PATTERN.test(reason)) return "AUTH_BLOCKED";
     if (TEST_DATA_BLOCKED_PATTERN.test(reason)) return "TEST_DATA_BLOCKED";
     if (ENVIRONMENT_FAILURE_PATTERN.test(reason)) return "ENVIRONMENT_BLOCKED";
@@ -22,6 +26,15 @@ function classifyFailure(status, reason = "") {
   if (ENVIRONMENT_FAILURE_PATTERN.test(reason)) return "ENVIRONMENT_ERROR";
   if (AUTOMATION_FAILURE_PATTERN.test(reason)) return "TEST_AUTOMATION_ERROR";
   return "FUNCTIONAL_FAIL";
+}
+
+function preferredBlockedReason(annotations, errors, fallback) {
+  const explicit = annotations
+    .filter((item) => ["skip", "qst-blocker"].includes(String(item?.type || "").toLowerCase()))
+    .map((item) => item.description)
+    .filter(Boolean)
+    .at(-1);
+  return explicit || errors[0] || fallback || "Test was skipped by an explicit runtime prerequisite.";
 }
 
 function safeArtifact(filePath, root) {
@@ -80,7 +93,7 @@ function buildMxQstRuntimeSummary(report, {
         failureType: classifyFailure(status, reason),
         duration: results.reduce((sum, result) => sum + (result.duration || 0), 0),
         error: status === "FAIL" ? errors.join(" | ") || null : null,
-        blockedReason: status === "SKIPPED-BLOCKED" ? reason || "Test was skipped by an explicit runtime prerequisite." : null,
+        blockedReason: status === "SKIPPED-BLOCKED" ? preferredBlockedReason(annotations, errors, reason) : null,
         testFile: spec.file ? safeArtifact(spec.file, root) : null,
         attachments, startTime: last.startTime || null, buildNumber, gitCommit, timestamp,
       }));
