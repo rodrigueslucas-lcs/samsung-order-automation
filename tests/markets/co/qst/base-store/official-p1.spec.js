@@ -474,8 +474,11 @@ test("SAM-24896 @qst @co @base-store @registered - Cart value when Reg user logs
     if(headed)await authBrowserWindow.prepareAuthBrowserWindow(page);
     await secondAuth.validateAuthenticatedSession(page);
     await page.keyboard.press("Escape");
+    await clearCoCartForPayment(page,cfg);
     const registeredCart=await cart(page,cfg);
     await registeredCart.validateProductInCart();
+    await expect(page.getByRole("textbox",{name:"Quantity",exact:true})).toHaveValue("1");
+    await i.attach("co-logout-registered-cart",{body:await page.screenshot({fullPage:true}),contentType:"image/png"});
     const total=page.getByRole("heading",{name:/^Total$/i}).locator("xpath=..");
     const registeredTotal=(await total.innerText()).match(/\$\s*([\d.,]+)/)?.[1];
     expect(registeredTotal,"Registered CO cart must show a numeric total before logout.").toBeTruthy();
@@ -491,6 +494,10 @@ test("SAM-24896 @qst @co @base-store @registered - Cart value when Reg user logs
     await expect(signedOutMenu.getByText(/Cerrar Sesi[oó]n/i)).toHaveCount(0);
     await page.keyboard.press("Escape");
     await expect(page.getByText(cfg.sku,{exact:true}).first()).toBeVisible({timeout:30000});
+    await expect(page.getByRole("textbox",{name:"Quantity",exact:true})).toHaveValue("1");
+    const guestTotal=(await total.innerText()).match(/\$\s*([\d.,]+)/)?.[1];
+    recordBusinessEvidence(i,{sku:cfg.sku,registeredCartTotal:registeredTotal,guestCartTotal:guestTotal,cartQuantity:1});
+    await i.attach("co-logout-guest-cart",{body:await page.screenshot({fullPage:true}),contentType:"image/png"});
     await expect.poll(async()=>{
       const guestTotal=(await total.innerText()).match(/\$\s*([\d.,]+)/)?.[1];
       return guestTotal?.replace(/\D/g,"");

@@ -101,3 +101,29 @@ Execuções direcionadas, sempre `--project=chromium --workers=1 --retries=0`, c
 - `--grep SAM-24919`: PASS, `test-results/co-s1-final-24919/`, com `ALLOW_PAYMENT_SUBMIT=1 MX_QST_HEADLESS=1`. Ordem CO261015-64014952 criada e confirmada, depois consultada e expandida no tracking. Capturas preservadas nesse diretório. Nenhuma ordem antiga foi reutilizada pelo TC.
 
 Os 12 testes focados de cartão/identidade de tracking/modos S1-S2/limites PreQA passaram. Arquitetura e inventário oficial passaram. Steps/refactor continuam sinalizando as 16 pendências CL preexistentes. S2 não foi reexecutado nesta rodada; preservação de OTP e recusa de consulta direta fora de CO S1 verificadas por contrato. Não houve nova campanha completa nem build Jenkins nesta rodada.
+
+## SAM-24896 — investigação com produtos alternativos
+
+Em 15/10/2026, os três SKUs fornecidos foram executados separadamente no TC oficial CO S1. Cada rodada limpou o carrinho pela UI, adicionou somente o SKU selecionado, comprovou quantidade 1, autenticou a conta e executou logout real. Nenhum pagamento foi enviado.
+
+| SKU | Total logado | Total após logout | Resultado |
+| --- | --- | --- | --- |
+| SM-F956BDBKCOO | $10.602.900 | $11.781.000 | FAIL: desconto de $1.178.100 removido |
+| WA21CG6746BVCO | $2.969.910 | $3.299.900 | FAIL: desconto de $329.990 removido |
+| SM-F936BZAJLTC | $7.559.928 | $8.399.920 | FAIL: desconto de $839.992 removido |
+
+Os PDPs mostram o mesmo preço público para cliente autenticado e visitante. Nos três carrinhos, a API identifica `appliedOrderPromotions` com **CO_Welcome_28112025**, que aplica exatamente 10% ao pedido logado; após logout, a lista de promoções fica vazia e o desconto zera. A diferença não é exclusiva de um SKU nem de quantidade acumulada. A regra comercial da promoção precisa ser confirmada antes de classificar sua retirada como defeito; a igualdade original do total foi preservada, sem skip ou known-defect artificial.
+
+O preparo anterior acrescentava o SKU ao carrinho existente. O TC agora limpa o carrinho antes da adição, exige um único campo Quantity com valor 1 antes/depois do logout e anexa as duas capturas e os totais ao registro de negócio. S2 não foi reexecutado nesta investigação.
+
+Comando de cada execução, substituindo o SKU e a pasta de evidência:
+
+```bash
+CO_QST_ENVIRONMENT=S1 CO_QST_SKU=SM-F956BDBKCOO ALLOW_PAYMENT_SUBMIT=0 CO_AUTH_AUTO_RENEW=0 npx playwright test tests/markets/co/qst/base-store/official-p1.spec.js --project=chromium --workers=1 --retries=0 --grep SAM-24896 --headed --reporter=list --output=test-results/co-s1-24896-products/fold6
+```
+
+Evidências locais ignoradas: `fold6/`, `washer-verified/`, `fold4/` dentro de `test-results/co-s1-24896-products/`; `cart-promotions.json` contém apenas os valores e códigos públicos de promoção extraídos dos traces. A tentativa inicial `washer/` encontrou sessão encerrada pelo logout anterior e não foi considerada comparação de preço.
+
+O logout invalida a second entre as rodadas: houve renovação humana e verificação em contexto novo. Antes do Fold4, a janela do login foi encerrada durante o retorno; exportar a sessão já autenticada e verificá-la em contexto novo resolveu o pré-requisito sem repetir o login. A first foi preservada. Ao terminar, a second está deslogada pelo próprio objetivo do TC e precisa de novo refresh antes de reutilização autenticada.
+
+Arquitetura e inventário oficial passaram. Steps/refactor mantêm as 16 pendências CL preexistentes. Não houve nova campanha completa, build Jenkins, publicação de sessão ou alteração de inventário/payment profile.
