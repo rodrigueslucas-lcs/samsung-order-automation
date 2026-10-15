@@ -99,15 +99,17 @@ function splitResultDistribution(html, runtime, active) {
   const failedWidth = otherFailed / official * 100;
 
   let output = html;
-  if (rawBlocked) {
+  if (knownBlocked && rawBlocked) {
     const blockedSegment = new RegExp(`<span class="blocked" style="width:[^"]+" title="BLOCKED: ${rawBlocked}"><\\/span>`, 'g');
     const pieces = `${otherBlocked ? `<span class="blocked" style="width:${blockedWidth}%" title="BLOCKED: ${otherBlocked}"></span>` : ''}<span class="defect" style="width:${knownWidth}%" title="KNOWN DEFECT: ${known}"></span>`;
     output = output.replace(blockedSegment, pieces);
     output = output.replace(new RegExp(`<span><i class="blocked"><\\/i><b>${rawBlocked}<\\/b> BLOCKED<\\/span>`, 'g'), `${otherBlocked ? `<span><i class="blocked"></i><b>${otherBlocked}</b> BLOCKED</span>` : ''}<span><i class="defect"></i><b>${known}</b> KNOWN DEFECT</span>`);
   }
   if (knownFailed && rawFailed) {
-    output = output.replace(new RegExp(`<span class="fail" style="width:[^"]+" title="FAIL: ${rawFailed}"><\\/span>`, 'g'), `${otherFailed ? `<span class="fail" style="width:${failedWidth}%" title="FAIL: ${otherFailed}"></span>` : ''}<span class="defect" style="width:${knownWidth}%" title="KNOWN DEFECT: ${known}"></span>`);
-    output = output.replace(new RegExp(`<span><i class="fail"><\\/i><b>${rawFailed}<\\/b> FAIL<\\/span>`, 'g'), `${otherFailed ? `<span><i class="fail"></i><b>${otherFailed}</b> FAIL</span>` : ''}<span><i class="defect"></i><b>${known}</b> KNOWN DEFECT</span>`);
+    const segment = knownBlocked ? '' : `<span class="defect" style="width:${knownWidth}%" title="KNOWN DEFECT: ${known}"></span>`;
+    const legend = knownBlocked ? '' : `<span><i class="defect"></i><b>${known}</b> KNOWN DEFECT</span>`;
+    output = output.replace(new RegExp(`<span class="fail" style="width:[^"]+" title="FAIL: ${rawFailed}"><\\/span>`, 'g'), `${otherFailed ? `<span class="fail" style="width:${failedWidth}%" title="FAIL: ${otherFailed}"></span>` : ''}${segment}`);
+    output = output.replace(new RegExp(`<span><i class="fail"><\\/i><b>${rawFailed}<\\/b> FAIL<\\/span>`, 'g'), `${otherFailed ? `<span><i class="fail"></i><b>${otherFailed}</b> FAIL</span>` : ''}${legend}`);
   }
   return output;
 }
@@ -125,14 +127,15 @@ function splitKpis(html, runtime, active) {
 
   const knownCard = `<article class="kpi defect-kpi"><small>Known Defect</small><b>${known}</b><span>Mapped Jira bug${known === 1 ? '' : 's'}</span></article>`;
   let output = html;
-  if (rawBlocked) {
+  if (knownBlocked && rawBlocked) {
     output = output.replace(new RegExp(`<article class="kpi warn"><small>Blocked<\\/small><b>${rawBlocked}<\\/b><span>Known prerequisites<\\/span><\\/article>`, 'g'), `${otherBlocked ? `<article class="kpi warn"><small>Blocked</small><b>${otherBlocked}</b><span>Other prerequisites</span></article>` : ''}${knownCard}`);
-  } else {
+  } else if (!knownFailed) {
     output = output.replace(/(<div class="hero-kpis">)/, `$1${knownCard}`);
   }
   if (knownFailed && rawFailed) {
-    output = output.replace(new RegExp(`<article class="kpi bad"><small>Failed<\\/small><b>${rawFailed}<\\/b><span>Current build<\\/span><\\/article>`, 'g'), `${otherFailed ? `<article class="kpi bad"><small>Failed</small><b>${otherFailed}</b><span>Current build</span></article>` : ''}${knownCard}`);
-    output = output.replace(new RegExp(`<article class="kpi bad"><small>FAIL<\\/small><b>${rawFailed}<\\/b><span>Current build failures<\\/span><\\/article>`, 'g'), `${otherFailed ? `<article class="kpi bad"><small>FAIL</small><b>${otherFailed}</b><span>Current build failures</span></article>` : ''}${knownCard}`);
+    const card = knownBlocked ? '' : knownCard;
+    output = output.replace(new RegExp(`<article class="kpi bad"><small>Failed<\\/small><b>${rawFailed}<\\/b><span>Current build<\\/span><\\/article>`, 'g'), `${otherFailed ? `<article class="kpi bad"><small>Failed</small><b>${otherFailed}</b><span>Current build</span></article>` : ''}${card}`);
+    output = output.replace(new RegExp(`<article class="kpi bad"><small>FAIL<\\/small><b>${rawFailed}<\\/b><span>Current build failures<\\/span><\\/article>`, 'g'), `${otherFailed ? `<article class="kpi bad"><small>FAIL</small><b>${otherFailed}</b><span>Current build failures</span></article>` : ''}${card}`);
   }
   return output;
 }

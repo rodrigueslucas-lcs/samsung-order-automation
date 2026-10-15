@@ -291,6 +291,12 @@ if (fs.existsSync(reportFile)) {
     runtimeSummaryFile,
   ], { stdio: "inherit", env: executionEnv });
   if (executive.status !== 0) console.error("[co-qst] Executive dashboard generation failed; raw runtime summary was preserved.");
+  if (executive.status === 0) {
+    const annotated = spawnSync(process.execPath, [path.resolve("scripts/annotate-known-defects-dashboard.cjs"), artifactDir], {
+      stdio: "inherit", env: executionEnv,
+    });
+    if (annotated.status !== 0) console.error("[co-qst] Known-defect annotation failed; raw runtime summary was preserved.");
+  }
 
   console.log("\n============================================================");
   console.log(` ${campaignLabel.toUpperCase()} · FINAL RESULT`);

@@ -17,6 +17,7 @@ function createAuthState({
   logoutTextName = "Cerrar sesión",
   authenticatedMenuSelector = null,
   profileMenuReadySelector = null,
+  profileMenuOpenAttempts = 1,
   storefrontDismissTextName = null,
   navigationTimeoutMs = null,
 }) {
@@ -164,7 +165,7 @@ function createAuthState({
     return null;
   }
 
-  async function validateCurrentPageAuthenticated(page) {
+  async function validateProfileMenu(page, menuAttempt = 0) {
     if (enforceHostname && new URL(page.url()).hostname !== hostname) {
       throw new Error(`Unexpected ${label} authentication host.`);
     }
@@ -191,6 +192,9 @@ function createAuthState({
         `The saved ${label} storefront access/auth state is not usable; the storefront did not render its profile control. ${AUTH_REFRESH_INSTRUCTION}`
       );
     }
+    // A previous validation can leave the pointer on the icon after Escape or
+    // navigation. Move away so hover produces a fresh mouseenter event.
+    if (profileMenuTrigger === "hover" && profileMenuOpenAttempts > 1) await page.mouse.move(0, 0);
     await page.keyboard.press("Escape");
 
     const menuRoot = authenticatedMenuSelector
@@ -212,17 +216,24 @@ function createAuthState({
         .waitFor({ state: "visible", timeout: 1000 })
         .then(() => true)
         .catch(() => false);
-      if (!openedFromHover) await profileButton.click();
+      if (!openedFromHover && !(await (menuReady || logout).isVisible().catch(() => false))) {
+        await profileButton.click();
+      }
     } else {
       await profileButton.click();
     }
 
     if (menuReady) {
-      await menuReady.waitFor({ state: "visible", timeout: authenticatedMenuSelector ? 5000 : 30000 }).catch(() => {
+      try {
+        await menuReady.waitFor({ state: "visible", timeout: authenticatedMenuSelector ? 5000 : 30000 });
+      } catch {
+        if (menuAttempt + 1 < Math.min(3, profileMenuOpenAttempts)) {
+          return validateProfileMenu(page, menuAttempt + 1);
+        }
         throw new Error(
           `The saved ${label} profile menu did not open. ${AUTH_REFRESH_INSTRUCTION}`
         );
-      });
+      }
     }
 
     if (menuRoot && await menuRoot.locator('a[data-an-la="login"]')
@@ -238,12 +249,19 @@ function createAuthState({
       const signedOut = menuRoot
         ? await menuRoot.locator('a[data-an-la="login"]').filter({ visible: true }).count().catch(() => 0)
         : 0;
+      if (!signedOut && menuAttempt + 1 < Math.min(3, profileMenuOpenAttempts)) {
+        return validateProfileMenu(page, menuAttempt + 1);
+      }
       throw new Error(
         signedOut
           ? `The saved ${label} storefront session is signed out. ${AUTH_REFRESH_INSTRUCTION}`
           : `The saved ${label} profile menu opened but authenticated logout control was not rendered. Authentication could not be proven. ${AUTH_REFRESH_INSTRUCTION}`
       );
     }
+  }
+
+  async function validateCurrentPageAuthenticated(page) {
+    return validateProfileMenu(page);
   }
 
   async function validateAuthenticatedSession(page) {

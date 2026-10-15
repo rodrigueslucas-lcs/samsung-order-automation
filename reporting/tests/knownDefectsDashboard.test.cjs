@@ -196,3 +196,35 @@ test('dashboard visually separates a mapped defect without rewriting raw runtime
 test('mapped Jira is not shown as a known defect when the current runtime passes', () => {
   assert.equal(activeKnownDefects(runtime('PASS'), registry).length, 0);
 });
+
+test('mixed failures and blockers count mapped defects once per KPI group and distribution', () => {
+  const scenarios = [
+    { market: 'CO', failed: 5, blocked: 4, known: 1, knownFailed: 1, knownBlocked: 0,
+      tests: [{ samId: 'SAM-24911', status: 'FAIL' }] },
+    { market: 'PE', failed: 3, blocked: 2, known: 2, knownFailed: 1, knownBlocked: 1,
+      tests: [{ samId: 'SAM-25094', status: 'FAIL' }, { samId: 'SAM-25062', status: 'SKIPPED-BLOCKED' }] },
+  ];
+  for (const scenario of scenarios) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'smb-mixed-defects-'));
+    try {
+      const data = { market: scenario.market, environment: 'S1', store: 'BASE_STORE',
+        summary: { official: 29, failed: scenario.failed, blocked: scenario.blocked }, tests: scenario.tests };
+      const kpis = `<article class="kpi bad"><small>Failed</small><b>${scenario.failed}</b><span>Current build</span></article><article class="kpi warn"><small>Blocked</small><b>${scenario.blocked}</b><span>Known prerequisites</span></article>`;
+      const html = `<html><head></head><body><div class="hero-kpis">${kpis}</div><div class="runtime-kpis">${kpis}</div><div class="result-bar"><span class="fail" style="width:20%" title="FAIL: ${scenario.failed}"></span><span class="blocked" style="width:20%" title="BLOCKED: ${scenario.blocked}"></span></div><div class="result-legend"><span><i class="fail"></i><b>${scenario.failed}</b> FAIL</span><span><i class="blocked"></i><b>${scenario.blocked}</b> BLOCKED</span></div><div class="table-wrap execution-table"></div></body></html>`;
+      fs.mkdirSync(path.join(dir, 'executive'));
+      fs.writeFileSync(path.join(dir, 'runtime-summary.json'), JSON.stringify(data));
+      fs.writeFileSync(path.join(dir, 'executive/index.html'), html);
+      assert.equal(annotateDashboard({ artifactDir: dir }).count, scenario.known);
+      const result = fs.readFileSync(path.join(dir, 'executive/index.html'), 'utf8');
+      assert.equal((result.match(/class="kpi defect-kpi"/g) || []).length, 2, 'one defect card per KPI group');
+      assert.equal((result.match(/class="defect" style=/g) || []).length, 1, 'one combined defect bar segment');
+      assert.equal((result.match(/<i class="defect"><\/i>/g) || []).length, 1, 'one combined defect legend');
+      assert.match(result, new RegExp(`<small>Known Defect</small><b>${scenario.known}</b>`));
+      assert.match(result, new RegExp(`<small>Failed</small><b>${scenario.failed - scenario.knownFailed}</b>`));
+      assert.match(result, new RegExp(`<small>Blocked</small><b>${scenario.blocked - scenario.knownBlocked}</b>`));
+      assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dir, 'runtime-summary.json'))), data);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});

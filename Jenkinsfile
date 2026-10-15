@@ -370,10 +370,12 @@ pipeline {
             } else if (params.MARKET == 'CO') {
               env.CO_BACKOFFICE_ADMIN_CREDENTIAL = params.ENVIRONMENT == 'S1' ? 'samsung-mx-s1-backoffice-admin' : 'samsung-mx-s2-backoffice-admin'
               env.CO_SESSION_BUNDLE_CREDENTIAL = "samsung-co-${params.ENVIRONMENT.toLowerCase()}-session-bundle"
+              env.CO_TEST_CARD_CREDENTIAL = params.ENVIRONMENT == 'S1' ? 'samsung-co-s1-test-card' : 'samsung-mx-test-card'
+              env.CO_TEST_CARD_RUNTIME_FILE = params.ENVIRONMENT == 'S1' ? 'co-s1-test-card.json' : 'mx-test-card.json'
               def coCredentials = [
                 file(credentialsId: env.CO_SESSION_BUNDLE_CREDENTIAL, variable: 'CO_SESSION_BUNDLE'),
                 file(credentialsId: env.CO_BACKOFFICE_ADMIN_CREDENTIAL, variable: 'CO_BACKOFFICE_ADMIN_SECRET'),
-                file(credentialsId: 'samsung-mx-test-card', variable: 'MX_TEST_CARD_SECRET')
+                file(credentialsId: env.CO_TEST_CARD_CREDENTIAL, variable: 'CO_TEST_CARD_SECRET')
               ]
               withCredentials(coCredentials) {
                 if (isUnix()) {
@@ -382,7 +384,7 @@ pipeline {
                     npm run auth:install:co
                     mkdir -p playwright/.auth
                     cp "$CO_BACKOFFICE_ADMIN_SECRET" playwright/.auth/backoffice-admin-${BACKOFFICE_ENV}.json
-                    cp "$MX_TEST_CARD_SECRET" playwright/.auth/mx-test-card.json
+                    cp "$CO_TEST_CARD_SECRET" "playwright/.auth/${CO_TEST_CARD_RUNTIME_FILE}"
                     chmod 600 playwright/.auth/*.json || true
                     CI=1 npm run auth:verify:co
                     npx -y node@22 scripts/run-co-qst-p1.cjs
@@ -392,7 +394,7 @@ pipeline {
                     call npm run auth:install:co || exit /b 2
                     if not exist playwright\\.auth mkdir playwright\\.auth
                     copy /Y "%CO_BACKOFFICE_ADMIN_SECRET%" "playwright\\.auth\\backoffice-admin-%BACKOFFICE_ENV%.json" >nul || exit /b 2
-                    copy /Y "%MX_TEST_CARD_SECRET%" "playwright\\.auth\\mx-test-card.json" >nul || exit /b 2
+                    copy /Y "%CO_TEST_CARD_SECRET%" "playwright\\.auth\\%CO_TEST_CARD_RUNTIME_FILE%" >nul || exit /b 2
                     set CI=1
                     call npm run auth:verify:co || exit /b 20
                     call npx -y node@22 scripts/run-co-qst-p1.cjs
