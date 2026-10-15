@@ -30,7 +30,19 @@ async function resolveProduct(page,config){
   return{pdpUrl,sku:decodeURIComponent(match[1])};
 }
 
+function applyCoS1KnownBlocker(config){
+  if(config.environment!=="S1")return;
+  const samId=test.info().title.match(/SAM-\d+/)?.[0];
+  if(samId==="SAM-24893"){
+    test.skip(true,"CO S1 Trade-up is BLOCKED by known defect SAM-25148: Trade-up / Plan Canje / Renueva is currently unavailable for the verified S1 product set.");
+  }
+  if(samId==="SAM-24915"){
+    test.skip(true,"CO S1 Rewards payment is BLOCKED: Samsung Rewards redemption is currently unavailable in this environment.");
+  }
+}
+
 export async function addConfiguredProductToCoCart(page, config) {
+  applyCoS1KnownBlocker(config);
   return test.step("Open the controlled CO PDP, add the configured product and reach Cart", async () => {
     const resolved=await resolveProduct(page,config);
     await bootstrapCoStorefront(page,config);

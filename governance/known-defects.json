@@ -72,6 +72,20 @@
       "notes": "Back to Top / Volver al inicio control is not rendered after scrolling, preventing the official Back to Top validation."
     },
     {
+      "market": "CO",
+      "environment": "S1",
+      "store": "BASE_STORE",
+      "samId": "SAM-24893",
+      "jira": "SAM-25148",
+      "url": "https://jira.secext.samsung.net/browse/SAM-25148",
+      "title": "CO S1 Trade-up cart validation tracked by SAM-25148",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "TBD",
+      "rootCause": "TBD",
+      "notes": "Trade-up / Plan Canje / Renueva is currently unavailable for the verified CO S1 product set, blocking the official Trade-up cart validation."
+    },
+    {
       "market": "PE",
       "environment": "S1",
       "store": "BASE_STORE",
