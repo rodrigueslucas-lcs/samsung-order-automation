@@ -45,56 +45,57 @@ export default class CartPage extends BasePage {
     if (!['stg.shop.samsung.com', 'stg2.shop.samsung.com'].includes(target.hostname) || target.pathname !== '/pe/cart') {
       throw new Error('PE cart cleanup is restricted to the PE S1/S2 staging cart.');
     }
+    const apiOrigin = target.hostname === 'stg.shop.samsung.com'
+      ? 'https://s1-smb-api-cdn.ecom-stg.samsung.com'
+      : 'https://s2-smb-api-cdn.ecom-stg.samsung.com';
+    const cartPath = '/tokocommercewebservices/v2/pe/users/current/carts/current';
+    const browserCart = this.page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return response.request().method() === 'GET' && url.origin === apiOrigin && url.pathname === cartPath;
+    }, { timeout: 60000 });
     await this.openCart();
-    const main = this.page.getByRole('main');
-    await main.waitFor({ state: 'visible', timeout: 60000 });
-
-    // Do not couple PE cleanup to the English "Cart" heading. S2 can render
-    // Spanish/localized headings while the actual cart controls are healthy.
-    const waitForCartSurface = async () => {
-      const remove = main.getByRole('button', { name: /^Remove$|^Eliminar$/i });
-      const empty = main.getByText(/carrito.*vac[ií]o|no hay productos|cart.*empty/i).first();
-      await Promise.race([
-        remove.first().waitFor({ state: 'visible', timeout: 60000 }),
-        empty.waitFor({ state: 'visible', timeout: 60000 }),
-      ]).catch(() => {
-        throw new Error(`PE cart surface did not render after navigation. url=${this.page.url()}`);
-      });
+    const observed = await browserCart;
+    if (observed.status() !== 200) throw new Error(`PE setup cart returned HTTP ${observed.status()}.`);
+    const apiUrl = new URL(observed.url());
+    const request = this.page.context().request;
+    const options = { headers: { origin: target.origin, referer: target.href }, timeout: 15000, failOnStatusCode: false };
+    const readCart = async () => {
+      const response = await request.get(apiUrl.href, options);
+      if (!response.ok()) throw new Error(`PE setup cart read returned HTTP ${response.status()}.`);
+      const cart = await response.json();
+      if (cart.type !== 'cartWsDTO' || !Array.isArray(cart.entries) || cart.entries.length > 10 ||
+        cart.entries.some(entry => !Number.isInteger(entry.entryNumber) || entry.entryNumber < 0)) {
+        throw new Error('PE setup cart has an unexpected entry schema or exceeds the 10-row safety limit.');
+      }
+      return cart;
     };
-    await waitForCartSurface();
-
-    for (let removed = 0; removed < 10; removed += 1) {
-      const removeButtons = main.getByRole('button', { name: /^Remove$|^Eliminar$/i });
-      const count = await removeButtons.count();
-      if (!count) {
-        await main.getByText(/carrito.*vac[ií]o|no hay productos/i).first()
-          .waitFor({ state: 'visible', timeout: 30000 });
-        return;
+    // This is setup for registered address/payment cases, not the cart-removal
+    // UI scenario. Build #132 confirmed that the UI can close without a DELETE.
+    // Use the observed, environment-scoped current-cart API and prove readback.
+    let cart = await readCart();
+    for (let removed = 0; cart.entries.length && removed < 10; removed += 1) {
+      // Removing the highest index avoids confusing a reindexed remaining row
+      // with the entry we just removed.
+      const entryNumber = Math.max(...cart.entries.map(entry => entry.entryNumber));
+      const entryUrl = new URL(apiUrl);
+      entryUrl.pathname += `/entries/${entryNumber}`;
+      const response = await request.delete(entryUrl.href, options);
+      if (!response.ok()) throw new Error(`PE setup cart removal returned HTTP ${response.status()}.`);
+      let persisted = true;
+      for (let poll = 0; poll < 10; poll += 1) {
+        cart = await readCart();
+        persisted = cart.entries.some(entry => entry.entryNumber === entryNumber);
+        if (!persisted) break;
+        await this.page.waitForTimeout(500);
       }
-      let removedFromCart = false;
-      for (let attempt = 0; attempt < 2 && !removedFromCart; attempt += 1) {
-        await removeButtons.first().click();
-        const dialog = this.page.getByRole('dialog').or(this.page.getByRole('alertdialog'))
-          .filter({ hasText: /Eliminar del carrito/i });
-        await dialog.waitFor({ state: 'visible', timeout: 30000 });
-        await dialog.getByRole('button', { name: /^S[ií]$/i }).click();
-        try {
-          await expect(removeButtons).toHaveCount(count - 1, { timeout: 15000 });
-          removedFromCart = true;
-        } catch (error) {
-          // The PE storefront occasionally closes the confirmation without sending a cart mutation.
-          // Reload once to distinguish a delayed update from a no-op before retrying via the UI.
-          await this.page.reload({ waitUntil: 'domcontentloaded' });
-          await main.waitFor({ state: 'visible', timeout: 60000 });
-          await waitForCartSurface();
-          removedFromCart = await removeButtons.count() === count - 1;
-          if (!removedFromCart && attempt === 1) {
-            throw new Error(`PE cart removal did not persist after two confirmed UI attempts (items: ${count}).`, { cause: error });
-          }
-        }
-      }
+      if (persisted) throw new Error('PE setup cart removal was acknowledged but did not persist; no mutation was retried.');
     }
-    throw new Error('PE cart cleanup exceeded the 10-row safety limit.');
+    if (cart.entries.length) throw new Error('PE cart cleanup exceeded the 10-row safety limit.');
+    await this.page.reload({ waitUntil: 'domcontentloaded' });
+    const main = this.page.getByRole('main');
+    await main.getByText(/carrito.*vac[ií]o|no hay productos|cart.*empty/i).first()
+      .waitFor({ state: 'visible', timeout: 30000 });
+    await expect(main.getByRole('button', { name: /^Remove$|^Eliminar$/i }).filter({ visible: true })).toHaveCount(0);
   }
 
   async loadMxCartState() {

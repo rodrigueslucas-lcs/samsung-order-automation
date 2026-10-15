@@ -18,7 +18,7 @@ test('CL Jenkins Base Store supports S1/S2 and discovers exactly its BS scope', 
 
 test('CL Jenkins consumes the selected environment bundle and existing shared BackOffice credential', () => {
   assert.ok(cl.includes('samsung-cl-${params.ENVIRONMENT.toLowerCase()}-session-bundle'));
-  assert.ok(cl.includes("env.CL_BACKOFFICE_ADMIN_CREDENTIAL = 'samsung-mx-s2-backoffice-admin'"));
+  assert.ok(cl.includes("env.CL_BACKOFFICE_ADMIN_CREDENTIAL = params.ENVIRONMENT == 'S1' ? 'samsung-mx-s1-backoffice-admin' : 'samsung-mx-s2-backoffice-admin'"));
   assert.ok(cl.includes('backoffice-admin-${BACKOFFICE_ENV}.json'));
   assert.ok(cl.includes('backoffice-admin-%BACKOFFICE_ENV%.json'));
   assert.doesNotMatch(cl, /samsung-cl-s2-session-bundle|backoffice-admin-s2\.json/);

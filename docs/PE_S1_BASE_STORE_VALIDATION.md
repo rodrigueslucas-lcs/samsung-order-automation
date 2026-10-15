@@ -8,9 +8,9 @@ worker, zero retries, using the existing shared Admin credential:
 - SAM-25103: basic/advanced order and product searches, plus order status readback.
 - SAM-25104: configured S1 order `PE261013-63986039` is `SHIPPING_REQUESTED`.
 
-The Jenkins provisioning correction already exists in commit `b525b45`.
-PE uses the existing `samsung-mx-s2-backoffice-admin` file credential for both
-staging environments. The credential ID is historical; the installed filename
+The shared BackOffice credentials are now separated by environment:
+`samsung-mx-s1-backoffice-admin` for S1 and `samsung-mx-s2-backoffice-admin` for S2.
+Each is shared by MX/PE/CO/CL. The MX prefix is historical; the installed filename
 is environment scoped: `playwright/.auth/backoffice-admin-${BACKOFFICE_ENV}.json`.
 Buyer sessions remain separate: `samsung-pe-s1-session-bundle` for S1 and
 `samsung-pe-s2-session-bundle` for S2. Never copy a buyer session across environments.
@@ -23,7 +23,24 @@ The archived build #131 metadata identifies checkout `0ff5d4c`, before the
 BackOffice provisioning correction `b525b45`. This explains the missing
 credentials in that build. The current branch includes the correction.
 Evidence was read directly from the local Jenkins build archive; no Jenkins
-build or credential publication was performed.
+build or credential publication was performed during that initial investigation.
+The later S1 credential was explicitly provisioned through the Credentials API,
+and both PE BackOffice cases passed again using that S1 access.
+
+## Registered address setup — build #132 follow-up
+
+SAM-25084 intermittently failed before its address form: the removal confirmation
+closed twice without sending a cart DELETE. More waiting did not reset the cart.
+Registered checkout setup now uses the current-cart API observed in the browser,
+restricted to the PE staging environment. Each entry removal is read back before
+proceeding; an acknowledged no-op fails without repeating the mutation. The
+reloaded UI must show an empty cart with zero removable product rows.
+
+This is setup for address/payment cases, not evidence that the cart-removal UI
+works. The original address persistence checks and current-run QA cleanup remain.
+SAM-25084 and SAM-25087 both passed locally with this setup, headless, one worker,
+zero retries, no payment submission. Evidence:
+`test-results/pe-s1-address-132-fixed/results.json`.
 
 Local targeted reproduction in Bash:
 

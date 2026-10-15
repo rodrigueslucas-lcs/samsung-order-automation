@@ -15,7 +15,7 @@ test('PE Jenkins supports both environments with environment-scoped buyer auth',
 });
 
 test('PE provisions the existing shared MX BackOffice credential for S1 and S2', () => {
-  assert.ok(pe.includes("env.PE_BACKOFFICE_ADMIN_CREDENTIAL = 'samsung-mx-s2-backoffice-admin'"));
+  assert.ok(pe.includes("env.PE_BACKOFFICE_ADMIN_CREDENTIAL = params.ENVIRONMENT == 'S1' ? 'samsung-mx-s1-backoffice-admin' : 'samsung-mx-s2-backoffice-admin'"));
   assert.ok(pe.includes("file(credentialsId: env.PE_BACKOFFICE_ADMIN_CREDENTIAL, variable: 'PE_BACKOFFICE_ADMIN_SECRET')"));
   assert.match(source, /env\.BACKOFFICE_ENV = params\.ENVIRONMENT\.toLowerCase\(\)/);
   assert.ok(pe.includes('backoffice-admin-${BACKOFFICE_ENV}.json'));

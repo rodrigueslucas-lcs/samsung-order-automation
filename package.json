@@ -26,6 +26,7 @@
     "auth:package:pe": "node scripts/auth-package-pe.cjs",
     "auth:install:pe": "node scripts/auth-install-pe-package.cjs",
     "auth:publish:jenkins:pe": "node scripts/auth-publish-jenkins-pe.cjs",
+    "auth:publish:jenkins:backoffice": "node scripts/auth-publish-jenkins-backoffice.cjs",
     "auth:login:cl": "node scripts/auth-login-cl.cjs",
     "auth:verify:cl": "node scripts/auth-verify-cl.cjs",
     "auth:refresh:cl": "node scripts/auth-refresh-cl.cjs",
