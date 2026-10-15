@@ -207,14 +207,45 @@ function injectKnownDefectStyles(html) {
   return html.replace('</head>', `${css}</head>`);
 }
 
+function replaceBlockedCategory(fragment, label) {
+  if (!/chip warn-chip/.test(fragment)) return fragment;
+  return fragment.replace(
+    /<span class="category">[^<]*<\/span>/,
+    `<span class="category blocked-category">${escapeHtml(label)}</span>`,
+  );
+}
+
+function applyCoS1BlockedLabels(html) {
+  const labels = new Map([
+    ['SAM-24892', 'MISSING SC+ PRODUCT'],
+    ['SAM-24914', 'PSE UNAVAILABLE'],
+    ['SAM-24915', 'REWARDS UNAVAILABLE'],
+  ]);
+  let output = html;
+
+  for (const [samId, label] of labels) {
+    output = output.replace(/<article\b[^>]*>[\s\S]*?<\/article>/g, fragment => {
+      if (!fragment.includes(`>${samId}</a>`)) return fragment;
+      return replaceBlockedCategory(fragment, label);
+    });
+    output = output.replace(/<tr\b[^>]*>[\s\S]*?<\/tr>/g, fragment => {
+      if (!fragment.includes(`>${samId}</a>`)) return fragment;
+      return replaceBlockedCategory(fragment, label);
+    });
+  }
+
+  return output;
+}
+
 function applyBlockedPresentation(html) {
   let output = html
     .replaceAll('<span>Known prerequisites</span>', '<span>Missing test data / prerequisites</span>')
     .replaceAll('<span>Other prerequisites</span>', '<span>Missing test data / prerequisites</span>');
 
+  output = applyCoS1BlockedLabels(output);
   if (output.includes('blocked-prerequisite-style')) return output;
 
-  const css = `<style id="blocked-prerequisite-style">.attention-list article:has(.chip.warn-chip){border-color:#efd59f;background:linear-gradient(145deg,#fff,#fffaf0)}.attention-list article:has(.chip.warn-chip) .category{display:inline-flex;justify-self:start;padding:3px 7px;border:1px solid #efd59f;border-radius:999px;background:#fff2d9;color:var(--amber)!important}</style>`;
+  const css = `<style id="blocked-prerequisite-style">.attention-list article:has(.chip.warn-chip){border-color:#efd59f;background:linear-gradient(145deg,#fff,#fffaf0)}.attention-list article:has(.chip.warn-chip) .category,.blocked-category{display:inline-flex;justify-self:start;padding:3px 7px;border:1px solid #efd59f;border-radius:999px;background:#fff2d9;color:var(--amber)!important}</style>`;
   return output.replace('</head>', `${css}</head>`);
 }
 
@@ -262,6 +293,7 @@ if (require.main === module) {
 module.exports = {
   normalizeEnvironment,
   activeKnownDefects,
+  applyCoS1BlockedLabels,
   applyBlockedPresentation,
   annotateDashboard,
 };
