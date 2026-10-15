@@ -6,9 +6,9 @@ Validações locais em 14 e 15/10/2026, Chrome headed/headless, um worker e sem 
 
 O refresh primary terminou em READY após CAPTCHA humano, com logout confirmado em contexto novo. Os dois casos do gate de autenticação passaram e o runner executou os demais 27 casos. O BackOffice SAM-24920 passou usando a credencial compartilhada S1, sem alteração de ordem.
 
-Depois da campanha, **SAM-24912 passou isolado**, com quantidade 1, zero retries e confirmação Samsung visível da ordem **CO261014-64013543**. Foi usada a Mastercard sandbox específica de CO, extraída da documentação oficial do Mercado Pago; a massa MX usada antes recebia rejeição 601. Em 15/10, SAM-24880 e SAM-24919 também passaram isolados. Considerando o último resultado de cada SAM: **23 PASS, 2 FAIL, 3 SKIP e 1 KNOWN DEFECT**. O relatório da campanha anterior continua preservado com seus resultados originais.
+Depois da campanha, **SAM-24912 passou isolado**, com quantidade 1, zero retries e confirmação Samsung visível da ordem **CO261014-64013543**. Foi usada a Mastercard sandbox específica de CO, extraída da documentação oficial do Mercado Pago; a massa MX usada antes recebia rejeição 601. Em 15/10, SAM-24880 e SAM-24919 também passaram isolados. Após desativação da promoção de boas-vindas, o SAM-24896 também passou isolado. Considerando o último resultado local observado de cada SAM: **24 PASS, 1 FAIL, 3 SKIP e 1 KNOWN DEFECT**; essa consolidação de execuções direcionadas não representa uma nova campanha completa. O relatório da campanha anterior continua preservado com seus resultados originais.
 
-A validação final do SAM-24896 confirmou login e logout da segunda conta, mas revelou remoção de desconto no carrinho; o caso permanece FAIL, sem skip ou relaxamento da comparação. O refresh second terminou READY antes do teste e sua sessão foi encerrada pelo logout esperado do próprio TC.
+O **SAM-24896 está PASS no CO S1**, após o operador desativar `CO_Welcome_28112025`. A execução oficial comprovou login, logout, SKU RF32CG5910B1CO e quantidade 1 preservados, com total **$15.199.900 antes e depois**. A API confirmou desconto zero e nenhuma promoção aplicada. A asserção original não foi alterada; a second termina deslogada pelo objetivo do próprio TC.
 
 ## Casos verdes
 
@@ -16,7 +16,7 @@ A validação final do SAM-24896 confirmou login e logout da segunda conta, mas 
 | --- | --- |
 | Login e conta | 24873, 24874 |
 | Desktop, GNB e PLP | 24806, 24875, 24879 |
-| Carrinho | 24882, 24883, 24886 |
+| Carrinho | 24882, 24883, 24886, 24896 |
 | Checkout e endereços | 24898, 24899, 24900, 24901, 24902, 24903, 24904, 24905, 24909, 24910 |
 | BC e tracking | 24880, 24919 |
 | Pagamento registrado | 24912 |
@@ -32,7 +32,7 @@ O SKU `RF32CG5910B1CO` está utilizável no S1. Os casos de salvar/editar criara
 | 24880 — BC | PASS direcionado | Catálogo e PDP CO no PreQA autenticado, SKU RF32CG5910B1CO, POST de adição bem-sucedido e aumento/persistência do minicarrinho. O frontend é PreQA2 e o backend observado é S2, inclusive quando o SAM pertence à campanha S1. Não é uma prova de adição pelo frontend nativo S1. |
 | 24892 — SC+ | SKIP | O caso oficial continua bloqueado. Geladeira `RF32CG5910B1CO` e S24 Ultra `SM-S928BZTKLTC` entram no carrinho S1, mas não oferecem Care+. Falta SKU elegível e fluxo BC/PDP de staging para validar a adição. |
 | 24893 — Trade-up | FAIL | Nenhum dos dois SKUs conhecidos mostrou Trade-up/Plan Canje/Renueva no carrinho S1. Falta uma oferta/SKU elegível habilitada nesse ambiente. |
-| 24896 — Logout | FAIL direcionado | Segunda conta renovada e verificada READY. Login, logout e carrinho preservado foram comprovados, mas o total muda de $27.359.820 para $30.399.800: o desconto de $3.039.980 desaparece ao deslogar. A igualdade continua obrigatória; validar a regra comercial antes de chamar isso de defeito. Evidência: co-s1-final-24896. |
+| 24896 — Logout | PASS direcionado | Promoção CO_Welcome_28112025 desativada pelo operador. Uma execução oficial verde, sem retry: login e logout comprovados, RF32CG5910B1CO quantidade 1 e total $15.199.900 preservados. API sem desconto/promoções. Evidência: co-s1-24896-promotion-disabled-final. |
 | 24911 — Back to Top | FAIL bruto / KNOWN DEFECT no dashboard | Controle ausente após scroll e rodapé carregado. Bug [RT-746043](https://jira.secext.samsung.net/browse/RT-746043), já mapeado para PE/CO S1/S2. Requer correção da UI; o resultado bruto permanece intacto. |
 | 24912 — Cartão registrado | PASS direcionado | Ordem CO261014-64013543 confirmada na Samsung usando a Mastercard sandbox regional CO. A rejeição 601 anterior ocorreu com a massa MX. O seletor final lê a massa CO S1; S2 preserva sua seleção anterior. |
 | 24914 — ADDI | SKIP | Bloqueio oficial existente: depende de fluxo/callback sandbox aprovado e operações PSE/BO/Kibana. |
@@ -102,7 +102,7 @@ Execuções direcionadas, sempre `--project=chromium --workers=1 --retries=0`, c
 
 Os 12 testes focados de cartão/identidade de tracking/modos S1-S2/limites PreQA passaram. Arquitetura e inventário oficial passaram. Steps/refactor continuam sinalizando as 16 pendências CL preexistentes. S2 não foi reexecutado nesta rodada; preservação de OTP e recusa de consulta direta fora de CO S1 verificadas por contrato. Não houve nova campanha completa nem build Jenkins nesta rodada.
 
-## SAM-24896 — investigação com produtos alternativos
+## SAM-24896 — histórico com a promoção ativa
 
 Em 15/10/2026, os três SKUs fornecidos foram executados separadamente no TC oficial CO S1. Cada rodada limpou o carrinho pela UI, adicionou somente o SKU selecionado, comprovou quantidade 1, autenticou a conta e executou logout real. Nenhum pagamento foi enviado.
 
@@ -112,7 +112,7 @@ Em 15/10/2026, os três SKUs fornecidos foram executados separadamente no TC ofi
 | WA21CG6746BVCO | $2.969.910 | $3.299.900 | FAIL: desconto de $329.990 removido |
 | SM-F936BZAJLTC | $7.559.928 | $8.399.920 | FAIL: desconto de $839.992 removido |
 
-Os PDPs mostram o mesmo preço público para cliente autenticado e visitante. Nos três carrinhos, a API identifica `appliedOrderPromotions` com **CO_Welcome_28112025**, que aplica exatamente 10% ao pedido logado; após logout, a lista de promoções fica vazia e o desconto zera. A diferença não é exclusiva de um SKU nem de quantidade acumulada. A regra comercial da promoção precisa ser confirmada antes de classificar sua retirada como defeito; a igualdade original do total foi preservada, sem skip ou known-defect artificial.
+Os PDPs mostram o mesmo preço público para cliente autenticado e visitante. Nos três carrinhos, a API identifica `appliedOrderPromotions` com **CO_Welcome_28112025**, que aplica exatamente 10% ao pedido logado; após logout, a lista de promoções fica vazia e o desconto zera. A diferença não é exclusiva de um SKU nem de quantidade acumulada. Esse histórico mostra a causa da divergência com a promoção ativa. Após sua desativação pelo operador, a revalidação passou; a igualdade original do total foi preservada, sem skip ou known-defect artificial.
 
 O preparo anterior acrescentava o SKU ao carrinho existente. O TC agora limpa o carrinho antes da adição, exige um único campo Quantity com valor 1 antes/depois do logout e anexa as duas capturas e os totais ao registro de negócio. S2 não foi reexecutado nesta investigação.
 
@@ -127,3 +127,13 @@ Evidências locais ignoradas: `fold6/`, `washer-verified/`, `fold4/` dentro de `
 O logout invalida a second entre as rodadas: houve renovação humana e verificação em contexto novo. Antes do Fold4, a janela do login foi encerrada durante o retorno; exportar a sessão já autenticada e verificá-la em contexto novo resolveu o pré-requisito sem repetir o login. A first foi preservada. Ao terminar, a second está deslogada pelo próprio objetivo do TC e precisa de novo refresh antes de reutilização autenticada.
 
 Arquitetura e inventário oficial passaram. Steps/refactor mantêm as 16 pendências CL preexistentes. Não houve nova campanha completa, build Jenkins, publicação de sessão ou alteração de inventário/payment profile.
+
+## SAM-24896 — revalidação PASS após desativação
+
+Em 15/10/2026: **1 passed, 0 failed, 0 skipped**, execução headed, um worker e zero retries. A segunda conta foi renovada pelo operador antes do teste. Carrinho isolado com RF32CG5910B1CO, quantidade 1; total $15.199.900 antes/depois do logout; resposta de carrinho com desconto 0 e promoções vazias. Não houve pagamento ou mudança adicional de código.
+
+```bash
+CO_QST_ENVIRONMENT=S1 CO_QST_SKU=RF32CG5910B1CO ALLOW_PAYMENT_SUBMIT=0 CO_AUTH_AUTO_RENEW=0 PW_TRACE=1 npx playwright test tests/markets/co/qst/base-store/official-p1.spec.js --project=chromium --workers=1 --retries=0 --grep SAM-24896 --headed --reporter=list --output=test-results/co-s1-24896-promotion-disabled-final
+```
+
+Evidência: `test-results/co-s1-24896-promotion-disabled-final/`, incluindo trace, captura final, `.last-run.json` verde e `cart-business-evidence.json` com apenas os valores de negócio. Os testes anteriores permanecem como histórico da promoção ativa. S2, campanha completa e Jenkins não foram reexecutados nesta revalidação.
