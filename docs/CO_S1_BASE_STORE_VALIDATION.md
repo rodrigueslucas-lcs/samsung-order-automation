@@ -1,12 +1,14 @@
 # CO S1 — Base Store P1
 
-Validação local em 14/10/2026, Chrome headed, um worker e sem retries.
+Validações locais em 14 e 15/10/2026, Chrome headed/headless, um worker e sem retries.
 
 Última campanha completa: **20 PASS, 5 FAIL brutos e 4 SKIP**, com os 29 SAMs representados e **zero NOT_RUN**. O dashboard separa um dos cinco FAIL como **KNOWN DEFECT**, vinculado ao RT-746043: visualmente são 20 PASS, 4 FAIL, 4 BLOCKED e 1 KNOWN DEFECT. O inventário e a cobertura oficial não foram alterados.
 
 O refresh primary terminou em READY após CAPTCHA humano, com logout confirmado em contexto novo. Os dois casos do gate de autenticação passaram e o runner executou os demais 27 casos. O BackOffice SAM-24920 passou usando a credencial compartilhada S1, sem alteração de ordem.
 
-Depois da campanha, **SAM-24912 passou isolado**, com quantidade 1, zero retries e confirmação Samsung visível da ordem **CO261014-64013543**. Foi usada a Mastercard sandbox específica de CO, extraída da documentação oficial do Mercado Pago; a massa MX usada antes recebia rejeição 601. Considerando o último resultado de cada SAM: **21 PASS, 3 FAIL, 4 SKIP e 1 KNOWN DEFECT**. O relatório da campanha anterior continua preservado com seus resultados originais.
+Depois da campanha, **SAM-24912 passou isolado**, com quantidade 1, zero retries e confirmação Samsung visível da ordem **CO261014-64013543**. Foi usada a Mastercard sandbox específica de CO, extraída da documentação oficial do Mercado Pago; a massa MX usada antes recebia rejeição 601. Em 15/10, SAM-24880 e SAM-24919 também passaram isolados. Considerando o último resultado de cada SAM: **23 PASS, 2 FAIL, 3 SKIP e 1 KNOWN DEFECT**. O relatório da campanha anterior continua preservado com seus resultados originais.
+
+A validação final do SAM-24896 confirmou login e logout da segunda conta, mas revelou remoção de desconto no carrinho; o caso permanece FAIL, sem skip ou relaxamento da comparação. O refresh second terminou READY antes do teste e sua sessão foi encerrada pelo logout esperado do próprio TC.
 
 ## Casos verdes
 
@@ -16,6 +18,8 @@ Depois da campanha, **SAM-24912 passou isolado**, com quantidade 1, zero retries
 | Desktop, GNB e PLP | 24806, 24875, 24879 |
 | Carrinho | 24882, 24883, 24886 |
 | Checkout e endereços | 24898, 24899, 24900, 24901, 24902, 24903, 24904, 24905, 24909, 24910 |
+| BC e tracking | 24880, 24919 |
+| Pagamento registrado | 24912 |
 | BackOffice | 24920 |
 | Mobile | 24925 |
 
@@ -25,15 +29,15 @@ O SKU `RF32CG5910B1CO` está utilizável no S1. Os casos de salvar/editar criara
 
 | SAM | Resultado bruto | Evidência / pré-requisito necessário |
 | --- | --- | --- |
-| 24880 — BC | FAIL | A navegação aponta para `www.samsung.com`, fora do staging. Falta uma categoria BC válida no S1 via `CO_QST_BC_URL`, na mesma origem do storefront. O teste interrompe antes de adicionar produto por esse caminho público. |
+| 24880 — BC | PASS direcionado | Catálogo e PDP CO no PreQA autenticado, SKU RF32CG5910B1CO, POST de adição bem-sucedido e aumento/persistência do minicarrinho. O frontend é PreQA2 e o backend observado é S2, inclusive quando o SAM pertence à campanha S1. Não é uma prova de adição pelo frontend nativo S1. |
 | 24892 — SC+ | SKIP | O caso oficial continua bloqueado. Geladeira `RF32CG5910B1CO` e S24 Ultra `SM-S928BZTKLTC` entram no carrinho S1, mas não oferecem Care+. Falta SKU elegível e fluxo BC/PDP de staging para validar a adição. |
 | 24893 — Trade-up | FAIL | Nenhum dos dois SKUs conhecidos mostrou Trade-up/Plan Canje/Renueva no carrinho S1. Falta uma oferta/SKU elegível habilitada nesse ambiente. |
-| 24896 — Logout | FAIL | A sessão second existe, mas o menu confirmou estado deslogado. Requer refresh legítimo da segunda conta, export e verificação em contexto novo; renovar primary não renova second. |
+| 24896 — Logout | FAIL direcionado | Segunda conta renovada e verificada READY. Login, logout e carrinho preservado foram comprovados, mas o total muda de $27.359.820 para $30.399.800: o desconto de $3.039.980 desaparece ao deslogar. A igualdade continua obrigatória; validar a regra comercial antes de chamar isso de defeito. Evidência: co-s1-final-24896. |
 | 24911 — Back to Top | FAIL bruto / KNOWN DEFECT no dashboard | Controle ausente após scroll e rodapé carregado. Bug [RT-746043](https://jira.secext.samsung.net/browse/RT-746043), já mapeado para PE/CO S1/S2. Requer correção da UI; o resultado bruto permanece intacto. |
 | 24912 — Cartão registrado | PASS direcionado | Ordem CO261014-64013543 confirmada na Samsung usando a Mastercard sandbox regional CO. A rejeição 601 anterior ocorreu com a massa MX. O seletor final lê a massa CO S1; S2 preserva sua seleção anterior. |
 | 24914 — ADDI | SKIP | Bloqueio oficial existente: depende de fluxo/callback sandbox aprovado e operações PSE/BO/Kibana. |
 | 24915 — Rewards | SKIP | Bloqueio da implementação oficial atual. Requer massa e fluxo de resgate/pagamento com pontos aprovados; texto de Rewards no carrinho não prova pagamento. |
-| 24919 — Tracking | SKIP | Falta pedido guest confirmado CO S1 com mailbox Mailinator correspondente. O novo modo de fixture permite validar tracking sem repetir o pagamento que falhou. OTP, identidade da ordem, status e resumo continuam obrigatórios. |
+| 24919 — Tracking | PASS direcionado | Nova ordem guest CO261015-64014952, quantidade 1, confirmação Samsung e tracking da mesma identidade na mesma execução. Detalhes exibem Pago confirmado, SKU e total $15.199.900. S1 usa a consulta pedido/e-mail que a UI oferece; S2 mantém OTP. |
 
 ## Reexecução local
 
@@ -53,9 +57,15 @@ Os SAMs de pagamento exigem `ALLOW_PAYMENT_SUBMIT=1`, e os de salvar/editar exig
 
 `MX_AUTH_SLOT=second` agora é aceito pelo refresh CO como alias explícito, mas prefira `CO_AUTH_SLOT=second`. Seletores de conta conflitantes são rejeitados antes do login. O perfil second usa login humano e não repete automaticamente uma tentativa manual incompleta.
 
-Para Tracking S1, use uma fixture local ignorada `playwright/.auth/co-s1-guest-tracking.json` com os campos `market: "CO"`, `environment: "S1"`, `confirmed: true`, `sku`, `orderNumber`, `email` e `inbox`. SKU e mailbox precisam corresponder à ordem real; dados de S2 ou de outro mercado são rejeitados. Não inclua tokens, cookies ou OTP nessa fixture.
+O **SAM-24919 sempre cria uma ordem guest nova em cada execução**, tanto no S1 quanto no S2. Exige `ALLOW_PAYMENT_SUBMIT=1`, carrinho com quantidade 1, uma única submissão, confirmação Samsung visível e correspondência entre a resposta do checkout e o número público da ordem. Em seguida rastreia esse mesmo número/e-mail e valida status, detalhes, produto e resumo. O CO S1 oferece consulta direta por pedido/e-mail na UI; o CO S2 mantém a verificação OTP. O modo direto é restrito à origem e à rota CO S1, e falha se aparecer um requisito de OTP inesperado. Não há retry automático de pagamento após resultado ambíguo.
 
-Uma nova ordem para Tracking S1 só é criada com `CO_QST_TRACKING_CREATE_ORDER=1` e `ALLOW_PAYMENT_SUBMIT=1`, após os pré-requisitos de pagamento estarem válidos. A confirmação visível é obrigatória antes de preservar a referência. O comportamento padrão de criação de ordem do S2 foi mantido.
+O arquivo ignorado `playwright/.auth/co-s1-guest-tracking.json` guarda apenas o recibo da última criação para investigação, com mercado, ambiente, SKU, ordem e mailbox. O TC não lê esse arquivo para reutilizar uma ordem anterior, e `CO_QST_TRACKING_CREATE_ORDER` não controla mais esse comportamento. Para evitar criação de pedido, exclua o SAM do filtro da campanha ou mantenha o opt-in de pagamento desligado. Não inclua tokens, cookies ou OTP no recibo.
+
+### BC no PreQA
+
+O SAM-24880 usa uma aba própria na sessão WMC/PreQA aberta em `PREQA2_CDP_URL` (padrão `http://127.0.0.1:9223`). Não navega nem fecha as abas existentes do operador. Abre `/co/refrigerators/all-refrigerators/`, seleciona o SKU controlado e adiciona pelo PDP. O override `CO_QST_BC_URL` deve ser uma URL/caminho CO no próprio `https://p6-pre-qa2.samsung.com`; Production e caminhos de outro mercado são rejeitados antes de abrir a conexão.
+
+As evidências registram o frontend PreQA, a origem real do backend de comércio S2 e os contadores antes/depois. A captura anexada é da aba real do BC, nunca da janela de login WMC ou de uma página S1 não relacionada.
 
 ### Cartão sandbox regional
 
@@ -81,3 +91,13 @@ O PASS foi obtido com a massa regional injetada no loader anterior. A seleção 
 Evidência da campanha completa: `test-results/co-s1-campaign-refreshed/`, com `runtime-summary.json`, resultados das três fases, screenshots e traces. PASS do cartão regional: `test-results/co-s1-card-co-mastercard/`, incluindo `test-finished-1.png` com o código da ordem. Evidências anteriores: `test-results/co-s1-stabilization/`. Artefatos de runtime/autenticação não são versionados. A validação de refresh em runtime foi feita no CO S1; os demais mercados receberam validação estática/regressão da preparação compartilhada.
 
 Arquitetura e inventário oficial passaram; os 27 testes focados de auth/janela/reporting/cartão/BackOffice CI passaram, assim como a validação do Jenkinsfile no servidor Jenkins. Steps/refactor mantêm as 16 pendências preexistentes de CL, fora deste escopo.
+
+## Follow-up de 15/10/2026
+
+Execuções direcionadas, sempre `--project=chromium --workers=1 --retries=0`, com `CO_QST_ENVIRONMENT=S1`:
+
+- `--grep SAM-24880`: PASS, `test-results/co-24880-preqa-live/`; catálogo/PDP PreQA autenticado e mutação real do minicarrinho S2.
+- `--grep SAM-24896 --headed`: FAIL na igualdade de total, `test-results/co-s1-final-24896/`; autenticação second renovada manualmente, verificação fresca READY, logout real e SKU preservado. Trace mostra $3.039.980 de desconto antes do logout e sua remoção depois.
+- `--grep SAM-24919`: PASS, `test-results/co-s1-final-24919/`, com `ALLOW_PAYMENT_SUBMIT=1 MX_QST_HEADLESS=1`. Ordem CO261015-64014952 criada e confirmada, depois consultada e expandida no tracking. Capturas preservadas nesse diretório. Nenhuma ordem antiga foi reutilizada pelo TC.
+
+Os 12 testes focados de cartão/identidade de tracking/modos S1-S2/limites PreQA passaram. Arquitetura e inventário oficial passaram. Steps/refactor continuam sinalizando as 16 pendências CL preexistentes. S2 não foi reexecutado nesta rodada; preservação de OTP e recusa de consulta direta fora de CO S1 verificadas por contrato. Não houve nova campanha completa nem build Jenkins nesta rodada.

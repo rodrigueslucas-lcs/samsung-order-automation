@@ -5,10 +5,18 @@ export default class GuestOrderTrackingPage extends BasePage {
     super(page);
 
     this.market = String(options.market || "pe").toLowerCase();
+    const mode = options.verificationMode || "otp";
+    if (!["otp", "order-email"].includes(mode) ||
+        (mode === "order-email" && (this.market !== "co" || options.environment !== "S1"))) {
+      throw new Error("Direct order/email tracking is supported only for the verified CO S1 UI.");
+    }
+    this.directOrderLookup = mode === "order-email";
     this.currencyPattern = options.currencyPattern || /S\/\s*[\d,.]+/;
     this.productPattern = options.productPattern || /RB45DG6300B1PE|Refrigeradora|producto/i;
 
-    this.form = page.locator("form").filter({
+    this.form = this.directOrderLookup ? page.getByRole("main").locator("form").filter({
+      has: page.getByRole("button", { name: "Buscar", exact: true }),
+    }) : page.locator("form").filter({
       has: page.getByRole("button", { name: /Enviar código|Reenviar Código/i }),
     });
     this.orderNumber = this.form.locator('input[type="text"]').first();
@@ -33,6 +41,7 @@ export default class GuestOrderTrackingPage extends BasePage {
   }
 
   async validateGuestTrackingForm() {
+    if (this.directOrderLookup) this.validateDirectLookupOrigin();
     let formReady = false;
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       formReady = await this.form.waitFor({ state: "visible", timeout: 30000 })
@@ -47,7 +56,8 @@ export default class GuestOrderTrackingPage extends BasePage {
       throw new Error("Guest Track Order form did not render after one controlled reload.");
     }
 
-    for (const field of [this.orderNumber, this.email, this.verificationCode]) {
+    const fields = this.directOrderLookup ? [this.orderNumber, this.email] : [this.orderNumber, this.email, this.verificationCode];
+    for (const field of fields) {
       await field.waitFor({ state: "visible" });
     }
 
@@ -59,6 +69,9 @@ export default class GuestOrderTrackingPage extends BasePage {
     }
     if ((await this.email.getAttribute("type")) !== "email") {
       throw new Error("Guest order email does not use native email validation.");
+    }
+    if (this.directOrderLookup && (await this.sendCodeButton.count() || await this.verificationCode.count())) {
+      throw new Error("CO S1 direct tracking unexpectedly requires OTP; update the flow instead of bypassing verification.");
     }
     if (!(await this.searchButton.isDisabled())) {
       throw new Error("Guest order Search should be disabled before verification.");
@@ -122,6 +135,7 @@ export default class GuestOrderTrackingPage extends BasePage {
   }
 
   async requestVerificationCode(orderNumber, email, { maxAttempts = 1, retryDelayMs = 15000 } = {}) {
+    if (this.directOrderLookup) throw new Error("CO S1 uses its order/email lookup, not the OTP request flow.");
     if (!orderNumber || !email) {
       throw new Error(
         "Guest order number and email must be supplied at runtime."
@@ -140,15 +154,10 @@ export default class GuestOrderTrackingPage extends BasePage {
       await this.sendCodeButton.click();
       response = await responsePromise;
 
-      const responseBody = await response.text().catch(() => "");
-      const requestBody = response.request().postData() || "";
-
       console.log("[mx-tracking-otp]", JSON.stringify({
         attempt,
         status: response.status(),
-        endpoint: response.url(),
-        requestBody,
-        responseBody,
+        endpoint: new URL(response.url()).origin + new URL(response.url()).pathname,
       }));
 
       if (response.ok()) break;
@@ -183,6 +192,7 @@ export default class GuestOrderTrackingPage extends BasePage {
   }
 
   async submitVerificationCode(otp, orderNumber) {
+    if (this.directOrderLookup) throw new Error("CO S1 direct lookup must not submit an OTP.");
     if (!/^\d{6}$/.test(otp)) {
       throw new Error("Guest tracking OTP must contain exactly six digits.");
     }
@@ -205,6 +215,24 @@ export default class GuestOrderTrackingPage extends BasePage {
         `Guest Track Order accepted the OTP but could not find ${orderNumber} in the current BaseSite.`
       );
     }
+  }
+
+  validateDirectLookupOrigin() {
+    const url = new URL(this.page.url());
+    if (url.origin !== "https://stg.shop.samsung.com" || !/^\/co\/mypage\/orders\/?$/.test(url.pathname)) {
+      throw new Error("Direct order/email tracking must stay on the verified CO S1 orders page.");
+    }
+  }
+
+  async lookupOrderByEmail(orderNumber, email) {
+    if (!this.directOrderLookup) throw new Error("This tracking UI requires OTP verification.");
+    this.validateDirectLookupOrigin();
+    await this.orderNumber.fill(orderNumber);
+    await this.email.fill(email);
+    await this.email.blur();
+    await this.searchButton.click();
+    await this.page.getByRole("main").getByText(orderNumber, { exact: false }).first()
+      .waitFor({ state: "visible", timeout: 60000 });
   }
 
   async validateTrackedOrder(orderNumber) {
