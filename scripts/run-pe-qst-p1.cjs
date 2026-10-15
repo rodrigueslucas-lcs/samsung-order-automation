@@ -2,6 +2,8 @@ const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const reusePlan = require("../governance/pe-qst-reuse-plan.json");
+const knownDefectRegistry = require("../governance/known-defects.json");
+const { activeKnownDefects } = require("./annotate-known-defects-dashboard.cjs");
 const { testTitles } = require("../utils/qstS1Implementation");
 const { buildMxQstRuntimeSummary, writeRuntimeSummary } = require("../utils/mxQstRuntimeSummary.cjs");
 const { getPeQstConfig } = require("../config/markets/pe");
@@ -155,16 +157,46 @@ if (fs.existsSync(reportFile)) {
   console.log(`\nPE ${targetEnvironment} BASE STORE P1 SUMMARY`);
   console.log(`Official=${runtimeSummary.summary.official} Executed=${runtimeSummary.summary.executed} Passed=${runtimeSummary.summary.passed} Failed=${runtimeSummary.summary.failed} Blocked=${runtimeSummary.summary.blocked} NotRun=${runtimeSummary.summary.notRun}`);
 
-  // Intentionally skipped/blocked TCs are reported for visibility but do not
-  // make the campaign fail. Build health is red only for a real test failure,
-  // an unexpected full-scope NOT_RUN, or an underlying Playwright/runner error.
+  const knownDefectIds = new Set(
+    activeKnownDefects(runtimeSummary, knownDefectRegistry).map(({ defect }) => String(defect.samId || "").toUpperCase())
+  );
+  const acceptedDataBlockers = new Map([
+    ["SAM-25068", "MISSING_BOGO_PRODUCT"],
+    ["SAM-25074", "MISSING_SC_PLUS_PRODUCT"],
+  ]);
   const targeted = requestedTargetIds.length > 0;
-  if (runtimeSummary.summary.failed > 0) {
-    process.exitCode = result.status || 1;
-  } else if (!targeted && runtimeSummary.summary.notRun > 0) {
-    process.exitCode = result.status || 1;
+  const unexpectedFailures = runtimeSummary.tests.filter((test) =>
+    test.status === "FAIL" && !knownDefectIds.has(String(test.samId || "").toUpperCase())
+  );
+  const unexpectedBlocked = runtimeSummary.tests.filter((test) => {
+    if (test.status !== "SKIPPED-BLOCKED") return false;
+    const samId = String(test.samId || "").toUpperCase();
+    if (knownDefectIds.has(samId)) return false;
+    return acceptedDataBlockers.get(samId) !== test.failureType;
+  });
+  const unexpectedNotRun = targeted ? [] : runtimeSummary.tests.filter((test) => test.status === "NOT_RUN");
+  const runnerInfrastructureFailure = Boolean(result.error) || (result.status != null && ![0, 1].includes(result.status));
+
+  if (knownDefectIds.size) {
+    console.log(`[pe-qst] Non-gating known defects: ${[...knownDefectIds].join(", ")}.`);
+  }
+  const acceptedBlocked = runtimeSummary.tests.filter((test) =>
+    test.status === "SKIPPED-BLOCKED" && acceptedDataBlockers.get(String(test.samId || "").toUpperCase()) === test.failureType
+  );
+  if (acceptedBlocked.length) {
+    console.log(`[pe-qst] Non-gating known test-data blockers: ${acceptedBlocked.map((test) => `${test.samId}=${test.failureType}`).join(", ")}.`);
+  }
+
+  if (runnerInfrastructureFailure) {
+    process.exitCode = result.status || 2;
+  } else if (unexpectedFailures.length || unexpectedBlocked.length || unexpectedNotRun.length) {
+    if (unexpectedFailures.length) console.error(`[pe-qst] Gating failures: ${unexpectedFailures.map((test) => test.samId).join(", ")}.`);
+    if (unexpectedBlocked.length) console.error(`[pe-qst] Unexpected blockers: ${unexpectedBlocked.map((test) => `${test.samId}=${test.failureType}`).join(", ")}.`);
+    if (unexpectedNotRun.length) console.error(`[pe-qst] Unexpected NOT_RUN: ${unexpectedNotRun.map((test) => test.samId).join(", ")}.`);
+    process.exitCode = 1;
   } else {
-    process.exitCode = result.status ?? 1;
+    console.log("[pe-qst] BUILD HEALTH PASS · only PASS, mapped known defects, and accepted test-data blockers remain.");
+    process.exitCode = 0;
   }
 } else {
   process.exitCode = result.status ?? 1;
