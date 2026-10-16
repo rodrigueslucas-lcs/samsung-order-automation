@@ -27,7 +27,7 @@ async function verifyClAuthentication() {
     page.setDefaultTimeout(ci ? 90000 : 60000);
     console.log(`[auth:verify:cl] validating ${config.environment} CL authenticated session`);
     await auth.validateAuthenticatedSession(page);
-    await context.storageState({ path: auth.requireAuthState(), indexedDB: true });
+    writeJsonAtomically(auth.requireAuthState(), await context.storageState({ indexedDB: true }));
     const sessionStorage = await page.evaluate(() => Object.fromEntries(
       Array.from({ length: window.sessionStorage.length }, (_, index) => {
         const key = window.sessionStorage.key(index);

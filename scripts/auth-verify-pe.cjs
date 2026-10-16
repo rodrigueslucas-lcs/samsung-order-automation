@@ -1,5 +1,5 @@
 const { chromium } = require("@playwright/test");
-const fs = require("node:fs");
+const { writeJsonAtomically } = require("../utils/atomicJson");
 const {
   PE_AUTH_SESSION_STORAGE_PATH,
   getPeAuthState,
@@ -8,10 +8,7 @@ const {
 const { getPeQstConfig } = require("../config/markets/pe");
 
 function writeJsonSecurely(destination, value) {
-  const temporary = `${destination}.tmp`;
-  fs.writeFileSync(temporary, JSON.stringify(value, null, 2), { mode: 0o600 });
-  fs.chmodSync(temporary, 0o600);
-  fs.renameSync(temporary, destination);
+  writeJsonAtomically(destination, value);
 }
 
 function isTransientNavigationError(error) {
@@ -110,7 +107,7 @@ async function verifyPeAuthentication() {
 
     console.log(`[auth:verify:pe] authenticated profile action validated in a fresh ${config.environment} PE context`);
 
-    await context.storageState({ path: auth.requireAuthState(), indexedDB: true });
+    writeJsonAtomically(auth.requireAuthState(), await context.storageState({ indexedDB: true }));
     const sessionStorage = await page.evaluate(() =>
       Object.fromEntries(
         Array.from({ length: window.sessionStorage.length }, (_, index) => {

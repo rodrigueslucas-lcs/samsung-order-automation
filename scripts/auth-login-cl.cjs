@@ -49,7 +49,8 @@ function profileButton(page) {
 
 function accountActions(page) {
   const login = page
-    .locator('a[data-an-la="login"], a.loginBtn')
+    .locator('[data-an-la="login"], a.loginBtn')
+    .or(page.getByRole("button", { name: /Iniciar Sesi[oó]n|Sign in/i }))
     .or(page.getByRole("link", { name: /Iniciar Sesi[oó]n|Sign in/i }))
     .or(page.getByText(/^Iniciar Sesi[oó]n$|^Sign in$/i))
     .filter({ visible: true })

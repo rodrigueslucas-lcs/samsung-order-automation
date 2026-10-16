@@ -127,7 +127,8 @@ function profileControl(page) {
 
 function accountActions(page) {
   const login = page
-    .locator('a[data-an-la="login"], a.loginBtn')
+    .locator('[data-an-la="login"], a.loginBtn')
+    .or(page.getByRole("button", { name: /Iniciar Sesi[oó]n|Sign in/i }))
     .or(page.getByRole("link", { name: /Iniciar Sesi[oó]n/i }))
     .or(page.getByText(/^Iniciar Sesi[oó]n$/i))
     .filter({ visible: true })
@@ -383,7 +384,7 @@ async function loginCoPreQa2SharedChrome() {
       const profile = page.locator("button.nv00-gnb-v4__utility-user").filter({ visible: true }).first();
       await profile.waitFor({ state: "visible", timeout: 30000 });
       await profile.click();
-      const login = page.locator("a.loginBtn").filter({ visible: true }).first();
+      const { login } = accountActions(page);
       if (!(await login.isVisible().catch(() => false))) {
         throw new Error("CO PreQA2 account menu has neither authenticated logout nor a visible sign-in action.");
       }

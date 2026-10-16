@@ -1,5 +1,6 @@
 const { chromium } = require("@playwright/test");
 const fs = require("node:fs");
+const { writeJsonAtomically } = require("../utils/atomicJson");
 const path = require("node:path");
 const { getPeQstConfig } = require("../config/markets/pe");
 
@@ -9,9 +10,7 @@ const HOSTNAME = config.baseUrl.hostname;
 const profileDir = path.resolve(`playwright/profiles/${envSuffix}-pe-qa`);
 const authDir = path.resolve("playwright/.auth");
 const authFile = path.join(authDir, `pe-${envSuffix}-user.json`);
-const authTempFile = `${authFile}.tmp`;
 const sessionStorageFile = path.join(authDir, `pe-${envSuffix}-session-storage.json`);
-const sessionStorageTempFile = `${sessionStorageFile}.tmp`;
 const devToolsActivePortFile = path.join(profileDir, "DevToolsActivePort");
 
 let currentStep = `starting ${config.environment} PE export`;
@@ -57,11 +56,6 @@ async function openAuthenticatedProfileMenu(page) {
   reportStep("authenticated profile action is visible");
 }
 
-function writeJsonAtomically(tempFile, destination, value) {
-  fs.writeFileSync(tempFile, JSON.stringify(value, null, 2), { mode: 0o600 });
-  fs.chmodSync(tempFile, 0o600);
-  fs.renameSync(tempFile, destination);
-}
 
 async function exportPeAuthentication() {
   fs.mkdirSync(authDir, { recursive: true });
@@ -105,13 +99,10 @@ async function exportPeAuthentication() {
       )
     );
 
-    writeJsonAtomically(authTempFile, authFile, peState);
-    writeJsonAtomically(sessionStorageTempFile, sessionStorageFile, sessionStorage);
+    writeJsonAtomically(authFile, peState);
+    writeJsonAtomically(sessionStorageFile, sessionStorage);
     reportStep(`${config.environment} PE auth state exported to dedicated ignored artifacts`);
   } finally {
-    for (const tempFile of [authTempFile, sessionStorageTempFile]) {
-      if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
-    }
     await browser.close();
   }
 }

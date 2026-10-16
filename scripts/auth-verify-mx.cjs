@@ -85,7 +85,7 @@ async function verifyMxAuthentication() {
     }
 
     console.log(`[auth:verify:mx] Cerrar sesión validated in a fresh ${target.name} MX context`);
-    await context.storageState({ path: requireAuthState(), indexedDB: true });
+    writeJsonAtomically(requireAuthState(), await context.storageState({ indexedDB: true }));
     const sessionStorage = await page.evaluate(() =>
       Object.fromEntries(
         Array.from({ length: window.sessionStorage.length }, (_, index) => {

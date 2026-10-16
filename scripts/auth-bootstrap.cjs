@@ -1,5 +1,6 @@
 const { chromium } = require("@playwright/test");
 const fs = require("node:fs");
+const { writeJsonAtomically } = require("../utils/atomicJson");
 const path = require("node:path");
 
 const setupUrl = "https://stg2.shop.samsung.com/getcookie.html";
@@ -7,9 +8,7 @@ const homeUrl = "https://stg2.shop.samsung.com/pe/";
 const profileDir = path.resolve("playwright/profiles/st2-peru-qa");
 const authDir = path.resolve("playwright/.auth");
 const authFile = path.join(authDir, "user.json");
-const authTempFile = path.join(authDir, "user.json.tmp");
 const sessionStorageFile = path.join(authDir, "session-storage.json");
-const sessionStorageTempFile = path.join(authDir, "session-storage.json.tmp");
 const devToolsActivePortFile = path.join(profileDir, "DevToolsActivePort");
 
 let currentStep = "starting export";
@@ -144,30 +143,12 @@ async function bootstrapAuthentication() {
       )
     );
 
-    fs.writeFileSync(authTempFile, JSON.stringify(st2State, null, 2), {
-      mode: 0o600,
-    });
-    fs.chmodSync(authTempFile, 0o600);
-
-    fs.writeFileSync(
-      sessionStorageTempFile,
-      JSON.stringify(st2SessionStorage, null, 2),
-      { mode: 0o600 }
-    );
-    fs.chmodSync(sessionStorageTempFile, 0o600);
-
-    fs.renameSync(authTempFile, authFile);
-    fs.renameSync(sessionStorageTempFile, sessionStorageFile);
+    writeJsonAtomically(authFile, st2State);
+    writeJsonAtomically(sessionStorageFile, st2SessionStorage);
 
     reportStep("ST2 auth state exported to playwright/.auth");
     console.log("[auth:export] ST2 and required parent-domain state exported; identity-provider and third-party state excluded");
   } finally {
-    if (fs.existsSync(authTempFile)) {
-      fs.unlinkSync(authTempFile);
-    }
-    if (fs.existsSync(sessionStorageTempFile)) {
-      fs.unlinkSync(sessionStorageTempFile);
-    }
     await browser.close();
   }
 }

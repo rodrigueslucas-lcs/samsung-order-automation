@@ -268,7 +268,7 @@ async function loginPeSamsungAccount() {
       page = await openPeHome(page, context);
       ({ menu } = await waitForProfileMenu(page));
       console.log("[auth:login:pe] PE profile menu is stable");
-      login = menu.locator('a[data-an-la="login"]').filter({ visible: true });
+      login = menu.locator('[data-an-la="login"]').filter({ visible: true });
       menuState = /Cerrar Sesi[oó]n/i.test(await menu.innerText()) ? "authenticated" : "signed-out";
     }
     if (menuState === "signed-out") {

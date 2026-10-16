@@ -93,7 +93,7 @@ async function verifyCoAuthentication() {
 
     console.log(`[auth:verify:co] authenticated profile action validated in a fresh ${config.environment} CO context`);
 
-    await context.storageState({ path: auth.requireAuthState(), indexedDB: true });
+    writeJsonAtomically(auth.requireAuthState(), await context.storageState({ indexedDB: true }));
     const sessionStorage = await page.evaluate(() =>
       Object.fromEntries(
         Array.from({ length: window.sessionStorage.length }, (_, index) => {

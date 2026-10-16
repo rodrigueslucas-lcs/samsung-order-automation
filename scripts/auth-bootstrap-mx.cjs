@@ -1,5 +1,6 @@
 const { chromium } = require("@playwright/test");
 const fs = require("node:fs");
+const { writeJsonAtomically } = require("../utils/atomicJson");
 const path = require("node:path");
 const { resolveMxEnvironment } = require("../utils/mxConfig");
 
@@ -15,9 +16,7 @@ const homeUrl = `https://${HOSTNAME}/mx/`;
 const profileDir = path.resolve(`playwright/profiles/${environment}-mx-${accountSlot === "second" ? "second" : "qa"}`);
 const authDir = path.resolve("playwright/.auth");
 const authFile = path.join(authDir, `mx-${environment}-${accountSlot === "second" ? "second-user" : "user"}.json`);
-const authTempFile = `${authFile}.tmp`;
 const sessionStorageFile = path.join(authDir, `mx-${environment}-${accountSlot === "second" ? "second-session-storage" : "session-storage"}.json`);
-const sessionStorageTempFile = `${sessionStorageFile}.tmp`;
 const devToolsActivePortFile = path.join(profileDir, "DevToolsActivePort");
 
 let currentStep = `starting ${label} export`;
@@ -132,11 +131,6 @@ async function openMxStorefrontForExport(context) {
   return page;
 }
 
-function writeJsonAtomically(tempFile, destination, value) {
-  fs.writeFileSync(tempFile, JSON.stringify(value, null, 2), { mode: 0o600 });
-  fs.chmodSync(tempFile, 0o600);
-  fs.renameSync(tempFile, destination);
-}
 
 async function exportMxAuthentication() {
   fs.mkdirSync(authDir, { recursive: true });
@@ -189,16 +183,13 @@ async function exportMxAuthentication() {
       )
     );
 
-    writeJsonAtomically(authTempFile, authFile, mxState);
-    writeJsonAtomically(sessionStorageTempFile, sessionStorageFile, sessionStorage);
+    writeJsonAtomically(authFile, mxState);
+    writeJsonAtomically(sessionStorageFile, sessionStorage);
     reportStep(`${label} auth state exported to dedicated ignored artifacts`);
     console.log(
       `[auth:export:mx] ${label} storefront and required parent-domain state exported; identity-provider and third-party state excluded`
     );
   } finally {
-    for (const tempFile of [authTempFile, sessionStorageTempFile]) {
-      if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
-    }
     await browser.close();
   }
 }

@@ -225,7 +225,7 @@ async function waitForAuthenticatedStorefront(context, preferredPage) {
 
 async function exportState(context, page) {
   fs.mkdirSync(authDir, { recursive: true });
-  await context.storageState({ path: authFile });
+  writeJsonAtomically(authFile, await context.storageState());
   const sessionStorage = await page.evaluate(() => Object.fromEntries(Object.entries(sessionStorage)));
   writeJsonAtomically(sessionStorageFile, sessionStorage);
   console.log(`[auth:login:mx] exported ${ENV_NAME} ${accountSlot} session -> ${authFile}`);

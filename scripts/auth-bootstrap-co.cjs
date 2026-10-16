@@ -1,5 +1,6 @@
 const { chromium } = require("@playwright/test");
 const fs = require("node:fs");
+const { writeJsonAtomically } = require("../utils/atomicJson");
 const path = require("node:path");
 const { getCoQstConfig } = require("../config/markets/co");
 
@@ -14,9 +15,7 @@ const API_HOSTNAME = config.environment === "S2"
 const profileDir = path.resolve(`playwright/profiles/${envSuffix}-co-${accountSlot === "second" ? "second" : "qa"}`);
 const authDir = path.resolve("playwright/.auth");
 const authFile = path.join(authDir, `co-${envSuffix}-${accountSlot === "second" ? "second-user" : "user"}.json`);
-const authTempFile = `${authFile}.tmp`;
 const sessionStorageFile = path.join(authDir, `co-${envSuffix}-${accountSlot === "second" ? "second-session-storage" : "session-storage"}.json`);
-const sessionStorageTempFile = `${sessionStorageFile}.tmp`;
 const devToolsActivePortFile = path.join(profileDir, "DevToolsActivePort");
 
 let currentStep = `starting ${config.environment} CO export`;
@@ -62,11 +61,6 @@ async function openAuthenticatedProfileMenu(page) {
   reportStep("authenticated profile action is visible");
 }
 
-function writeJsonAtomically(tempFile, destination, value) {
-  fs.writeFileSync(tempFile, JSON.stringify(value, null, 2), { mode: 0o600 });
-  fs.chmodSync(tempFile, 0o600);
-  fs.renameSync(tempFile, destination);
-}
 
 async function exportCoAuthentication() {
   fs.mkdirSync(authDir, { recursive: true });
@@ -110,13 +104,10 @@ async function exportCoAuthentication() {
       )
     );
 
-    writeJsonAtomically(authTempFile, authFile, coState);
-    writeJsonAtomically(sessionStorageTempFile, sessionStorageFile, sessionStorage);
+    writeJsonAtomically(authFile, coState);
+    writeJsonAtomically(sessionStorageFile, sessionStorage);
     reportStep(`${config.environment} CO auth state exported to dedicated ignored artifacts`);
   } finally {
-    for (const tempFile of [authTempFile, sessionStorageTempFile]) {
-      if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
-    }
     await browser.close();
   }
 }
