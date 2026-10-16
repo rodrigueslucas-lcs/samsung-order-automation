@@ -166,7 +166,6 @@ export default class MailinatorPage extends BasePage {
           await this.refreshInbox();
           continue;
         }
-        await this.screenshot("tc13-mailinator-otp-email");
         return {
           otp,
           sender: message.sender,

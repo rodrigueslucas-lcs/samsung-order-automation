@@ -179,8 +179,14 @@ test("SAM-25010 @destructive @qst @mx @base-store - Track Order with email and O
 
   let otpEmail;
   await test.step("Wait for the new OTP email and capture the verification code", async () => {
-    await mailPage.bringToFront();
-    otpEmail = await mailinator.waitForOtpEmail({ baselineMessageIds, baselineOtpCodes });
+    try {
+      await mailPage.bringToFront();
+      otpEmail = await mailinator.waitForOtpEmail({ baselineMessageIds, baselineOtpCodes });
+    } finally {
+      // Final evidence belongs to the storefront result, never the OTP inbox.
+      await mailPage.close();
+      await page.bringToFront();
+    }
   });
 
   let result;
