@@ -182,6 +182,34 @@
       "priority": "High",
       "rootCause": "TBD",
       "notes": "Legacy reporting alias retained for regression compatibility; CL official runtime uses SAM-24803 for the Trade-in cart scenario."
+    },
+    {
+      "market": "CO",
+      "environment": "S1",
+      "store": "BASE_STORE",
+      "samId": "SAM-24882",
+      "jira": "SAM-25146",
+      "url": "https://jira.secext.samsung.net/browse/SAM-25146",
+      "title": "QST STG1 SMB CO/PE BS and EPP Footer Section Missing on PDP/Checkout/Cart Page",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "Medium",
+      "rootCause": "Storefront Issue",
+      "notes": "CO S1 cart UI footer validation is affected by the missing footer tracked in SAM-25146; linked alongside desktop UI SAM-24806."
+    },
+    {
+      "market": "CO",
+      "environment": "S2",
+      "store": "BASE_STORE",
+      "samId": "SAM-24882",
+      "jira": "SAM-25146",
+      "url": "https://jira.secext.samsung.net/browse/SAM-25146",
+      "title": "QST STG1 SMB CO/PE BS and EPP Footer Section Missing on PDP/Checkout/Cart Page",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "Medium",
+      "rootCause": "Storefront Issue",
+      "notes": "CO S2 cart footer confirmed empty in build143 local reproduction: contentinfo and generated Footer CMS slot render no navigation/legal content. Linked to SAM-25146 by operator confirmation; original ticket title describes STG1."
     }
   ]
 }

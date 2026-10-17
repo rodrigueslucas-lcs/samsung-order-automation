@@ -91,3 +91,22 @@ test('CO S1 known-defect mappings do not leak into S2', () => {
   };
   assert.equal(activeKnownDefects(runtime, registry).length, 0);
 });
+
+test('CO cart footer links SAM-24882 to SAM-25146 in confirmed S1/S2 scopes', () => {
+  for (const environment of ['S1/STG1', 'S2/STG2']) {
+    for (const status of ['FAIL', 'BLOCKED', 'PASS', 'NOT_RUN']) {
+      const runtime = {
+        market: 'CO', environment, store: 'BASE_STORE',
+        tests: [{ samId: 'SAM-24882', status, error: 'Cart footer is empty.' }],
+      };
+      const active = activeKnownDefects(runtime, registry);
+      assert.equal(active.length, ['FAIL', 'BLOCKED'].includes(status) ? 1 : 0);
+      if (active.length) {
+        assert.equal(active[0].defect.jira, 'SAM-25146');
+        assert.equal(active[0].defect.url, 'https://jira.secext.samsung.net/browse/SAM-25146');
+      }
+      assert.equal(activeKnownDefects({ ...runtime, market: 'MX' }, registry).length, 0);
+      assert.equal(activeKnownDefects({ ...runtime, store: 'EPP' }, registry).length, 0);
+    }
+  }
+});
