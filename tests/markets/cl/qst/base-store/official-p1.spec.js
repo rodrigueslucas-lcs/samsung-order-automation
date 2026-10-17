@@ -255,7 +255,7 @@ test.describe("CL QST - Base Store Official P1", () => {
 
   test("SAM-24797 @qst @cl @base-store - Verify BOGO product on cart page", async ({ page }) => {
     const cfg = config();
-    const defaultBogoSku = cfg.environment === "S1" ? "SM-S926BLBKLTL" : "";
+    const defaultBogoSku = cfg.environment === "S1" ? "SM-S926BLBKLTL" : "SM-S928BZKILTL";
     const bogoSku = String(process.env.CL_QST_BOGO_SKU || defaultBogoSku).trim();
     const bogoPdp = process.env.CL_QST_BOGO_PDP_URL ||
       (bogoSku ? new URL(`/cl/p/${bogoSku}`, cfg.baseUrl.origin).href : "");
