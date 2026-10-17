@@ -1,4 +1,6 @@
 const { chromium } = require("@playwright/test");
+const { createAuthNavigation } = require("../utils/authNavigation.cjs");
+const gotoWithTransientRetry = createAuthNavigation("cl");
 const fs = require("node:fs");
 const path = require("node:path");
 const { getClQstConfig } = require("../config/markets/cl");
@@ -203,7 +205,7 @@ async function exportState(context, page) {
     await installClChatNoticeDismissal(page);
     page.setDefaultTimeout(120000);
     if (config.setupUrl) {
-      await page.goto(config.setupUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
+      await gotoWithTransientRetry(page, config.setupUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
       await page.getByText(/You can access pages now/i).waitFor({ timeout: 60000 });
     }
     const configuration = page.waitForResponse(response => {
@@ -215,7 +217,7 @@ async function exportState(context, page) {
     const ssoInfo = page.waitForResponse(response => {
       return new URL(response.url()).pathname.endsWith("/v2/cl/ssoInfo");
     }, { timeout: 30000 }).then(response => response.ok() ? response.json() : null).catch(() => null);
-    await page.goto(config.baseUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await gotoWithTransientRetry(page, config.baseUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
     console.log("[auth:login:cl] storefront loaded; maximizing and checking profile actions");
     await dismissNotificationTutorial(page);
     let state = await accountState(page);

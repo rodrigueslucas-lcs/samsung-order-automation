@@ -2,6 +2,8 @@ const { chromium } = require("@playwright/test");
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const { writeJsonAtomically } = require("../utils/atomicJson");
+const { createAuthNavigation } = require("../utils/authNavigation.cjs");
+const gotoWithTransientRetry = createAuthNavigation("pe");
 const path = require("node:path");
 const { getPeQstConfig } = require("../config/markets/pe");
 
@@ -78,23 +80,6 @@ async function connectDedicatedChrome() {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   throw new Error("Dedicated PE Chrome did not expose CDP within 30 seconds.");
-}
-
-async function gotoWithTransientRetry(page, url, options = {}) {
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    try {
-      return await page.goto(url, options);
-    } catch (error) {
-      const transientNavigation = /net::ERR_ABORTED|frame was detached|ERR_NETWORK_CHANGED/i.test(
-        String(error?.message || error)
-      );
-      if (!transientNavigation || attempt === 2) throw error;
-      console.warn(`[auth:login:pe] transient navigation abort; retrying ${url} (${attempt + 1}/2)`);
-      if (page.isClosed()) throw error;
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
-  }
-  return null;
 }
 
 function assertAllowedHost(page, allowed, step) {

@@ -1,4 +1,6 @@
 const { chromium } = require("@playwright/test");
+const { createAuthNavigation } = require("../utils/authNavigation.cjs");
+const gotoWithTransientRetry = createAuthNavigation("co");
 const { prepareAuthBrowserWindow, hasNativeAuthWindow } = require("../utils/authBrowserWindow.cjs");
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
@@ -267,13 +269,13 @@ async function openCoHome(page, context) {
   }
 
   console.log(`[auth:login:co] checking CO ${ENV_NAME} storefront setup`);
-  await page.goto(setupUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await gotoWithTransientRetry(page, setupUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
   assertAllowedHost(page, [HOSTNAME], "CO setup");
   await page.getByText(/You can access pages now/i).waitFor({ timeout: 60000 });
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     console.log(`[auth:login:co] loading CO ${ENV_NAME} home (${attempt}/3)`);
-    await page.goto(homeUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+    await gotoWithTransientRetry(page, homeUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
     await closeDedicatedDevTools(context);
     await maximizeDedicatedChrome(page);
     assertAllowedHost(page, [HOSTNAME], "CO storefront");
@@ -376,7 +378,7 @@ async function loginCoPreQa2SharedChrome() {
       page = existingCoPage || await context.newPage();
       if (!existingCoPage) {
         temporaryPage = page;
-        await page.goto(homeUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+        await gotoWithTransientRetry(page, homeUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
       }
       if (!isCoStorefront(page)) {
         throw new Error(`CO S2 did not reach ${HOSTNAME}/co/. Complete WMC → Samsung Employees → AD SSO Login → QA / PreQA2 in the shared Chrome.`);

@@ -1,4 +1,6 @@
 const { chromium } = require("@playwright/test");
+const { createAuthNavigation } = require("../utils/authNavigation.cjs");
+const gotoWithTransientRetry = createAuthNavigation("mx");
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const { writeJsonAtomically } = require("../utils/atomicJson");
@@ -154,10 +156,10 @@ async function isAuthenticated(page) {
 }
 
 async function goToMxStorefront(page) {
-  await page.goto(setupUrl, { waitUntil: "domcontentloaded", timeout: 120000 });
+  await gotoWithTransientRetry(page, setupUrl, { waitUntil: "domcontentloaded", timeout: 120000 });
   assertAllowedHost(page, [HOSTNAME], "MX setup");
   if (page.url() !== homeUrl) {
-    await page.goto(homeUrl, { waitUntil: "domcontentloaded", timeout: 120000 });
+    await gotoWithTransientRetry(page, homeUrl, { waitUntil: "domcontentloaded", timeout: 120000 });
   }
   assertAllowedHost(page, [HOSTNAME], "MX storefront");
 }
