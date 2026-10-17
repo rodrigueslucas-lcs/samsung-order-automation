@@ -44,12 +44,17 @@ export default class BackOfficePage extends BasePage {
     this.url = getBackOfficeUrl(options.url);
   }
 
+  adminPerspective() {
+    return this.page.getByText("Administration Cockpit", { exact: true })
+      .or(this.page.getByRole("tabpanel", { name: "admin.area", exact: true })
+        .getByRole("row", { name: /^Order(?: selected)?$/ }))
+      .filter({ visible: true }).first();
+  }
+
   async openLoginSurface() {
     const usernameInput = this.page.getByPlaceholder("Enter user name", { exact: true });
     const passwordInput = this.page.getByPlaceholder("Enter password", { exact: true });
-    const directPerspective = this.page
-      .getByText("Administration Cockpit", { exact: true })
-      .first();
+    const directPerspective = this.adminPerspective();
     const maintenance = this.page.getByText(/service is down for maintenance/i);
     const forbidden = this.page.getByRole("heading", {
       name: /403: The server did not authorize the request/i,
@@ -135,7 +140,7 @@ export default class BackOfficePage extends BasePage {
       const proceedButton = this.page.getByRole("button", { name: "PROCEED", exact: true });
       // A timed-out loser must not reject the whole login while another
       // legitimate outcome is still loading (ZK often redirects via custom-login).
-      const loginOutcome = await Promise.any([
+      const waitForLoginOutcome = () => Promise.any([
         proceedButton
           .waitFor({ state: "visible", timeout: 60000 })
           .then(() => "authority"),
@@ -145,7 +150,15 @@ export default class BackOfficePage extends BasePage {
         this.page
           .waitForURL(/login\.zul\?login_error=1/, { timeout: 60000 })
           .then(() => "rejected"),
-      ]).catch(() => {
+      ]);
+      const loginOutcome = await waitForLoginOutcome().catch(async () => {
+        // ZK can retain its Processing shell after the login redirect. Reload
+        // that document once; never resubmit credentials or accept the spinner.
+        if (await this.page.getByText(/^Processing\.\.\.$/).isVisible().catch(() => false)) {
+          await this.page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+          const recovered = await waitForLoginOutcome().catch(() => null);
+          if (recovered) return recovered;
+        }
         throw new Error(
           `BackOffice login did not reach an authenticated perspective or authority selector; current URL: ${this.page.url()}`
         );
@@ -177,12 +190,10 @@ export default class BackOfficePage extends BasePage {
   }
 
   async expectPerspective(authority) {
-    const perspectiveName =
-      authority === "admin" ? "Administration Cockpit" : "Customer Support";
-    await this.page
-      .getByText(perspectiveName, { exact: true })
-      .first()
-      .waitFor({ state: "visible", timeout: 30000 });
+    const perspective = authority === "admin" ? this.adminPerspective()
+      : this.page.getByText("Customer Support", { exact: true }).first();
+    await perspective.waitFor({ state: "visible", timeout: 30000 });
+    await this.page.locator("#zk_proc").waitFor({ state: "hidden", timeout: 60000 });
   }
 
   async openTreeRow(name) {
@@ -190,6 +201,7 @@ export default class BackOfficePage extends BasePage {
     const row = this.page.getByRole("row", {
       name: new RegExp(`^${escapedName}(?: selected)?$`),
     });
+    await this.page.locator("#zk_proc").waitFor({ state: "hidden", timeout: 60000 });
     await row.waitFor({ state: "visible", timeout: 30000 });
     await row.click();
   }

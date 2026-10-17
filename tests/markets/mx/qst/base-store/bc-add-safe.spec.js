@@ -21,37 +21,6 @@ async function dismissLocationBanner(page) {
   }
 }
 
-async function readHeaderCartCount(page) {
-  const cartControl = page.getByRole("link", { name: /Carrito de compras/i })
-    .filter({ visible: true }).first();
-  if (!(await cartControl.isVisible().catch(() => false))) return null;
-  const badge = cartControl.locator(".gnb-cart-count").first();
-  const value = (await badge.innerText().catch(() => "")).match(/(\d+)\s*$/)?.[1];
-  return value ? Number(value) : 0;
-}
-
-async function resolveObservedMinicartCountUrl(page) {
-  await page.waitForFunction(() => {
-    return performance.getEntriesByType("resource")
-      .some((entry) => /\/minicart\/totalProducts(?:[?#]|$)/i.test(entry.name));
-  }, null, { timeout: 30000 });
-  return page.evaluate(() => {
-    const resources = performance.getEntriesByType("resource")
-      .map((entry) => entry.name)
-      .filter((url) => /\/minicart\/totalProducts(?:[?#]|$)/i.test(url));
-    return resources.at(-1);
-  });
-}
-
-async function readMinicartCount(page, url) {
-  const response = await page.request.get(url);
-  expect(response.ok(), "The PreQA PDP minicart count must be readable.").toBe(true);
-  const body = await response.text();
-  const count = Number(body.match(/<Integer>(\d+)<\/Integer>/i)?.[1]);
-  expect(Number.isFinite(count), "The minicart must return a numeric product count.").toBe(true);
-  return count;
-}
-
 async function getAuthenticatedPreQaPage() {
   const cdpBrowser = await chromium.connectOverCDP(PRE_QA_CDP_URL);
   const contexts = cdpBrowser.contexts();
@@ -62,7 +31,21 @@ async function getAuthenticatedPreQaPage() {
 
   const context = contexts[0];
   const page = await context.newPage();
-  return { cdpBrowser, page };
+  const buyingToolErrors = new Set();
+  page.on("pageerror", error => {
+    // Keep only known, non-sensitive frontend signatures in the evidence.
+    for (const key of ["rewardsGrid", "checkSignIn"]) {
+      if (error.message.includes(key)) buyingToolErrors.add(key);
+    }
+  });
+  await page.bringToFront();
+  await page.route("**/tokocommercewebservices/**", route => {
+    const request = route.request();
+    const allowed = ["s2-api-cdn.ecom-stg.samsung.com", "s2-smb-api-cdn.ecom-stg.samsung.com"];
+    return !["GET", "HEAD"].includes(request.method()) && !allowed.includes(new URL(request.url()).hostname)
+      ? route.abort() : route.continue();
+  });
+  return { cdpBrowser, page, buyingToolErrors };
 }
 
 async function returnToPreQaPdp(page) {
@@ -128,9 +111,28 @@ test.use({ screenshot: "off" });
 test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({}, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24969"));
 
-  const { cdpBrowser, page } = await getAuthenticatedPreQaPage();
+  const { cdpBrowser, page, buyingToolErrors } = await getAuthenticatedPreQaPage();
+  const cartUrl = "https://stg2.shop.samsung.com/mx/cart";
+  const quantity = () => page.getByRole("main").locator("cx-cart-item-v2")
+    .filter({ has: page.getByText(PRE_QA_MODEL_CODE, { exact: true }) }).first()
+    .getByRole("textbox", { name: "Quantity", exact: true });
+  let cartCountBefore = 0;
 
   try {
+    await test.step("Bootstrap S2 and read the selected SKU quantity before BC add", async () => {
+      await page.goto("https://stg2.shop.samsung.com/getcookie.html", { waitUntil: "domcontentloaded", timeout: 60000 });
+      await expect(page.getByText(/You can access pages now/i)).toBeVisible({ timeout: 30000 });
+      await page.goto(cartUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+      await expect(page).toHaveURL(cartUrl);
+      await Promise.race([
+        page.getByRole("main").getByRole("textbox", { name: "Quantity", exact: true }).first().waitFor({ timeout: 60000 }),
+        page.getByRole("heading", { name: /carrito.*vac[ií]o|no hay productos/i }).waitFor({ timeout: 60000 }),
+      ]);
+      if (await quantity().count()) {
+        cartCountBefore = Number(await quantity().inputValue());
+        expect(Number.isInteger(cartCountBefore) && cartCountBefore > 0).toBe(true);
+      }
+    });
     await test.step("Open the authenticated PreQA BC product listing", async () => {
       await page.goto(PRE_QA_PLP, { waitUntil: "domcontentloaded", timeout: 60000 });
       await dismissLocationBanner(page);
@@ -145,32 +147,44 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
     });
 
     await test.step("Open the configured Galaxy Z Flip7 PDP from the BC catalog", async () => {
-      await page.getByText("Filtros", { exact: true }).first().scrollIntoViewIfNeeded();
-      await expect(page.getByText(/\d+\s*Resultado/i).first()).toBeVisible({ timeout: 90000 });
       const productCard = page.locator("[role='listitem'].pd21-product-card__item")
         .filter({ has: page.locator(`a.pd21-product-card__name[data-modelcode='${PRE_QA_MODEL_CODE}']`) })
         .first();
-      await productCard.evaluate((card) => card.scrollIntoView({ block: "center" }));
+      // The filter label includes its active count (for example "Filtros (1)").
+      // Readiness is the exact product card rather than incidental filter copy.
       await expect(productCard, "The PreQA BC catalog must render the configured Galaxy Z Flip7 product card.")
         .toBeVisible({ timeout: 60000 });
-      await productCard.getByRole("link", { name: /^Comprar:Galaxy Z Flip7/i }).click();
+      await productCard.scrollIntoViewIfNeeded();
+      const productLink = productCard.locator(`a.pd21-product-card__name[data-modelcode='${PRE_QA_MODEL_CODE}']`);
+      const detailsUrl = new URL(await productLink.getAttribute("href"), PRE_QA_ORIGIN);
+      expect(detailsUrl.origin).toBe(PRE_QA_ORIGIN);
+      await productLink.click();
+      await page.waitForURL(detailsUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
+      const buyingLink = page.locator(`a[href='${PRE_QA_PDP_PATH}']`).filter({ visible: true }).first();
+      const buyingUrl = new URL(await buyingLink.getAttribute("href"), PRE_QA_ORIGIN);
+      expect(buyingUrl.origin).toBe(PRE_QA_ORIGIN);
+      // This link is also handled by the storefront SPA, which renders a shell
+      // without the AEM buying tool. Load its actual catalog URL as a document.
+      await page.goto(buyingUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
 
       await page.waitForURL((url) =>
         url.hostname === "p6-pre-qa2.samsung.com" && url.pathname.includes(PRE_QA_PDP_PATH),
-        { timeout: 60000 }
+        { waitUntil: "domcontentloaded", timeout: 60000 }
       );
       await dismissLocationBanner(page);
       await expect(page.getByText(PRE_QA_PRODUCT_NAME, { exact: true }).filter({ visible: true }).first()).toBeVisible({ timeout: 60000 });
     });
 
-    const cartCountBefore = await readHeaderCartCount(page);
-    expect(cartCountBefore).not.toBeNull();
-    const minicartCountUrl = await resolveObservedMinicartCountUrl(page);
-    const apiCountBefore = await readMinicartCount(page, minicartCountUrl);
     let addResponse;
 
-    await test.step("Add the product and validate the minicart API mutation", async () => {
-      await page.getByRole("button", { name: /No, gracias/i }).first().click();
+    await test.step("Add the BC product and prove its quantity in the S2 cart", async () => {
+      const noTradeIn = page.getByRole("button", { name: /No, gracias/i }).first();
+      const choicesReady = await noTradeIn.waitFor({ state: "visible", timeout: 30000 })
+        .then(() => true, () => false);
+      if (!choicesReady) {
+        throw new Error(`MX PreQA buying tool did not render its required Canje choice before Add to Cart. Observed frontend error signatures: ${JSON.stringify([...buyingToolErrors])}. No Add request was submitted.`);
+      }
+      await noTradeIn.click();
       // Declining Galaxy Canje does not resolve the mandatory Care+ choice.
       // Explicitly opt out so the buying tool enables this product's CTA.
       const noCare = page.getByRole("tab", { name: /Sin protecci[oó]n para mi Galaxy/i });
@@ -182,51 +196,34 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
       const addToCart = await waitForPreQaAddToCart(page, testInfo);
       await expect(addToCart).toHaveAttribute("data-modelcode", PRE_QA_MODEL_CODE);
       await expect(addToCart).toHaveAttribute("canaddtocart", "true");
-      const addResponsePromise = page.waitForResponse((response) =>
-        response.request().method() === "POST" &&
-        new URL(response.url()).pathname.endsWith("/addToCart/multi/"),
-      { timeout: 15000 }).catch(() => null);
+      const addResponsePromise = page.waitForResponse(response => {
+        const url = new URL(response.url());
+        return response.request().method() === "POST" &&
+          ["s2-api-cdn.ecom-stg.samsung.com", "s2-smb-api-cdn.ecom-stg.samsung.com"].includes(url.hostname) &&
+          url.pathname === "/tokocommercewebservices/v2/mx/addToCart/multi/";
+      }, { timeout: 30000 });
       await addToCart.click();
       addResponse = await addResponsePromise;
-      if (addResponse) {
-        expect(addResponse.ok(), "The PreQA Add to Cart request must succeed.").toBe(true);
-      }
-
-      await expect.poll(() => readMinicartCount(page, minicartCountUrl), {
-        timeout: 30000,
-        message: "The PreQA Add to Cart action must increase the observed minicart count.",
-      }).toBeGreaterThan(apiCountBefore);
+      expect(addResponse.ok(), "The actual S2 Add to Cart mutation must succeed.").toBe(true);
+      await expect(page).toHaveURL(cartUrl, { timeout: 60000 });
+      await expect(quantity(), "The intended BC SKU must increase by exactly one.")
+        .toHaveValue(String(cartCountBefore + 1), { timeout: 60000 });
     });
-
-    const cartCountAfter = await readMinicartCount(page, minicartCountUrl);
-
-    await test.step("Return to the PDP and validate the header minicart badge", async () => {
-      await returnToPreQaPdp(page);
-      const badgeUpdated = await expect.poll(() => readHeaderCartCount(page), {
-        timeout: 10000,
-        message: "The PDP minicart badge should refresh after Add to Cart.",
-      }).toBeGreaterThan(cartCountBefore).then(() => true, () => false);
-      if (!badgeUpdated) {
-        await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
-        await dismissLocationBanner(page);
-        // A PDP reload can route through the S2 SystemParking storefront.
-        // Restore the CDP page to PreQA2 before checking its header again.
-        await returnToPreQaPdp(page);
-      }
-      await expect.poll(() => readHeaderCartCount(page), {
-        timeout: 30000,
-        message: "The PreQA PDP header minicart must show the added product after returning from maintenance.",
-      }).toBeGreaterThan(cartCountBefore);
+    await test.step("Reload the S2 cart and validate the added SKU persists", async () => {
+      await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+      await expect(page).toHaveURL(cartUrl);
+      await expect(quantity()).toHaveValue(String(cartCountBefore + 1), { timeout: 60000 });
     });
+    const cartCountAfter = cartCountBefore + 1;
 
     recordBusinessEvidence(testInfo, {
-      source: "PreQA PLP -> PDP",
+      source: "PreQA PLP -> PDP -> S2 cart",
       plpPath: "/mx/smartphones/all-smartphones/",
       pdpPath: PRE_QA_PDP_PATH,
       modelCode: PRE_QA_MODEL_CODE,
       cdpUrl: PRE_QA_CDP_URL,
-      cartCountBefore,
-      cartCountAfter,
+      skuQuantityBefore: cartCountBefore,
+      skuQuantityAfter: cartCountAfter,
       addToCartStatus: addResponse?.status() ?? null,
       addedFromPdp: true,
       careProtectionDeclined: true,
