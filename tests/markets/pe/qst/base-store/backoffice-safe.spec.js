@@ -84,7 +84,7 @@ test.describe("PE QST - BackOffice official coverage", () => {
 
   test("SAM-25104 @qst @pe @base-store @backoffice @safe @reuse - Order Process Shipping Requested baseline", async ({ page }, testInfo) => {
     const credentials = requirePeBackOffice(testInfo, "SAM-25104");
-    const testData = getPeBackofficeTestData();
+    const testData = getPeBackofficeTestData(process.env, { shippingRequested: true });
 
     const orders = new BackOfficeSearchPage(page);
     await test.step("Authenticate in shared environment BackOffice as Admin", async () => {

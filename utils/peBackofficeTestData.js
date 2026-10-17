@@ -5,18 +5,23 @@ const PE_BACKOFFICE_TEST_DATA = Object.freeze({
     productCode: "SM-F741BLBKPEO",
   }),
   S2: Object.freeze({
-    orderCode: "PE261016-78670136",
+    orderCode: "PE260926-77211976",
+    shippingOrderCode: "PE261016-78670136",
     productCode: "SM-F741BLBKPEO",
   }),
 });
 
-function getPeBackofficeTestData(environment = process.env) {
+function getPeBackofficeTestData(environment = process.env, { shippingRequested = false } = {}) {
   const target = String(environment.PE_QST_ENVIRONMENT || environment.BACKOFFICE_ENV || "S2").toUpperCase();
   const defaults = PE_BACKOFFICE_TEST_DATA[target] || {};
 
   const orderCode = String(
+    (shippingRequested && (
+      environment[`PE_QST_${target}_SHIPPING_ORDER_CODE`] || environment.PE_QST_SHIPPING_ORDER_CODE
+    )) ||
     environment[`PE_QST_${target}_ORDER_CODE`] ||
     environment.PE_QST_ORDER_CODE ||
+    (shippingRequested && defaults.shippingOrderCode) ||
     defaults.orderCode ||
     ""
   ).trim();
