@@ -143,14 +143,9 @@ export default class PaymentPage extends BasePage {
 
     await paymentMode.waitFor({ state: "visible", timeout: 90000 });
     await paymentMode.scrollIntoViewIfNeeded();
-    await paymentMode.click();
-
-    const expanded = await paymentMode.getAttribute("aria-expanded");
-    if (expanded !== "true") {
-      throw new Error(
-        `Payment mode did not become selected. aria-expanded: ${expanded ?? "missing"}`
-      );
-    }
+    if ((await paymentMode.getAttribute("aria-expanded")) !== "true") await paymentMode.click();
+    await expect(paymentMode, "Payment mode must finish expanding before its form is used")
+      .toHaveAttribute("aria-expanded", "true", { timeout: 30000 });
 
     await this.screenshot(screenshotName);
 
@@ -324,11 +319,11 @@ export default class PaymentPage extends BasePage {
   }
 
   async selectCreditCard() {
-    await this.creditCardOption.click();
-
     if ((await this.creditCardOption.getAttribute("aria-expanded")) !== "true") {
-      throw new Error("Credit/Debit Card did not become the selected payment mode.");
+      await this.creditCardOption.click();
     }
+    await expect(this.creditCardOption, "Credit/Debit Card must finish expanding before its form is used")
+      .toHaveAttribute("aria-expanded", "true", { timeout: 30000 });
 
     const newPaymentMethod = this.page.getByRole("radio", {
       name: "Nuevo método de pago",

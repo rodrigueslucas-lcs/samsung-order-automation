@@ -523,15 +523,11 @@ export default class CartPage extends BasePage {
 
       name: "Tienda",
 
-      level: 2,
-
     });
 
     const productos = footer.getByRole("heading", {
 
       name: "Productos",
-
-      level: 2,
 
     });
 
@@ -539,15 +535,11 @@ export default class CartPage extends BasePage {
 
       name: "Soporte",
 
-      level: 2,
-
     });
 
     const cuenta = footer.getByRole("heading", {
 
       name: this.footerAccountPattern,
-
-      level: 2,
 
     });
 

@@ -9,12 +9,14 @@ const source = fs.readFileSync(path.join(__dirname, '../../pages/CheckoutPage.js
   .replace('export default class CheckoutPage', 'class CheckoutPage');
 const CheckoutPage = vm.runInNewContext(`${source}\nCheckoutPage;`, { BasePage: class {} });
 
-function scenario({ direct = false, disappear = false, clickFails = false, checked = true } = {}) {
+function scenario({ direct = false, disappear = false, clickFails = false, checked = true, headingVisible = true } = {}) {
   let radioVisible = !direct;
   let formVisible = direct;
   let clicks = 0;
   const failure = new Error('Radio click failed');
   const form = {
+    filter() { return this; },
+    first() { return this; },
     isVisible: async () => formVisible,
     waitFor: async () => { assert.equal(formVisible, true, 'new-address form must actually be ready'); },
   };
@@ -29,7 +31,12 @@ function scenario({ direct = false, disappear = false, clickFails = false, check
       formVisible = checked;
     } }),
   };
-  const panel = { waitFor: async () => {}, getByRole: role => role === 'radio' ? radio : form };
+  const panel = { waitFor: async () => {}, getByRole: role => {
+    if (role === 'radio') return radio;
+    if (role === 'heading') return { isVisible: async () => headingVisible, waitFor: async () => {} };
+    assert.equal(role, 'combobox');
+    return form;
+  } };
   const checkout = Object.create(CheckoutPage.prototype);
   checkout.page = { getByRole: () => panel };
   return { run: () => checkout.selectNewAuthenticatedAddress(), clicks: () => clicks, failure };
@@ -51,6 +58,12 @@ test('PE still selects the new-address radio when saved-address mode remains', a
   const s = scenario();
   await s.run();
   assert.equal(s.clicks(), 1);
+});
+
+test('PE shared address heading does not count as an editable new-address form', async () => {
+  const s = scenario({ headingVisible: true });
+  await s.run();
+  assert.equal(s.clicks(), 1, 'saved mode must switch even when its section heading is visible');
 });
 
 test('PE does not swallow an unrelated click failure', async () => {

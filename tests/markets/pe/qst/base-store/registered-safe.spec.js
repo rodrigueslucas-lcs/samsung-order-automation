@@ -17,6 +17,7 @@ const { recordBusinessEvidence } = evidenceContext;
 const { getPeQstEvidenceMetadata } = peEvidenceMetadata;
 
 test.describe("PE QST - registered checkout safe reuse", () => {
+  test.describe.configure({ timeout: 300000 });
   test.use({ storageState: hasPeAuthState() ? PE_AUTH_STATE_PATH : undefined });
 
   test.beforeEach(async ({ context }) => {

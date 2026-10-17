@@ -160,7 +160,10 @@ export default class CheckoutPage extends BasePage {
       name: "Nueva dirección",
       exact: true,
     });
-    const addressForm = deliveryPanel.getByRole("heading", { name: "Completa tu dirección de entrega", exact: true });
+    // The section heading also exists in saved-address mode. Only an editable
+    // address field proves that the new-address form has actually opened.
+    const addressForm = deliveryPanel.getByRole("combobox", { name: /departamento/i })
+      .filter({ visible: true }).first();
     await newAddress.or(addressForm).first().waitFor({ state: "visible", timeout: 30000 });
     if (!(await addressForm.isVisible()) && await newAddress.isVisible()) {
       try {

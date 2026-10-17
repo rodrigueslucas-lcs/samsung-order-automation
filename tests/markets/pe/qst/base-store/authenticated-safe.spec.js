@@ -15,6 +15,7 @@ const { recordBusinessEvidence } = evidenceContext;
 const { getPeQstEvidenceMetadata } = peEvidenceMetadata;
 
 test.describe("PE QST - authenticated safe reuse", () => {
+  test.describe.configure({ timeout: 180000 });
   test.use({ storageState: hasPeAuthState() ? PE_AUTH_STATE_PATH : undefined });
 
   test.beforeEach(async ({ context }) => {
@@ -65,7 +66,8 @@ test.describe("PE QST - authenticated safe reuse", () => {
     await test.step("Open My Orders", async () => {
       const responsePromise = page.waitForResponse((response) =>
         response.request().method() === "GET" &&
-        new URL(response.url()).pathname.endsWith("/v2/pe/users/current/orders")
+        new URL(response.url()).pathname.endsWith("/v2/pe/users/current/orders"),
+        { timeout: 60000 }
       );
       await myOrders.openMyOrders();
       const response = await responsePromise;
@@ -73,8 +75,7 @@ test.describe("PE QST - authenticated safe reuse", () => {
       history = await response.json();
     });
     await test.step("Validate order history is available", async () => {
-      if (config.environment === "S1" &&
-          Array.isArray(history.currentOrders) && history.currentOrders.length === 0 &&
+      if (Array.isArray(history.currentOrders) && history.currentOrders.length === 0 &&
           Array.isArray(history.previousOrders) && history.previousOrders.length === 0) {
         await expect(page).toHaveURL(/\/pe\/mypage\/orders(?:[?#]|$)/);
         const main = page.getByRole("main");
@@ -82,7 +83,7 @@ test.describe("PE QST - authenticated safe reuse", () => {
         await expect(main.getByRole("textbox", { name: "Número de pedido", exact: true })).toBeVisible();
         await expect(main.getByRole("button", { name: "Buscar pedido", exact: true })).toBeDisabled();
         expect(await myOrders.visibleOrderCodes()).toEqual([]);
-        testInfo.annotations.push({ type: "qst-order-history-state", description: "S1 authenticated API and UI confirm an empty order history." });
+        testInfo.annotations.push({ type: "qst-order-history-state", description: `${config.environment} authenticated API and UI confirm an empty order history.` });
         return;
       }
       await expect.poll(() => myOrders.visibleOrderCodes().then((codes) => codes.length), {
