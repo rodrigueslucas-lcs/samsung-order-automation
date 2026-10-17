@@ -204,18 +204,19 @@ async function validateControlledCartUi(page, config) {
 export async function openMxQstPdp(page, config) {
   await bootstrapMx(page, config);
   await test.step("Open controlled MX product detail page", async () => {
-    await page.goto(config.pdpUrl.toString(), { waitUntil: "domcontentloaded", timeout: 60000 });
+    // S2 product responses can exceed 60s. A DOM-only 30s check followed by
+    // reload cancels the still-pending request and starts the same race again.
+    const productResponse = page.waitForResponse(response =>
+      response.request().method() === "GET" &&
+      new URL(response.url()).pathname === `/tokocommercewebservices/v2/mx/products/${config.sku}`,
+    { timeout: 90000 });
+    const [response] = await Promise.all([
+      productResponse,
+      page.goto(config.pdpUrl.toString(), { waitUntil: "domcontentloaded", timeout: 60000 }),
+    ]);
+    expect(response.status(), "The configured MX product service must succeed before validating its PDP.").toBe(200);
     await expect(page).toHaveURL(new RegExp(`/mx/p/${config.sku}`, "i"));
     const sku = page.getByText(config.sku, { exact: true }).first();
-    const loaded = await sku.waitFor({ state: "visible", timeout: 30000 }).then(() => true).catch(() => false);
-    if (!loaded) {
-      const hasProductAction = await page.getByRole("button", { name: /^(Comprar|Agregar al carrito|Add to cart)$/i })
-        .first().isVisible().catch(() => false);
-      if (!hasProductAction) {
-        await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
-        await expect(page).toHaveURL(new RegExp(`/mx/p/${config.sku}`, "i"));
-      }
-    }
     await expect(sku).toBeVisible({ timeout: 60000 });
   });
 }

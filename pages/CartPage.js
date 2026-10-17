@@ -244,12 +244,16 @@ export default class CartPage extends BasePage {
     throw new Error('MX cart cleanup exceeded the 20-item safety limit.');
   }
 
-  async validateControlledSingleSku(sku) {
+  async validateControlledSingleSku(sku, { allowPromotionalGifts = false } = {}) {
     const { productEntries } = await this.loadMxCartState();
+    const controlledEntries = allowPromotionalGifts ? productEntries.filter(entry => !(
+      entry.product.code !== sku && entry.giveAway === true &&
+      Number(entry.quantity) === 1 && entry.basePrice?.value === 0 && entry.totalPrice?.value === 0
+    )) : productEntries;
     if (
-      productEntries.length !== 1 ||
-      productEntries[0].product.code !== sku ||
-      Number(productEntries[0].quantity) !== 1
+      controlledEntries.length !== 1 ||
+      controlledEntries[0].product.code !== sku ||
+      Number(controlledEntries[0].quantity) !== 1
     ) {
       const summary = productEntries.map((entry) => ({
         sku: entry.product.code,

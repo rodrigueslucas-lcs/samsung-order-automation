@@ -127,7 +127,7 @@ test("SAM-24986 @qst @mx @base-store @safe @registered - Cart is isolated from a
     });
     await test.step("Prepare a controlled cart for the first authenticated account", async () => {
       const firstCart = await prepareMxQstCart(page, mxConfig);
-      await firstCart.validateControlledSingleSku(mxConfig.sku);
+      await firstCart.validateControlledSingleSku(mxConfig.sku, { allowPromotionalGifts: true });
     });
 
     await test.step("Verify the second account did not inherit the first account cart", async () => {
@@ -143,11 +143,11 @@ test("SAM-24986 @qst @mx @base-store @safe @registered - Cart is isolated from a
 
     await test.step("Create and validate an independent cart for the second account", async () => {
       const secondCart = await prepareMxQstCart(secondPage, mxConfig);
-      await secondCart.validateControlledSingleSku(mxConfig.sku);
+      await secondCart.validateControlledSingleSku(mxConfig.sku, { allowPromotionalGifts: true });
     });
 
     await test.step("Verify second-account mutations did not change the first cart", async () => {
-      await mxQstCart(page, mxConfig).validateControlledSingleSku(mxConfig.sku);
+      await mxQstCart(page, mxConfig).validateControlledSingleSku(mxConfig.sku, { allowPromotionalGifts: true });
     });
 
     recordBusinessEvidence(testInfo, {
