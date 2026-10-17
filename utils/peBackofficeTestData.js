@@ -5,7 +5,7 @@ const PE_BACKOFFICE_TEST_DATA = Object.freeze({
     productCode: "SM-F741BLBKPEO",
   }),
   S2: Object.freeze({
-    orderCode: "PE260926-77211976",
+    orderCode: "PE261016-78670136",
     productCode: "SM-F741BLBKPEO",
   }),
 });

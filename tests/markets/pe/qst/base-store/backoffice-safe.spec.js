@@ -95,7 +95,8 @@ test.describe("PE QST - BackOffice official coverage", () => {
       await orders.openAdminOrders();
     });
     const status = await test.step("Open target PE order and validate Shipping Requested", async () => {
-      await orders.openAdminOrderByCode(testData.orderCode);
+      const row = await orders.searchAdminOrderAdvanced(testData.orderCode);
+      await orders.openAdminOrderByCode(testData.orderCode, row);
       const currentStatus = await orders.readOpenAdminOrderStatus(testData.orderCode);
       expect(currentStatus.replace(/_/g, " ").trim().toLowerCase()).toBe("shipping requested");
       return currentStatus;
