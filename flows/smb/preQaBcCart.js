@@ -30,6 +30,7 @@ export async function addProductFromPreQaBc({ market, sku, plpPath, testInfo }) 
       await expect(page).toHaveURL(plp.href, { timeout: 30000 });
       const card = page.locator('[role="listitem"].pd21-product-card__item')
         .filter({ has: page.locator(`a.pd21-product-card__name[data-modelcode="${sku}"]`) }).first();
+      await card.scrollIntoViewIfNeeded({ timeout: 60000 });
       await expect(card).toBeVisible({ timeout: 60000 });
       const product = card.locator(`a.pd21-product-card__name[data-modelcode="${sku}"]`).first();
       const destination = new URL(await product.getAttribute("href"), plp);

@@ -1,4 +1,4 @@
-import { test as base, expect } from "@playwright/test";
+import { test as base, expect, chromium } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import HomePage from "../../../../../pages/HomePage";
@@ -67,6 +67,8 @@ async function authenticatedPage(browser,cfg,{desktopProfile=false}={}){
     page=await context.newPage();
   }
   await home(page,cfg);
+  await page.keyboard.press("Escape");
+  await page.mouse.move(0,0);
   return {context,page};
 }
 async function cart(page,cfg){const c=await addConfiguredProductToCoCart(page,cfg);await c.validateProductInCart();return c;}
@@ -223,8 +225,17 @@ async function coSelectOption(page,delivery,name,option){
   await coClick(page,page.getByRole("option",{name:option,exact:true}));
 }
 async function coFillNewShipping(page,delivery,secondaryNumber="113-43"){
-  const newAddressMode=delivery.locator('input[name="addressOptionShipping"][value="NEW_ADDRESS"]');
-  if(await newAddressMode.isEnabled().catch(()=>false))await coSelectAddressMode(page,delivery,"Shipping","NEW_ADDRESS");
+  const department=delivery.locator('mat-select[name="regionIso"]');
+  const radio=delivery.locator('input[name="addressOptionShipping"][value="NEW_ADDRESS"]');
+  await Promise.race([
+    department.waitFor({state:"visible",timeout:30000}),
+    radio.waitFor({state:"visible",timeout:30000}),
+  ]);
+  if(!await department.isVisible()){
+    try{await coSelectAddressMode(page,delivery,"Shipping","NEW_ADDRESS");}
+    catch(error){if(!await department.isVisible())throw error;}
+  }
+  await expect(department).toBeVisible({timeout:30000});
   for(const [field,option] of [["regionIso","Bogota, D.C."],["town","BOGOTA, D.C."],["line2_a","Carrera"],["line1","Oficina"]]){
     await coSelectOption(page,delivery,field,option);
   }
@@ -312,7 +323,38 @@ test("SAM-24874 @qst @co @base-store @registered - Validate My account menu",asy
   } finally {await context.close();}
 });
 test("SAM-24875 @qst @co @base-store @safe - GNB menu",async({page},i)=>{evidence(i,"SAM-24875");const c=getCoQstConfig();await home(page,c);await expect(page.locator("header").first()).toBeVisible();await expect(page.locator("header a").first()).toBeVisible();});
-test("SAM-24879 @qst @co @base-store @safe - Facets Filter on PLP",async({page},i)=>{evidence(i,"SAM-24879");const c=getCoQstConfig();await home(page,c);const nav=page.getByRole("link",{name:/Galaxy|Smartphone|TV|Televisores/i}).filter({visible:true}).first();await nav.click();await expect(page.getByText(/Filtrar|Filtro|Filter/i).filter({visible:true}).first()).toBeVisible({timeout:60000});});
+test("SAM-24879 @qst @co @base-store @safe - Facets Filter on PLP",async({},i)=>{
+  evidence(i,"SAM-24879");
+  const browser=await chromium.connectOverCDP(process.env.PREQA2_CDP_URL||"http://127.0.0.1:9223");
+  const page=await browser.contexts()[0].newPage();
+  try{
+    let initialCount;
+    const results=page.getByText(/^\d+\s+resultados?$/i).filter({visible:true}).first();
+    await test.step("Open CO PreQA PLP and prove the unfiltered catalog",async()=>{
+      await page.goto("https://p6-pre-qa2.samsung.com/co/refrigerators/all-refrigerators/",{waitUntil:"domcontentloaded",timeout:60000});
+      await expect(page).toHaveURL(/p6-pre-qa2\.samsung\.com\/co\/refrigerators\/all-refrigerators\//);
+      const product=page.locator(`a.pd21-product-card__name[data-modelcode="${getCoQstConfig().sku}"]`).first();
+      await product.scrollIntoViewIfNeeded({timeout:60000});
+      await expect(product).toBeVisible({timeout:60000});
+      await expect(results).toBeVisible({timeout:60000});
+      initialCount=Number((await results.innerText()).match(/\d+/)?.[0]);
+      expect(initialCount).toBeGreaterThan(0);
+    });
+    await test.step("Apply the refrigerator type facet and prove fewer matching products",async()=>{
+      await page.getByRole("button",{name:"Tipo",exact:true}).click();
+      const facet=page.locator('input.checkbox-v3__input[data-reg-name="french-door"]');
+      const id=await facet.getAttribute("id");
+      await page.locator(`label[for="${id}"]`).click();
+      await expect(facet).toBeChecked();
+      await expect(page).toHaveURL(/\/co\/refrigerators\/all-refrigerators\/\?[^#]*french-door/i);
+      await expect.poll(async()=>Number((await results.innerText()).match(/\d+/)?.[0]),{timeout:60000}).toBeLessThan(initialCount);
+      const filteredCount=Number((await results.innerText()).match(/\d+/)?.[0]);
+      expect(filteredCount).toBeGreaterThan(0);
+      recordBusinessEvidence(i,{source:"PreQA CO refrigerator PLP",facet:"french-door",initialCount,filteredCount});
+      await i.attach("co-plp-filtered",{body:await page.screenshot({fullPage:false}),contentType:"image/png"});
+    });
+  }finally{await page.close();await browser.close();}
+});
 async function runCanonicalCase(id,page,info){evidence(info,id);const cfg=getCoQstConfig();
 if(id==="SAM-24920"){process.env.BACKOFFICE_ENV=cfg.environment.toLowerCase();const credentials=getBackOfficeAdminCredentials();test.skip(!credentials.password,"Shared environment-scoped BackOffice credentials are required.");const orders=new BackOfficeOrderPage(page);await orders.login({...credentials,authority:"admin"});await orders.openAdminOrders();const order=await orders.openFirstAdminOrderAndReadStatus();expect(order.orderCode).toBeTruthy();expect(order.status).toBeTruthy();return;}
 if(id==="SAM-24912"){
@@ -490,7 +532,7 @@ test("SAM-24896 @qst @co @base-store @registered - Cart value when Reg user logs
     await page.waitForURL(cfg.cartUrl.href,{waitUntil:"domcontentloaded",timeout:60000});
     await page.getByRole("button",{name:"My Profile",exact:true}).hover();
     const signedOutMenu=page.locator('[role="menu"].profile-menu');
-    await expect(signedOutMenu.locator('a[data-an-la="login"]'),"CO logout must render the signed-out profile action.").toBeVisible({timeout:30000});
+    await expect(signedOutMenu.locator('[data-an-la="login"]'),"CO logout must render the signed-out profile action.").toBeVisible({timeout:30000});
     await expect(signedOutMenu.getByText(/Cerrar Sesi[oó]n/i)).toHaveCount(0);
     await page.keyboard.press("Escape");
     await expect(page.getByText(cfg.sku,{exact:true}).first()).toBeVisible({timeout:30000});
