@@ -2,6 +2,7 @@ import { chromium } from "@playwright/test";
 import evidenceContext from "../../../../../reporting/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import { test, expect } from "./mxQst.fixture";
+import preQaCustomerState from "../../../../../utils/preQaCustomerState.js";
 
 const { recordBusinessEvidence } = evidenceContext;
 const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
@@ -29,9 +30,18 @@ async function getAuthenticatedPreQaPage() {
     throw new Error(`No Chrome context found at ${PRE_QA_CDP_URL}. Keep the authenticated PreQA2 bootstrap Chrome open.`);
   }
 
-  const context = contexts[0];
-  const page = await context.newPage();
+  // Reuse the authorized persistent Chrome as other BC market flows do, while
+  // resetting the incompatible AEM display-profile cache before scripts run.
+  const page = await preQaCustomerState.preparePreQaCustomerPage(contexts[0]);
   const buyingToolErrors = new Set();
+  const careServiceStatuses = [];
+  page.on("response", response => {
+    const url = new URL(response.url());
+    if (url.hostname === "stg2.shop.samsung.com" && url.pathname === "/mx/servicesv2/getSmcSimpleInfo") {
+      careServiceStatuses.push(response.status());
+      if (careServiceStatuses.length > 10) careServiceStatuses.shift();
+    }
+  });
   page.on("pageerror", error => {
     // Keep only known, non-sensitive frontend signatures in the evidence.
     for (const key of ["rewardsGrid", "checkSignIn"]) {
@@ -45,7 +55,7 @@ async function getAuthenticatedPreQaPage() {
     return !["GET", "HEAD"].includes(request.method()) && !allowed.includes(new URL(request.url()).hostname)
       ? route.abort() : route.continue();
   });
-  return { cdpBrowser, page, buyingToolErrors };
+  return { cdpBrowser, page, buyingToolErrors, careServiceStatuses };
 }
 
 async function returnToPreQaPdp(page) {
@@ -111,7 +121,7 @@ test.use({ screenshot: "off" });
 test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({}, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24969"));
 
-  const { cdpBrowser, page, buyingToolErrors } = await getAuthenticatedPreQaPage();
+  const { cdpBrowser, page, buyingToolErrors, careServiceStatuses } = await getAuthenticatedPreQaPage();
   const cartUrl = "https://stg2.shop.samsung.com/mx/cart";
   const quantity = () => page.getByRole("main").locator("cx-cart-item-v2")
     .filter({ has: page.getByText(PRE_QA_MODEL_CODE, { exact: true }) }).first()
@@ -184,12 +194,28 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
       if (!choicesReady) {
         throw new Error(`MX PreQA buying tool did not render its required Canje choice before Add to Cart. Observed frontend error signatures: ${JSON.stringify([...buyingToolErrors])}. No Add request was submitted.`);
       }
+      await page.waitForLoadState("load", { timeout: 60000 });
       await noTradeIn.click();
+      const tradeSelected = await expect(noTradeIn).toHaveAttribute("aria-selected", "true", { timeout: 15000 })
+        .then(() => true, () => false);
+      if (!tradeSelected) await noTradeIn.click();
+      await expect(noTradeIn, "The Galaxy Canje opt-out must actually be selected.")
+        .toHaveAttribute("aria-selected", "true", { timeout: 30000 });
       // Declining Galaxy Canje does not resolve the mandatory Care+ choice.
       // Explicitly opt out so the buying tool enables this product's CTA.
       const noCare = page.getByRole("tab", { name: /Sin protecci[oó]n para mi Galaxy/i });
-      await expect(noCare).toBeVisible({ timeout: 30000 });
+      await expect(noCare,
+        `Care+ choice must render before Add. S2 /mx/servicesv2/getSmcSimpleInfo HTTP statuses: ${JSON.stringify(careServiceStatuses)}`)
+        .toBeVisible({ timeout: 30000 });
       await noCare.click();
+      const careChoice = noCare.locator("xpath=..");
+      // Asynchronous service rendering can replace the choice. Retry only the
+      // optional selection once, before any Add mutation is submitted.
+      const selected = await expect(careChoice).toHaveClass(/\bis-checked\b/, { timeout: 5000 })
+        .then(() => true, () => false);
+      if (!selected) await noCare.click();
+      await expect(careChoice, "The Care+ opt-out must actually be selected.")
+        .toHaveClass(/\bis-checked\b/, { timeout: 30000 });
       await expect(page.locator('[canaddtocart="true"]').filter({ visible: true }).first(),
         "The configured PreQA product must become purchasable after declining Galaxy Canje and Care+.")
         .toBeVisible({ timeout: 30000 });
