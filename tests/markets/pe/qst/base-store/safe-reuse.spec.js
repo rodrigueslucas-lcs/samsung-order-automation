@@ -216,8 +216,11 @@ test("SAM-25090 @qst @pe @base-store @safe @guest @reuse - Validate home deliver
   await test.step("Fill delivery address", () => checkout.fillAddress(testData.address));
   const delivery = page.getByRole("tabpanel", { name: "Envío", exact: true })
     .filter({ visible: true })
-    .getByRole("listitem").filter({ hasText: /Para envíos a provincias/i });
+    .getByRole("listitem").filter({ hasText: /Para envíos a provincias/i })
+    .filter({ visible: true });
   await test.step("Select province home delivery", async () => {
+    await expect(delivery, "The active shipping panel must finish replacing its delivery options before selection.")
+      .toHaveCount(1, { timeout: 30000 });
     await expect(delivery).toBeVisible({ timeout: 30000 });
     await delivery.click();
   });

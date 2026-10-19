@@ -21,10 +21,34 @@ export default class CheckoutPage extends BasePage {
     });
   }
 
+  async waitForPeCustomerForm() {
+    const url = new URL(this.page.url());
+    if (!['stg.shop.samsung.com', 'stg2.shop.samsung.com'].includes(url.hostname) ||
+        !url.pathname.startsWith('/pe/')) return;
+    if (await this.firstNameInput.isVisible()) return;
+    const apiHost = url.hostname === 'stg2.shop.samsung.com'
+      ? 's2-smb-api-cdn.ecom-stg.samsung.com' : 's1-smb-api-cdn.ecom-stg.samsung.com';
+    const visible = this.firstNameInput.waitFor({ state: 'visible', timeout: 90000 });
+    const form = this.page.waitForResponse(response => {
+      const resource = new URL(response.url());
+      return resource.protocol === 'https:' && resource.hostname === apiHost &&
+        resource.pathname === '/tokocommercewebservices/v2/pe/dynamicforms/CHECKOUT_CUSTOMER_INFO' &&
+        response.request().method() === 'GET';
+    }, { timeout: 90000 }).then(async response => {
+      if (!response.ok()) throw new Error(`PE customer contact form service returned HTTP ${response.status()}.`);
+      await response.body();
+    });
+    // The checkout shell/route can render before its dynamic form has arrived.
+    // Wait for the actual form without reloading or submitting customer data twice.
+    await Promise.race([visible, form]);
+    await visible;
+  }
+
   async fillCustomerData(customer) {
     await this.page.waitForURL(/CHECKOUT_STEP_CONTACT_INFO/, {
       timeout: 30000,
     });
+    await this.waitForPeCustomerForm();
     for (let attempt = 0; attempt < 2; attempt += 1) {
       await this.firstNameInput.fill(customer.firstName);
       await this.lastNameInput.fill(customer.lastName);
