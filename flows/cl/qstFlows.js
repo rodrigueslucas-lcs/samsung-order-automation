@@ -16,8 +16,31 @@ export async function bootstrapClStorefront(page, config) {
         .catch(() => {});
     }
     await page.goto(config.baseUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
-    await page.getByRole("button", { name: "My Profile", exact: true })
-      .waitFor({ state: "visible", timeout: 60000 });
+    const profile = page.getByRole("button", { name: "My Profile", exact: true })
+      .or(page.locator('button[data-an-la="L0_13_login"], button.nv00-gnb-v4__utility-user'))
+      .filter({ visible: true }).first();
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await profile.waitFor({ state: "visible", timeout: 60000 });
+        return;
+      } catch (error) {
+        const current = new URL(page.url());
+        const main = page.getByRole("main");
+        const banner = page.getByRole("banner");
+        const empty = async locator => await locator.count() === 1 &&
+          !(await locator.innerText()).trim();
+        const body = await page.locator("body").innerText().catch(() => "unavailable");
+        const blankShell = current.origin === config.baseUrl.origin &&
+          /^stg2?\.shop\.samsung\.com$/.test(current.hostname) &&
+          current.pathname.replace(/\/+$/, "") === config.baseUrl.pathname.replace(/\/+$/, "") &&
+          await empty(main) && await empty(banner) &&
+          !body.replace(/Skip to (?:Header|Main Content|Footer)/g, "").trim();
+        if (attempt || !blankShell) throw error;
+        // Only an empty home shell is recoverable here, before any cart or
+        // address mutation. Login/error/content pages must keep their failure.
+        await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
+      }
+    }
   });
 }
 

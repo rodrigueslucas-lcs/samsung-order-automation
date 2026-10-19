@@ -168,6 +168,24 @@ export default class ProfilePage extends MyAccountPage {
     };
   }
 
+  async saveClQaAddress(save, dialog) {
+    const target = new URL(this.origin).hostname;
+    const environment = target === "stg2.shop.samsung.com" ? "s2"
+      : target === "stg.shop.samsung.com" ? "s1" : null;
+    if (this.market !== "cl" || !environment) throw new Error("CL address save requires its staging origin.");
+    const hosts = new Set([`${environment}-api-cdn.ecom-stg.samsung.com`, `${environment}-smb-api-cdn.ecom-stg.samsung.com`]);
+    const pending = this.page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.protocol === "https:" && hosts.has(url.hostname) &&
+        /\/tokocommercewebservices\/v2\/cl\/users\/[^/]+\/addresses(?:\/[^/]+)?$/.test(url.pathname) &&
+        ["POST", "PUT", "PATCH"].includes(response.request().method());
+    }, { timeout: 120000 });
+    const [response] = await Promise.all([pending, save.click()]);
+    if (!response.ok()) throw new Error(`CL address save returned HTTP ${response.status()}; no automatic resubmit.`);
+    if (await response.finished()) throw new Error("CL address save response was interrupted; no automatic resubmit.");
+    await expect(dialog).toBeHidden({ timeout: 30000 });
+  }
+
   async createQaAddress(address) {
     if (!address.street.startsWith(this.qaMarker)) {
       throw new Error("Refusing to create an address without the QA AUTOMATION marker.");
@@ -196,12 +214,12 @@ export default class ProfilePage extends MyAccountPage {
         })));
       throw new Error(`CL address form rejected QA data; invalid fields=${JSON.stringify(invalid)}`);
     }
-    await save.click();
     if (this.market === "cl") {
-      await expect(this.page.locator("app-address-form-dialog")).toBeHidden({ timeout: 30000 });
+      await this.saveClQaAddress(save, this.page.locator("app-address-form-dialog"));
       await this.expectQaAddress(address.street);
       return;
     }
+    await save.click();
     if (this.market === "pe") {
       await expect(this.page.getByRole("dialog", { name: "Añadir nueva dirección" }).first()).toBeHidden({ timeout: 30000 });
       await this.page.reload({ waitUntil: "domcontentloaded" });
@@ -215,15 +233,17 @@ export default class ProfilePage extends MyAccountPage {
     const card = await this.qaCard(currentMarker);
     await card.getByRole("button", { name: /Editar|Edit/i }).click();
     await this.fillAddressForm(updatedAddress);
-    await (this.market === "cl"
+    const save = this.market === "cl"
       ? this.page.getByRole("dialog", { name: /Editar direcci[oó]n/i }).last().getByRole("button", { name: "Guardar", exact: true })
       : this.market === "pe"
       ? this.page.getByRole("dialog", { name: /direcci[oó]n/i }).filter({ visible: true }).getByRole("button", { name: /^(Guardar|Actualizar|Save|Update)$/i })
-      : this.page.getByRole("button", { name: /Guardar|Actualizar|Save|Update/i })).click();
+      : this.page.getByRole("button", { name: /Guardar|Actualizar|Save|Update/i });
     if (this.market === "cl") {
+      await this.saveClQaAddress(save, this.page.locator("app-address-form-dialog"));
       await this.expectQaAddress(updatedAddress.street);
       return;
     }
+    await save.click();
     if (this.market !== "pe") await this.expectAddressNotification(/actualiz|editad|guardad|success/i);
     await this.expectQaAddress(updatedAddress.street);
   }
