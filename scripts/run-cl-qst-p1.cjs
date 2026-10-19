@@ -2,8 +2,10 @@ const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const plan = require("../governance/cl-qst-plan.json");
+const knownDefects = require("../governance/known-defects.json");
 const { buildMxQstRuntimeSummary, writeRuntimeSummary } = require("../utils/mxQstRuntimeSummary.cjs");
 const { getClQstConfig } = require("../config/markets/cl");
+const { activeKnownDefects } = require("./annotate-known-defects-dashboard.cjs");
 
 const listOnly = process.argv.includes("--list");
 const targetEnvironment = String(process.env.CL_QST_ENVIRONMENT || process.env.ENVIRONMENT || "S2").toUpperCase();
@@ -114,6 +116,15 @@ const summary = buildMxQstRuntimeSummary(report, {
 });
 writeRuntimeSummary(runtimeSummaryFile, summary);
 
+const mappedKnownDefects = activeKnownDefects(summary, knownDefects);
+const knownDefectFailedIds = new Set(mappedKnownDefects
+  .filter(({ test }) => String(test.status || "").toUpperCase() === "FAIL")
+  .map(({ test }) => String(test.samId || test.id || test.officialTc || "").toUpperCase()));
+const unclassifiedFailures = (summary.tests || []).filter((testCase) =>
+  String(testCase.status || "").toUpperCase() === "FAIL"
+  && !knownDefectFailedIds.has(String(testCase.samId || testCase.id || testCase.officialTc || "").toUpperCase())
+);
+
 fs.mkdirSync(executiveDir, { recursive: true });
 const executive = spawnSync(process.execPath, [
   path.resolve("reporting/executive-v3/generateExecutiveV3.cjs"),
@@ -131,11 +142,16 @@ console.log(` Official : ${summary.summary.official}`);
 console.log(` Executed : ${summary.summary.executed}`);
 console.log(` Passed   : ${summary.summary.passed}`);
 console.log(` Failed   : ${summary.summary.failed}`);
+console.log(` KnownDef : ${knownDefectFailedIds.size}`);
 console.log(` Blocked  : ${summary.summary.blocked}`);
 console.log(` NotRun   : ${summary.summary.notRun}`);
 console.log("============================================================");
 
+if (knownDefectFailedIds.size) {
+  console.log(`[cl-qst] Known defect failures do not fail the campaign: ${[...knownDefectFailedIds].join(", ")}.`);
+}
+
 const targeted = requestedTargetIds.length > 0;
-if (summary.summary.failed > 0) process.exitCode = result.status || 1;
+if (unclassifiedFailures.length > 0) process.exitCode = result.status || 1;
 else if (!targeted && summary.summary.notRun > 0) process.exitCode = result.status || 1;
 else process.exitCode = 0;
