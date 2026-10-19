@@ -11,11 +11,13 @@ const AUTOMATION_FAILURE_PATTERN = /locator|selector|strict mode|element.*(?:not
 const TEST_DATA_BLOCKED_PATTERN = /bogo|eligible|campaign|sku|product|test data|order code|address data|prerequisite/i;
 const BOGO_BLOCKED_PATTERN = /bogo.*(?:eligible|product|sku)|(?:eligible|product|sku).*bogo/i;
 const SC_PLUS_BLOCKED_PATTERN = /(?:Samsung Care\+|SC\+).*(?:eligible|expose|required|configured)|(?:eligible|expose|required|configured).*(?:Samsung Care\+|SC\+)/i;
+const TRADE_IN_BLOCKED_PATTERN = /trade[- ]?in.*(?:eligible|product|sku|required|test data)|(?:eligible|product|sku|required|test data).*trade[- ]?in/i;
 
 function classifyFailure(status, reason = "") {
   if (status === "SKIPPED-BLOCKED") {
     if (BOGO_BLOCKED_PATTERN.test(reason)) return "MISSING_BOGO_PRODUCT";
     if (SC_PLUS_BLOCKED_PATTERN.test(reason)) return "MISSING_SC_PLUS_PRODUCT";
+    if (TRADE_IN_BLOCKED_PATTERN.test(reason)) return "MISSING_TRADE_IN_PRODUCT";
     if (AUTH_FAILURE_PATTERN.test(reason)) return "AUTH_BLOCKED";
     if (TEST_DATA_BLOCKED_PATTERN.test(reason)) return "TEST_DATA_BLOCKED";
     if (ENVIRONMENT_FAILURE_PATTERN.test(reason)) return "ENVIRONMENT_BLOCKED";
