@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { waitForClAuthenticatedReturn, assertClSsoConfiguration, validatedClSsoLoginUrl } = require("../../utils/clAuthLoginReturn.cjs");
+const { waitForClAuthenticatedReturn, assertClSsoConfiguration, validatedClSsoLoginUrl, waitForClCheckoutLoginStep } = require("../../utils/clAuthLoginReturn.cjs");
 
 const target = { hostname: "stg2.shop.samsung.com", environment: "S2" };
 function ssoInfo(callback = "https://stg2.shop.samsung.com/cl/login/authorize") {
@@ -116,4 +116,39 @@ test("CL signed-out callback stops after three checks instead of hovering for th
   }), error => error.exitCode === 78 && /remains signed-out/.test(error.message));
   assert.equal(reads, 3);
   assert.ok(time < 15000);
+});
+
+test('CL checkout login accepts a genuine SSO return instead of waiting for an obsolete password field', async () => {
+  let time = 0;
+  let current = 'https://account.samsung.com/iam/signin';
+  const result = await waitForClCheckoutLoginStep({ url: () => current, isClosed: () => false }, {
+    isVisible: async () => false,
+  }, { hostname: target.hostname, now: () => time,
+    pause: async ms => { time += ms; current = 'https://stg2.shop.samsung.com/cl/checkout/one?step=CHECKOUT_STEP_CONTACT_INFO'; },
+  });
+  assert.equal(result, 'checkout');
+});
+
+test('CL login fields are accepted only on the legitimate HTTPS Account host', async () => {
+  assert.equal(await waitForClCheckoutLoginStep(page('https://account.samsung.com/iam/signin'), {
+    isVisible: async () => true,
+  }, { hostname: target.hostname }), 'field');
+  for (const url of ['https://foreign.example/login', 'http://account.samsung.com/iam/signin',
+    'https://stg2.shop.samsung.com/cl/', 'https://stg.shop.samsung.com/cl/checkout/one',
+    'https://stg2.shop.samsung.com/pe/checkout/one']) {
+    let time = 0;
+    await assert.rejects(waitForClCheckoutLoginStep(page(url), { isVisible: async () => true }, {
+      hostname: target.hostname, timeout: 500, now: () => time, pause: async ms => { time += ms; },
+    }), /did not expose the required field or return to checkout/);
+  }
+});
+
+test('CL checkout human verification remains bounded and never creates a successful return', async () => {
+  let time = 0;
+  await assert.rejects(waitForClCheckoutLoginStep(page('https://account.samsung.com/iam/signin'), {
+    isVisible: async () => false,
+  }, { hostname: target.hostname, timeout: 500, now: () => time, pause: async ms => { time += ms; } }), /CAPTCHA\/MFA/);
+  await assert.rejects(waitForClCheckoutLoginStep({ isClosed: () => true }, {}, {
+    hostname: target.hostname,
+  }), /window closed/);
 });

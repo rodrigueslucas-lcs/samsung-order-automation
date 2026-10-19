@@ -1,10 +1,21 @@
-import { test } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import ProductPage from "../../pages/ProductPage";
 import CartPage from "../../pages/CartPage";
 import clAuthStateModule from "../../utils/clAuthState";
 import clStorefrontOverlays from "../../utils/clStorefrontOverlays";
 
 const { CL_AUTH_STATE_PATH, getClAuthState, hasClAuthState } = clAuthStateModule;
+
+export async function selectClCheckoutOption(page, control, name) {
+  await control.click();
+  const option = page.locator(".cdk-overlay-pane:visible")
+    .getByRole("option", { name }).filter({ visible: true }).first();
+  await option.waitFor({ state: "visible", timeout: 30000 });
+  // Material's long overlay can leave a valid option outside the click viewport.
+  // Keyboard selection uses its native handler and still requires readback.
+  await option.press("Enter");
+  await expect(control).toContainText(name);
+}
 
 export async function bootstrapClStorefront(page, config) {
   await test.step("Bootstrap the CL storefront and wait for the header to become interactive", async () => {

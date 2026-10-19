@@ -11,7 +11,8 @@ import clAuthStateModule from "../../../../../utils/clAuthState";
 import backofficeCredentialsModule from "../../../../../utils/backofficeAdminCredentials";
 import mxTestCard from "../../../../../utils/mxTestCard";
 import clSamsungCredentials from "../../../../../utils/clSamsungCredentials";
-import { addConfiguredProductToClCart, bootstrapClStorefront } from "../../../../../flows/cl/qstFlows";
+import clAuthLoginReturn from "../../../../../utils/clAuthLoginReturn.cjs";
+import { addConfiguredProductToClCart, bootstrapClStorefront, selectClCheckoutOption } from "../../../../../flows/cl/qstFlows";
 
 const test = base.extend({
   qstBusinessScenario: [async ({}, use, testInfo) => {
@@ -314,6 +315,9 @@ test.describe("CL QST - Base Store Official P1", () => {
   {
     const test = checkoutLoginTest;
     test("SAM-24807 @qst @cl @base-store @registered - Login from Checkout page", async ({ browser }, testInfo) => {
+      // Human Account verification needs its own bounded budget; do not close
+      // the maximized window while the operator is completing the challenge.
+      test.setTimeout(900000);
       expect(hasClAuthState(), "Refresh the legitimate CL Samsung Account session before this login scenario.").toBe(true);
       const cfg = config();
       const state = JSON.parse(fs.readFileSync(CL_AUTH_STATE_PATH, "utf8"));
@@ -357,27 +361,33 @@ test.describe("CL QST - Base Store Official P1", () => {
         const credentials = clSamsungCredentials.readClSamsungCredentials();
         expect(Boolean(credentials.email && credentials.password), "Legitimate CL Samsung Account credentials are required for checkout login.").toBe(true);
         const email = page.locator('input#account, input[type="email"], input[name="userId"], input[name="email"]').filter({ visible: true }).first();
-        await email.waitFor({ state: "visible", timeout: 60000 });
-        await email.fill(credentials.email);
-        const next = page.getByRole("button", { name: /Siguiente|Continuar|Next|Sign in/i }).filter({ visible: true }).first();
-        await next.click();
-        const password = page.locator('input[type="password"]').filter({ visible: true }).first();
-        const passwordReady = await password.waitFor({ state: "visible", timeout: 15000 }).then(() => true, () => false);
-        if (!passwordReady) {
-          const captchaVisible = await page.locator("iframe").evaluateAll(frames => frames.some(frame => {
-            const bounds = frame.getBoundingClientRect();
-            return /reCAPTCHA/i.test(frame.title) && /desaf[ií]o|challenge|expira|expires/i.test(frame.title) && bounds.width > 0 && bounds.height > 0;
-          }));
-          if (!captchaVisible) throw new Error("Samsung Account did not advance from email to password; no visible CAPTCHA challenge was detected.");
-          if (process.env.CI) throw new Error("Samsung Account requires an interactive CAPTCHA during checkout login; CI cannot complete this human verification.");
-          await page.bringToFront();
-          console.log("[cl-checkout-login] CAPTCHA visible: complete it manually in the maximized Chrome and click Siguiente; the test will resume automatically.");
-          await password.waitFor({ state: "visible", timeout: 180000 });
+        const waitForStep = (field, timeout) => clAuthLoginReturn.waitForClCheckoutLoginStep(page, field, {
+          hostname: cfg.baseUrl.hostname, timeout,
+        });
+        if (await waitForStep(email, 60000) === "field") {
+          await email.fill(credentials.email);
+          const next = page.getByRole("button", { name: /Siguiente|Continuar|Next|Sign in/i }).filter({ visible: true }).first();
+          await next.click();
+          const password = page.locator('input[type="password"]').filter({ visible: true }).first();
+          let passwordStep = await waitForStep(password, 15000).catch(() => "pending");
+          if (passwordStep === "pending") {
+            const captchaVisible = await page.locator("iframe").evaluateAll(frames => frames.some(frame => {
+              const bounds = frame.getBoundingClientRect();
+              return /reCAPTCHA/i.test(frame.title) && /desaf[ií]o|challenge|expira|expires/i.test(frame.title) && bounds.width > 0 && bounds.height > 0;
+            }));
+            if (!captchaVisible) throw new Error("Samsung Account did not advance from email to password; no visible CAPTCHA challenge was detected.");
+            if (process.env.CI) throw new Error("Samsung Account requires an interactive CAPTCHA during checkout login; CI cannot complete this human verification.");
+            await page.bringToFront();
+            console.log("[cl-checkout-login] CAPTCHA visible: complete it manually in the maximized Chrome and click Siguiente; the test will resume automatically.");
+            passwordStep = await waitForStep(password, 600000);
+          }
+          if (passwordStep === "field") {
+            await password.fill(credentials.password);
+            console.log("[cl-checkout-login] Password step reached; submitting legitimate primary-account login.");
+            await page.getByRole("button", { name: /Iniciar sesi[oó]n|Sign in|Continuar/i }).filter({ visible: true }).last().click();
+            console.log("[cl-checkout-login] Login submitted; waiting for authenticated CL checkout.");
+          }
         }
-        await password.fill(credentials.password);
-        console.log("[cl-checkout-login] Password step reached; submitting legitimate primary-account login.");
-        await page.getByRole("button", { name: /Iniciar sesi[oó]n|Sign in|Continuar/i }).filter({ visible: true }).last().click();
-        console.log("[cl-checkout-login] Login submitted; waiting for authenticated CL checkout.");
         await page.waitForURL(url => url.hostname === cfg.baseUrl.hostname && /\/cl\/checkout\/one/i.test(url.pathname), { timeout: 60000 }).catch(() => {
           return page.evaluate(() => {
             const text = document.body?.innerText || "";
@@ -643,10 +653,8 @@ test.describe("CL QST - Base Store Official P1", () => {
     await test.step("Validate CL different billing and shipping", async () => {
       await clGuestDelivery(page);
       const shipping = page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
-      await shipping.locator('mat-select[name="regionIso"]:visible').first().click();
-      await page.getByRole("option", { name: /Metropolitana/i }).first().click();
-      await shipping.locator('mat-select[name="town"]:visible').first().click();
-      await page.getByRole("option", { name: /Alhu[eé]/i }).first().click();
+      await selectClCheckoutOption(page, shipping.locator('mat-select[name="regionIso"]:visible').first(), /Metropolitana/i);
+      await selectClCheckoutOption(page, shipping.locator('mat-select[name="town"]:visible').first(), /Alhu[eé]/i);
       await shipping.locator('input[name="line2"]:visible').first().fill("QA AUTOMATION SHIPPING");
       await shipping.locator('input[name="line1"]:visible').first().fill("123");
       await shipping.getByText(/^Factura$/i).filter({ visible: true }).first().click();
@@ -658,18 +666,8 @@ test.describe("CL QST - Base Store Official P1", () => {
       await billing.locator('input[name="companyName"]:visible').fill("QA AUTOMATION LTDA");
       await billing.locator('input[name="commercializeTxt"]:visible').fill("Tecnologia");
       await billing.locator('input[name="phone"]:visible').fill("987654321");
-      await billing.locator('mat-select[name="regionIso"]:visible').click();
-      await page.getByRole("option", { name: /Metropolitana/i }).first().click();
-      await billing.locator('mat-select[name="town"]:visible').click();
-      const billingCommune = page.getByRole("option", { name: /Alhu[eé]/i }).first();
-      if (config().environment === "S1") {
-        // The long S1 option panel can place this option outside the viewport.
-        // Use its normal keyboard selection and prove the selected value.
-        await billingCommune.press("Enter");
-      } else {
-        await billingCommune.click();
-      }
-      await expect(billing.locator('mat-select[name="town"]:visible')).toContainText(/Alhu[eé]/i);
+      await selectClCheckoutOption(page, billing.locator('mat-select[name="regionIso"]:visible'), /Metropolitana/i);
+      await selectClCheckoutOption(page, billing.locator('mat-select[name="town"]:visible'), /Alhu[eé]/i);
       await billing.locator('input[name="line2"]:visible').fill("QA AUTOMATION BILLING");
       await billing.locator('input[name="line1"]:visible').fill("124");
       await expect(sameAsShipping).not.toBeChecked();

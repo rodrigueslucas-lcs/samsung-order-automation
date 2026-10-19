@@ -67,4 +67,24 @@ function assertClSsoConfiguration(configuration, ssoInfo, config) {
   throw error;
 }
 
-module.exports = { waitForClAuthenticatedReturn, assertClSsoConfiguration, validatedClSsoLoginUrl };
+async function waitForClCheckoutLoginStep(page, field, {
+  hostname, timeout = 60000, now = Date.now,
+  pause = ms => new Promise(resolve => setTimeout(resolve, ms)),
+}) {
+  const deadline = now() + timeout;
+  while (now() < deadline) {
+    if (page.isClosed()) throw new Error("CL checkout login window closed before its result was proven.");
+    let url;
+    try { url = new URL(page.url()); } catch {}
+    if (url?.protocol === "https:" && url.hostname === hostname && /^\/cl\/checkout\/one\/?$/i.test(url.pathname)) {
+      // This is only a handoff. The caller must still prove delivery and logout.
+      return "checkout";
+    }
+    if (url?.protocol === "https:" && url.hostname === "account.samsung.com" &&
+      await field.isVisible().catch(() => false)) return "field";
+    await pause(250);
+  }
+  throw new Error("CL Samsung Account did not expose the required field or return to checkout. Complete any CAPTCHA/MFA in its login window.");
+}
+
+module.exports = { waitForClAuthenticatedReturn, assertClSsoConfiguration, validatedClSsoLoginUrl, waitForClCheckoutLoginStep };
