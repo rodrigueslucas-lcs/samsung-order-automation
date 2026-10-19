@@ -3,6 +3,7 @@ const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const { writeJsonAtomically } = require("../utils/atomicJson");
 const { createAuthNavigation } = require("../utils/authNavigation.cjs");
+const { assertAuthStorefrontHealth } = require("../utils/authStorefrontHealth.cjs");
 const gotoWithTransientRetry = createAuthNavigation("pe");
 const path = require("node:path");
 const { getPeQstConfig } = require("../config/markets/pe");
@@ -158,6 +159,7 @@ async function openPeHome(page, context) {
   await gotoWithTransientRetry(page, setupUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
   assertAllowedHost(page, [HOSTNAME], "PE setup");
   await page.getByText(/You can access pages now/i).waitFor({ timeout: 60000 });
+  await assertAuthStorefrontHealth(context.request, { market: "PE", environment: ENV_NAME });
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     await gotoWithTransientRetry(page, homeUrl, { waitUntil: "domcontentloaded", timeout: 60000 });

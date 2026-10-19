@@ -42,6 +42,13 @@ export default class ProductPage extends BasePage {
 
       if (!buttonReady) {
         diagnostics?.push({ attempt, checkpoint: 'button-not-visible', url: this.page.url() });
+        const unavailableText = await this.page.getByRole('main').innerText({ timeout: 5000 }).catch(() => '');
+        if (unavailableText.includes(this.sku) && /Sold out\.\s*Get stock alert/i.test(unavailableText)) {
+          const error = new Error(`Configured product ${this.sku} is sold out; a currently purchasable fixture is required.`);
+          error.code = 'PRODUCT_OUT_OF_STOCK';
+          error.sku = this.sku;
+          throw error;
+        }
         if (attempt < maxAttempts) {
           await this.page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
           continue;

@@ -59,9 +59,14 @@ test.describe("PE QST - official safe gap reconciliation", () => {
     }
     const bogoCfg = { ...cfg, pdpUrl: target, sku: bogoSku };
 
-    const cart = await test.step("Add eligible Galaxy S25 BOGO product to cart", () =>
-      addConfiguredProductToPeCart(page, bogoCfg)
-    );
+    const cart = await test.step("Add eligible Galaxy S25 BOGO product to cart", async () => {
+      try {
+        return await addConfiguredProductToPeCart(page, bogoCfg);
+      } catch (error) {
+        if (error.code !== "PRODUCT_OUT_OF_STOCK" || error.sku !== bogoSku) throw error;
+        test.skip(true, `Missing PE BOGO test data: configured SKU ${bogoSku} is explicitly sold out. Provide a purchasable BOGO-eligible PE_QST_BOGO_SKU/PE_QST_BOGO_PDP_URL.`);
+      }
+    });
     await test.step("Validate BOGO source product in cart", async () => {
       const sourceSku = page.getByText(bogoSku, { exact: true }).filter({ visible: true });
       await expect(sourceSku.first(), "PE BOGO cart must contain the eligible source SKU.").toBeVisible({ timeout: 30000 });
