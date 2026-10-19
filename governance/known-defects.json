@@ -72,6 +72,34 @@
       "notes": "Back to Top / Volver al inicio control is not rendered after scrolling, preventing the official Back to Top validation."
     },
     {
+      "market": "CL",
+      "environment": "S1",
+      "store": "BASE_STORE",
+      "samId": "SAM-24821",
+      "jira": "RT-746043",
+      "url": "https://jira.secext.samsung.net/browse/RT-746043",
+      "title": "SMB Cluster Back to Top Control Is Missing on Storefront",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "Major",
+      "rootCause": "Storefront Issue",
+      "notes": "CL Back to Top / Volver al inicio validation is tracked by RT-746043. If the control is missing after scrolling, the runtime failure is classified as a known functional defect."
+    },
+    {
+      "market": "CL",
+      "environment": "S2",
+      "store": "BASE_STORE",
+      "samId": "SAM-24821",
+      "jira": "RT-746043",
+      "url": "https://jira.secext.samsung.net/browse/RT-746043",
+      "title": "SMB Cluster Back to Top Control Is Missing on Storefront",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "Major",
+      "rootCause": "Storefront Issue",
+      "notes": "CL Back to Top / Volver al inicio validation is tracked by RT-746043. If the control is missing after scrolling, the runtime failure is classified as a known functional defect."
+    },
+    {
       "market": "CO",
       "environment": "S1",
       "store": "BASE_STORE",
