@@ -42,6 +42,35 @@ test("runtime summary distinguishes known PE BOGO and SC+ test-data blockers", (
   assert.equal(value.tests[1].blockedReason, "Configured PE SKU does not currently expose SC+; provide a verified SC+-eligible PE_QST_PDP_URL/PE_QST_SKU.");
 });
 
+test("runtime summary classifies CL Trade-in and SC+ prerequisites without failing them", () => {
+  const report = { suites: [{ specs: [
+    {
+      title: "SAM-24803 Verify Recycle & Save Trade-in on cart page",
+      file: "tests/markets/cl/qst/base-store/official-p1.spec.js",
+      tests: [{
+        annotations: [{ type: "skip", description: "CL QST environment prerequisite BLOCKED: eligible CL Trade-in SKU/test data is required." }],
+        results: [{ status: "skipped", duration: 0, attachments: [] }],
+      }],
+    },
+    {
+      title: "SAM-24804 SC+ on cart page",
+      file: "tests/markets/cl/qst/base-store/official-p1.spec.js",
+      tests: [{
+        annotations: [{ type: "skip", description: "CL QST environment prerequisite BLOCKED: eligible CL Samsung Care+ SKU/test data is required." }],
+        results: [{ status: "skipped", duration: 0, attachments: [] }],
+      }],
+    },
+  ] }] };
+
+  const value = buildMxQstRuntimeSummary(report, { officialIds: ["SAM-24803", "SAM-24804"], market: "CL", environment: "S2/STG2" });
+  assert.equal(value.summary.failed, 0);
+  assert.equal(value.summary.blocked, 2);
+  assert.equal(value.tests[0].status, "SKIPPED-BLOCKED");
+  assert.equal(value.tests[0].failureType, "MISSING_TRADE_IN_PRODUCT");
+  assert.equal(value.tests[1].status, "SKIPPED-BLOCKED");
+  assert.equal(value.tests[1].failureType, "MISSING_SC_PLUS_PRODUCT");
+});
+
 test("auth artifacts cannot be published", () => {
   assert.equal(safeArtifact("playwright/.auth/mx-s1-user.json", process.cwd()), null);
 });
