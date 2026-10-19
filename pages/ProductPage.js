@@ -16,7 +16,8 @@ export default class ProductPage extends BasePage {
     this.cartUrl = options.cartUrl || 'https://stg2.shop.samsung.com/pe/cart';
   }
 
-  async addConfiguredPdpToCart({ waitForCartMutation = false, configureProduct, diagnostics } = {}) {
+  async addConfiguredPdpToCart({ waitForCartMutation = false, configureProduct, diagnostics,
+    addButtonName = /Agregar al (?:carro|carrito)|Add to cart|Add to basket/i } = {}) {
     if (!this.pdpUrl) throw new Error('A configured PDP URL is required.');
     const isCartMutation = (request) =>
       request.method() === 'POST' &&
@@ -31,7 +32,7 @@ export default class ProductPage extends BasePage {
 
       const addButton = this.page
         .getByRole('main')
-        .getByRole('button', { name: /Agregar al (?:carro|carrito)|Add to cart|Add to basket/i })
+        .getByRole('button', { name: addButtonName })
         .filter({ visible: true })
         .first();
 
@@ -44,6 +45,14 @@ export default class ProductPage extends BasePage {
         diagnostics?.push({ attempt, checkpoint: 'button-not-visible', url: this.page.url() });
         const unavailableText = await this.page.getByRole('main').innerText({ timeout: 5000 }).catch(() => '');
         if (unavailableText.includes(this.sku) && /Sold out\.\s*Get stock alert/i.test(unavailableText)) {
+          const preorder = this.page.getByRole('main').getByRole('button', { name: /^Preventa$/i })
+            .filter({ visible: true }).first();
+          if (await preorder.isVisible() && await preorder.isEnabled()) {
+            const error = new Error(`Configured product ${this.sku} exposes an enabled Preventa button; configure the native preorder action for this scenario.`);
+            error.code = 'PRODUCT_PREORDER_AVAILABLE';
+            error.sku = this.sku;
+            throw error;
+          }
           const error = new Error(`Configured product ${this.sku} is sold out; a currently purchasable fixture is required.`);
           error.code = 'PRODUCT_OUT_OF_STOCK';
           error.sku = this.sku;

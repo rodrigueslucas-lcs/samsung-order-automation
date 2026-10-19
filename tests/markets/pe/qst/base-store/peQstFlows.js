@@ -16,7 +16,7 @@ async function bootstrapPeStorefront(page, config) {
   });
 }
 
-export async function addConfiguredProductToPeCart(page, config) {
+export async function addConfiguredProductToPeCart(page, config, { addButtonName } = {}) {
   await bootstrapPeStorefront(page, config);
   const product = new ProductPage(page, {
     setupUrl: config.setupUrl?.href || null,
@@ -25,7 +25,7 @@ export async function addConfiguredProductToPeCart(page, config) {
     cartUrl: config.cartUrl.href,
   });
   await test.step("Open controlled PE PDP and add configured product to cart", async () => {
-    await product.addConfiguredPdpToCart({ waitForCartMutation: true });
+    await product.addConfiguredPdpToCart({ waitForCartMutation: true, ...(addButtonName ? { addButtonName } : {}) });
   });
 
   return new CartPage(page, {

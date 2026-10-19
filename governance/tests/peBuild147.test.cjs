@@ -37,12 +37,13 @@ test('auth health accepts only known staging targets before making a request', a
   }
 });
 
-function unavailableProduct(text) {
+function unavailableProduct(text, { preorder = false } = {}) {
   const source = fs.readFileSync('pages/ProductPage.js', 'utf8').replace(/^import .*;\r?\n/gm, '')
     .replace('export default class ProductPage', 'class ProductPage');
   const Page = vm.runInNewContext(`${source}\nProductPage;`, { BasePage: class { constructor(page) { this.page = page; } } });
   let navigations = 0;
-  const button = { filter() { return this; }, first() { return this; }, waitFor: async () => { throw Error('not rendered'); } };
+  const button = { filter() { return this; }, first() { return this; }, waitFor: async () => { throw Error('not rendered'); },
+    isVisible: async () => preorder, isEnabled: async () => preorder };
   const page = { getByRole: () => ({ getByRole: () => button, innerText: async () => text }),
     reload: async () => {}, title: async () => 'Galaxy S25', url: () => 'https://stg2.shop.samsung.com/pe/p/SM-S931BDBLLTP' };
   const product = new Page(page, { sku: 'SM-S931BDBLLTP', pdpUrl: page.url() });
@@ -53,6 +54,12 @@ function unavailableProduct(text) {
 test('explicit sold-out evidence is typed for the exact configured SKU without repeated navigation', async () => {
   const state = unavailableProduct('SM-S931BDBLLTP Sold out. Get stock alert to receive notification');
   await assert.rejects(state.product.addConfiguredPdpToCart(), error => error.code === 'PRODUCT_OUT_OF_STOCK' && error.sku === 'SM-S931BDBLLTP');
+  assert.equal(state.navigations(), 1);
+});
+
+test('enabled Preventa overrides sold-out text and must never be classified as missing product mass', async () => {
+  const state = unavailableProduct('SM-S931BDBLLTP Sold out. Get stock alert', { preorder: true });
+  await assert.rejects(state.product.addConfiguredPdpToCart(), error => error.code === 'PRODUCT_PREORDER_AVAILABLE');
   assert.equal(state.navigations(), 1);
 });
 
