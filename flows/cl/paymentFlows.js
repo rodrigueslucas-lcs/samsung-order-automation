@@ -1,0 +1,127 @@
+import { test, expect } from "@playwright/test";
+import MarketPaymentPage from "../../pages/MarketPaymentPage";
+import clTestCard from "../../utils/clTestCard.cjs";
+import destructiveGuards from "../../utils/destructiveGuards";
+
+export async function completeClFlowSandbox(page, { orderCode, storefrontOrigin }) {
+  destructiveGuards.requirePaymentSubmitOptIn();
+  const current = new URL(page.url());
+  const target = new URL(storefrontOrigin);
+  if (current.protocol !== "https:" || current.hostname !== "sandbox.flow.cl" ||
+      target.protocol !== "https:" || !["stg.shop.samsung.com", "stg2.shop.samsung.com"].includes(target.hostname) ||
+      !/^CL\d{6}-\d{8}(?:_\d+)?$/i.test(orderCode)) {
+    throw new Error("CL Flow completion requires the genuine sandbox, a staging return and the exact existing CL order.");
+  }
+  await expect(page.getByText(/Sitio de pruebas de Flow/i)).toBeVisible();
+  await expect(page.getByText(/Simulador de Pagos/i)).toBeVisible();
+  await expect(page.locator("body")).toContainText(orderCode);
+  const action = page.getByRole("combobox");
+  await action.selectOption({ label: "Quiero pagar la orden" });
+  await expect(action.locator("option:checked")).toHaveText("Quiero pagar la orden");
+  // Flow renders the form before its external scripts bind the Confirmar handler.
+  // An early native click only focuses the button and sends no request.
+  await page.waitForFunction(() => {
+    const button = document.getElementById("pagar");
+    return Boolean(button) && typeof window.jQuery?._data === "function" &&
+      Boolean(window.jQuery._data(button, "events")?.click?.length);
+  }, null, { timeout: 60000 });
+  // One native simulator confirmation for this existing attempt; never resubmit an order.
+  await page.getByRole("button", { name: /^Confirmar$/i }).click();
+  await page.waitForURL(url => url.origin === target.origin && url.pathname.startsWith("/cl/"), { timeout: 90000 });
+}
+
+export async function continueClRegisteredDeliveryToPayment(page) {
+  const saved = page.getByRole("radio", { name: /Mis direcciones/i });
+  await saved.locator("xpath=ancestor::mat-radio-button[1]").click();
+  await expect(saved).toBeChecked();
+  const shipping = page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
+  const delivery = shipping.getByText(/Entrega d[ií]a siguiente|Despacho est[aá]ndar/i)
+    .filter({ visible: true }).first();
+  await expect(delivery).toBeVisible({ timeout: 30000 });
+  await delivery.click();
+  const terms = shipping.locator('input[name="termsAndCondition"]:visible');
+  if (!(await terms.isChecked())) await terms.check({ force: true });
+  await page.getByRole("button", { name: /Continuar al pago/i }).click();
+  await expect(page).toHaveURL(/CHECKOUT_STEP_PAYMENT/i, { timeout: 60000 });
+}
+
+export async function selectClInterestFreeInstallments(payment, testInfo) {
+  const control = payment.installmentsCombobox;
+  await expect(control).toBeVisible({ timeout: 30000 });
+  const options = await control.locator("option").evaluateAll(items => items
+    .filter(option => !option.disabled && option.value)
+    .map(option => ({ value: option.value, text: option.textContent.trim() })));
+  await testInfo.attach("cl-offered-installments", {
+    body: JSON.stringify(options), contentType: "application/json",
+  });
+  const choice = options.find(option => /^\s*(?:[2-9]|\d{2,})\s+cuotas?\b/i.test(option.text) &&
+    /sin\s+inter[eé]s|0\s*%/i.test(option.text));
+  test.skip(!choice, "Missing CL interest-free installments test data: the selected test card does not offer an explicitly interest-free multi-installment option. One installment is not coverage for this TC.");
+  await control.selectOption(choice.value);
+  await expect(control).toHaveValue(choice.value);
+  return choice;
+}
+
+export async function selectClNativePaymentButton(page, heading) {
+  const method = page.getByRole("button").filter({
+    has: page.getByRole("heading", { name: heading }),
+  }).filter({ visible: true }).first();
+  await expect(method).toBeVisible({ timeout: 60000 });
+  if (await method.getAttribute("aria-expanded") !== "true") await method.click();
+  await expect(method).toHaveAttribute("aria-expanded", "true");
+  // The previous method can remain visible while the new details render.
+  // Never let its global Pay button submit a different payment mode.
+  const panel = method.locator("xpath=ancestor::mat-expansion-panel[1]");
+  const button = panel.getByRole("button", { name: /realizar pedido|pagar ahora/i })
+    .filter({ visible: true });
+  await expect(button).toBeVisible({ timeout: 60000 });
+  await expect(button).toBeEnabled();
+  return button;
+}
+
+export async function executeClPaymentOrder(browser, testInfo, { reachDelivery, kind = "card" }) {
+  test.skip(process.env.ALLOW_PAYMENT_SUBMIT !== "1", "Set ALLOW_PAYMENT_SUBMIT=1 to authorize a CL test order.");
+  const cardProvider = String(process.env.CL_QST_CARD_PROVIDER || "webpay").toLowerCase();
+  if (!["webpay", "mercado"].includes(cardProvider)) throw new Error("CL_QST_CARD_PROVIDER must be webpay or mercado.");
+  const flowCard = kind === "card" && cardProvider === "webpay";
+  const { context, page } = await reachDelivery(browser, { singleItem: true });
+  try {
+    await test.step("Choose the registered delivery address and continue to CL Payment", async () => {
+      await continueClRegisteredDeliveryToPayment(page);
+    });
+    const payment = new MarketPaymentPage(page, { market: "CL" });
+    if (kind === "transfer" || flowCard) {
+      await test.step(flowCard ? "Select native CL Webpay credit/debit card payment" : "Select the native CL bank transfer payment method", async () => {
+        const heading = flowCard ? /^Tarjetas de Cr[eé]dito y D[eé]bito \(Webpay\)$/i : /^Transferencia Bancaria$/i;
+        payment.placeOrderButton = await selectClNativePaymentButton(page, heading);
+      });
+    } else {
+      await test.step("Populate and validate the selected CL sandbox card", async () => {
+        let card;
+        try { card = clTestCard.getClTestCard(); } catch (error) {
+          if (error.code !== "CL_TEST_CARD_DATA_REQUIRED") throw error;
+          test.skip(true, "Missing CL sandbox card test data: provision CL_TEST_CARD_* or the ignored CL card fixture. MX card data must not be borrowed.");
+        }
+        await payment.selectCreditCard();
+        await payment.fillCardData(card);
+        await payment.validateCreditCardReady(card);
+        if (kind === "installments") await selectClInterestFreeInstallments(payment, testInfo);
+      });
+    }
+    await test.step("Submit once and prove a new Samsung order confirmation", async () => {
+      const storefrontOrigin = new URL(page.url()).origin;
+      const result = await payment.placeOrderAndCapture(kind === "transfer" || flowCard ? {
+        submitResponsePathPattern: /^\/tokocommercewebservices\/v2\/cl\/users\/[^/]+\/carts\/[^/]+\/paymentmodes\/cl-[^/]+\/submitOrder$/i,
+      } : {});
+      expect(result.orderCode).toMatch(/^CL\d{6}-\d{8}(?:_\d+)?$/i);
+      if (new URL(page.url()).hostname === "sandbox.flow.cl") {
+        await completeClFlowSandbox(page, { orderCode: result.orderCode, storefrontOrigin });
+      }
+      await expect(page).toHaveURL(/confirmation|confirmacion|order-confirmation|checkout\/order|success/i, { timeout: 90000 });
+      await expect(page.getByText(result.orderCode, { exact: false }).first()).toBeVisible({ timeout: 30000 });
+      testInfo.annotations.push({ type: "cl-qst-order", description: result.orderCode });
+    });
+  } finally {
+    await context.close();
+  }
+}

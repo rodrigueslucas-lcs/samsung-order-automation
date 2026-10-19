@@ -5,14 +5,13 @@ import CartPage from "../../../../../pages/CartPage";
 import ProfilePage from "../../../../../pages/ProfilePage";
 import MyOrdersPage from "../../../../../pages/MyOrdersPage";
 import BackOfficeSearchPage from "../../../../../pages/BackOfficeSearchPage";
-import MarketPaymentPage from "../../../../../pages/MarketPaymentPage";
 import clConfigModule from "../../../../../config/markets/cl";
 import clAuthStateModule from "../../../../../utils/clAuthState";
 import backofficeCredentialsModule from "../../../../../utils/backofficeAdminCredentials";
-import mxTestCard from "../../../../../utils/mxTestCard";
 import clSamsungCredentials from "../../../../../utils/clSamsungCredentials";
 import clAuthLoginReturn from "../../../../../utils/clAuthLoginReturn.cjs";
 import { addConfiguredProductToClCart, bootstrapClStorefront, selectClCheckoutOption } from "../../../../../flows/cl/qstFlows";
+import { executeClPaymentOrder } from "../../../../../flows/cl/paymentFlows";
 
 const test = base.extend({
   qstBusinessScenario: [async ({}, use, testInfo) => {
@@ -29,7 +28,6 @@ const test = base.extend({
 const { getClQstConfig } = clConfigModule;
 const { CL_AUTH_STATE_PATH, CL_AUTH_SESSION_STORAGE_PATH, getClAuthState, hasClAuthState } = clAuthStateModule;
 const { getBackOfficeAdminCredentials } = backofficeCredentialsModule;
-const { getMxTestCard } = mxTestCard;
 const checkoutLoginTest = test.extend({ trace: "off", screenshot: "off", video: "off" });
 
 test.describe("CL QST - Base Store Official P1", () => {
@@ -97,6 +95,10 @@ test.describe("CL QST - Base Store Official P1", () => {
   async function clRegisteredDelivery(browser, { singleItem = false } = {}) {
     const cfg = config();
     const { context, page } = await authenticatedPage(browser, cfg);
+    if (singleItem) {
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      await getClAuthState().validateCurrentPageAuthenticated(page);
+    }
     await page.goto(cfg.cartUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
     const existingProduct = await page.getByText(cfg.sku, { exact: true }).first()
       .waitFor({ state: "visible", timeout: 20000 }).then(() => true, () => false);
@@ -740,42 +742,21 @@ test.describe("CL QST - Base Store Official P1", () => {
 
   test("SAM-24826 @destructive @qst @cl @base-store @registered - Order confirmation screen", async ({ browser }, testInfo) => {
     await test.step("Validate CL order confirmation screen", async () => {
-      test.skip(process.env.ALLOW_PAYMENT_SUBMIT !== "1", "Set ALLOW_PAYMENT_SUBMIT=1 to authorize a CL test order.");
-      test.skip(!hasClAuthState(), "CL authenticated state is required.");
-      const { context, page } = await clRegisteredDelivery(browser, { singleItem: true });
-      try {
-        const saved = page.getByRole("radio", { name: /Mis direcciones/i });
-        await saved.locator("xpath=ancestor::mat-radio-button[1]").click();
-        await expect(saved).toBeChecked();
-        const shipping = page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
-        const deliveryOption = shipping.getByText(/Entrega d[ií]a siguiente|Despacho est[aá]ndar/i).filter({ visible: true }).first();
-        await expect(deliveryOption).toBeVisible({ timeout: 30000 });
-        await deliveryOption.click();
-        const terms = shipping.locator('input[name="termsAndCondition"]:visible');
-        if (!(await terms.isChecked())) await terms.check({ force: true });
-        await page.getByRole("button", { name: /Continuar al pago/i }).click();
-        await expect(page).toHaveURL(/CHECKOUT_STEP_PAYMENT/i, { timeout: 60000 });
-
-        const payment = new MarketPaymentPage(page, { market: "CL" });
-        const card = getMxTestCard();
-        await payment.selectCreditCard();
-        await payment.fillCardData(card);
-        await payment.validateCreditCardReady(card);
-        const result = await payment.placeOrderAndCapture();
-        expect(result.orderCode).toMatch(/^CL\d{6}-\d{8}(?:_\d+)?$/i);
-        await expect(page).toHaveURL(/confirmation|confirmacion|order-confirmation|checkout\/order|success/i, { timeout: 90000 });
-        await expect(page.getByText(result.orderCode, { exact: false }).first()).toBeVisible({ timeout: 30000 });
-        testInfo.annotations.push({ type: "cl-qst-order", description: result.orderCode });
-      } finally {
-        await context.close();
-      }
+      await executeClPaymentOrder(browser, testInfo, { reachDelivery: clRegisteredDelivery, kind: "transfer" });
     });
   });
 
+  for (const [id, title, kind] of [
+    ["SAM-24822", "Payment using Credit / Debit card with reg user", "card"],
+    ["SAM-24823", "Payment using Direct Bank Transfer", "transfer"],
+    ["SAM-24824", "Payment using Interest-free installments - Credit card / Debit Card", "installments"],
+  ]) {
+    test(`${id} @destructive @qst @cl @base-store @registered - ${title}`, async ({ browser }, testInfo) => {
+      await executeClPaymentOrder(browser, testInfo, { reachDelivery: clRegisteredDelivery, kind });
+    });
+  }
+
   for (const [id, title, reason] of [
-    ["SAM-24822", "Payment using Credit / Debit card with reg user", "registered auth is wired; approved CL card-submit path/test data is still required."],
-    ["SAM-24823", "Payment using Direct Bank Transfer", "Direct Bank Transfer includes a CS/BackOffice approval dependency."],
-    ["SAM-24824", "Payment using Interest-free installments - Credit card / Debit Card", "CL installments payment path must be proven before destructive automation."],
     ["SAM-24825", "Payment using Rewards", "Missing Rewards test data: a verified eligible points balance and redemption fixture are required before payment validation."],
   ]) {
     test(`${id} @blocked @qst @cl @base-store - ${title}`, async () => blocked(reason));

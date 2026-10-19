@@ -57,7 +57,12 @@ export default class MarketPaymentPage extends PaymentPage {
   async placeOrderAndCapture(options = {}) {
     if (this.externalMercadoPago) return this.placeExternalMercadoPagoOrder(options);
     const { orderCodePattern } = this.marketProfile;
+    const clCapture = this.marketProfile.code === "CL" ? {
+      submitResponsePathPattern: /^\/tokocommercewebservices\/v2\/cl\/users\/[^/]+\/carts\/[^/]+\/paymentmodes\/cl-mercadoCC\/submitOrder$/i,
+      orderResponsePathPattern: /^\/tokocommercewebservices\/v2\/cl\/users\/[^/]+\/orders(?:\/|$)/i,
+    } : {};
     return super.placeOrderAndCapture({
+      ...clCapture,
       ...options,
       orderCodePattern: options.orderCodePattern || orderCodePattern,
     });
