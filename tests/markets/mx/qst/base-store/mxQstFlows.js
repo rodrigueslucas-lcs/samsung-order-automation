@@ -31,6 +31,8 @@ export function mxQstCart(page, config) {
     totalPattern: /Total con IVA/i,
     checkoutButtonPattern: /Finalizar Compra/i,
     currencyPattern: /\$\s*[\d,.]+/,
+    cartPageTitlePattern: /Tienes\s+[1-9]\d*\s+productos? en tu carrito/i,
+    allowPromotionalGifts: true,
   });
 }
 
@@ -86,7 +88,8 @@ async function cartDiagnostic(page) {
 }
 
 export async function resetMxCartViaUi(page, config) {
-  await page.goto(config.cartUrl.toString(), { waitUntil: "domcontentloaded", timeout: 60000 });
+  // Do not act on an old/optimistic row while the initial current-cart GET is pending.
+  await mxQstCart(page, config).loadMxCartState();
   const main = page.getByRole("main");
   await main.waitFor({ state: "attached", timeout: 30000 });
 
@@ -142,13 +145,17 @@ export async function resetMxCartViaUi(page, config) {
     const removal = page.waitForResponse(response => {
       return response.request().method() === "DELETE" &&
         /\/v2\/mx\/users\/current\/carts\/[^/]+\/entries(?:\/|$)/.test(new URL(response.url()).pathname);
-    }, { timeout: 30000 });
+    }, { timeout: 120000 });
     const [response] = await Promise.all([
       removal,
       dialog.waitFor({ state: "hidden", timeout: 30000 }),
       confirm.click(),
     ]);
     expect(response.ok(), "MX cart entry deletion must succeed before another navigation.").toBe(true);
+    const failure = await response.finished();
+    if (failure) throw new Error("MX cart deletion response was interrupted; do not repeat the mutation.");
+    // Read back committed state before selecting another row or navigating away.
+    await mxQstCart(page, config).loadMxCartState();
   }
 
   throw new Error("MX cart reset exceeded the 20-item safety limit.");

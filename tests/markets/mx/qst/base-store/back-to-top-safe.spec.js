@@ -25,7 +25,7 @@ test("SAM-25001 @qst @mx @base-store @safe - Back to Top returns the cart to the
   });
 
   let backToTop;
-  const cartTopContent = page.getByText(/Tienes\s+1\s+producto en tu carrito/i).first();
+  const cartTopContent = page.getByText(/Tienes\s+[1-9]\d*\s+productos? en tu carrito/i).first();
   await test.step("Scroll to the cart footer and expose Back to Top", async () => {
     // MX S1 lazily appends the recommendation and global-footer sections. Keep
     // following the observable document end until the real control is hydrated.

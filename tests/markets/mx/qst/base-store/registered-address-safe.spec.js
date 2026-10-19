@@ -2,7 +2,6 @@ import evidenceContext from "../../../../../reporting/evidence/evidenceContext.j
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import MxCheckoutPage from "../../../../../pages/MxCheckoutPage";
 import { test, expect } from "../../dst/base-store/mx.auth.fixture";
-import { reachMxRegisteredDelivery } from "../../dst/base-store/mxFlows";
 import { prepareMxQstCart } from "./mxQstFlows";
 
 const { recordBusinessEvidence } = evidenceContext;
@@ -71,7 +70,7 @@ test("SAM-24993 @qst @mx @base-store @safe @registered - Save shipping and billi
 
   let checkout;
   await test.step("Reach registered Delivery and open New address mode", async () => {
-    ({ checkout } = await reachMxRegisteredDelivery(page, mxConfig));
+    ({ checkout } = await reachRegisteredDeliveryForSavedAddress(page, mxConfig));
     await openNewAddressMode(page);
   });
 
@@ -124,7 +123,7 @@ test("SAM-24994 @qst @mx @base-store @safe @registered - Checkout accepts a new 
     page.on("request", onRequest);
     page.on("requestfailed", onRequestFailed);
     try {
-      ({ checkout } = await reachMxRegisteredDelivery(page, mxConfig, { addToCartDiagnostics }));
+      ({ checkout } = await reachRegisteredDeliveryForSavedAddress(page, mxConfig));
     } finally {
       page.off("pageerror", onPageError);
       page.off("console", onConsole);

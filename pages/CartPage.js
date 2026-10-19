@@ -7,6 +7,7 @@ export default class CartPage extends BasePage {
 
     this.cartUrl = options.cartUrl || 'https://stg2.shop.samsung.com/pe/cart';
     this.sku = options.sku || 'RB45DG6300B1PE';
+    this.allowPromotionalGifts = options.allowPromotionalGifts === true;
 
     this.continueButton = page.getByRole('button', {
       name: options.checkoutButtonPattern || /^continuar$/i
@@ -244,7 +245,7 @@ export default class CartPage extends BasePage {
     throw new Error('MX cart cleanup exceeded the 20-item safety limit.');
   }
 
-  async validateControlledSingleSku(sku, { allowPromotionalGifts = false } = {}) {
+  async validateControlledSingleSku(sku, { allowPromotionalGifts = this.allowPromotionalGifts } = {}) {
     const { productEntries } = await this.loadMxCartState();
     const controlledEntries = allowPromotionalGifts ? productEntries.filter(entry => !(
       entry.product.code !== sku && entry.giveAway === true &&
@@ -311,9 +312,12 @@ export default class CartPage extends BasePage {
   }
 
   async validateQuantityCanChange() {
-    const quantity = this.page.getByRole('textbox', { name: 'Quantity' });
-    const plusButton = this.page.getByRole('button', { name: '+', exact: true });
-    const minusButton = this.page.getByRole('button', { name: '-', exact: true });
+    const item = this.allowPromotionalGifts
+      ? this.cartProductSku.locator("xpath=ancestor::*[.//input[@aria-label='Quantity'] and .//button[@aria-label='Remove']][1]")
+      : this.page;
+    const quantity = item.getByRole('textbox', { name: 'Quantity' });
+    const plusButton = item.getByRole('button', { name: '+', exact: true });
+    const minusButton = item.getByRole('button', { name: '-', exact: true });
     await quantity.waitFor({ state: 'visible', timeout: 30000 });
     const initial = await quantity.inputValue();
     await plusButton.click();

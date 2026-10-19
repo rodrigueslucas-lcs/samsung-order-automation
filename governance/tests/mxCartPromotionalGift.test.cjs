@@ -27,6 +27,13 @@ test('isolation opt-in accepts an explicitly flagged zero-price quantity-one gif
   await cart([mainProduct, gift]).validateControlledSingleSku('PHONE', { allowPromotionalGifts: true });
 });
 
+test('safe QST cart opt-in accepts gifts without changing an explicit strict guard', async () => {
+  const safe = cart([mainProduct, gift]);
+  safe.allowPromotionalGifts = true;
+  await safe.validateControlledSingleSku('PHONE');
+  await assert.rejects(safe.validateControlledSingleSku('PHONE', { allowPromotionalGifts: false }), /Controlled MX cart/);
+});
+
 test('gift opt-in still rejects extra paid products, unflagged freebies, quantity changes and missing main SKU', async () => {
   for (const extra of [
     { ...gift, giveAway: false },
