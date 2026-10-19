@@ -2,20 +2,6 @@ import { expect } from "@playwright/test";
 import BackOfficePage from "./BackOfficePage";
 
 export default class BackOfficeCatalogPage extends BackOfficePage {
-  async waitForZkUpdate(action) {
-    const responsePromise = this.page.waitForResponse(
-      (response) =>
-        response.request().method() === "POST" &&
-        /\/zkau(?:\/|$)/.test(new URL(response.url()).pathname),
-      { timeout: 30000 }
-    );
-    await action();
-    await responsePromise;
-    await this.page.waitForFunction(() => !window.zk || !zk.processing, null, {
-      timeout: 30000,
-    });
-  }
-
   async openAdminProducts() {
     const catalogRow = this.page
       .getByRole("row", { name: /^Catalog(?: selected)?$/i })

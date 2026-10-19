@@ -34,9 +34,15 @@ test('BackOffice admin readiness accepts real admin shells and rejects unrelated
     await bo.expectPerspective('agent');
     assert.equal(await bo.adminPerspective().count(), 0);
     await page.setContent('<div>Administration Cockpit</div><div id="zk_proc">Processing...</div>');
-    await page.evaluate(() => setTimeout(() => document.querySelector('#zk_proc').remove(), 100));
+    await page.evaluate(() => {
+      window.zk = { processing: true };
+      window.zAu = { processing: () => true };
+      setTimeout(() => document.querySelector('#zk_proc').remove(), 100);
+    });
     await bo.expectPerspective('admin');
     assert.equal(await page.locator('#zk_proc').count(), 0, 'Admin readiness must wait for ZK processing to finish.');
+    assert.equal(await page.evaluate(() => window.zk.processing && window.zAu.processing()), true,
+      'Non-blocking background AU activity must not prevent real Admin readiness.');
   } finally {
     await browser.close();
   }

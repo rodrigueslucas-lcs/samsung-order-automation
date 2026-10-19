@@ -112,10 +112,7 @@ export default class BackOfficeOrderPage extends BackOfficePage {
         await target.evaluate((element) => element.click()).catch(() => {});
       }
 
-      await this.page
-        .waitForFunction(() => !window.zk || !zk.processing, null, {
-          timeout: 15000,
-        })
+      await this.waitForZkReady({ timeout: 15000 })
         .catch(() => {});
 
       const opened = await orderNumberControl
@@ -160,9 +157,7 @@ export default class BackOfficeOrderPage extends BackOfficePage {
       name: new RegExp(`Order Nr\\.: ${this.escapeRegExp(order.orderCode)}(?:,|$)`),
     });
     await row.click();
-    await this.page.waitForFunction(() => !window.zk || !zk.processing, null, {
-      timeout: 30000,
-    });
+    await this.waitForZkReady({ timeout: 30000 });
 
     const status = await this.readOpenAdminOrderStatus();
     return { orderCode: order.orderCode, status };
@@ -217,9 +212,7 @@ export default class BackOfficeOrderPage extends BackOfficePage {
         name: new RegExp(`Order Nr\\.: ${this.escapeRegExp(order.orderCode)}(?:,|$)`),
       });
       await row.click();
-      await this.page.waitForFunction(() => !window.zk || !zk.processing, null, {
-        timeout: 30000,
-      });
+      await this.waitForZkReady({ timeout: 30000 });
       const status = await this.readOpenAdminOrderStatus();
       inspected.push({ orderCode: order.orderCode, status });
 
@@ -266,20 +259,6 @@ export default class BackOfficeOrderPage extends BackOfficePage {
       responseMessage: value.match(/Response message: ([^,]+)/)?.[1]?.trim() || null,
       label: value,
     };
-  }
-
-  async waitForZkUpdate(action) {
-    const responsePromise = this.page.waitForResponse(
-      (response) =>
-        response.request().method() === "POST" &&
-        /\/zkau(?:\/|$)/.test(new URL(response.url()).pathname),
-      { timeout: 30000 }
-    );
-    await action();
-    await responsePromise;
-    await this.page.waitForFunction(() => !window.zk || !zk.processing, null, {
-      timeout: 30000,
-    });
   }
 
   async resetAgentOrderPager() {

@@ -51,6 +51,35 @@ export default class BackOfficePage extends BasePage {
       .filter({ visible: true }).first();
   }
 
+  async waitForZkReady({ timeout = 30000 } = {}) {
+    // Background AU polling can keep zk.processing true after the UI is ready.
+    // The real processing overlay must disappear; callers still prove their
+    // specific row, editor or search-mode result before proceeding.
+    await this.page.locator("#zk_proc").waitFor({ state: "hidden", timeout });
+  }
+
+  async waitForZkUpdate(action) {
+    await this.waitForZkReady();
+    const requests = new Set();
+    const origin = new URL(this.url).origin;
+    const track = request => {
+      const url = new URL(request.url());
+      if (request.method() === "POST" && url.origin === origin && /\/zkau(?:\/|$)/.test(url.pathname)) {
+        requests.add(request);
+      }
+    };
+    this.page.on("request", track);
+    try {
+      const responsePromise = this.page.waitForResponse(response => requests.has(response.request()), { timeout: 30000 });
+      const [response] = await Promise.all([responsePromise, action()]);
+      if (!response.ok()) throw new Error(`BackOffice ZK update returned HTTP ${response.status()}.`);
+      if (await response.finished()) throw new Error("BackOffice ZK update response did not finish successfully.");
+      await this.waitForZkReady();
+    } finally {
+      this.page.off("request", track);
+    }
+  }
+
   async openLoginSurface() {
     const usernameInput = this.page.getByPlaceholder("Enter user name", { exact: true });
     const passwordInput = this.page.getByPlaceholder("Enter password", { exact: true });
@@ -134,7 +163,7 @@ export default class BackOfficePage extends BasePage {
       await usernameInput.press("Tab");
       await passwordInput.pressSequentially(password, { delay: 35 });
       await passwordInput.press("Tab");
-      await this.page.waitForFunction(() => !window.zk || !zk.processing, null, { timeout: 10000 }).catch(() => {});
+      await this.waitForZkReady({ timeout: 10000 }).catch(() => {});
       await this.page.getByRole("button", { name: "Sign In", exact: true }).click();
 
       const proceedButton = this.page.getByRole("button", { name: "PROCEED", exact: true });
@@ -193,7 +222,7 @@ export default class BackOfficePage extends BasePage {
     const perspective = authority === "admin" ? this.adminPerspective()
       : this.page.getByText("Customer Support", { exact: true }).first();
     await perspective.waitFor({ state: "visible", timeout: 30000 });
-    await this.page.locator("#zk_proc").waitFor({ state: "hidden", timeout: 60000 });
+    await this.waitForZkReady({ timeout: 60000 });
   }
 
   async openTreeRow(name) {
@@ -201,7 +230,7 @@ export default class BackOfficePage extends BasePage {
     const row = this.page.getByRole("row", {
       name: new RegExp(`^${escapedName}(?: selected)?$`),
     });
-    await this.page.locator("#zk_proc").waitFor({ state: "hidden", timeout: 60000 });
+    await this.waitForZkReady({ timeout: 60000 });
     await row.waitFor({ state: "visible", timeout: 30000 });
     await row.click();
   }
