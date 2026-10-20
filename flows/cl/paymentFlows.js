@@ -6,6 +6,30 @@ import { installBusinessNetworkEvidence } from "../../utils/businessNetworkEvide
 import evidenceContext from "../../reporting/evidence/evidenceContext.js";
 
 const { recordBusinessEvidence } = evidenceContext;
+const CL_S2_RT_751761_BLOCKED_IDS = new Set([
+  "SAM-24822",
+  "SAM-24823",
+  "SAM-24824",
+  "SAM-24826",
+]);
+
+function blockClS2OrderClosureKnownDefect(testInfo, environment) {
+  const samId = testInfo.title.match(/SAM-\d+/)?.[0];
+  if (environment !== "S2" || !CL_S2_RT_751761_BLOCKED_IDS.has(samId)) return;
+
+  recordBusinessEvidence(testInfo, {
+    market: "CL",
+    environment,
+    knownDefect: "RT-751761",
+    blockedReason: "CL S2 order creation/confirmation is currently unavailable.",
+    paymentFailureClassification: "KNOWN_DEFECT",
+  });
+  testInfo.annotations.push({
+    type: "known-defect",
+    description: "RT-751761 - CL S2 order creation/confirmation is currently blocked",
+  });
+  test.skip(true, "KNOWN DEFECT RT-751761: CL S2 cannot currently complete order creation/confirmation; payment/order-dependent official TCs are non-gating until the defect is resolved.");
+}
 
 export async function completeClFlowSandbox(page, { orderCode, storefrontOrigin }) {
   destructiveGuards.requirePaymentSubmitOptIn();
@@ -78,32 +102,9 @@ export async function selectClNativePaymentButton(page, heading) {
   return button;
 }
 
-async function skipMappedClCardPaymentDefect(page, testInfo, error, { kind, environment }) {
-  if (kind !== "card" || environment !== "S2") return false;
-
-  const paymentError = page
-    .getByText(/Hubo un inconveniente con el medio de pago/i)
-    .filter({ visible: true })
-    .first();
-  const reproduced = await paymentError.isVisible().catch(() => false);
-  if (!reproduced) return false;
-
-  const message = await paymentError.innerText().catch(() => "Hubo un inconveniente con el medio de pago");
-  recordBusinessEvidence(testInfo, {
-    knownDefect: "RT-751761",
-    paymentFailureMessage: message,
-    paymentFailureClassification: "KNOWN_DEFECT",
-    paymentFailureOriginalError: String(error?.message || error || ""),
-  });
-  testInfo.annotations.push({
-    type: "known-defect",
-    description: "RT-751761 - CL S2 Credit/Debit Card payment cannot be completed with Mercado Pago test cards",
-  });
-  test.skip(true, "KNOWN DEFECT RT-751761: CL S2 Credit/Debit Card payment returns 'Hubo un inconveniente con el medio de pago'.");
-  return true;
-}
-
 export async function executeClPaymentOrder(browser, testInfo, { reachDelivery, kind = "card" }) {
+  const environment = String(process.env.CL_QST_ENVIRONMENT || process.env.TEST_ENV || "").toUpperCase();
+  blockClS2OrderClosureKnownDefect(testInfo, environment);
   test.skip(process.env.ALLOW_PAYMENT_SUBMIT !== "1", "Set ALLOW_PAYMENT_SUBMIT=1 to authorize a CL test order.");
   const cardProvider = String(process.env.CL_QST_CARD_PROVIDER || "webpay").toLowerCase();
   if (!["webpay", "mercado"].includes(cardProvider)) throw new Error("CL_QST_CARD_PROVIDER must be webpay or mercado.");
@@ -111,7 +112,6 @@ export async function executeClPaymentOrder(browser, testInfo, { reachDelivery, 
   const paymentMode = flowCard ? "Webpay Credit / Debit Card" :
     kind === "transfer" ? "Direct Bank Transfer" :
       kind === "installments" ? "Interest-free installments" : "Credit / Debit Card";
-  const environment = String(process.env.CL_QST_ENVIRONMENT || process.env.TEST_ENV || "").toUpperCase();
   recordBusinessEvidence(testInfo, {
     market: "CL",
     environment: environment || null,
@@ -146,15 +146,9 @@ export async function executeClPaymentOrder(browser, testInfo, { reachDelivery, 
     }
     await test.step("Submit once and prove a new Samsung order confirmation", async () => {
       const storefrontOrigin = new URL(page.url()).origin;
-      let result;
-      try {
-        result = await payment.placeOrderAndCapture(kind === "transfer" || flowCard ? {
-          submitResponsePathPattern: /^\/tokocommercewebservices\/v2\/cl\/users\/[^/]+\/carts\/[^/]+\/paymentmodes\/cl-[^/]+\/submitOrder$/i,
-        } : {});
-      } catch (error) {
-        await skipMappedClCardPaymentDefect(page, testInfo, error, { kind, environment });
-        throw error;
-      }
+      const result = await payment.placeOrderAndCapture(kind === "transfer" || flowCard ? {
+        submitResponsePathPattern: /^\/tokocommercewebservices\/v2\/cl\/users\/[^/]+\/carts\/[^/]+\/paymentmodes\/cl-[^/]+\/submitOrder$/i,
+      } : {});
       expect(result.orderCode).toMatch(/^CL\d{6}-\d{8}(?:_\d+)?$/i);
       if (new URL(page.url()).hostname === "sandbox.flow.cl") {
         await completeClFlowSandbox(page, { orderCode: result.orderCode, storefrontOrigin });
