@@ -66,13 +66,15 @@ class SmbEvidenceReporter {
       if (Object.hasOwn(counts, test.result)) counts[test.result] += 1;
       else if (test.result === "timedOut") counts.timedOut += 1;
     }
+
+    const targetIdsRaw = process.env.MX_QST_TARGET_IDS || process.env.PE_QST_TARGET_IDS || process.env.CO_QST_TARGET_IDS || process.env.CL_QST_TARGET_IDS || "";
     const execution = sanitize({
       timestamp: this.startedAt?.toISOString() || endedAt.toISOString(),
       completedAt: endedAt.toISOString(),
-      environment: process.env.TEST_ENV || process.env.MX_QST_ENVIRONMENT || process.env.PE_QST_ENVIRONMENT || process.env.BACKOFFICE_ENV || null,
+      environment: process.env.TEST_ENV || process.env.MX_QST_ENVIRONMENT || process.env.PE_QST_ENVIRONMENT || process.env.CO_QST_ENVIRONMENT || process.env.CL_QST_ENVIRONMENT || process.env.BACKOFFICE_ENV || null,
       market: process.env.TEST_MARKET || process.env.MARKET || null,
-      executionMode: (process.env.MX_QST_TARGET_IDS || process.env.PE_QST_TARGET_IDS || process.env.CO_QST_TARGET_IDS) ? "TARGETED" : "FULL",
-      targetIds: String(process.env.MX_QST_TARGET_IDS || process.env.PE_QST_TARGET_IDS || process.env.CO_QST_TARGET_IDS || "").split(/[\\s,;]+/).filter(Boolean),
+      executionMode: targetIdsRaw ? "TARGETED" : "FULL",
+      targetIds: String(targetIdsRaw).split(/[\s,;]+/).filter(Boolean),
       branch: process.env.BRANCH_NAME || process.env.GIT_BRANCH || null,
       gitCommit: process.env.GIT_COMMIT || null,
       executionPolicy: process.env.EXECUTION_MODE || null,
