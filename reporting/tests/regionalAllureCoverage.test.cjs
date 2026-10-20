@@ -11,10 +11,18 @@ const clPlan = require("../../governance/cl-qst-plan.json");
 const mxCoverage = require("../../governance/mx-qst-coverage.json");
 const { enrichOfficialQst, normalizeStore } = require("../allure/officialQstEnrichment.cjs");
 
-function auditedIds(source) {
-  const block = source.match(/const AUDITED_BASE_STORE_IDS = Object\.freeze\(\[([\s\S]*?)\]\);/);
-  assert.ok(block, "AUDITED_BASE_STORE_IDS declaration must exist");
+function idsFromBlock(source, pattern, label) {
+  const block = source.match(pattern);
+  assert.ok(block, `${label} declaration must exist`);
   return [...block[1].matchAll(/"(SAM-\d+)"/g)].map((match) => match[1]).sort();
+}
+
+function auditedIds(source) {
+  return idsFromBlock(source, /const AUDITED_BASE_STORE_IDS = Object\.freeze\(\[([\s\S]*?)\]\);/, "AUDITED_BASE_STORE_IDS");
+}
+
+function detailIds(source) {
+  return idsFromBlock(source, /const DETAILS = \{([\s\S]*?)\n\};\n\nenrichOfficialQst/, "DETAILS");
 }
 
 function officialIds(cases) {
@@ -24,7 +32,7 @@ function officialIds(cases) {
     .sort();
 }
 
-test("regional official Base Store inventories are exhaustively audited", () => {
+test("regional official Base Store inventories and per-TC journeys are exhaustively audited", () => {
   const coSource = read("scripts/enrich-allure-co-qst.cjs");
   const clSource = read("scripts/enrich-allure-cl-qst.cjs");
   const mxSource = read("scripts/enrich-allure-mx-qst.cjs");
@@ -39,6 +47,9 @@ test("regional official Base Store inventories are exhaustively audited", () => 
   assert.deepEqual(auditedIds(coSource), co);
   assert.deepEqual(auditedIds(clSource), cl);
   assert.deepEqual(auditedIds(mxSource), mx);
+  assert.deepEqual(detailIds(coSource), co);
+  assert.deepEqual(detailIds(clSource), cl);
+  assert.deepEqual(detailIds(mxSource), mx);
   assert.ok(!mx.includes("SAM-25006"), "historical-only MX SAM-25006 must not inflate active P1 scope");
 });
 
@@ -144,24 +155,12 @@ test("shared enrichment can generate a sanitized contextual Allure result", () =
     tests: [{ samId: "SAM-99999", status: "PASS" }],
   }));
   fs.writeFileSync(path.join(evidenceRoot, "qst-evidence.json"), JSON.stringify({
-    tests: [{
-      zephyrId: "SAM-99999",
-      sku: "SKU-123",
-      orderCode: "MX261020-12345678",
-      paymentMode: "Credit Card",
-      email: "must-not-leak@example.com",
-    }],
+    tests: [{ zephyrId: "SAM-99999", sku: "SKU-123", orderCode: "MX261020-12345678", paymentMode: "Credit Card", email: "must-not-leak@example.com" }],
   }));
 
   const outcome = enrichOfficialQst({
-    market: "MX",
-    resultsDir,
-    runtimeFile: path.join(temp, "runtime-summary.json"),
-    evidenceRoot: path.join(temp, "evidence"),
-    environment: "S2",
-    store: "BASE_STORE",
-    cases: { "SAM-99999": { store: "BS", title: "Example checkout" } },
-    auditedIds: ["SAM-99999"],
+    market: "MX", resultsDir, runtimeFile: path.join(temp, "runtime-summary.json"), evidenceRoot: path.join(temp, "evidence"),
+    environment: "S2", store: "BASE_STORE", cases: { "SAM-99999": { store: "BS", title: "Example checkout" } }, auditedIds: ["SAM-99999"],
   });
   assert.equal(outcome.enriched, 1);
   const result = JSON.parse(fs.readFileSync(path.join(resultsDir, "one-result.json"), "utf8"));
