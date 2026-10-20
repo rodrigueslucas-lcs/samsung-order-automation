@@ -1,6 +1,7 @@
 import { attachNetworkEvidence } from "./networkEvidence";
 
 const INSTALLED = Symbol.for("samsung.qst.businessNetworkEvidence");
+const MAX_PER_KIND = 3;
 
 function marketMatcher(market) {
   const code = String(market || "").toLowerCase();
@@ -13,6 +14,8 @@ function classify(response, market) {
   const url = response.url();
   const marketPath = marketMatcher(market);
   if (!marketPath.test(url)) return null;
+  // Add-to-cart POST has its own dedicated attachment in CO/CL product flows.
+  if (method === "POST" && /\/carts?\/[^/]+\/entries(?:\?|$)/i.test(url)) return null;
   if (/\/carts?\/[^/]+\/entries(?:\/\d+)?(?:\?|$)/i.test(url)) return `Cart ${method}`;
   if (/\/carts?(?:\/|\?|$)/i.test(url)) return `Cart ${method}`;
   if (/deliverymodes|delivery|shipping|slots?/i.test(url)) return `Delivery ${method}`;
@@ -23,7 +26,7 @@ function classify(response, market) {
   return null;
 }
 
-export function installBusinessNetworkEvidence(page, testInfo, market, { max = 24 } = {}) {
+export function installBusinessNetworkEvidence(page, testInfo, market, { max = 18 } = {}) {
   if (!page || !testInfo?.attach || page[INSTALLED]) return;
   const counts = new Map();
   let captured = 0;
@@ -31,9 +34,11 @@ export function installBusinessNetworkEvidence(page, testInfo, market, { max = 2
   const listener = (response) => {
     const kind = classify(response, market);
     if (!kind || captured >= max) return;
-    captured += 1;
-    const count = (counts.get(kind) || 0) + 1;
+    const previous = counts.get(kind) || 0;
+    if (previous >= MAX_PER_KIND) return;
+    const count = previous + 1;
     counts.set(kind, count);
+    captured += 1;
     void attachNetworkEvidence(testInfo, `${kind} #${count}`, { response });
   };
 
