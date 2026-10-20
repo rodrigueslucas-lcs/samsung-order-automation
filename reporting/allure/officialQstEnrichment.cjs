@@ -17,7 +17,8 @@ function prettyEnvironment(value) {
 }
 
 function normalizeStore(value) {
-  return String(value || "BASE_STORE").toUpperCase().replaceAll("-", "_").replaceAll(" ", "_");
+  const text = String(value || "BASE_STORE").toUpperCase().replaceAll("-", "_").replaceAll(" ", "_");
+  return text === "BS" || text === "BASESTORE" ? "BASE_STORE" : text;
 }
 
 function prettyStore(value) {
@@ -129,6 +130,40 @@ function loadEvidence(root) {
       byId.set(id, sanitize({ ...previous, ...item }));
     }
   }
+  return byId;
+}
+
+function stdoutText(value) {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (Buffer.isBuffer(value)) return value.toString("utf8");
+  if (typeof value.text === "string") return value.text;
+  return "";
+}
+
+function extractRuntimeOutputEvidence(runtimeFile, market) {
+  const reportFile = path.join(path.dirname(runtimeFile), "results.json");
+  const report = readJson(reportFile);
+  const byId = new Map();
+  if (!report) return byId;
+  const orderPattern = new RegExp(`\\b${market}\\d{6}-\\d{8}(?:_\\d+)?\\b`, "i");
+
+  const visit = (node) => {
+    for (const spec of node.specs || []) {
+      const samId = String(spec.title || "").match(/SAM-\d+/)?.[0];
+      if (!samId) continue;
+      const text = (spec.tests || []).flatMap((testCase) => testCase.results || [])
+        .flatMap((result) => [...(result.stdout || []), ...(result.stderr || [])])
+        .map(stdoutText)
+        .join("\n");
+      const orderCode = text.match(orderPattern)?.[0] || null;
+      const paymentMode = text.match(/"paymentMode"\s*:\s*"([^"]+)"/i)?.[1] || null;
+      const outcome = text.match(/"outcome"\s*:\s*"([^"]+)"/i)?.[1] || null;
+      if (orderCode || paymentMode || outcome) byId.set(samId, sanitize({ orderCode, paymentMode, outcome }));
+    }
+    for (const suite of node.suites || []) visit(suite);
+  };
+  for (const suite of report.suites || []) visit(suite);
   return byId;
 }
 
@@ -298,6 +333,7 @@ function enrichOfficialQst({
   const runtime = readJson(runtimeFile) || { tests: [] };
   const runtimeById = new Map((runtime.tests || []).map((item) => [item.samId || item.id || item.officialTc, item]).filter(([id]) => id));
   const evidenceById = loadEvidence(evidenceRoot);
+  const outputEvidenceById = extractRuntimeOutputEvidence(runtimeFile, market);
   const registry = readKnownDefects();
   let enriched = 0;
 
@@ -311,22 +347,24 @@ function enrichOfficialQst({
     if (!samId || !entry || !officialIds.includes(samId)) continue;
 
     const runtimeTest = runtimeById.get(samId) || {};
-    const evidence = evidenceById.get(samId) || {};
+    const evidence = sanitize({ ...(outputEvidenceById.get(samId) || {}), ...(evidenceById.get(samId) || {}) });
     const details = { ...defaultCaseDetails(entry, samId, market), ...(detailsById[samId] || {}) };
     details.feature ||= inferFeature(entry, entry.title);
     details.userType ||= inferUserType(entry, entry.title);
     details.paymentMode ||= inferPaymentMode(entry.title);
-    const defect = activeDefect(registry, market, environment, store, samId);
-    const context = dynamicContext({ market, environment, store, samId, entry, details, runtimeTest, evidence, defect, defaults });
+    const runtimeStatus = prettyStatus(runtimeTest?.status || evidence.result || result.status);
+    const mappedDefect = activeDefect(registry, market, environment, store, samId);
+    const defect = ["FAIL", "BLOCKED"].includes(runtimeStatus) ? mappedDefect : null;
+    const context = dynamicContext({ market, environment, store, samId, entry, details, runtimeTest: { ...runtimeTest, status: runtimeStatus }, evidence, defect, defaults });
 
     result.name = `${samId} · ${entry.title}`;
-    result.description = description({ samId, market, environment, store, entry, details, runtimeTest, context, defect });
+    result.description = description({ samId, market, environment, store, entry, details, runtimeTest: { ...runtimeTest, status: runtimeStatus }, context, defect });
     result.labels = upsert(result.labels, "epic", "Samsung SMB QST");
     result.labels = upsert(result.labels, "parentSuite", `${market} · ${prettyEnvironment(environment)}`);
     result.labels = upsert(result.labels, "suite", `${prettyStore(store)} · P1/QST`);
     result.labels = upsert(result.labels, "feature", details.feature);
     result.labels = upsert(result.labels, "story", entry.title);
-    result.labels = upsert(result.labels, "severity", entry.payment || /payment|order confirmation/i.test(entry.title) ? "critical" : entry.dataDependent ? "normal" : "normal");
+    result.labels = upsert(result.labels, "severity", entry.payment || /payment|order confirmation/i.test(entry.title) ? "critical" : "normal");
     addTag(result.labels, market.toLowerCase());
     addTag(result.labels, normalizeEnvironment(environment).toLowerCase());
     addTag(result.labels, "qst");
@@ -344,7 +382,7 @@ function enrichOfficialQst({
     result.parameters = upsert(result.parameters, "Coverage", entry.coverage ? String(entry.coverage).toUpperCase() : null);
     result.parameters = upsert(result.parameters, "Known Defect", defect?.jira || null);
 
-    result.links = (result.links || []).filter((link) => ![samId, defect?.jira].includes(link.name));
+    result.links = (result.links || []).filter((link) => ![samId, mappedDefect?.jira].includes(link.name));
     result.links.push({ name: samId, url: `${JIRA_BASE_URL}${samId}`, type: "issue" });
     if (defect?.jira && defect.url) result.links.push({ name: defect.jira, url: defect.url, type: "issue" });
 
@@ -366,6 +404,8 @@ module.exports = {
   inferUserType,
   inferPaymentMode,
   normalizeEnvironment,
+  normalizeStore,
   prettyStatus,
   blockerCategory,
+  extractRuntimeOutputEvidence,
 };
