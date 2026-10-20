@@ -20,6 +20,7 @@ import coTrackingPrerequisite from "../../../../../utils/coTrackingPrerequisite.
 import atomicJson from "../../../../../utils/atomicJson";
 import authBrowserWindow from "../../../../../utils/authBrowserWindow.cjs";
 import { addProductFromPreQaBc } from "../../../../../flows/smb/preQaBcCart";
+import coLogoutCart from "../../../../../flows/co/logoutCart.cjs";
 
 const test = base.extend({
   qstBusinessScenario: [async ({}, use, testInfo) => {
@@ -525,15 +526,11 @@ test("SAM-24896 @qst @co @base-store @registered - Cart value when Reg user logs
     const registeredTotal=(await total.innerText()).match(/\$\s*([\d.,]+)/)?.[1];
     expect(registeredTotal,"Registered CO cart must show a numeric total before logout.").toBeTruthy();
     expect(Number(registeredTotal.replace(/\D/g,""))).toBeGreaterThan(0);
-    const logout=page.getByText(/Cerrar Sesi[oó]n/i).filter({visible:true}).first();
+    const logout=page.locator('[role="menu"].profile-menu').getByRole("menuitem",{name:/Cerrar Sesi[oó]n/i}).filter({visible:true}).first();
     await secondAuth.validateCurrentPageAuthenticated(page);
     await expect(logout).toBeVisible({timeout:30000});
-    await logout.click();
-    await page.waitForURL(cfg.cartUrl.href,{waitUntil:"domcontentloaded",timeout:60000});
-    await page.getByRole("button",{name:"My Profile",exact:true}).hover();
-    const signedOutMenu=page.locator('[role="menu"].profile-menu');
-    await expect(signedOutMenu.locator('[data-an-la="login"]'),"CO logout must render the signed-out profile action.").toBeVisible({timeout:30000});
-    await expect(signedOutMenu.getByText(/Cerrar Sesi[oó]n/i)).toHaveCount(0);
+    const logoutResult=await coLogoutCart.logoutCoCartAndValidateSignedOut(page,cfg,logout);
+    await i.attach("co-logout-transition",{body:Buffer.from(JSON.stringify(logoutResult)),contentType:"application/json"});
     await page.keyboard.press("Escape");
     await expect(page.getByText(cfg.sku,{exact:true}).first()).toBeVisible({timeout:30000});
     await expect(page.getByRole("textbox",{name:"Quantity",exact:true})).toHaveValue("1");
