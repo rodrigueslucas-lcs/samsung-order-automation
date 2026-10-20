@@ -8,6 +8,7 @@ const runtimeFile = path.resolve(process.argv[3] || path.join(process.env.MX_QST
 const evidenceRoot = path.resolve(process.argv[4] || path.join(path.dirname(runtimeFile), "evidence"));
 const environment = String(process.env.MX_QST_ENVIRONMENT || process.env.ENVIRONMENT || "S2").toUpperCase();
 const config = getMxConfig({ ...process.env, MX_QST_ENVIRONMENT: environment });
+const cases = Object.fromEntries(Object.entries(coverage.cases).map(([id, entry]) => [id, { ...entry, store: entry.store === "BS" ? "BASE_STORE" : entry.store }]));
 
 // Explicit 29-TC active Base Store P1 audit. SAM-25006 is intentionally excluded
 // because governance marks it historical-only; it must not inflate active scope.
@@ -111,7 +112,7 @@ enrichOfficialQst({
   evidenceRoot,
   environment,
   store: "BASE_STORE",
-  cases: coverage.cases,
+  cases,
   auditedIds: AUDITED_BASE_STORE_IDS,
   detailsById: DETAILS,
   defaults: {
