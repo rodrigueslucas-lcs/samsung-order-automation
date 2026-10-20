@@ -100,6 +100,20 @@
       "notes": "CL Back to Top / Volver al inicio validation is tracked by RT-746043. If the control is missing after scrolling, the runtime failure is classified as a known functional defect."
     },
     {
+      "market": "CL",
+      "environment": "S2",
+      "store": "BASE_STORE",
+      "samId": "SAM-24822",
+      "jira": "RT-751761",
+      "url": "https://jira.secext.samsung.net/browse/RT-751761",
+      "title": "[RT][CL][STG2] Credit/Debit Card payment cannot be completed with Mercado Pago test cards",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "Critical",
+      "rootCause": "Environment Issue",
+      "notes": "CL S2 registered Credit/Debit Card payment is blocked when the storefront returns 'Hubo un inconveniente con el medio de pago'. Reproduced manually with multiple official Mercado Pago test-card brands. Only this exact payment symptom is non-gating; unrelated SAM-24822 failures must remain FAIL."
+    },
+    {
       "market": "CO",
       "environment": "S1",
       "store": "BASE_STORE",
