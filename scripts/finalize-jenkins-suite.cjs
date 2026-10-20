@@ -103,16 +103,23 @@ function writeAllureEnvironment() {
 }
 
 function enrichAllure() {
-  if (!fs.existsSync(allureResultsDir)) return;
-  if (market !== 'CO' || !/P1|QST/i.test(suite)) return;
-  const script = path.resolve('scripts/enrich-allure-co-qst.cjs');
+  if (!fs.existsSync(allureResultsDir) || !/P1|QST/i.test(suite)) return;
+  const scriptByMarket = {
+    CO: 'scripts/enrich-allure-co-qst.cjs',
+    PE: 'scripts/enrich-allure-pe-qst.cjs',
+  };
+  const scriptName = scriptByMarket[market];
+  if (!scriptName) return;
+  const script = path.resolve(scriptName);
   if (!fs.existsSync(script)) return;
-  const enriched = spawnSync(process.execPath, [script, allureResultsDir, runtimeSummaryFile], {
+  const args = [script, allureResultsDir, runtimeSummaryFile];
+  if (market === 'PE') args.push(path.join(artifactDir, 'evidence', 'qst-evidence.json'));
+  const enriched = spawnSync(process.execPath, args, {
     stdio: 'inherit',
     env: process.env,
   });
   if (enriched.status !== 0) {
-    console.error('[reporting] CO Allure enrichment failed; raw results were preserved.');
+    console.error(`[reporting] ${market} Allure enrichment failed; raw results were preserved.`);
   }
 }
 
