@@ -4,6 +4,7 @@ import path from "node:path";
 import mxConfigModule from "../../../../../utils/mxConfig";
 import mxAuthState from "../../../../../utils/mxAuthState";
 import mxStagingGuard from "../../../../../utils/mxStagingGuard";
+import { installBusinessNetworkEvidence } from "../../../../../utils/businessNetworkEvidence";
 
 const { getMxConfig } = mxConfigModule;
 const {
@@ -118,6 +119,14 @@ test.beforeAll(async () => {
 test.beforeEach(async ({ context, page, mxConfig, headless }, testInfo) => {
   testInfo.setTimeout(780000);
   test.skip(!hasAuthState(), "Dedicated MX authenticated state is required.");
+
+  // Authenticated QSTs use a different fixture from the guest/safe lane. Install
+  // the same curated business API listener here so registered cart/checkout/
+  // delivery/payment/order evidence reaches Allure as well. Keep DST/auth-only
+  // runs clean unless the test itself is tagged QST or the active suite is P1/QST.
+  const qstEvidenceEnabled = /@qst\b/i.test(testInfo.title) || /P1|QST/i.test(String(process.env.TEST_SUITE || ""));
+  if (qstEvidenceEnabled) installBusinessNetworkEvidence(page, testInfo, "MX");
+
   await applyAuthSessionStorage(context);
   if (!headless) await maximizeMxWindow(page);
 
