@@ -3,16 +3,17 @@ import ProductPage from "../../pages/ProductPage";
 import CartPage from "../../pages/CartPage";
 import clAuthStateModule from "../../utils/clAuthState";
 import clStorefrontOverlays from "../../utils/clStorefrontOverlays";
+import { attachNetworkEvidence } from "../../utils/networkEvidence";
+import evidenceContext from "../../reporting/evidence/evidenceContext";
 
 const { CL_AUTH_STATE_PATH, getClAuthState, hasClAuthState } = clAuthStateModule;
+const { recordBusinessEvidence } = evidenceContext;
 
 export async function selectClCheckoutOption(page, control, name) {
   await control.click();
   const option = page.locator(".cdk-overlay-pane:visible")
     .getByRole("option", { name }).filter({ visible: true }).first();
   await option.waitFor({ state: "visible", timeout: 30000 });
-  // Material's long overlay can leave a valid option outside the click viewport.
-  // Keyboard selection uses its native handler and still requires readback.
   await option.press("Enter");
   await expect(control).toContainText(name);
 }
@@ -47,8 +48,6 @@ export async function bootstrapClStorefront(page, config) {
           await empty(main) && await empty(banner) &&
           !body.replace(/Skip to (?:Header|Main Content|Footer)/g, "").trim();
         if (attempt || !blankShell) throw error;
-        // Only an empty home shell is recoverable here, before any cart or
-        // address mutation. Login/error/content pages must keep their failure.
         await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 });
       }
     }
@@ -93,6 +92,22 @@ async function resolveProduct(page, config) {
 export async function addConfiguredProductToClCart(page, config) {
   return test.step("Add the configured CL product to cart and wait for the cart mutation", async () => {
     const resolved = await resolveProduct(page, config);
+    const testInfo = test.info();
+    recordBusinessEvidence(testInfo, {
+      market: "CL",
+      environment: config.environment,
+      sku: resolved.sku,
+      pdpUrl: resolved.pdpUrl.href,
+    });
+    await testInfo.attach("CL Product Context", {
+      body: Buffer.from(JSON.stringify({
+        market: "CL",
+        environment: config.environment,
+        sku: resolved.sku,
+        pdpUrl: `${resolved.pdpUrl.origin}${resolved.pdpUrl.pathname}`,
+      }, null, 2)),
+      contentType: "application/json",
+    });
     await bootstrapClStorefront(page, config);
     const product = new ProductPage(page, {
       setupUrl: config.setupUrl?.href || null,
@@ -100,7 +115,14 @@ export async function addConfiguredProductToClCart(page, config) {
       pdpUrl: resolved.pdpUrl.href,
       cartUrl: config.cartUrl.href,
     });
+    const addResponse = page.waitForResponse((response) => {
+      const request = response.request();
+      const url = new URL(response.url());
+      return request.method() === "POST" && /\/cl\/users\/[^/]+\/carts\/[^/]+\/entries(?:\/|$)/i.test(url.pathname);
+    }, { timeout: 60000 }).catch(() => null);
     await product.addConfiguredPdpToCart({ waitForCartMutation: true });
+    const response = await addResponse;
+    if (response) await attachNetworkEvidence(testInfo, "Add to Cart", { response });
     return new CartPage(page, {
       cartUrl: config.cartUrl.href,
       sku: resolved.sku,
