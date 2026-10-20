@@ -14,7 +14,7 @@ function bootstrapScenario({ failures = 1, body = '', url = 'https://stg2.shop.s
     locator: selector => selector === 'body' ? { innerText: async () => body } : profile };
   const source = fs.readFileSync('flows/cl/qstFlows.js', 'utf8').replace(/^import .*;\r?\n/gm, '').replace(/^export /gm, '');
   const run = vm.runInNewContext(`${source}\nbootstrapClStorefront;`, {
-    URL, test: { step: (_, action) => action() }, clAuthStateModule: {},
+    evidenceContext: { recordBusinessEvidence() {} }, URL, test: { step: (_, action) => action() }, clAuthStateModule: {},
     clStorefrontOverlays: { installClChatNoticeDismissal: async () => {} },
   });
   return { run: () => run(page, { baseUrl: new URL('https://stg2.shop.samsung.com/cl/') }),

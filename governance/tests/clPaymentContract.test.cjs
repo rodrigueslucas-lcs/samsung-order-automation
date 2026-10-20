@@ -44,7 +44,7 @@ function installments(options) {
   const selected = [];
   const control = { locator: () => ({ evaluateAll: async () => options }), selectOption: async value => selected.push(value) };
   const choose = vm.runInNewContext(`${source}\nselectClInterestFreeInstallments;`, {
-    test: { skip(condition, reason) { if (condition) throw new Error(reason); } },
+    evidenceContext: { recordBusinessEvidence() {} }, test: { skip(condition, reason) { if (condition) throw new Error(reason); } },
     expect: () => ({ toBeVisible: async () => {}, toHaveValue: async value => assert.equal(selected.at(-1), value) }),
   });
   return { selected, run: () => choose({ installmentsCombobox: control }, { attach: async () => {} }) };
@@ -69,7 +69,7 @@ test('CL Flow simulator refuses Production, foreign storefronts and an unrelated
   const source = fs.readFileSync('flows/cl/paymentFlows.js', 'utf8')
     .replace(/^import .*;\r?\n/gm, '').replace(/^export /gm, '');
   const complete = vm.runInNewContext(`${source}\ncompleteClFlowSandbox;`, {
-    destructiveGuards: { requirePaymentSubmitOptIn() {} }, URL,
+    evidenceContext: { recordBusinessEvidence() {} }, destructiveGuards: { requirePaymentSubmitOptIn() {} }, URL,
   });
   for (const [url, storefrontOrigin, orderCode] of [
     ['https://www.flow.cl/app/web/pay.php', 'https://stg2.shop.samsung.com', 'CL261019-12345678'],
@@ -100,7 +100,7 @@ test('CL Flow confirms an existing sandbox attempt once and never retries an amb
       },
     };
     const complete = vm.runInNewContext(`${source}\ncompleteClFlowSandbox;`, {
-      destructiveGuards: { requirePaymentSubmitOptIn() {} }, URL,
+      evidenceContext: { recordBusinessEvidence() {} }, destructiveGuards: { requirePaymentSubmitOptIn() {} }, URL,
       expect: () => ({ toBeVisible: async () => {}, toContainText: async code => assert.equal(code, 'CL261019-12345678'),
         toHaveText: async text => assert.equal(text, 'Quiero pagar la orden') }),
     });
@@ -127,7 +127,7 @@ test('CL native submit waits for and returns only the chosen panel button', asyn
     return method;
   } };
   const choose = vm.runInNewContext(`${source}\nselectClNativePaymentButton;`, {
-    expect: target => ({ toBeVisible: async () => { if (target === button) { assert.ok(opened); ready = true; } },
+    evidenceContext: { recordBusinessEvidence() {} }, expect: target => ({ toBeVisible: async () => { if (target === button) { assert.ok(opened); ready = true; } },
       toHaveAttribute: async () => assert.ok(opened), toBeEnabled: async () => assert.ok(ready) }),
   });
   assert.equal(await choose(page, /^Transferencia Bancaria$/), button);
