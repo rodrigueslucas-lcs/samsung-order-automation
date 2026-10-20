@@ -98,3 +98,17 @@ test("Allure normalization hardens blocked known defects and removes broken deta
   assert.match(dedupe, /Blocked by Known Defect/);
   assert.match(dedupe, /blocked\/non-gating/);
 });
+
+test("final Allure normalization maps known defects for every market and publishes Actual Result", () => {
+  const dedupe = read("scripts/dedupe-allure-evidence.cjs");
+  assert.match(dedupe, /governance\/known-defects\.json/);
+  assert.match(dedupe, /function mappedDefect\(result\)/);
+  assert.match(dedupe, /parameterValue\(result, "Market"\)/);
+  assert.match(dedupe, /parameterValue\(result, "Environment"\)/);
+  assert.match(dedupe, /parameterValue\(result, "Store"\)/);
+  assert.match(dedupe, /Known Defect Title/);
+  assert.match(dedupe, /\*\*Actual result:\*\*/);
+  assert.match(dedupe, /PASS — all automated assertions executed for this scenario were satisfied/);
+  assert.match(dedupe, /BLOCKED \/ KNOWN DEFECT/);
+  assert.match(dedupe, /FAIL \/ KNOWN DEFECT/);
+});
