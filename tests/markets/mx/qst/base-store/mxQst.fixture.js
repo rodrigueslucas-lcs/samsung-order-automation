@@ -2,26 +2,25 @@ import { test as base, expect } from "@playwright/test";
 import mxConfigModule from "../../../../../utils/mxConfig";
 import mxStagingGuard from "../../../../../utils/mxStagingGuard";
 import { attachNetworkEvidence } from "../../../../../utils/networkEvidence";
+import evidenceContext from "../../../../../reporting/evidence/evidenceContext.js";
 
 const { getMxConfig } = mxConfigModule;
 const { assertMxStagingPage } = mxStagingGuard;
+const { recordBusinessEvidence } = evidenceContext;
 
 function classifyBusinessApi(response) {
   const request = response.request();
   const method = request.method();
   const url = response.url();
 
-  if (/\/users\/current\/carts(?:\/[^/]+\/entries)?(?:\?|$)/i.test(url) && /POST|PUT|PATCH|DELETE/i.test(method)) {
+  if (/\/users\/current\/carts(?:\/[^/]+)?(?:\/entries(?:\/\d+)?)?(?:\?|$)/i.test(url)) {
     return `Cart ${method}`;
   }
   if (/getAddressForWardPostCode/i.test(url)) return "Postal code lookup";
-  if (/\/deliverymodes\/update(?:\?|$)/i.test(url)) return "Delivery mode update";
-  if (/\/payment(?:details|mode|modes)?(?:\/|\?|$)/i.test(url) && /POST|PUT|PATCH/i.test(method)) {
-    return `Payment ${method}`;
-  }
-  if (/\/users\/current\/orders(?:\/|\?|$)/i.test(url) && /POST/i.test(method)) {
-    return "Order creation";
-  }
+  if (/delivery|deliverymodes|address/i.test(url) && /\/v2\/mx\//i.test(url)) return `Delivery ${method}`;
+  if (/checkout/i.test(url) && /\/mx\//i.test(url)) return `Checkout ${method}`;
+  if (/payment|submitOrder/i.test(url) && /\/mx\//i.test(url)) return `Payment ${method}`;
+  if (/\/users\/current\/orders(?:\/|\?|$)/i.test(url)) return `Order ${method}`;
   return null;
 }
 
@@ -45,11 +44,27 @@ export const test = base.extend({
     });
   }, { auto: true }],
   mxStagingSession: [async ({ page, mxConfig }, use, testInfo) => {
+    recordBusinessEvidence(testInfo, {
+      market: "MX",
+      environment: mxConfig.environment,
+      sku: mxConfig.sku,
+      pdpUrl: mxConfig.pdpUrl.href,
+    });
+    await testInfo.attach("MX Test Context", {
+      body: Buffer.from(JSON.stringify({
+        market: "MX",
+        environment: mxConfig.environment,
+        sku: mxConfig.sku,
+        pdpUrl: `${mxConfig.pdpUrl.origin}${mxConfig.pdpUrl.pathname}`,
+      }, null, 2)),
+      contentType: "application/json",
+    });
+
     const evidenceTasks = [];
     const evidenceCounts = new Map();
     const onResponse = (response) => {
       const kind = classifyBusinessApi(response);
-      if (!kind || evidenceTasks.length >= 20) return;
+      if (!kind || evidenceTasks.length >= 24) return;
       const count = (evidenceCounts.get(kind) || 0) + 1;
       evidenceCounts.set(kind, count);
       evidenceTasks.push(
