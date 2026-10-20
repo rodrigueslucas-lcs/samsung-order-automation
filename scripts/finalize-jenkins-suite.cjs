@@ -115,7 +115,8 @@ function enrichAllure() {
   const script = path.resolve(scriptName);
   if (!fs.existsSync(script)) return;
   const evidenceRoot = path.join(artifactDir, 'evidence');
-  const args = [script, allureResultsDir, runtimeSummaryFile, evidenceRoot];
+  const evidenceArg = market === 'PE' ? path.join(evidenceRoot, 'qst-evidence.json') : evidenceRoot;
+  const args = [script, allureResultsDir, runtimeSummaryFile, evidenceArg];
   const enriched = spawnSync(process.execPath, args, {
     stdio: 'inherit',
     env: process.env,
