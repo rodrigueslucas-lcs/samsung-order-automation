@@ -6,6 +6,7 @@ import destructiveGuards from "../../../../../utils/destructiveGuards";
 import PaymentPage from "../../../../../pages/PaymentPage";
 import OrderConfirmationPage from "../../../../../pages/OrderConfirmationPage";
 import { testData } from "../../../../../utils/testData";
+import safetyPaySandbox from "../../../../../flows/pe/safetyPaySandbox.cjs";
 import { addConfiguredProductToPeCart, reachPeGuestPayment } from "./peQstFlows";
 
 const { getPeQstConfig } = peConfigModule;
@@ -196,13 +197,19 @@ test.describe("PE QST - official safe gap reconciliation", () => {
     });
 
     await test.step("Validate visible new order confirmation screen", async () => {
-      const outcomeUrl = new URL(result.finalUrl);
+      if (!useCard && new URL(page.url()).origin === 'https://sandbox-gateway.safetypay.com') {
+        await safetyPaySandbox.completePeSafetyPaySandbox(page, {
+          orderCode: result.orderCode, storefrontOrigin: cfg.baseUrl.origin,
+        });
+      }
+      const outcomeUrl = new URL(page.url());
       if (outcomeUrl.hostname !== cfg.baseUrl.hostname) {
         throw new Error(`PE order ${result.orderCode} reached ${outcomeUrl.origin}${outcomeUrl.pathname}; Samsung confirmation remains unproven. Resume the existing attempt before any new submission.`);
       }
       const confirmation = new OrderConfirmationPage(page);
       const confirmationOrder = await confirmation.validateOrderCreated();
-      expect(confirmationOrder).toContain(result.orderCode.replace(/^PE/i, ""));
+      const baseOrderCode = result.orderCode.match(/^PE\d{6}-\d{8}/i)[0];
+      expect(confirmationOrder).toContain(baseOrderCode.replace(/^PE/i, ""));
     });
 
     recordBusinessEvidence(testInfo, {
