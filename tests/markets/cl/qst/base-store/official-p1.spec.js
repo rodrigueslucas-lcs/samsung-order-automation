@@ -12,6 +12,8 @@ import clSamsungCredentials from "../../../../../utils/clSamsungCredentials";
 import clAuthLoginReturn from "../../../../../utils/clAuthLoginReturn.cjs";
 import { addConfiguredProductToClCart, bootstrapClStorefront, selectClCheckoutOption } from "../../../../../flows/cl/qstFlows";
 import { executeClPaymentOrder } from "../../../../../flows/cl/paymentFlows";
+import clCareFlows from "../../../../../flows/cl/careFlows.cjs";
+import authBrowserWindow from "../../../../../utils/authBrowserWindow.cjs";
 
 const test = base.extend({
   qstBusinessScenario: [async ({}, use, testInfo) => {
@@ -299,8 +301,31 @@ test.describe("CL QST - Base Store Official P1", () => {
       expect(await giftLabels.count(), "CL BOGO cart should expose at least one promotional gift indicator.").toBeGreaterThanOrEqual(1);
     });
   });
-  test("SAM-24803 @blocked @qst @cl @base-store - Verify Recycle & Save Trade-in on cart page", async () => blocked("eligible CL Trade-in SKU/test data is required."));
-  test("SAM-24804 @blocked @qst @cl @base-store - SC+ on cart page", async () => blocked("eligible CL Samsung Care+ SKU/test data is required."));
+  test("SAM-24803 @blocked @qst @cl @base-store - Verify Recycle & Save Trade-in on cart page", async () => blocked("eligible CL Trade-in PDP SKU/test data is required."));
+  test("SAM-24804 @qst @cl @base-store - SC+ on cart page", async ({ page }, testInfo) => {
+    const cfg = config();
+    test.skip(!cfg.scPlusSku || !cfg.scPlusPlanSku, "An eligible CL Samsung Care+ PDP SKU and plan are required for this environment.");
+    await test.step("Prepare the maximized CL desktop window without clipping the service dialog", async () => {
+      if (["1", "true"].includes(String(process.env.CI).toLowerCase()) || process.env.MX_QST_HEADLESS === "1") return;
+      await authBrowserWindow.prepareAuthBrowserWindow(page);
+      const cdp = await page.context().newCDPSession(page);
+      try {
+        await cdp.send("Emulation.clearDeviceMetricsOverride");
+        const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+        await page.setViewportSize(viewport);
+      } finally { await cdp.detach(); }
+    });
+    const careConfig = { ...cfg, sku: cfg.scPlusSku, pdpUrl: new URL(`/cl/p/${cfg.scPlusSku}`, cfg.baseUrl.origin) };
+    await test.step("Open the eligible CL PDP and add its quantity-one product to cart", () =>
+      addConfiguredProductToClCart(page, careConfig)
+    );
+    const evidence = await test.step("Add Samsung Care+ and prove persisted plan, total and delete control", () =>
+      clCareFlows.addAndValidateClCare(page, careConfig)
+    );
+    await testInfo.attach("CL SC+ persisted cart evidence", {
+      body: JSON.stringify({ entryPoint: "PDP", ...evidence }), contentType: "application/json",
+    });
+  });
 
   test("SAM-24806 @qst @cl @base-store - UI validation in desktop view", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });

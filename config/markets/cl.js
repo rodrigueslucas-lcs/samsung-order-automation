@@ -43,6 +43,9 @@ function getClQstConfig(environment = process.env) {
     ? httpsUrl(environment.CL_EPP_STOREFRONT_URL, "CL_EPP_STOREFRONT_URL")
     : null;
 
+  const scPlusSku = String(environment.CL_QST_SC_PLUS_SKU || (envName === "S2" ? "SM-S918BZKILTL" : "")).trim();
+  const scPlusPlanSku = String(environment.CL_QST_SC_PLUS_PLAN_SKU || (envName === "S2" ? "P-GT-HKXXHP2C" : "")).trim();
+
   return Object.freeze({
     market: "CL",
     environment: envName,
@@ -56,6 +59,8 @@ function getClQstConfig(environment = process.env) {
     cartUrl: new URL("/cl/cart", baseUrl),
     checkoutCommune,
     eppUrl,
+    scPlusSku,
+    scPlusPlanSku,
   });
 }
 
