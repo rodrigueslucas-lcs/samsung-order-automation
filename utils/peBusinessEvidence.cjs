@@ -2,35 +2,48 @@ const { sanitize } = require("../reporting/evidence/sanitizer");
 
 const MUTATING_METHOD = /^(POST|PUT|PATCH|DELETE)$/i;
 const BUSINESS_URL = /(?:\/cart(?:s|\/|\?|$)|\/entries(?:\/|\?|$)|checkout|delivery|address|payment|submitOrder|\/orders(?:\/|\?|$))/i;
+const MAX_BODY_CHARS = 16000;
 
 function parseBody(text) {
   if (!text) return null;
-  const limited = String(text).slice(0, 16000);
+  const raw = String(text);
   try {
-    return JSON.parse(limited);
+    const parsed = JSON.parse(raw);
+    return sanitize(parsed);
   } catch {
-    return limited;
+    return sanitize(raw.slice(0, MAX_BODY_CHARS));
+  }
+}
+
+function safeEndpoint(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return String(rawUrl || "").split("?")[0];
   }
 }
 
 async function serializeExchange(response) {
   const request = response.request();
-  const contentType = String(response.headers()["content-type"] || "");
+  const responseContentType = String(response.headers()["content-type"] || "");
+  const requestContentType = String(request.headers()["content-type"] || "");
   let responseBody = null;
-  if (/json|text/i.test(contentType)) {
+  if (/json|text/i.test(responseContentType)) {
     responseBody = await response.text().then(parseBody).catch(() => null);
   }
   const requestBody = parseBody(request.postData());
   return sanitize({
     method: request.method(),
-    url: request.url(),
+    endpoint: safeEndpoint(request.url()),
     status: response.status(),
+    ok: response.ok(),
     request: {
-      contentType: request.headers()["content-type"] || null,
+      contentType: requestContentType || null,
       body: requestBody,
     },
     response: {
-      contentType: contentType || null,
+      contentType: responseContentType || null,
       body: responseBody,
     },
   });
@@ -48,8 +61,8 @@ async function captureBusinessExchange(page, testInfo, name, action, { matcher =
   const pending = [];
   const onResponse = (response) => {
     const request = response.request();
-    if (!MUTATING_METHOD.test(request.method()) && !matcher.test(request.url())) return;
     if (!matcher.test(request.url())) return;
+    if (!MUTATING_METHOD.test(request.method()) && !/\/orders(?:\/|\?|$)/i.test(request.url())) return;
     pending.push(serializeExchange(response));
   };
 
@@ -57,7 +70,7 @@ async function captureBusinessExchange(page, testInfo, name, action, { matcher =
   try {
     return await action();
   } finally {
-    await page.waitForTimeout(250).catch(() => {});
+    await page.waitForTimeout(350).catch(() => {});
     page.off("response", onResponse);
     const settled = await Promise.allSettled(pending);
     const exchanges = settled
@@ -73,18 +86,24 @@ async function attachProductContext(testInfo, config, extra = {}) {
     market: "PE",
     environment: config?.environment || process.env.PE_QST_ENVIRONMENT || null,
     sku: config?.sku || null,
-    pdpUrl: config?.pdpUrl?.href || String(config?.pdpUrl || "") || null,
-    cartUrl: config?.cartUrl?.href || String(config?.cartUrl || "") || null,
+    pdpUrl: safeEndpoint(config?.pdpUrl?.href || String(config?.pdpUrl || "") || null),
+    cartUrl: safeEndpoint(config?.cartUrl?.href || String(config?.cartUrl || "") || null),
     ...extra,
   });
 }
 
 async function attachOrderEvidence(testInfo, data = {}) {
-  return attachJson(testInfo, "PE Order Evidence", data);
+  return attachJson(testInfo, "PE Order Evidence", {
+    market: "PE",
+    environment: process.env.PE_QST_ENVIRONMENT || process.env.TEST_ENV || null,
+    ...data,
+  });
 }
 
 module.exports = {
   BUSINESS_URL,
+  safeEndpoint,
+  serializeExchange,
   captureBusinessExchange,
   attachProductContext,
   attachOrderEvidence,
