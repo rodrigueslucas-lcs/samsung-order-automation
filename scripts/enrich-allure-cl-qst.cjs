@@ -10,8 +10,6 @@ const environment = String(process.env.CL_QST_ENVIRONMENT || process.env.ENVIRON
 const config = getClQstConfig({ ...process.env, CL_QST_ENVIRONMENT: environment });
 const cases = Object.fromEntries(Object.entries(plan.cases).map(([id, entry]) => [id, { ...entry, store: entry.store === "BS" ? "BASE_STORE" : entry.store }]));
 
-// Explicitly reviewed against governance/cl-qst-plan.json on 2026-10-20.
-// Keep this hand-audited list so official-scope drift cannot silently degrade Allure.
 const AUDITED_BASE_STORE_IDS = Object.freeze([
   "SAM-24784", "SAM-24785", "SAM-24786", "SAM-24790", "SAM-24791",
   "SAM-24793", "SAM-24794", "SAM-24797", "SAM-24803", "SAM-24804",
@@ -22,109 +20,39 @@ const AUDITED_BASE_STORE_IDS = Object.freeze([
   "SAM-24831",
 ]);
 
+const D = (objective, expected, steps, extra = {}) => ({ objective, expected, steps, ...extra });
 const DETAILS = {
-  "SAM-24785": {
-    objective: "Validate the CL My Profile address lifecycle with QA-only data.",
-    expected: "A registered user can create, edit and remove the controlled QA address and cleanup leaves no residual test address.",
-    steps: ["Restore registered CL session", "Open address management", "Create QA-only address", "Edit the created address", "Delete the QA address", "Validate cleanup"],
-    feature: "Account & Profile",
-    userType: "Registered",
-  },
-  "SAM-24786": {
-    objective: "Validate the registered CL My Orders page and available order references.",
-    expected: "My Orders opens for the authenticated account and exposes order information or a valid empty-history state.",
-    feature: "Order & BackOffice",
-    userType: "Registered",
-  },
-  "SAM-24790": {
-    objective: "Validate the controlled CL product can be added from PDP to cart.",
-    expected: "The configured SKU is added successfully and is observable in cart with product/network evidence.",
-    feature: "Product & Catalog",
-  },
-  "SAM-24797": {
-    objective: "Validate an active CL BOGO campaign using an eligible source SKU.",
-    expected: "The eligible source product and promotional gift indicator are represented in cart; missing campaign eligibility is treated as test-data prerequisite.",
-    feature: "Cart & Promotions",
-  },
-  "SAM-24803": {
-    objective: "Validate Recycle & Save / Trade-in while tracking the mapped SAM-25150 defect.",
-    expected: "Trade-in should retain/display the expected device and trade amount; the mapped missing-trade-amount symptom is reported as Known Defect rather than an unrelated failure.",
-    feature: "Cart & Promotions",
-  },
-  "SAM-24804": {
-    objective: "Validate Samsung Care+ for an eligible CL product.",
-    expected: "SC+ is available when an eligible SKU exists; missing eligible product data remains an explicit prerequisite blocker.",
-    feature: "Cart & Promotions",
-  },
-  "SAM-24807": {
-    objective: "Validate legitimate Samsung Account login initiated from CL checkout.",
-    expected: "Checkout reaches the real Samsung Account flow and returns to authenticated CL checkout after any required human verification.",
-    steps: ["Prepare legitimate Samsung Account state", "Start checkout as registered user", "Open Samsung Account login", "Complete required human verification when presented", "Return to CL checkout", "Validate authenticated Delivery state"],
-    feature: "Account & Profile",
-    userType: "Registered",
-  },
-  "SAM-24811": {
-    objective: "Validate adding/editing a saved or new address during registered CL checkout.",
-    expected: "Controlled address data can be persisted from checkout and is visible in My Profile, with QA cleanup performed after validation.",
-    feature: "Checkout",
-    userType: "Registered",
-  },
-  "SAM-24816": {
-    objective: "Validate distinct shipping and billing address data in CL checkout.",
-    expected: "Shipping and billing values remain independently represented and are not unintentionally overwritten.",
-    feature: "Checkout",
-    userType: "Guest",
-  },
-  "SAM-24821": {
-    objective: "Validate Back to Top on the CL cart while tracking RT-746043 when the control is missing.",
-    expected: "The control returns the viewport to the top when available; the exact mapped missing-control symptom is SKIPPED/KNOWN DEFECT and does not mask unrelated failures.",
-    feature: "Storefront UI",
-  },
-  "SAM-24822": {
-    objective: "Validate an authorized registered-user CL credit/debit-card payment.",
-    expected: "The payment reaches Samsung confirmation and exposes a valid CL Order ID when destructive submission is explicitly authorized.",
-    steps: ["Restore registered CL session", "Prepare one controlled cart item", "Reach Payment", "Select and validate Credit/Debit Card", "Submit the authorized payment once", "Capture Order ID and payment/network evidence", "Validate Samsung confirmation"],
-    feature: "Payment",
-    userType: "Registered",
-    paymentMode: "Credit / Debit Card",
-  },
-  "SAM-24823": {
-    objective: "Validate an authorized CL Direct Bank Transfer payment journey.",
-    expected: "The configured bank-transfer journey reaches its accepted outcome and preserves payment/order evidence when an order is created.",
-    feature: "Payment",
-    paymentMode: "Direct Bank Transfer",
-  },
-  "SAM-24824": {
-    objective: "Validate CL interest-free installment payment using the supported card path.",
-    expected: "The installment option is selectable and the authorized payment outcome is proven with order evidence when submitted.",
-    feature: "Payment",
-    paymentMode: "Interest-free installments",
-  },
-  "SAM-24825": {
-    objective: "Validate Samsung Rewards payment only with a verified eligible CL Rewards balance and redemption fixture.",
-    expected: "Rewards payment is exercised when prerequisites exist; missing points/configuration is reported as a payment prerequisite blocker.",
-    feature: "Payment",
-    paymentMode: "Samsung Rewards",
-    userType: "Rewards-capable account",
-  },
-  "SAM-24826": {
-    objective: "Validate the CL order-confirmation screen after an authorized payment submission.",
-    expected: "A new CL Order ID is created and the Samsung confirmation screen visibly represents the same order.",
-    steps: ["Prepare controlled checkout", "Reach Payment", "Submit one authorized payment", "Capture Order ID and payment outcome", "Validate the confirmation screen", "Preserve order/network evidence"],
-    feature: "Payment",
-  },
-  "SAM-24830": {
-    objective: "Validate CL BackOffice order and product search/read access.",
-    expected: "BackOffice authentication succeeds and order/product data can be found in the required search modes.",
-    feature: "Order & BackOffice",
-    userType: "BackOffice",
-  },
-  "SAM-24831": {
-    objective: "Validate the CL BackOffice order process/status for the controlled reference order.",
-    expected: "The order can be opened and its process/status matches the official checkpoint for the target environment.",
-    feature: "Order & BackOffice",
-    userType: "BackOffice",
-  },
+  "SAM-24784": D("Validate the registered CL Samsung Account session on Home.", "The restored registered session is recognized and authenticated profile/logout controls are available.", ["Restore CL registered session", "Open CL storefront home", "Validate authenticated profile state", "Validate logout/account control"], { feature: "Account & Profile", userType: "Registered" }),
+  "SAM-24785": D("Validate the CL My Profile address lifecycle with QA-only data.", "A registered user can create, edit and remove the controlled QA address and cleanup leaves no residual test address.", ["Restore registered CL session", "Open address management", "Create QA-only address", "Edit the created address", "Delete the QA address", "Validate cleanup"], { feature: "Account & Profile", userType: "Registered" }),
+  "SAM-24786": D("Validate the registered CL My Orders page and available order references.", "My Orders opens for the authenticated account and exposes order information or a valid empty-history state.", ["Restore registered session", "Open My Orders", "Validate orders page/API state", "Read visible order references when available", "Preserve order-history evidence"], { feature: "Order & BackOffice", userType: "Registered" }),
+  "SAM-24790": D("Validate the controlled CL product can be added from PDP to Cart.", "The configured SKU is added successfully and is observable in Cart with product/network evidence.", ["Open controlled CL PDP", "Add configured product", "Capture Add to Cart request/response", "Open Cart", "Validate controlled SKU"], { feature: "Product & Catalog" }),
+  "SAM-24791": D("Validate the CL Cart page UI.", "The controlled product, cart structure and required presentation are rendered correctly.", ["Add controlled product", "Open Cart", "Validate product presentation", "Validate cart UI/controls", "Preserve Cart evidence"], { feature: "Cart & Promotions" }),
+  "SAM-24793": D("Validate the CL Order Summary on Cart.", "Subtotal/total and order-summary information are displayed for the controlled product.", ["Prepare controlled Cart", "Locate Order Summary", "Validate subtotal", "Validate total/summary content", "Preserve summary evidence"], { feature: "Cart & Promotions" }),
+  "SAM-24794": D("Validate Samsung Rewards messaging for a Rewards-capable CL user.", "Rewards information is visible in the applicable controlled cart surface for the configured account/environment.", ["Prepare controlled cart", "Use the intended Rewards-capable context", "Locate Samsung Rewards messaging", "Validate Rewards text/state", "Preserve Rewards evidence"], { feature: "Cart & Promotions", userType: "Rewards-capable account" }),
+  "SAM-24797": D("Validate an active CL BOGO promotion using an eligible source SKU.", "The source product and promotional gift indicator are represented in Cart; missing campaign eligibility remains an explicit test-data blocker.", ["Open BOGO-eligible product", "Add source SKU", "Validate source product in Cart", "Validate promotional gift indicator", "Preserve campaign/SKU evidence"], { feature: "Cart & Promotions" }),
+  "SAM-24803": D("Validate Recycle & Save / Trade-in while tracking SAM-25150.", "Trade-in should retain/display device and trade amount; the mapped missing-trade-amount symptom is represented as Known Defect instead of an unrelated failure.", ["Prepare Trade-in eligible context", "Open Trade-in journey", "Complete required device flow when data is available", "Validate device/trade amount in Cart", "Report prerequisite blocker or mapped SAM-25150 as applicable"], { feature: "Cart & Promotions" }),
+  "SAM-24804": D("Validate Samsung Care+ on CL Cart for an eligible product.", "SC+ is available for an eligible SKU; absence of eligible test data is an explicit prerequisite blocker, not a false product failure.", ["Prepare SC+-eligible product", "Open Cart", "Locate Samsung Care+", "Validate service surface", "Preserve eligible-data/blocker evidence"], { feature: "Cart & Promotions" }),
+  "SAM-24806": D("Validate CL desktop storefront UI.", "Header, footer, images and desktop layout render without blocking visual issues.", ["Open CL storefront in desktop viewport", "Validate header", "Validate footer", "Validate image/content presence", "Preserve visual evidence"], { feature: "Storefront UI" }),
+  "SAM-24807": D("Validate legitimate Samsung Account login initiated from CL Checkout.", "Checkout reaches the real Samsung Account flow and returns to authenticated CL checkout after any required human verification.", ["Prepare legitimate Samsung Account state", "Start Checkout as registered user", "Open Samsung Account login", "Complete required human verification when presented", "Return to CL Checkout", "Validate authenticated Delivery state"], { feature: "Account & Profile", userType: "Registered" }),
+  "SAM-24808": D("Validate the CL Checkout button on Cart.", "The Cart Checkout CTA is enabled and navigation reaches the CL checkout journey.", ["Prepare controlled Cart", "Validate Checkout CTA", "Activate Checkout", "Capture checkout request/navigation evidence", "Validate checkout entry"], { feature: "Checkout" }),
+  "SAM-24810": D("Validate Step 1 Contact Details in CL Checkout.", "Mandatory contact fields are visible, accept controlled valid data and permit progression toward Delivery.", ["Start guest Checkout", "Locate Contact Details", "Populate required customer fields", "Submit Contact Details", "Validate Delivery progression"], { feature: "Checkout", userType: "Guest" }),
+  "SAM-24811": D("Validate adding/editing a saved or new address during registered CL Checkout.", "Controlled address data can be persisted from Checkout and is visible in My Profile, with QA cleanup after validation.", ["Restore registered CL session", "Enter Checkout/Delivery", "Create or edit controlled address", "Continue to Payment", "Validate persisted address in profile", "Clean up QA address"], { feature: "Checkout", userType: "Registered" }),
+  "SAM-24812": D("Validate selecting a saved address in registered CL Checkout.", "A saved address can be selected and remains the active Delivery address.", ["Restore registered session", "Reach Delivery", "Open saved addresses", "Select saved address", "Validate selected state"], { feature: "Checkout", userType: "Registered" }),
+  "SAM-24813": D("Validate the Save Address option for a registered CL user.", "Registered Checkout exposes the expected save-address capability for new address data.", ["Restore registered session", "Reach Delivery", "Select New Address", "Locate save-address option", "Validate registered-user persistence control"], { feature: "Checkout", userType: "Registered" }),
+  "SAM-24814": D("Validate registered CL Checkout with a new address.", "A controlled new address is accepted and Checkout can progress to Payment without requiring persistence.", ["Restore registered session", "Select New Address", "Populate controlled address", "Keep save state as required", "Select delivery/terms", "Validate Payment progression"], { feature: "Checkout", userType: "Registered" }),
+  "SAM-24815": D("Validate Save Address option is not visible to a CL guest.", "Guest Checkout does not expose the registered-user address persistence option.", ["Start guest Checkout", "Reach Delivery", "Inspect address controls", "Validate save-address checkbox/text is absent", "Preserve guest evidence"], { feature: "Checkout", userType: "Guest" }),
+  "SAM-24816": D("Validate different shipping and billing addresses in CL Checkout.", "Shipping and billing values remain independently represented and are not unintentionally overwritten.", ["Reach guest Delivery", "Populate shipping address", "Select invoice/billing path", "Populate distinct billing address", "Validate shipping and billing remain different"], { feature: "Checkout", userType: "Guest" }),
+  "SAM-24817": D("Validate CL home delivery.", "The applicable home-delivery mode is available and required address controls remain usable.", ["Reach Delivery", "Select/validate home delivery for the target environment", "Validate address inputs", "Validate delivery state", "Preserve Delivery evidence"], { feature: "Checkout", userType: "Guest" }),
+  "SAM-24818": D("Validate store pickup is available in CL Checkout.", "The Retiro en tienda/store-pickup option is visible, selectable and keeps the user in a valid Delivery state.", ["Reach guest Delivery", "Locate store pickup", "Select Retiro en tienda", "Validate selected/visible state", "Preserve Delivery evidence"], { feature: "Checkout", userType: "Guest" }),
+  "SAM-24819": D("Validate switching between delivery/address modes in registered CL Checkout.", "The user can switch Saved Address ↔ New Address and the selected state updates correctly.", ["Restore registered session", "Reach Delivery", "Select saved address mode", "Switch to New Address", "Switch back to Saved Address", "Validate final selected state"], { feature: "Checkout", userType: "Registered" }),
+  "SAM-24821": D("Validate Back to Top on CL Cart while tracking RT-746043.", "The control returns the viewport to the top when available; the exact mapped missing-control symptom is SKIPPED/KNOWN DEFECT and does not mask unrelated failures.", ["Prepare Cart", "Scroll to bottom", "Locate Back to Top", "Skip only when RT-746043 symptom reproduces", "Otherwise click and validate viewport return"], { feature: "Storefront UI" }),
+  "SAM-24822": D("Validate an authorized registered-user CL credit/debit-card payment.", "The payment reaches Samsung confirmation and exposes a valid CL Order ID when destructive submission is explicitly authorized.", ["Restore registered CL session", "Prepare one controlled cart item", "Reach Payment", "Select/validate Credit/Debit Card", "Submit once", "Capture CL Order ID and payment/network evidence", "Validate Samsung confirmation"], { feature: "Payment", userType: "Registered", paymentMode: "Credit / Debit Card" }),
+  "SAM-24823": D("Validate an authorized CL Direct Bank Transfer payment journey.", "The configured bank-transfer path reaches its accepted outcome and preserves payment/order evidence when an order is created.", ["Prepare registered Checkout", "Reach Payment", "Select Direct Bank Transfer", "Submit the authorized payment once", "Capture Order ID/outcome", "Validate confirmation"], { feature: "Payment", paymentMode: "Direct Bank Transfer" }),
+  "SAM-24824": D("Validate CL interest-free installment payment using the supported card path.", "An explicitly interest-free multi-installment option is selected and the authorized payment outcome is proven with order evidence.", ["Prepare registered Checkout", "Reach card Payment", "Populate controlled card", "Select explicit interest-free installment", "Submit once", "Capture Order ID/outcome and validate confirmation"], { feature: "Payment", paymentMode: "Interest-free installments" }),
+  "SAM-24825": D("Validate Samsung Rewards payment only with verified eligible CL Rewards prerequisites.", "Rewards payment is exercised when a valid points balance/configuration exists; missing prerequisites remain a payment blocker.", ["Prepare Rewards-capable account", "Reach Payment", "Locate Rewards", "Apply required points when available", "Validate payment continuation or explicit prerequisite blocker"], { feature: "Payment", paymentMode: "Samsung Rewards", userType: "Rewards-capable account" }),
+  "SAM-24826": D("Validate the CL Order Confirmation screen after an authorized payment submission.", "A new CL Order ID is created and the Samsung confirmation screen visibly represents the same order.", ["Prepare controlled Checkout", "Reach Payment", "Submit one authorized payment", "Capture CL Order ID and outcome", "Validate confirmation screen", "Preserve order/network evidence"], { feature: "Payment" }),
+  "SAM-24830": D("Validate CL BackOffice order and product search/read access.", "BackOffice authentication succeeds and order/product data can be found using the required search modes.", ["Authenticate to CL BackOffice", "Open Orders", "Search/read a real order", "Validate Order ID/status", "Search/read configured product"], { feature: "Order & BackOffice", userType: "BackOffice" }),
+  "SAM-24831": D("Validate the CL BackOffice order process/status for the controlled reference order.", "The reference order can be opened and its process/status matches the official environment checkpoint.", ["Authenticate to CL BackOffice", "Locate reference Order ID", "Open order details", "Read process/status", "Validate expected process state"], { feature: "Order & BackOffice", userType: "BackOffice" }),
 };
 
 enrichOfficialQst({
@@ -137,8 +65,5 @@ enrichOfficialQst({
   cases,
   auditedIds: AUDITED_BASE_STORE_IDS,
   detailsById: DETAILS,
-  defaults: {
-    sku: config.sku,
-    pdpUrl: config.pdpUrl.href,
-  },
+  defaults: { sku: config.sku, pdpUrl: config.pdpUrl.href },
 });
