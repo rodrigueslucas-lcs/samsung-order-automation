@@ -161,7 +161,27 @@ export default class CartPage extends BasePage {
     return { productEntries };
   }
 
+  async confirmMxCartRemoval(confirmButton, dialog, entryNumber) {
+    if (!Number.isInteger(entryNumber) || entryNumber < 0) {
+      throw new Error('MX cart removal requires a valid observed entry number.');
+    }
+    const target = new URL(this.cartUrl);
+    const apiOrigin = target.hostname === 'stg.shop.samsung.com'
+      ? 'https://s1-smb-api-cdn.ecom-stg.samsung.com'
+      : 'https://s2-smb-api-cdn.ecom-stg.samsung.com';
+    const removal = this.page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return response.request().method() === 'DELETE' && url.origin === apiOrigin &&
+        url.pathname === `/tokocommercewebservices/v2/mx/users/current/carts/current/entries/${entryNumber}`;
+    }, { timeout: 120000 });
+    const [response] = await Promise.all([removal, confirmButton.click()]);
+    if (!response.ok()) throw new Error(`MX cart removal returned HTTP ${response.status()}; no mutation was retried.`);
+    if (await response.finished()) throw new Error('MX cart removal response was interrupted; no mutation was retried.');
+    await dialog.waitFor({ state: 'hidden', timeout: 30000 });
+  }
+
   async clearMxCartAndConfirmEmpty() {
+    const removedSkus = new Set();
     for (let removed = 0; removed < 20; removed += 1) {
       const { productEntries } = await this.loadMxCartState();
       const main = this.page.getByRole('main');
@@ -169,23 +189,17 @@ export default class CartPage extends BasePage {
       const emptyCart = main.getByRole('heading', { name: /Su carrito esta vac[ií]o/i });
 
       if (!productEntries.length) {
+        await emptyCart.waitFor({ state: 'visible', timeout: 30000 });
         if (await removeButtons.count()) {
           throw new Error('MX cart API is empty but a visible product row is still rendered.');
         }
         return;
       }
 
-      // S2 can briefly return the pre-removal cart payload after the UI has
-      // already committed the empty state. Do not keep deleting a stale API
-      // entry when the rendered cart has no removable product rows.
-      if (await emptyCart.isVisible().catch(() => false)) {
-        if (await removeButtons.count()) {
-          throw new Error('MX cart rendered an empty state together with removable product rows.');
-        }
-        return;
-      }
-
       const sku = productEntries[0].product.code;
+      if (removedSkus.has(sku)) {
+        throw new Error(`MX cart removal did not persist for ${sku}; no mutation was retried.`);
+      }
       const skuLabels = main.getByText(sku, { exact: true }).filter({ visible: true });
       await skuLabels.first().waitFor({ state: 'visible', timeout: 30000 });
       if ((await skuLabels.count()) !== 1) {
@@ -227,10 +241,8 @@ export default class CartPage extends BasePage {
         throw new Error(`MX cart removal dialog for ${sku} does not expose exactly one Sí button.`);
       }
 
-      await Promise.all([
-        dialog.first().waitFor({ state: 'hidden', timeout: 30000 }),
-        confirmButton.click(),
-      ]);
+      await this.confirmMxCartRemoval(confirmButton, dialog.first(), productEntries[0].entryNumber);
+      removedSkus.add(sku);
     }
     // The final removal may render the empty cart just after the last API
     // snapshot. Accept only the observed empty UI with no removable rows.
