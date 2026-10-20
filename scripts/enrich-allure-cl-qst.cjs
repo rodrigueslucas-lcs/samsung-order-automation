@@ -8,6 +8,7 @@ const runtimeFile = path.resolve(process.argv[3] || path.join(process.env.CL_QST
 const evidenceRoot = path.resolve(process.argv[4] || path.join(path.dirname(runtimeFile), "evidence"));
 const environment = String(process.env.CL_QST_ENVIRONMENT || process.env.ENVIRONMENT || "S2").toUpperCase();
 const config = getClQstConfig({ ...process.env, CL_QST_ENVIRONMENT: environment });
+const cases = Object.fromEntries(Object.entries(plan.cases).map(([id, entry]) => [id, { ...entry, store: entry.store === "BS" ? "BASE_STORE" : entry.store }]));
 
 // Explicitly reviewed against governance/cl-qst-plan.json on 2026-10-20.
 // Keep this hand-audited list so official-scope drift cannot silently degrade Allure.
@@ -133,7 +134,7 @@ enrichOfficialQst({
   evidenceRoot,
   environment,
   store: "BASE_STORE",
-  cases: plan.cases,
+  cases,
   auditedIds: AUDITED_BASE_STORE_IDS,
   detailsById: DETAILS,
   defaults: {
