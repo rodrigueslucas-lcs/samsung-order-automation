@@ -84,6 +84,7 @@ test("CO CL and MX publish controlled product and business API evidence", () => 
   const coFlow = read("tests/markets/co/qst/base-store/coQstFlows.js");
   const clFlow = read("flows/cl/qstFlows.js");
   const mxFixture = read("tests/markets/mx/qst/base-store/mxQst.fixture.js");
+  const mxAuthFixture = read("tests/markets/mx/dst/base-store/mx.auth.fixture.js");
   const regionalNetwork = read("utils/businessNetworkEvidence.js");
 
   for (const source of [coFlow, clFlow]) {
@@ -105,6 +106,13 @@ test("CO CL and MX publish controlled product and business API evidence", () => 
   assert.match(mxFixture, /Payment \$\{method\}/);
   assert.match(mxFixture, /Order \$\{method\}/);
   assert.match(mxFixture, /attachNetworkEvidence/);
+
+  // Registered MX QSTs use the auth fixture rather than mxQst.fixture. They must
+  // receive the same curated business API evidence, especially SAM-25002 where
+  // Checkout/Payment/Order are the core proof shown in Allure.
+  assert.match(mxAuthFixture, /installBusinessNetworkEvidence/);
+  assert.match(mxAuthFixture, /qstEvidenceEnabled/);
+  assert.match(mxAuthFixture, /installBusinessNetworkEvidence\(page, testInfo, "MX"\)/);
 });
 
 test("destructive regional order flows publish or recover Order ID evidence", () => {
