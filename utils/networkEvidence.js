@@ -10,27 +10,22 @@ function parseBody(text) {
     return {
       truncated: true,
       originalLength: raw.length,
-      preview: raw.slice(0, BODY_PREVIEW_LIMIT),
+      preview: sanitize(raw.slice(0, BODY_PREVIEW_LIMIT)),
     };
   }
   try {
-    return JSON.parse(raw);
+    return sanitize(JSON.parse(raw));
   } catch {
-    return raw.slice(0, 4000);
+    return sanitize(raw.slice(0, 4000));
   }
 }
 
 function safeUrl(value) {
   try {
     const url = new URL(value);
-    for (const key of [...url.searchParams.keys()]) {
-      if (/token|auth|session|cookie|card|cvv|cvc|email/i.test(key)) {
-        url.searchParams.set(key, "[REDACTED]");
-      }
-    }
-    return url.toString();
+    return `${url.origin}${url.pathname}`;
   } catch {
-    return String(value || "");
+    return String(value || "").split("?")[0];
   }
 }
 
@@ -51,14 +46,14 @@ export async function attachNetworkEvidence(testInfo, name, { request, response,
       name,
       request: req ? {
         method: req.method(),
-        url: safeUrl(req.url()),
-        body: requestBody !== undefined ? requestBody : parseBody(req.postData?.()),
+        endpoint: safeUrl(req.url()),
+        body: requestBody !== undefined ? sanitize(requestBody) : parseBody(req.postData?.()),
       } : null,
       response: response ? {
         status: response.status(),
         ok: response.ok(),
-        url: safeUrl(response.url()),
-        body: explicitResponseBody !== undefined ? explicitResponseBody : await responseBody(response),
+        endpoint: safeUrl(response.url()),
+        body: explicitResponseBody !== undefined ? sanitize(explicitResponseBody) : await responseBody(response),
       } : null,
       capturedAt: new Date().toISOString(),
     });
@@ -72,3 +67,5 @@ export async function attachNetworkEvidence(testInfo, name, { request, response,
     return null;
   }
 }
+
+export { safeUrl };
