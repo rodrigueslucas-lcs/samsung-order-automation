@@ -4,6 +4,7 @@ import CartPage from "../../pages/CartPage";
 import clAuthStateModule from "../../utils/clAuthState";
 import clStorefrontOverlays from "../../utils/clStorefrontOverlays";
 import { attachNetworkEvidence } from "../../utils/networkEvidence";
+import { installBusinessNetworkEvidence } from "../../utils/businessNetworkEvidence";
 import evidenceContext from "../../reporting/evidence/evidenceContext";
 
 const { CL_AUTH_STATE_PATH, getClAuthState, hasClAuthState } = clAuthStateModule;
@@ -93,6 +94,7 @@ export async function addConfiguredProductToClCart(page, config) {
   return test.step("Add the configured CL product to cart and wait for the cart mutation", async () => {
     const resolved = await resolveProduct(page, config);
     const testInfo = test.info();
+    installBusinessNetworkEvidence(page, testInfo, "CL");
     recordBusinessEvidence(testInfo, {
       market: "CL",
       environment: config.environment,
