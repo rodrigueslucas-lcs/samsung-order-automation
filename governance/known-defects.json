@@ -111,7 +111,49 @@
       "status": "OPEN",
       "priority": "Critical",
       "rootCause": "Environment Issue",
-      "notes": "CL S2 registered Credit/Debit Card payment is blocked when the storefront returns 'Hubo un inconveniente con el medio de pago'. Reproduced manually with multiple official Mercado Pago test-card brands. Only this exact payment symptom is non-gating; unrelated SAM-24822 failures must remain FAIL."
+      "notes": "CL S2 order creation is currently unavailable, blocking the official registered card-payment scenario. Runtime is intentionally non-gating until RT-751761 is resolved."
+    },
+    {
+      "market": "CL",
+      "environment": "S2",
+      "store": "BASE_STORE",
+      "samId": "SAM-24823",
+      "jira": "RT-751761",
+      "url": "https://jira.secext.samsung.net/browse/RT-751761",
+      "title": "[RT][CL][STG2] Credit/Debit Card payment cannot be completed with Mercado Pago test cards",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "Critical",
+      "rootCause": "Environment Issue",
+      "notes": "CL S2 cannot currently complete order creation/confirmation, so the Direct Bank Transfer official order-dependent scenario is blocked by RT-751761 and must remain non-gating."
+    },
+    {
+      "market": "CL",
+      "environment": "S2",
+      "store": "BASE_STORE",
+      "samId": "SAM-24824",
+      "jira": "RT-751761",
+      "url": "https://jira.secext.samsung.net/browse/RT-751761",
+      "title": "[RT][CL][STG2] Credit/Debit Card payment cannot be completed with Mercado Pago test cards",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "Critical",
+      "rootCause": "Environment Issue",
+      "notes": "CL S2 cannot currently complete order creation/confirmation, so the installments official order-dependent scenario is blocked by RT-751761 and must remain non-gating."
+    },
+    {
+      "market": "CL",
+      "environment": "S2",
+      "store": "BASE_STORE",
+      "samId": "SAM-24826",
+      "jira": "RT-751761",
+      "url": "https://jira.secext.samsung.net/browse/RT-751761",
+      "title": "[RT][CL][STG2] Credit/Debit Card payment cannot be completed with Mercado Pago test cards",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "Critical",
+      "rootCause": "Environment Issue",
+      "notes": "CL S2 cannot currently create/confirm a new order, blocking the official Order Confirmation scenario. The TC is non-gating while RT-751761 remains active."
     },
     {
       "market": "CO",
