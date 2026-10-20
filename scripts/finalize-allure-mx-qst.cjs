@@ -3,10 +3,11 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { MX_BASE_P1_IDS, MX_BASE_P1_EXCLUSIONS } = require("../utils/mxQstScope.cjs");
 
-const artifactDir = path.resolve(process.env.MX_QST_ARTIFACT_DIR || "test-results/jenkins/mx-qst");
+const artifactDir = path.resolve(process.env.MX_QST_ARTIFACT_DIR || process.env.JENKINS_ARTIFACT_DIR || "test-results/jenkins/mx-qst");
 const resultsDir = path.join(artifactDir, "allure-results");
 const reportDir = path.join(artifactDir, "allure-report");
 const runtimeFile = path.join(artifactDir, "runtime-summary.json");
+const evidenceRoot = path.join(artifactDir, "evidence");
 
 if (!fs.existsSync(resultsDir)) {
   console.log("[allure] No MX QST Allure results found; nothing to finalize.");
@@ -17,27 +18,26 @@ const enrich = spawnSync(process.execPath, [
   path.resolve("scripts/enrich-allure-mx-qst.cjs"),
   resultsDir,
   runtimeFile,
+  evidenceRoot,
 ], { stdio: "inherit", env: process.env });
 if (enrich.status !== 0) process.exit(enrich.status || 1);
 
-// The historical/source metadata still contains the original 30 mapped MX Base
-// P1 rows. Reconcile the published Allure environment to the active campaign so
-// the report denominator always matches the runner and Executive Dashboard.
+// Reconcile the published denominator to the active 29-TC campaign. The
+// historical Rewards/PSE row remains in governance only for traceability.
 const environmentFile = path.join(resultsDir, "environment.properties");
-if (fs.existsSync(environmentFile)) {
-  const excludedIds = Object.keys(MX_BASE_P1_EXCLUSIONS);
-  const filtered = fs.readFileSync(environmentFile, "utf8")
-    .split(/\r?\n/)
-    .filter((line) => line && !/^(Official_P1_QST|MX_BaseStore_P1_Selected|Source_P1_QST|Active_P1_QST|MX_BaseStore_P1_Excluded|MX_BaseStore_P1_Excluded_IDs)=/.test(line));
-  filtered.push(
-    "Source_P1_QST=144",
-    "Active_P1_QST=143",
-    `MX_BaseStore_P1_Selected=${MX_BASE_P1_IDS.length}`,
-    `MX_BaseStore_P1_Excluded=${excludedIds.length}`,
-    `MX_BaseStore_P1_Excluded_IDs=${excludedIds.join(",") || "none"}`,
-  );
-  fs.writeFileSync(environmentFile, `${filtered.join("\n")}\n`);
-}
+const excludedIds = Object.keys(MX_BASE_P1_EXCLUSIONS);
+const existing = fs.existsSync(environmentFile)
+  ? fs.readFileSync(environmentFile, "utf8").split(/\r?\n/)
+  : [];
+const filtered = existing
+  .filter((line) => line && !/^(Official_P1_QST|MX_BaseStore_P1_Selected|MX_BaseStore_P1_Excluded|MX_BaseStore_P1_Excluded_IDs)=/.test(line));
+filtered.push(
+  `Official_P1_QST=${MX_BASE_P1_IDS.length}`,
+  `MX_BaseStore_P1_Selected=${MX_BASE_P1_IDS.length}`,
+  `MX_BaseStore_P1_Excluded=${excludedIds.length}`,
+  `MX_BaseStore_P1_Excluded_IDs=${excludedIds.join(",") || "none"}`,
+);
+fs.writeFileSync(environmentFile, `${filtered.join("\n")}\n`);
 
 const dedupe = spawnSync(process.execPath, [
   path.resolve("scripts/dedupe-allure-evidence.cjs"),
