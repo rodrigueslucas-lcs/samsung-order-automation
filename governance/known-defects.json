@@ -199,6 +199,20 @@
     },
     {
       "market": "CL",
+      "environment": "S2",
+      "store": "BASE_STORE",
+      "samId": "SAM-24803",
+      "jira": "SAM-25150",
+      "url": "https://jira.secext.samsung.net/browse/SAM-25150",
+      "title": "QST STG1 SMB CL When Applying Trade-In on Cart Page, the Trade Amount Is Not Appearing",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "High",
+      "rootCause": "Storefront Issue",
+      "notes": "CL S2 Base Store Trade-in validation is linked to SAM-25150. When the cart does not retain/display the expected Trade-in amount and device/model after the Trade-in journey, the blocked runtime result is tracked as this known functional defect and must not fail the campaign."
+    },
+    {
+      "market": "CL",
       "environment": "S1",
       "store": "BASE_STORE",
       "samId": "SAM-25075",
