@@ -82,17 +82,26 @@ function parameterValue(result, name) {
   return (result.parameters || []).find((item) => item?.name === name)?.value || null;
 }
 
+function mappedDefectTitle(result) {
+  const description = String(result.description || "");
+  const match = description.match(/\*\*Known defect:\*\*[^\n]*?·\s*([^\n]+)/i);
+  return match?.[1]?.trim() || null;
+}
+
 function hardenKnownDefect(result) {
   const knownDefect = parameterValue(result, "Known Defect");
   const runtimeStatus = String(parameterValue(result, "Runtime Status") || "").toUpperCase();
   if (!knownDefect || runtimeStatus !== "BLOCKED") return false;
+
+  const defectTitle = mappedDefectTitle(result);
+  const defectSummary = defectTitle ? `${knownDefect} · ${defectTitle}` : knownDefect;
 
   // "blocked" is not an Allure result status. Keep the business meaning in
   // parameters/description, while representing the non-gating runtime as skipped.
   result.status = "skipped";
   result.stage = "finished";
   result.statusDetails = {
-    message: `Known Defect ${knownDefect}: execution is blocked/non-gating. See the linked Jira defect and preserved evidence for details.`,
+    message: `Known Defect ${defectSummary}: execution is blocked/non-gating. See the linked Jira defect and preserved evidence for details.`,
     trace: "",
   };
 
@@ -109,7 +118,7 @@ function hardenKnownDefect(result) {
       attachments: [],
       parameters: [],
       statusDetails: {
-        message: `Official scenario was not counted as a functional failure because ${knownDefect} is an active mapped defect.`,
+        message: `Official scenario was not counted as a functional failure because ${defectSummary} is an active mapped defect.`,
       },
     }];
   }
