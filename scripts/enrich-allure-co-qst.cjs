@@ -10,9 +10,6 @@ const environment = String(process.env.CO_QST_ENVIRONMENT || process.env.ENVIRON
 const config = getCoQstConfig({ ...process.env, CO_QST_ENVIRONMENT: environment });
 const cases = Object.fromEntries(Object.entries(plan.cases).map(([id, entry]) => [id, { ...entry, store: entry.store === "BS" ? "BASE_STORE" : entry.store }]));
 
-// Explicitly reviewed against governance/co-qst-plan.json on 2026-10-20.
-// This list is deliberately not generated: drift must fail loudly if the official
-// inventory changes without a corresponding Allure/reporting review.
 const AUDITED_BASE_STORE_IDS = Object.freeze([
   "SAM-24806", "SAM-24873", "SAM-24874", "SAM-24875", "SAM-24879",
   "SAM-24880", "SAM-24882", "SAM-24883", "SAM-24886", "SAM-24892",
@@ -22,61 +19,37 @@ const AUDITED_BASE_STORE_IDS = Object.freeze([
   "SAM-24915", "SAM-24919", "SAM-24920", "SAM-24925",
 ]);
 
+const D = (objective, expected, steps, extra = {}) => ({ objective, expected, steps, ...extra });
 const DETAILS = {
-  "SAM-24880": {
-    objective: "Validate a product can be selected from the CO buying-category/PDP journey and added to cart.",
-    expected: "The controlled CO product is added successfully and the cart mutation is observable.",
-    steps: ["Open the controlled CO catalog/product journey", "Add the selected product to cart", "Validate the cart mutation", "Validate the controlled SKU is represented in cart", "Preserve product and request/response evidence"],
-    feature: "Product & Catalog",
-  },
-  "SAM-24892": {
-    objective: "Validate Samsung Care+ for an eligible CO product without treating missing eligible test data as a product failure.",
-    expected: "SC+ is addable when an eligible product is available; otherwise the scenario is reported as an explicit test-data prerequisite blocker.",
-    feature: "Cart & Promotions",
-  },
-  "SAM-24893": {
-    objective: "Validate the CO Trade-up service on cart for an eligible product.",
-    expected: "Trade-up is available and usable when eligible; a mapped storefront defect is reported separately as Known Defect rather than a generic automation failure.",
-    feature: "Cart & Promotions",
-  },
-  "SAM-24911": {
-    objective: "Validate Back to Top on the CO cart while preserving the mapped RT-746043 defect classification when the control is absent.",
-    expected: "The control returns the cart to the top when available; the exact mapped missing-control symptom is reported as Known Defect.",
-    feature: "Storefront UI",
-  },
-  "SAM-24912": {
-    objective: "Validate an authorized registered-user credit/debit-card purchase in CO.",
-    expected: "The card flow reaches Samsung order confirmation and exposes a valid CO order ID when destructive submission is explicitly authorized.",
-    steps: ["Restore registered CO session", "Prepare one controlled cart item", "Reach Payment", "Populate and validate the configured test card", "Submit the authorized payment once", "Capture Order ID and payment/network evidence", "Validate Samsung confirmation"],
-    feature: "Payment",
-    userType: "Registered",
-    paymentMode: "Credit / Debit Card",
-  },
-  "SAM-24914": {
-    objective: "Validate the source-defined CO alternative payment path only when its required method/configuration is available.",
-    expected: "Unavailable payment configuration is represented as a payment prerequisite blocker, not a false functional failure.",
-    feature: "Payment",
-  },
-  "SAM-24915": {
-    objective: "Validate Samsung Rewards payment for an eligible CO Rewards account.",
-    expected: "Rewards is available/selectable with the required account balance and configuration; missing Rewards prerequisites remain explicit blockers.",
-    feature: "Payment",
-    paymentMode: "Samsung Rewards",
-    userType: "Rewards-capable account",
-  },
-  "SAM-24919": {
-    objective: "Validate guest Track Order using a causal CO order and verification email.",
-    expected: "The order can be located with the captured Order ID/email verification flow and its tracking details are displayed.",
-    steps: ["Create or load the causal guest order", "Capture Order ID and guest mailbox context", "Open Track Order", "Request and retrieve the verification code", "Submit verification", "Validate tracked order details and preserve order evidence"],
-    feature: "Order & BackOffice",
-    userType: "Guest",
-  },
-  "SAM-24920": {
-    objective: "Validate CO BackOffice order search/read access in the target environment.",
-    expected: "BackOffice authentication succeeds and a real order can be found with readable Order ID and status.",
-    feature: "Order & BackOffice",
-    userType: "BackOffice",
-  },
+  "SAM-24806": D("Validate the Colombia storefront desktop UI is rendered correctly without broken visual elements.", "Desktop UI renders correctly, key images are available and the storefront layout is usable.", ["Open the CO Base Store home page in desktop viewport", "Validate header, main content and footer are rendered", "Validate storefront images are present", "Confirm the page has no blocking visual distortion"], { feature: "Storefront UI" }),
+  "SAM-24873": D("Validate a registered user is recognized from the CO home page.", "The authenticated account is active and the profile menu exposes the logout action.", ["Restore the registered CO session", "Open the CO Base Store home page", "Open My Profile", "Validate the authenticated logout control is available"], { feature: "Account & Profile", userType: "Registered" }),
+  "SAM-24874": D("Validate the registered-user My Account menu in CO.", "The expected account options are visible for the authenticated user.", ["Restore the registered CO session", "Open My Profile", "Validate My Page / My Orders / Wishlist options", "Validate Logout is available"], { feature: "Account & Profile", userType: "Registered" }),
+  "SAM-24875": D("Validate the CO global navigation menu and storefront navigation entry points.", "The GNB is displayed and exposes usable storefront navigation links.", ["Open the CO Base Store home page", "Validate the global header is visible", "Validate navigation links are rendered", "Confirm the GNB is interactive"], { feature: "Storefront UI" }),
+  "SAM-24879": D("Validate PLP facet/filter availability in CO.", "The product listing exposes filtering controls that can be used to refine products.", ["Open the CO Base Store home page", "Navigate to a product listing category", "Locate the facet/filter controls", "Validate the filtering UI is available"], { feature: "Product & Catalog" }),
+  "SAM-24880": D("Validate a product can be added from the BC/PDP journey in CO.", "The selected product is added successfully and the cart mutation is observable with SKU/API evidence.", ["Open a CO buying-category/product journey", "Open a purchasable product PDP", "Add the product to cart", "Capture Add to Cart request/response", "Validate the controlled SKU is represented in cart"], { feature: "Product & Catalog" }),
+  "SAM-24882": D("Validate the CO cart page presentation.", "The cart shows the product, price, summary and required cart sections correctly.", ["Add the configured CO product to cart", "Open the cart page", "Validate product presentation and price", "Validate order summary", "Validate available services and footer"], { feature: "Cart & Promotions" }),
+  "SAM-24883": D("Validate cart quantity management in CO.", "The user can increase/decrease quantity and the cart updates consistently.", ["Add the configured product to cart", "Open the cart page", "Exercise quantity change controls", "Validate the cart reflects the updated quantity"], { feature: "Cart & Promotions" }),
+  "SAM-24886": D("Validate Samsung Rewards messaging for a guest user.", "Rewards-related text is visible in the guest cart journey.", ["Add a product to cart as guest", "Open the cart page", "Locate Samsung Rewards messaging", "Validate Rewards text is displayed"], { feature: "Cart & Promotions", userType: "Guest" }),
+  "SAM-24892": D("Validate Samsung Care+ can be added from an eligible CO product journey.", "Care+ can be selected for an eligible product and is reflected in cart; missing eligibility remains an explicit prerequisite blocker.", ["Open an eligible CO product", "Locate Samsung Care+", "Add Care+ with the product", "Open cart", "Validate Care+ is reflected in cart or report missing eligible test data"], { feature: "Cart & Promotions" }),
+  "SAM-24893": D("Validate the Trade-up / exchange service in the CO cart.", "The Trade-up service is available and can be associated with the cart product when eligible; a mapped defect remains separated from automation failures.", ["Add an eligible product to cart", "Open cart", "Locate Trade-up / exchange service", "Exercise the Trade-up control", "Validate the service state or mapped Known Defect"], { feature: "Cart & Promotions" }),
+  "SAM-24896": D("Validate cart isolation when switching registered CO accounts.", "After logout/account switch, cart state follows the expected account-isolation behavior and does not leak the first account state.", ["Restore the dedicated second registered account", "Add the configured product and capture cart value", "Logout from the registered account", "Validate the signed-out cart state", "Validate the expected cart value/isolation behavior"], { feature: "Cart & Promotions", userType: "Registered / second account" }),
+  "SAM-24898": D("Validate the checkout action from the CO cart.", "The checkout button is usable and navigates the user into checkout.", ["Add the configured product to cart", "Open cart", "Validate the checkout action is enabled", "Continue to checkout", "Validate checkout is reached and preserve checkout API evidence"], { feature: "Checkout" }),
+  "SAM-24899": D("Validate the order summary on CO checkout.", "Checkout displays the order summary and total information.", ["Add product to cart", "Continue as guest to checkout", "Open the checkout journey", "Validate order summary", "Validate total information"], { feature: "Checkout", userType: "Guest" }),
+  "SAM-24900": D("Validate the mandatory Contact Details section in CO checkout.", "Required customer/contact fields accept valid data and allow progression to Delivery.", ["Add product and start guest checkout", "Populate the mandatory contact fields", "Select required identification data", "Submit Contact Details", "Validate Delivery step is reached"], { feature: "Checkout", userType: "Guest" }),
+  "SAM-24901": D("Validate adding and editing a saved/new address during registered CO checkout.", "A registered user can create/update checkout addresses and the changed values are reflected correctly.", ["Restore registered CO session and enter checkout", "Create new shipping and billing address data", "Save the addresses and continue to payment", "Edit the saved checkout address", "Validate the updated values are reflected"], { feature: "Checkout", userType: "Registered" }),
+  "SAM-24902": D("Validate selecting a saved address during registered CO checkout.", "A saved shipping/billing address can be selected and used to continue checkout.", ["Restore registered CO session and enter Delivery", "Select a saved shipping address", "Select a saved billing address", "Continue to payment", "Validate the selected address is reflected"], { feature: "Checkout", userType: "Registered" }),
+  "SAM-24903": D("Validate the save-address option for a registered CO user.", "Registered users can save checkout addresses for future use.", ["Restore registered CO session", "Enter a new shipping address", "Enable save-address option", "Enter/save billing address", "Return to Delivery and validate the saved address is available"], { feature: "Checkout", userType: "Registered" }),
+  "SAM-24904": D("Validate registered checkout with a new CO address.", "A registered user can use a new non-saved address and reach payment successfully.", ["Restore registered CO session and enter checkout", "Select New Address", "Populate new shipping/billing address", "Keep the new address non-persistent when required", "Continue to payment and validate the new address summary"], { feature: "Checkout", userType: "Registered" }),
+  "SAM-24905": D("Validate guest users cannot save checkout addresses.", "Save-address controls are not available/enabled for guest checkout.", ["Start guest checkout", "Populate Contact Details", "Open Delivery address section", "Inspect save-address controls", "Validate guest save options are disabled or unavailable"], { feature: "Checkout", userType: "Guest" }),
+  "SAM-24909": D("Validate invalid-address feedback in CO checkout.", "Invalid address data is rejected and checkout remains on Delivery with a clear validation message.", ["Start guest checkout and reach Delivery", "Populate an invalid address value", "Attempt to continue to payment", "Validate the address error message", "Confirm checkout remains on Delivery"], { feature: "Checkout", userType: "Guest" }),
+  "SAM-24910": D("Validate switching saved/new address modes during registered CO checkout.", "The user can switch address modes and the selected mode is reflected correctly.", ["Restore registered CO session and reach Delivery", "Select saved shipping address", "Switch to New Address", "Validate the saved address is deselected", "Switch back and validate the saved address is selected"], { feature: "Checkout", userType: "Registered" }),
+  "SAM-24911": D("Validate the Back to Top control on the CO cart.", "The Back to Top control returns the cart view to the top when present; the exact mapped RT-746043 symptom is reported as Known Defect.", ["Add product and open cart", "Scroll to the bottom of the cart page", "Locate the Back to Top control", "Activate Back to Top when available", "Validate viewport return or mapped Known Defect"], { feature: "Storefront UI" }),
+  "SAM-24912": D("Validate registered-user credit/debit-card payment in CO.", "A registered user can complete the authorized card checkout flow and receive a valid CO Order ID.", ["Restore registered CO session and prepare a clean cart", "Proceed through Delivery and mandatory consents", "Reach Payment", "Select and populate Credit/Debit Card", "Submit the authorized payment once", "Capture CO Order ID and payment/network evidence", "Validate Samsung order confirmation"], { feature: "Payment", userType: "Registered", paymentMode: "Credit / Debit Card" }),
+  "SAM-24914": D("Validate the source-defined CO alternative payment journey only when its required method/configuration is available.", "Unavailable payment configuration is represented as a payment prerequisite blocker instead of a false functional failure.", ["Prepare checkout and reach Payment", "Inspect available payment methods", "Locate the source-required payment option", "Continue only when required prerequisites are available", "Validate the payment outcome or explicit blocker"], { feature: "Payment" }),
+  "SAM-24915": D("Validate payment using Samsung Rewards in CO.", "Rewards payment can be selected and completed when the required Rewards account/test data are available.", ["Prepare checkout with eligible Rewards account/data", "Reach Payment", "Select Rewards", "Apply the required Rewards value", "Validate payment continuation/order result or prerequisite blocker"], { feature: "Payment", paymentMode: "Samsung Rewards", userType: "Rewards-capable account" }),
+  "SAM-24919": D("Validate CO guest Track Order using a freshly created/causal order.", "A guest order can be located using Order ID/email verification and the tracked order details are displayed.", ["Create or load the causal guest CO order", "Capture Order ID and guest mailbox context", "Open Track Order", "Request and retrieve the verification code", "Submit verification", "Validate tracked order details and preserve order evidence"], { feature: "Order & BackOffice", userType: "Guest" }),
+  "SAM-24920": D("Validate CO BackOffice order search/read access.", "BackOffice opens successfully and an order can be located/read with a valid Order ID and status.", ["Authenticate to the target BackOffice environment", "Open the Orders area", "Search/open an order", "Read Order ID and status", "Validate both values are available"], { feature: "Order & BackOffice", userType: "BackOffice" }),
+  "SAM-24925": D("Validate mobile sticky checkout behavior in CO.", "Checkout action remains available and usable in the mobile cart viewport.", ["Add product to cart", "Switch to mobile viewport", "Open cart", "Locate the sticky checkout action", "Validate the checkout action is visible and usable"], { feature: "Storefront UI" }),
 };
 
 enrichOfficialQst({
@@ -89,8 +62,5 @@ enrichOfficialQst({
   cases,
   auditedIds: AUDITED_BASE_STORE_IDS,
   detailsById: DETAILS,
-  defaults: {
-    sku: config.sku,
-    pdpUrl: config.pdpUrl.href,
-  },
+  defaults: { sku: config.sku, pdpUrl: config.pdpUrl.href },
 });
