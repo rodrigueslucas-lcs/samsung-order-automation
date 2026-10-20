@@ -2,6 +2,7 @@ import { test } from "@playwright/test";
 import ProductPage from "../../../../../pages/ProductPage";
 import CartPage from "../../../../../pages/CartPage";
 import { attachNetworkEvidence } from "../../../../../utils/networkEvidence";
+import { installBusinessNetworkEvidence } from "../../../../../utils/businessNetworkEvidence";
 import evidenceContext from "../../../../../reporting/evidence/evidenceContext";
 
 const { recordBusinessEvidence } = evidenceContext;
@@ -48,6 +49,7 @@ export async function addConfiguredProductToCoCart(page, config) {
   return test.step("Open the controlled CO PDP, add the configured product and reach Cart", async () => {
     const resolved=await resolveProduct(page,config);
     const testInfo=test.info();
+    installBusinessNetworkEvidence(page,testInfo,"CO");
     recordBusinessEvidence(testInfo,{
       market:"CO",
       environment:config.environment,
