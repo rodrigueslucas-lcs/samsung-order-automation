@@ -7,6 +7,8 @@ import evidenceContext from "../../../../../reporting/evidence/evidenceContext.j
 const { getMxConfig } = mxConfigModule;
 const { assertMxStagingPage } = mxStagingGuard;
 const { recordBusinessEvidence } = evidenceContext;
+const MAX_API_EVIDENCE = 18;
+const MAX_API_EVIDENCE_PER_KIND = 3;
 
 function classifyBusinessApi(response) {
   const request = response.request();
@@ -64,8 +66,10 @@ export const test = base.extend({
     const evidenceCounts = new Map();
     const onResponse = (response) => {
       const kind = classifyBusinessApi(response);
-      if (!kind || evidenceTasks.length >= 24) return;
-      const count = (evidenceCounts.get(kind) || 0) + 1;
+      if (!kind || evidenceTasks.length >= MAX_API_EVIDENCE) return;
+      const previous = evidenceCounts.get(kind) || 0;
+      if (previous >= MAX_API_EVIDENCE_PER_KIND) return;
+      const count = previous + 1;
       evidenceCounts.set(kind, count);
       evidenceTasks.push(
         attachNetworkEvidence(testInfo, `${kind} #${count}`, { response })
