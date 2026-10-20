@@ -1,6 +1,10 @@
 import { test } from "@playwright/test";
 import ProductPage from "../../../../../pages/ProductPage";
 import CartPage from "../../../../../pages/CartPage";
+import { attachNetworkEvidence } from "../../../../../utils/networkEvidence";
+import evidenceContext from "../../../../../reporting/evidence/evidenceContext";
+
+const { recordBusinessEvidence } = evidenceContext;
 
 export async function bootstrapCoStorefront(page, config) {
   return test.step("Bootstrap the CO storefront and validate staging access", async () => {
@@ -11,8 +15,6 @@ export async function bootstrapCoStorefront(page, config) {
     const setupReady=await page.getByText(/you can access pages now/i)
       .waitFor({state:"visible",timeout:8000}).then(()=>true,()=>false);
     if (setupReady) return;
-    // getcookie sometimes returns an empty document despite setting the staging cookie.
-    // Prove access against the storefront itself instead of requiring its prose.
     await page.goto(config.baseUrl.href,{waitUntil:"domcontentloaded",timeout:60000});
     await page.getByRole("button",{name:"My Profile",exact:true})
       .waitFor({state:"visible",timeout:60000});
@@ -45,9 +47,27 @@ export async function addConfiguredProductToCoCart(page, config) {
   applyCoS1KnownBlocker(config);
   return test.step("Open the controlled CO PDP, add the configured product and reach Cart", async () => {
     const resolved=await resolveProduct(page,config);
+    const testInfo=test.info();
+    recordBusinessEvidence(testInfo,{
+      market:"CO",
+      environment:config.environment,
+      sku:resolved.sku,
+      pdpUrl:resolved.pdpUrl.href,
+    });
+    await testInfo.attach("CO Product Context",{
+      body:Buffer.from(JSON.stringify({market:"CO",environment:config.environment,sku:resolved.sku,pdpUrl:`${resolved.pdpUrl.origin}${resolved.pdpUrl.pathname}`},null,2)),
+      contentType:"application/json",
+    });
     await bootstrapCoStorefront(page,config);
     const product=new ProductPage(page,{setupUrl:config.setupUrl?.href||null,sku:resolved.sku,pdpUrl:resolved.pdpUrl.href,cartUrl:config.cartUrl.href});
+    const addResponse=page.waitForResponse((response)=>{
+      const request=response.request();
+      const url=new URL(response.url());
+      return request.method()==="POST" && /\/co\/users\/[^/]+\/carts\/[^/]+\/entries(?:\/|$)/i.test(url.pathname);
+    },{timeout:60000}).catch(()=>null);
     await product.addConfiguredPdpToCart({waitForCartMutation:true});
+    const response=await addResponse;
+    if(response) await attachNetworkEvidence(testInfo,"Add to Cart",{response});
     return new CartPage(page,{
       cartUrl:config.cartUrl.href,
       sku:resolved.sku,
