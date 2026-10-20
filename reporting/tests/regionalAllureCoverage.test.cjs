@@ -5,7 +5,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "../..");
-const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+const read = (file) => fs.readFileSync(path.join(root, file), "utf8").replace(/\r\n/g, "\n");
 const coPlan = require("../../governance/co-qst-plan.json");
 const clPlan = require("../../governance/cl-qst-plan.json");
 const mxCoverage = require("../../governance/mx-qst-coverage.json");
