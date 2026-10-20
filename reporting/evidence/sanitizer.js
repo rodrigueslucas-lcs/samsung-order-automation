@@ -1,5 +1,5 @@
-const SENSITIVE_KEY = /^(?:password|passwd|token|authorization|cookie|secret|api_?key|card_?number|cvv|cvc|email|phone|first_?name|last_?name|line1|line2|address)$/i;
-const SENSITIVE_VALUE = /(password|passwd|token|authorization|cookie|secret|api_?key|card_?number|cvv|cvc|email|phone)(\s*[=:]\s*)(["']?)[^\s,;\]}]+/gi;
+const SENSITIVE_KEY = /^(?:password|passwd|token|authorization|cookie|secret|api_?key|card_?number|cvv|cvc|security_?code|email|phone|first_?name|last_?name|holder_?name|line1|line2|street|address|postal_?code|zip_?code|document|document_?number|identification|identification_?number|vat_?number|company_?id|imei)$/i;
+const SENSITIVE_VALUE = /(password|passwd|token|authorization|cookie|secret|api_?key|card_?number|cvv|cvc|security_?code|email|phone|first_?name|last_?name|holder_?name|street|address|postal_?code|zip_?code|document|identification|vat_?number|company_?id|imei)(\s*[=:]\s*)(["']?)[^\s,;\]}]+/gi;
 
 function sanitizeString(value) {
   return value.replace(
