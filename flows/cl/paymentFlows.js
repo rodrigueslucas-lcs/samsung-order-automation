@@ -2,6 +2,9 @@ import { test, expect } from "@playwright/test";
 import MarketPaymentPage from "../../pages/MarketPaymentPage";
 import clTestCard from "../../utils/clTestCard.cjs";
 import destructiveGuards from "../../utils/destructiveGuards";
+import evidenceContext from "../../reporting/evidence/evidenceContext.js";
+
+const { recordBusinessEvidence } = evidenceContext;
 
 export async function completeClFlowSandbox(page, { orderCode, storefrontOrigin }) {
   destructiveGuards.requirePaymentSubmitOptIn();
@@ -18,14 +21,11 @@ export async function completeClFlowSandbox(page, { orderCode, storefrontOrigin 
   const action = page.getByRole("combobox");
   await action.selectOption({ label: "Quiero pagar la orden" });
   await expect(action.locator("option:checked")).toHaveText("Quiero pagar la orden");
-  // Flow renders the form before its external scripts bind the Confirmar handler.
-  // An early native click only focuses the button and sends no request.
   await page.waitForFunction(() => {
     const button = document.getElementById("pagar");
     return Boolean(button) && typeof window.jQuery?._data === "function" &&
       Boolean(window.jQuery._data(button, "events")?.click?.length);
   }, null, { timeout: 60000 });
-  // One native simulator confirmation for this existing attempt; never resubmit an order.
   await page.getByRole("button", { name: /^Confirmar$/i }).click();
   await page.waitForURL(url => url.origin === target.origin && url.pathname.startsWith("/cl/"), { timeout: 90000 });
 }
@@ -51,7 +51,7 @@ export async function selectClInterestFreeInstallments(payment, testInfo) {
   const options = await control.locator("option").evaluateAll(items => items
     .filter(option => !option.disabled && option.value)
     .map(option => ({ value: option.value, text: option.textContent.trim() })));
-  await testInfo.attach("cl-offered-installments", {
+  await testInfo.attach("CL Offered Installments", {
     body: JSON.stringify(options), contentType: "application/json",
   });
   const choice = options.find(option => /^\s*(?:[2-9]|\d{2,})\s+cuotas?\b/i.test(option.text) &&
@@ -69,8 +69,6 @@ export async function selectClNativePaymentButton(page, heading) {
   await expect(method).toBeVisible({ timeout: 60000 });
   if (await method.getAttribute("aria-expanded") !== "true") await method.click();
   await expect(method).toHaveAttribute("aria-expanded", "true");
-  // The previous method can remain visible while the new details render.
-  // Never let its global Pay button submit a different payment mode.
   const panel = method.locator("xpath=ancestor::mat-expansion-panel[1]");
   const button = panel.getByRole("button", { name: /realizar pedido|pagar ahora/i })
     .filter({ visible: true });
@@ -84,6 +82,16 @@ export async function executeClPaymentOrder(browser, testInfo, { reachDelivery, 
   const cardProvider = String(process.env.CL_QST_CARD_PROVIDER || "webpay").toLowerCase();
   if (!["webpay", "mercado"].includes(cardProvider)) throw new Error("CL_QST_CARD_PROVIDER must be webpay or mercado.");
   const flowCard = kind === "card" && cardProvider === "webpay";
+  const paymentMode = flowCard ? "Webpay Credit / Debit Card" :
+    kind === "transfer" ? "Direct Bank Transfer" :
+      kind === "installments" ? "Interest-free installments" : "Credit / Debit Card";
+  recordBusinessEvidence(testInfo, {
+    market: "CL",
+    environment: process.env.CL_QST_ENVIRONMENT || process.env.TEST_ENV || null,
+    paymentMode,
+    authorizedSubmit: true,
+  });
+
   const { context, page } = await reachDelivery(browser, { singleItem: true });
   try {
     await test.step("Choose the registered delivery address and continue to CL Payment", async () => {
@@ -119,6 +127,27 @@ export async function executeClPaymentOrder(browser, testInfo, { reachDelivery, 
       }
       await expect(page).toHaveURL(/confirmation|confirmacion|order-confirmation|checkout\/order|success/i, { timeout: 90000 });
       await expect(page.getByText(result.orderCode, { exact: false }).first()).toBeVisible({ timeout: 30000 });
+
+      recordBusinessEvidence(testInfo, {
+        orderCode: result.orderCode,
+        paymentMode,
+        outcome: result.outcome,
+        authorizedSubmit: true,
+      });
+      await testInfo.attach("CL Order Evidence", {
+        body: Buffer.from(JSON.stringify({
+          market: "CL",
+          environment: process.env.CL_QST_ENVIRONMENT || process.env.TEST_ENV || null,
+          orderId: result.orderCode,
+          paymentMode,
+          outcome: result.outcome,
+          finalUrl: result.finalUrl,
+          responses: result.responses || [],
+          authorizedSubmit: true,
+          confirmationValidated: true,
+        }, null, 2)),
+        contentType: "application/json",
+      });
       testInfo.annotations.push({ type: "cl-qst-order", description: result.orderCode });
     });
   } finally {
