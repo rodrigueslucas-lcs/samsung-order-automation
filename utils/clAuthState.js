@@ -33,6 +33,7 @@ function getClAuthState(environment = process.env) {
     logoutTextName: /Cerrar Sesi[oó]n/i,
     authenticatedMenuSelector: '[role="menu"].profile-menu',
     profileMenuReadySelector: '[role="menu"].profile-menu:not(.mat-menu-panel-animating)',
+    profileMenuOpenAttempts: 3,
   });
 
   return withRegisteredSessionRecovery(auth, {

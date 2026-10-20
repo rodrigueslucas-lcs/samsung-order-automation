@@ -150,15 +150,21 @@ test.describe("CL QST - Base Store Official P1", () => {
   test("SAM-24784 @qst @cl @base-store @registered - Login Home page", async ({ browser }) => {
     await test.step("Validate CL login home page", async () => {
       const cfg = config();
-      const { context, page } = await authenticatedPage(browser, cfg);
+      test.skip(!hasClAuthState(), `CL authenticated state is required. Run CL_QST_ENVIRONMENT=${cfg.environment} npm run auth:refresh:cl first.`);
+      const auth = getClAuthState();
+      const context = await browser.newContext({
+        storageState: CL_AUTH_STATE_PATH,
+        viewport: { width: 1920, height: 1080 },
+      });
       try {
-        const profile = page.getByRole("button", { name: "My Profile", exact: true })
-          .or(page.locator('button[data-an-la="L0_13_login"]'))
-          .or(page.locator("button.nv00-gnb-v4__utility-user"))
-          .filter({ visible: true }).first();
-        await expect(profile).toBeVisible({ timeout: 60000 });
-        await profile.click();
-        await expect(page.getByText(/Cerrar Sesi[oó]n/i).filter({ visible: true }).first()).toBeVisible({ timeout: 30000 });
+        await auth.applyAuthSessionStorage(context);
+        // The registered context's newPage already opens and validates home.
+        // Preserve that rendered page instead of navigating twice more, then
+        // prove logout with the hover-aware menu contract rather than toggling it.
+        const page = await context.newPage();
+        await test.step("Open the desktop profile menu and prove authenticated logout", () =>
+          auth.validateCurrentPageAuthenticated(page)
+        );
       } finally {
         await context.close();
       }
