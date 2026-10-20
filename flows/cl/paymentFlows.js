@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import MarketPaymentPage from "../../pages/MarketPaymentPage";
 import clTestCard from "../../utils/clTestCard.cjs";
 import destructiveGuards from "../../utils/destructiveGuards";
+import { installBusinessNetworkEvidence } from "../../utils/businessNetworkEvidence";
 import evidenceContext from "../../reporting/evidence/evidenceContext.js";
 
 const { recordBusinessEvidence } = evidenceContext;
@@ -70,7 +71,7 @@ export async function selectClNativePaymentButton(page, heading) {
   if (await method.getAttribute("aria-expanded") !== "true") await method.click();
   await expect(method).toHaveAttribute("aria-expanded", "true");
   const panel = method.locator("xpath=ancestor::mat-expansion-panel[1]");
-  const button = panel.getByRole("button", { name: /realizar pedido|pagar ahora/i })
+  const button = panel.getByRole("button", { name: /realizar pedido|pagar agora/i })
     .filter({ visible: true });
   await expect(button).toBeVisible({ timeout: 60000 });
   await expect(button).toBeEnabled();
@@ -93,6 +94,7 @@ export async function executeClPaymentOrder(browser, testInfo, { reachDelivery, 
   });
 
   const { context, page } = await reachDelivery(browser, { singleItem: true });
+  installBusinessNetworkEvidence(page, testInfo, "CL");
   try {
     await test.step("Choose the registered delivery address and continue to CL Payment", async () => {
       await continueClRegisteredDeliveryToPayment(page);
