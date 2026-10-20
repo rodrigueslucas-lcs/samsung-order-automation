@@ -42,18 +42,18 @@ test("regional official Base Store inventories are exhaustively audited", () => 
   assert.ok(!mx.includes("SAM-25006"), "historical-only MX SAM-25006 must not inflate active P1 scope");
 });
 
-test("shared enrichment normalizes BS and exposes actionable runtime context", () => {
+test("shared enrichment normalizes BS and exposes only actionable known defects", () => {
   const source = read("reporting/allure/officialQstEnrichment.cjs");
   assert.equal(normalizeStore("BS"), "BASE_STORE");
   assert.equal(normalizeStore("BASE-STORE"), "BASE_STORE");
   assert.match(source, /extractRuntimeOutputEvidence/);
   assert.match(source, /Order ID/);
   assert.match(source, /\["FAIL", "BLOCKED"\]\.includes\(runtimeStatus\)/);
-  assert.match(source, /known-defect/);
+  assert.match(source, /mappedDefect/);
   assert.match(source, /collectEvidenceFiles/);
 });
 
-test("regional finalization sends the correct artifacts to Allure", () => {
+test("regional finalization sends the correct evidence argument to each Allure enricher", () => {
   const finalize = read("scripts/finalize-jenkins-suite.cjs");
   const mxFinalize = read("scripts/finalize-allure-mx-qst.cjs");
   const clRunner = read("scripts/run-cl-qst-p1.cjs");
@@ -62,23 +62,32 @@ test("regional finalization sends the correct artifacts to Allure", () => {
     assert.match(finalize, new RegExp(`${market}: 'scripts/enrich-allure-${market.toLowerCase()}-qst\\.cjs'`));
   }
   assert.match(finalize, /const evidenceRoot = path\.join\(artifactDir, 'evidence'\)/);
+  assert.match(finalize, /market === 'PE' \? path\.join\(evidenceRoot, 'qst-evidence\.json'\) : evidenceRoot/);
   assert.match(mxFinalize, /evidenceRoot/);
   assert.match(mxFinalize, /enrich-allure-mx-qst\.cjs/);
   assert.match(clRunner, /ALLURE_RESULTS_DIR: allureResultsDir/);
   assert.match(clRunner, /ENABLE_ALLURE:/);
 });
 
-test("CO CL and MX publish controlled product and API evidence", () => {
+test("CO CL and MX publish controlled product and business API evidence", () => {
   const coFlow = read("tests/markets/co/qst/base-store/coQstFlows.js");
   const clFlow = read("flows/cl/qstFlows.js");
   const mxFixture = read("tests/markets/mx/qst/base-store/mxQst.fixture.js");
+  const regionalNetwork = read("utils/businessNetworkEvidence.js");
 
   for (const source of [coFlow, clFlow]) {
     assert.match(source, /recordBusinessEvidence/);
     assert.match(source, /Product Context/);
     assert.match(source, /attachNetworkEvidence/);
+    assert.match(source, /installBusinessNetworkEvidence/);
     assert.match(source, /Add to Cart/);
   }
+  assert.match(regionalNetwork, /Delivery \$\{method\}/);
+  assert.match(regionalNetwork, /Address \$\{method\}/);
+  assert.match(regionalNetwork, /Payment \$\{method\}/);
+  assert.match(regionalNetwork, /Order \$\{method\}/);
+  assert.match(regionalNetwork, /Checkout \$\{method\}/);
+
   assert.match(mxFixture, /MX Test Context/);
   assert.match(mxFixture, /Cart \$\{method\}/);
   assert.match(mxFixture, /Delivery \$\{method\}/);
@@ -87,7 +96,7 @@ test("CO CL and MX publish controlled product and API evidence", () => {
   assert.match(mxFixture, /attachNetworkEvidence/);
 });
 
-test("destructive regional order flows publish Order ID evidence", () => {
+test("destructive regional order flows publish or recover Order ID evidence", () => {
   const mxOrder = read("tests/markets/mx/qst/base-store/registered-order.spec.js");
   const clPayment = read("flows/cl/paymentFlows.js");
   const coOfficial = read("tests/markets/co/qst/base-store/official-p1.spec.js");
@@ -108,7 +117,7 @@ test("network evidence and checkout data are sanitized before publication", () =
   const dedupe = read("scripts/dedupe-allure-evidence.cjs");
 
   for (const key of ["security_?code", "postal_?code", "document", "identification", "vat_?number", "imei"]) {
-    assert.match(sanitizer, new RegExp(key.replaceAll("?", "\\?"), "i"));
+    assert.ok(sanitizer.toLowerCase().includes(key.toLowerCase()), `sanitizer must include ${key}`);
   }
   assert.match(network, /return `\$\{url\.origin\}\$\{url\.pathname\}`/);
   assert.doesNotMatch(network, /searchParams/);
@@ -158,6 +167,7 @@ test("shared enrichment can generate a sanitized contextual Allure result", () =
   const result = JSON.parse(fs.readFileSync(path.join(resultsDir, "one-result.json"), "utf8"));
   assert.equal(result.parameters.find((item) => item.name === "SKU")?.value, "SKU-123");
   assert.equal(result.parameters.find((item) => item.name === "Order ID")?.value, "MX261020-12345678");
+  assert.equal(result.parameters.find((item) => item.name === "Known Defect"), undefined);
   const contextAttachment = result.attachments.find((item) => item.name === "MX Test Context");
   assert.ok(contextAttachment);
   const context = fs.readFileSync(path.join(resultsDir, contextAttachment.source), "utf8");
