@@ -86,3 +86,15 @@ test("per-TC Allure definitions retain objective expected result and multiple bu
     }
   }
 });
+
+test("Allure normalization hardens blocked known defects and removes broken detail sources", () => {
+  const dedupe = read("scripts/dedupe-allure-evidence.cjs");
+  assert.match(dedupe, /sourceExists/);
+  assert.match(dedupe, /if \(!sourceExists\(attachment\)\) continue/);
+  assert.match(dedupe, /TECHNICAL_STEP/);
+  assert.match(dedupe, /Runtime Status/);
+  assert.match(dedupe, /Known Defect/);
+  assert.match(dedupe, /result\.status = "skipped"/);
+  assert.match(dedupe, /Blocked by Known Defect/);
+  assert.match(dedupe, /blocked\/non-gating/);
+});
