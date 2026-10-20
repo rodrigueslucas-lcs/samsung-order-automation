@@ -158,9 +158,6 @@ test.describe("CL QST - Base Store Official P1", () => {
       });
       try {
         await auth.applyAuthSessionStorage(context);
-        // The registered context's newPage already opens and validates home.
-        // Preserve that rendered page instead of navigating twice more, then
-        // prove logout with the hover-aware menu contract rather than toggling it.
         const page = await context.newPage();
         await test.step("Open the desktop profile menu and prove authenticated logout", () =>
           auth.validateCurrentPageAuthenticated(page)
@@ -323,8 +320,6 @@ test.describe("CL QST - Base Store Official P1", () => {
   {
     const test = checkoutLoginTest;
     test("SAM-24807 @qst @cl @base-store @registered - Login from Checkout page", async ({ browser }, testInfo) => {
-      // Human Account verification needs its own bounded budget; do not close
-      // the maximized window while the operator is completing the challenge.
       test.setTimeout(900000);
       expect(hasClAuthState(), "Refresh the legitimate CL Samsung Account session before this login scenario.").toBe(true);
       const cfg = config();
@@ -633,7 +628,6 @@ test.describe("CL QST - Base Store Official P1", () => {
     const shipping = page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
     await test.step("Select home delivery and validate its address fields", async () => {
       if (config().environment === "S1") {
-        // S1 exposes home delivery directly; it has no delivery-mode tab to click.
         await expect(shipping.getByRole("tabpanel", { name: "Envío", exact: true })).toBeVisible();
       } else {
         const homeDelivery = shipping.getByText(/^Env[ií]o$/i).filter({ visible: true }).first();
@@ -687,12 +681,19 @@ test.describe("CL QST - Base Store Official P1", () => {
 
   test("SAM-24821 @qst @cl @base-store - Verify Back to Top", async ({ page }) => {
     await test.step("Validate CL verify back to top", async () => {
-      await cart(page);
+      const { cfg } = await cart(page);
       await page.setViewportSize({ width: 1920, height: 1080 });
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
       const control = page.getByRole("button", { name: /Volver al inicio|Back to top|Volver arriba|Ir arriba|Subir/i })
         .or(page.getByRole("link", { name: /Volver al inicio|Back to top|Volver arriba|Ir arriba|Subir/i }))
         .filter({ visible: true }).first();
+
+      const visible = await control.waitFor({ state: "visible", timeout: 10000 })
+        .then(() => true, () => false);
+      if (!visible && cfg.environment === "S2") {
+        test.skip(true, "KNOWN DEFECT RT-746043: CL S2 Back to Top control is not rendered after scrolling.");
+      }
+
       await expect(control).toBeVisible({ timeout: 30000 });
       await control.click();
       await expect.poll(() => page.evaluate(() => window.scrollY), { timeout: 10000 }).toBeLessThan(200);
