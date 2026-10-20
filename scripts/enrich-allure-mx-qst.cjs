@@ -10,8 +10,6 @@ const environment = String(process.env.MX_QST_ENVIRONMENT || process.env.ENVIRON
 const config = getMxConfig({ ...process.env, MX_QST_ENVIRONMENT: environment });
 const cases = Object.fromEntries(Object.entries(coverage.cases).map(([id, entry]) => [id, { ...entry, store: entry.store === "BS" ? "BASE_STORE" : entry.store }]));
 
-// Explicit 29-TC active Base Store P1 audit. SAM-25006 is intentionally excluded
-// because governance marks it historical-only; it must not inflate active scope.
 const AUDITED_BASE_STORE_IDS = Object.freeze([
   "SAM-24962", "SAM-24963", "SAM-24964", "SAM-24968", "SAM-24969",
   "SAM-24971", "SAM-24972", "SAM-24975", "SAM-24981", "SAM-24982",
@@ -21,88 +19,37 @@ const AUDITED_BASE_STORE_IDS = Object.freeze([
   "SAM-25005", "SAM-25010", "SAM-25011", "SAM-25016",
 ]);
 
+const D = (objective, expected, steps, extra = {}) => ({ objective, expected, steps, ...extra });
 const DETAILS = {
-  "SAM-24969": {
-    objective: "Validate the MX buying-category/PDP journey can add the controlled product to cart.",
-    expected: "The product is added through the supported storefront path and the cart mutation is proven with SKU/network evidence.",
-    feature: "Product & Catalog",
-  },
-  "SAM-24975": {
-    objective: "Validate Samsung Rewards messaging across the supported MX cart/checkout/payment surfaces.",
-    expected: "Rewards messaging is visible in the applicable surfaces; any documented tooltip/path gap remains explicit rather than being overstated as full coverage.",
-    feature: "Checkout",
-    userType: "Rewards-capable account",
-  },
-  "SAM-24981": {
-    objective: "Validate Samsung Care+ availability and cart behavior for an eligible MX product.",
-    expected: "SC+ is reflected correctly when an eligible SKU is used; missing eligibility is reported as test-data prerequisite rather than a false product failure.",
-    feature: "Cart & Promotions",
-  },
-  "SAM-24982": {
-    objective: "Validate the MX Trade-up interaction while preserving the controlled cart product.",
-    expected: "The Trade-up journey is accessible for eligible data and its resulting cart behavior remains observable.",
-    feature: "Cart & Promotions",
-  },
-  "SAM-24985": {
-    objective: "Validate Extended Warranty can be added for an eligible MX product and is associated with the cart entry.",
-    expected: "The eligible warranty/service pack is reflected in cart with the controlled product.",
-    feature: "Cart & Promotions",
-  },
-  "SAM-24986": {
-    objective: "Validate cart isolation across the dedicated second MX account/session.",
-    expected: "Cart state from one account is not incorrectly exposed to the other account/session.",
-    feature: "Cart & Promotions",
-    userType: "Registered / second account",
-  },
-  "SAM-24991": {
-    objective: "Validate the registered MX checkout address journey represented by the current automation.",
-    expected: "New/saved address behavior that is implemented is proven while any remaining official edit-path gap stays visible in coverage metadata.",
-    feature: "Checkout",
-    userType: "Registered",
-  },
-  "SAM-24999": {
-    objective: "Validate invalid MX address/postal-code data is rejected before normal Delivery progression.",
-    expected: "A clear validation barrier is observable and checkout does not silently accept invalid address data.",
-    feature: "Checkout",
-  },
-  "SAM-25001": {
-    objective: "Validate the MX Back to Top control on cart.",
-    expected: "The control is visible after scrolling and returns the cart viewport to the top.",
-    feature: "Storefront UI",
-  },
-  "SAM-25002": {
-    objective: "Validate an authorized registered-user MX Mercado Pago card purchase end to end.",
-    expected: "The payment reaches Samsung order confirmation and exposes a valid MX Order ID when destructive submission is explicitly authorized.",
-    steps: ["Restore registered MX session", "Prepare one controlled cart item", "Reach Payment", "Populate and validate the configured test card", "Submit the authorized payment once", "Capture Order ID and payment/network evidence", "Validate Samsung confirmation"],
-    feature: "Payment",
-    userType: "Registered",
-    paymentMode: "Credit / Debit Card",
-  },
-  "SAM-25004": {
-    objective: "Validate PayPal is available/selectable in MX without claiming an order when submission is intentionally not performed.",
-    expected: "PayPal availability and controlled selection are proven safely; order success remains unclaimed without authorized submit evidence.",
-    feature: "Payment",
-    paymentMode: "PayPal",
-  },
-  "SAM-25005": {
-    objective: "Validate Pay in Cash is available/selectable in MX without claiming an order when submission is intentionally not performed.",
-    expected: "Cash-payment availability and controlled selection are proven safely; order success remains unclaimed without authorized submit evidence.",
-    feature: "Payment",
-    paymentMode: "Cash Payment",
-  },
-  "SAM-25010": {
-    objective: "Validate MX Track Order using a causal order, verification email and OTP flow.",
-    expected: "The order-tracking flow accepts the valid verification code and resolves the order unless the exact mapped RT-738525 environment defect reproduces.",
-    steps: ["Create or reuse the causal guest order", "Capture Order ID and guest mailbox", "Request Track Order verification", "Read the OTP email", "Submit the OTP", "Validate tracked order details or mapped Known Defect"],
-    feature: "Order & BackOffice",
-    userType: "Guest",
-  },
-  "SAM-25011": {
-    objective: "Validate MX BackOffice order and product search in the target staging environment.",
-    expected: "BackOffice authentication succeeds and order/product data can be located in the required search modes.",
-    feature: "Order & BackOffice",
-    userType: "BackOffice",
-  },
+  "SAM-24962": D("Validate the registered MX Samsung Account session on Home.", "The restored registered session lands on the MX storefront and authenticated profile controls are available.", ["Restore the MX registered session", "Open the MX storefront home page", "Validate My Profile/authenticated state", "Preserve session evidence"], { feature: "Account & Profile", userType: "Registered" }),
+  "SAM-24963": D("Validate the registered MX My Account menu.", "Expected account navigation options are visible and usable for the authenticated user.", ["Restore registered session", "Open My Profile/My Account", "Validate expected account menu items", "Validate Logout/account state"], { feature: "Account & Profile", userType: "Registered" }),
+  "SAM-24964": D("Validate the MX global navigation menu.", "The GNB and its category/storefront navigation entry points are rendered and interactive.", ["Open MX storefront", "Locate the global navigation header", "Open/inspect GNB categories", "Validate usable navigation targets"], { feature: "Storefront UI" }),
+  "SAM-24968": D("Validate MX PLP facets/filters.", "Facet controls are available and the currently automated filter behavior is proven while the documented result-change gap remains visible as PARTIAL coverage.", ["Open the controlled PLP/category", "Locate facet/filter controls", "Exercise the supported filter interaction", "Validate the implemented filter state", "Preserve PARTIAL coverage note"], { feature: "Product & Catalog" }),
+  "SAM-24969": D("Validate the MX buying-category/PDP journey can add the controlled product to cart.", "The product is added through the supported storefront path and the cart mutation is proven with SKU/network evidence.", ["Open the MX buying-category/product journey", "Open the controlled PDP", "Add the product to cart", "Capture Add to Cart request/response", "Validate the SKU/cart mutation"], { feature: "Product & Catalog" }),
+  "SAM-24971": D("Validate the MX cart page UI for the controlled product.", "Core product, pricing and order-summary presentation is rendered correctly; remaining official UI detail stays visible as PARTIAL coverage.", ["Add the controlled product", "Open Cart", "Validate product and price presentation", "Validate order summary", "Preserve cart UI evidence"], { feature: "Cart & Promotions" }),
+  "SAM-24972": D("Validate increase, decrease and delete quantity behavior in MX cart.", "Cart quantity can be increased/decreased and the product can be removed with the empty-cart state confirmed.", ["Prepare controlled MX cart", "Increase quantity and validate persistence", "Decrease quantity and validate persistence", "Remove the product", "Validate empty cart"], { feature: "Cart & Promotions" }),
+  "SAM-24975": D("Validate Samsung Rewards messaging across MX cart, checkout and payment surfaces.", "Rewards messaging is visible in the implemented surfaces; the documented tooltip assertion gap remains visible as PARTIAL coverage.", ["Prepare controlled cart", "Validate Rewards text on Cart", "Continue through Checkout", "Validate Rewards text in Checkout/Payment", "Preserve the documented tooltip coverage note"], { feature: "Checkout", userType: "Rewards-capable account" }),
+  "SAM-24981": D("Validate Samsung Care+ availability/cart behavior for an eligible MX product.", "SC+ is reflected correctly when an eligible SKU is used; exact BC/PDP-origin coverage limitations remain explicit.", ["Prepare an SC+-eligible product", "Open the supported product/cart service surface", "Select Samsung Care+", "Validate service association in cart", "Preserve eligibility evidence"], { feature: "Cart & Promotions" }),
+  "SAM-24982": D("Validate the MX Trade-up interaction while preserving the controlled cart.", "Trade-up can be opened/exercised for eligible data and the controlled product remains valid in cart; documented resulting-cart/delete gaps remain explicit.", ["Add eligible product", "Locate Trade-up service", "Open/exercise Trade-up journey", "Return to Cart", "Validate controlled product/service state"], { feature: "Cart & Promotions" }),
+  "SAM-24985": D("Validate Extended Warranty on MX cart.", "An eligible warranty/service pack can be associated with the controlled product and is reflected in Cart.", ["Prepare warranty-eligible SKU", "Open Cart", "Select Extended Warranty/Service Pack", "Validate service association", "Preserve service evidence"], { feature: "Cart & Promotions" }),
+  "SAM-24986": D("Validate cart isolation across the dedicated second MX account/session.", "Cart state from one account is not incorrectly exposed to the other account/session; explicit logout refinement remains visible as PARTIAL coverage.", ["Prepare first account/cart state", "Open the dedicated second account/session", "Inspect second-account cart", "Validate account isolation", "Preserve isolation evidence"], { feature: "Cart & Promotions", userType: "Registered / second account" }),
+  "SAM-24988": D("Validate the Checkout button on MX cart.", "The controlled cart Checkout action is enabled and navigates into the MX checkout journey.", ["Prepare controlled cart", "Validate Checkout CTA", "Activate Checkout", "Capture checkout API/navigation evidence", "Validate checkout entry"], { feature: "Checkout" }),
+  "SAM-24989": D("Validate the order summary on MX checkout.", "Checkout exposes the expected order summary and values; deeper presentation details remain marked PARTIAL.", ["Prepare controlled cart", "Enter checkout", "Locate order summary", "Validate implemented summary values", "Preserve checkout evidence"], { feature: "Checkout" }),
+  "SAM-24990": D("Validate MX Step 1 Contact Information.", "Mandatory guest contact data is accepted and checkout can progress toward Delivery.", ["Start guest checkout", "Populate mandatory contact fields", "Submit Contact Information", "Validate Delivery progression", "Preserve checkout API evidence"], { feature: "Checkout", userType: "Guest" }),
+  "SAM-24991": D("Validate the registered MX new/saved address journey represented by the current automation.", "Implemented new-address behavior is proven while the remaining official edit/change gap stays visible as PARTIAL coverage.", ["Restore registered session", "Reach Delivery", "Exercise implemented new/saved address path", "Validate accepted address state", "Preserve documented edit-path gap"], { feature: "Checkout", userType: "Registered" }),
+  "SAM-24992": D("Validate selecting a saved address in registered MX checkout.", "A prerequisite saved address can be selected and remains the active checkout address.", ["Restore registered session", "Reach Delivery", "Select a saved address", "Validate checked/active state", "Preserve address evidence"], { feature: "Checkout", userType: "Registered" }),
+  "SAM-24993": D("Validate the save-address option for a registered MX user.", "Registered checkout exposes and preserves the expected save-address behavior, including environment-specific default state.", ["Restore registered session", "Reach Delivery with new address", "Inspect save-address control", "Exercise expected save option behavior", "Validate resulting state"], { feature: "Checkout", userType: "Registered" }),
+  "SAM-24994": D("Validate registered MX checkout with a new unsaved address.", "A new address is accepted and checkout progresses while the address remains intentionally unsaved.", ["Restore registered session", "Select New Address", "Populate controlled address", "Keep Save disabled/unselected", "Validate checkout progression"], { feature: "Checkout", userType: "Registered" }),
+  "SAM-24995": D("Validate Save option is not visible for MX guest checkout.", "Guest checkout does not expose the registered-user address persistence option.", ["Start guest checkout", "Reach Delivery", "Inspect address persistence controls", "Validate Save option is absent", "Preserve guest-state evidence"], { feature: "Checkout", userType: "Guest" }),
+  "SAM-24999": D("Validate invalid MX address/postal-code data is rejected.", "A clear validation barrier is observable and checkout does not silently accept invalid address data.", ["Start checkout", "Enter invalid postal/address data", "Attempt normal Delivery progression", "Validate error/validation barrier", "Confirm invalid data is not accepted"], { feature: "Checkout", userType: "Guest" }),
+  "SAM-25000": D("Validate switching between saved/new MX address modes and the currently implemented delivery state.", "Saved/new address switching works correctly; the remaining delivery-mode switching path stays visible as PARTIAL coverage.", ["Restore registered session", "Reach Delivery", "Switch Saved → New Address", "Switch New → Saved Address", "Validate selected state and document delivery-mode gap"], { feature: "Checkout", userType: "Registered" }),
+  "SAM-25001": D("Validate the MX Back to Top control on cart.", "The control is visible after scrolling and returns the cart viewport to the top.", ["Prepare Cart", "Scroll to bottom", "Locate Back to Top", "Activate the control", "Validate viewport returns upward"], { feature: "Storefront UI" }),
+  "SAM-25002": D("Validate an authorized registered-user MX Mercado Pago card purchase end to end.", "The payment reaches Samsung order confirmation and exposes a valid MX Order ID when destructive submission is explicitly authorized.", ["Restore registered MX session", "Prepare one controlled cart item", "Reach Payment", "Populate and validate the configured test card", "Submit the authorized payment once", "Capture MX Order ID and payment/network evidence", "Validate Samsung confirmation"], { feature: "Payment", userType: "Registered", paymentMode: "Credit / Debit Card" }),
+  "SAM-25004": D("Validate PayPal is available/selectable in MX without claiming an order when submission is intentionally not performed.", "PayPal availability and controlled selection are proven safely; order success remains unclaimed without authorized submit evidence.", ["Prepare checkout", "Reach Payment", "Locate PayPal", "Select/expand PayPal safely", "Validate payment surface without submitting an order"], { feature: "Payment", paymentMode: "PayPal" }),
+  "SAM-25005": D("Validate Pay in Cash is available/selectable in MX without claiming an order when submission is intentionally not performed.", "Cash-payment availability and controlled selection are proven safely; order success remains unclaimed without authorized submit evidence.", ["Prepare checkout", "Reach Payment", "Locate Pay in Cash", "Select/expand the method safely", "Validate payment surface without submitting an order"], { feature: "Payment", paymentMode: "Cash Payment" }),
+  "SAM-25010": D("Validate MX Track Order using a causal order, verification email and OTP flow.", "The valid OTP resolves the causal order unless the exact mapped RT-738525 environment defect reproduces.", ["Create or reuse the causal guest order", "Capture Order ID and guest mailbox", "Request Track Order verification", "Read the OTP email", "Submit the OTP", "Validate tracked order details or mapped Known Defect"], { feature: "Order & BackOffice", userType: "Guest" }),
+  "SAM-25011": D("Validate MX BackOffice order and product search in the target staging environment.", "BackOffice authentication succeeds and order/product data can be located using the required basic/advanced search modes.", ["Authenticate to MX BackOffice", "Open Orders/Product search", "Execute required basic search", "Execute required advanced search", "Validate returned data"], { feature: "Order & BackOffice", userType: "BackOffice" }),
+  "SAM-25016": D("Validate the sticky Checkout button on MX mobile cart.", "The mobile cart Checkout action remains visible/usable in the implemented sticky context; deeper checkout sticky behavior remains PARTIAL.", ["Prepare controlled cart", "Switch to mobile viewport", "Scroll/inspect mobile Cart", "Validate sticky Checkout action", "Preserve mobile evidence and coverage note"], { feature: "Storefront UI" }),
 };
 
 enrichOfficialQst({
