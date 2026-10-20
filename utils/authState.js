@@ -1,6 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { writeJsonAtomically } = require("./atomicJson");
+const { bypassStagingHttpCache } = require("./authNavigation.cjs");
 
 function createAuthState({
   authStatePath,
@@ -146,6 +147,7 @@ function createAuthState({
   }
 
   async function gotoWithNetworkRetry(page, url, options = {}) {
+    await bypassStagingHttpCache(page, url);
     const effectiveOptions = {
       ...options,
       ...(navigationTimeoutMs != null && options.timeout == null ? { timeout: navigationTimeoutMs } : {}),
@@ -266,13 +268,25 @@ function createAuthState({
 
   async function validateAuthenticatedSession(page) {
     if (setupUrl) {
-      await gotoWithNetworkRetry(page, setupUrl, { waitUntil: "domcontentloaded" });
-      if (enforceHostname && new URL(page.url()).hostname !== hostname) {
-        throw new Error(`Unexpected ${label} setup host.`);
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const response = await gotoWithNetworkRetry(page, setupUrl, { waitUntil: "domcontentloaded" });
+        if (enforceHostname && new URL(page.url()).hostname !== hostname) {
+          throw new Error(`Unexpected ${label} setup host.`);
+        }
+        const html = response?.ok() ? await response.text() : '';
+        const truncated = Boolean(html) && !/<\/html\s*>/i.test(html);
+        try {
+          await page.getByText(/You can access pages now/i).waitFor({ state: "visible", timeout: truncated ? 10000 : 60000 });
+          break;
+        } catch (error) {
+          const blank = !(await page.locator('body').innerText()).trim();
+          if (attempt === 0 && blank && truncated) {
+            console.warn(`[auth-state:${label}] blank, incomplete bootstrap response; retrying its read-only navigation once.`);
+            continue;
+          }
+          throw new Error(`The saved ${label} bootstrap did not render its access confirmation${blank && truncated ? ' after one incomplete-response retry' : ''}. Authentication was not checked.`, { cause: error });
+        }
       }
-      await page
-        .getByText(/You can access pages now/i)
-        .waitFor({ state: "visible", timeout: 60000 });
     }
 
     await gotoWithNetworkRetry(page, validationUrl, { waitUntil: "domcontentloaded" });
