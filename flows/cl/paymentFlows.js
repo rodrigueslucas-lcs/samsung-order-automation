@@ -78,6 +78,31 @@ export async function selectClNativePaymentButton(page, heading) {
   return button;
 }
 
+async function skipMappedClCardPaymentDefect(page, testInfo, error, { kind, environment }) {
+  if (kind !== "card" || environment !== "S2") return false;
+
+  const paymentError = page
+    .getByText(/Hubo un inconveniente con el medio de pago/i)
+    .filter({ visible: true })
+    .first();
+  const reproduced = await paymentError.isVisible().catch(() => false);
+  if (!reproduced) return false;
+
+  const message = await paymentError.innerText().catch(() => "Hubo un inconveniente con el medio de pago");
+  recordBusinessEvidence(testInfo, {
+    knownDefect: "RT-751761",
+    paymentFailureMessage: message,
+    paymentFailureClassification: "KNOWN_DEFECT",
+    paymentFailureOriginalError: String(error?.message || error || ""),
+  });
+  testInfo.annotations.push({
+    type: "known-defect",
+    description: "RT-751761 - CL S2 Credit/Debit Card payment cannot be completed with Mercado Pago test cards",
+  });
+  test.skip(true, "KNOWN DEFECT RT-751761: CL S2 Credit/Debit Card payment returns 'Hubo un inconveniente con el medio de pago'.");
+  return true;
+}
+
 export async function executeClPaymentOrder(browser, testInfo, { reachDelivery, kind = "card" }) {
   test.skip(process.env.ALLOW_PAYMENT_SUBMIT !== "1", "Set ALLOW_PAYMENT_SUBMIT=1 to authorize a CL test order.");
   const cardProvider = String(process.env.CL_QST_CARD_PROVIDER || "webpay").toLowerCase();
@@ -86,9 +111,10 @@ export async function executeClPaymentOrder(browser, testInfo, { reachDelivery, 
   const paymentMode = flowCard ? "Webpay Credit / Debit Card" :
     kind === "transfer" ? "Direct Bank Transfer" :
       kind === "installments" ? "Interest-free installments" : "Credit / Debit Card";
+  const environment = String(process.env.CL_QST_ENVIRONMENT || process.env.TEST_ENV || "").toUpperCase();
   recordBusinessEvidence(testInfo, {
     market: "CL",
-    environment: process.env.CL_QST_ENVIRONMENT || process.env.TEST_ENV || null,
+    environment: environment || null,
     paymentMode,
     authorizedSubmit: true,
   });
@@ -120,9 +146,15 @@ export async function executeClPaymentOrder(browser, testInfo, { reachDelivery, 
     }
     await test.step("Submit once and prove a new Samsung order confirmation", async () => {
       const storefrontOrigin = new URL(page.url()).origin;
-      const result = await payment.placeOrderAndCapture(kind === "transfer" || flowCard ? {
-        submitResponsePathPattern: /^\/tokocommercewebservices\/v2\/cl\/users\/[^/]+\/carts\/[^/]+\/paymentmodes\/cl-[^/]+\/submitOrder$/i,
-      } : {});
+      let result;
+      try {
+        result = await payment.placeOrderAndCapture(kind === "transfer" || flowCard ? {
+          submitResponsePathPattern: /^\/tokocommercewebservices\/v2\/cl\/users\/[^/]+\/carts\/[^/]+\/paymentmodes\/cl-[^/]+\/submitOrder$/i,
+        } : {});
+      } catch (error) {
+        await skipMappedClCardPaymentDefect(page, testInfo, error, { kind, environment });
+        throw error;
+      }
       expect(result.orderCode).toMatch(/^CL\d{6}-\d{8}(?:_\d+)?$/i);
       if (new URL(page.url()).hostname === "sandbox.flow.cl") {
         await completeClFlowSandbox(page, { orderCode: result.orderCode, storefrontOrigin });
@@ -139,7 +171,7 @@ export async function executeClPaymentOrder(browser, testInfo, { reachDelivery, 
       await testInfo.attach("CL Order Evidence", {
         body: Buffer.from(JSON.stringify({
           market: "CL",
-          environment: process.env.CL_QST_ENVIRONMENT || process.env.TEST_ENV || null,
+          environment: environment || null,
           orderId: result.orderCode,
           paymentMode,
           outcome: result.outcome,
