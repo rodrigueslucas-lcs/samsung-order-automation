@@ -49,7 +49,10 @@ export default defineConfig({
     ...(allureEnabled
       ? [['allure-playwright', {
           resultsDir: process.env.ALLURE_RESULTS_DIR || 'allure-results',
-          detail: true,
+          // Keep the report business-readable. Our explicit test.step(...) nodes,
+          // curated evidence and attachments remain visible, while low-level
+          // Playwright API calls (waitFor/click/fill/locator/etc.) stay in Trace.
+          detail: false,
           suiteTitle: false
         }]]
       : []),
