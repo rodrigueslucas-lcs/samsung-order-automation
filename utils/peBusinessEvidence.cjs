@@ -1,6 +1,5 @@
 const { sanitize } = require("../reporting/evidence/sanitizer");
 
-const MUTATING_METHOD = /^(POST|PUT|PATCH|DELETE)$/i;
 const BUSINESS_URL = /(?:\/cart(?:s|\/|\?|$)|\/entries(?:\/|\?|$)|checkout|delivery|address|payment|submitOrder|\/orders(?:\/|\?|$))/i;
 const MAX_BODY_CHARS = 16000;
 
@@ -60,9 +59,7 @@ async function attachJson(testInfo, name, value) {
 async function captureBusinessExchange(page, testInfo, name, action, { matcher = BUSINESS_URL, max = 8 } = {}) {
   const pending = [];
   const onResponse = (response) => {
-    const request = response.request();
-    if (!matcher.test(request.url())) return;
-    if (!MUTATING_METHOD.test(request.method()) && !/\/orders(?:\/|\?|$)/i.test(request.url())) return;
+    if (!matcher.test(response.request().url())) return;
     pending.push(serializeExchange(response));
   };
 
