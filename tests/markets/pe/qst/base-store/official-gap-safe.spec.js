@@ -3,6 +3,7 @@ import peConfigModule from "../../../../../config/markets/pe";
 import evidenceContext from "../../../../../reporting/evidence/evidenceContext";
 import peEvidenceMetadata from "../../../../../utils/qstPeEvidenceMetadata";
 import destructiveGuards from "../../../../../utils/destructiveGuards";
+import peBusinessEvidence from "../../../../../utils/peBusinessEvidence.cjs";
 import PaymentPage from "../../../../../pages/PaymentPage";
 import OrderConfirmationPage from "../../../../../pages/OrderConfirmationPage";
 import { testData } from "../../../../../utils/testData";
@@ -13,6 +14,7 @@ const { getPeQstConfig } = peConfigModule;
 const { recordBusinessEvidence } = evidenceContext;
 const { getPeQstEvidenceMetadata } = peEvidenceMetadata;
 const { requirePaymentSubmitOptIn } = destructiveGuards;
+const { captureBusinessExchange, attachOrderEvidence } = peBusinessEvidence;
 
 function config() {
   test.skip(!process.env.PE_STOREFRONT_URL, "PE_STOREFRONT_URL is required.");
@@ -45,9 +47,6 @@ test.describe("PE QST - official safe gap reconciliation", () => {
   test("SAM-25068 @qst @pe @base-store @safe - Verify BOGO product on cart page", async ({ page }, testInfo) => {
     evidence(testInfo, "SAM-25068");
     const cfg = config();
-    // Live-validated PE S2 BOGO campaign (2026-10-01):
-    // Galaxy S25 SM-S931BDBLLTP adds the promotional gifts in cart.
-    // Keep env overrides so the campaign can be rotated without changing the TC.
     const defaultBogoSku = cfg.environment === "S2" ? "SM-S931BDBLLTP" : "";
     const bogoSku = String(process.env.PE_QST_BOGO_SKU || defaultBogoSku).trim();
     const bogoPdp = process.env.PE_QST_BOGO_PDP_URL ||
@@ -79,11 +78,6 @@ test.describe("PE QST - official safe gap reconciliation", () => {
       const giftLabels = page.getByText(/BOGO\s*Gift/i, { exact: true }).filter({ visible: true });
       await expect(giftLabels.first(), "PE BOGO cart must expose the BOGO Gift label.").toBeVisible({ timeout: 30000 });
       expect(await giftLabels.count(), "PE BOGO cart should expose the promotional gift entries.").toBeGreaterThanOrEqual(1);
-
-      // The PE S2 campaign identifies promotional lines with the explicit
-      // "BOGO Gift" badge. Do not require a localized "GRATIS" price label:
-      // the live cart can render the gift price numerically while the badge
-      // remains the stable campaign indicator.
       expect(await giftLabels.count(), "PE BOGO cart should expose at least one promotional BOGO gift.").toBeGreaterThanOrEqual(1);
     });
     recordBusinessEvidence(testInfo, {
@@ -181,16 +175,23 @@ test.describe("PE QST - official safe gap reconciliation", () => {
         await payment.validateCreditCardReady(testData.card);
       });
       result = await test.step("Submit the authorized PE card payment once", () =>
-        payment.placeOrderAndCapture({
-          // The gateway adds a transaction suffix; Samsung displays the base order code.
-          orderCodePattern: /\bPE\d{6}-\d{8}(?=_|\b)/i,
-          orderResponsePathPattern: /\/users\/[^/]+\/orders(?:\/|$)/i,
-          submitResponsePathPattern: /\/users\/[^/]+\/carts\/[^/]+\/paymentmodes\/pe-mercadoCC\/submitOrder$/i,
-        })
+        captureBusinessExchange(page, testInfo, "Order Submit", () =>
+          payment.placeOrderAndCapture({
+            orderCodePattern: /\bPE\d{6}-\d{8}(?=_|\b)/i,
+            orderResponsePathPattern: /\/users\/[^/]+\/orders(?:\/|$)/i,
+            submitResponsePathPattern: /\/users\/[^/]+\/carts\/[^/]+\/paymentmodes\/pe-mercadoCC\/submitOrder$/i,
+          }),
+          { matcher: /submitOrder|\/orders(?:\/|$)|payment/i, max: 12 }
+        )
       );
     } else {
       await test.step("Select Internet Banking", () => payment.selectBancaPorInternet());
-      result = await test.step("Submit authorized payment", () => payment.submitSelectedPaymentMode());
+      result = await test.step("Submit authorized payment", () =>
+        captureBusinessExchange(page, testInfo, "Order Submit", () =>
+          payment.submitSelectedPaymentMode(),
+          { matcher: /submitOrder|\/orders(?:\/|$)|payment|transaction/i, max: 12 }
+        )
+      );
     }
     await test.step("Validate created PE order code", async () => {
       expect(result.orderCode, `Authorized PE order submit produced no observable order code. Outcome: ${result.outcome ?? result.type}`).toMatch(/^PE\d{6}-\d{8}(?:_\d+)?$/i);
@@ -212,11 +213,24 @@ test.describe("PE QST - official safe gap reconciliation", () => {
       expect(confirmationOrder).toContain(baseOrderCode.replace(/^PE/i, ""));
     });
 
-    recordBusinessEvidence(testInfo, {
+    const paymentMode = useCard ? "Tarjeta de Crédito / Débito" : "Banca por Internet";
+    await attachOrderEvidence(testInfo, {
+      sku: cfg.sku,
       orderCode: result.orderCode,
       outcome: result.outcome ?? result.type,
-      paymentMode: useCard ? "Tarjeta de Crédito / Débito" : "Banca por Internet",
+      paymentMode,
+      finalUrl: result.finalUrl || `${new URL(page.url()).origin}${new URL(page.url()).pathname}`,
+      networkSummary: result.responses || [],
       authorizedSubmit: true,
+      confirmationValidated: true,
+    });
+    recordBusinessEvidence(testInfo, {
+      sku: cfg.sku,
+      orderCode: result.orderCode,
+      outcome: result.outcome ?? result.type,
+      paymentMode,
+      authorizedSubmit: true,
+      confirmationValidated: true,
     });
   });
 
