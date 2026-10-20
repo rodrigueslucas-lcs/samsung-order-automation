@@ -47,6 +47,7 @@ const runtimeSummaryFile = path.join(artifactDir, "runtime-summary.json");
 const executiveDir = path.join(artifactDir, "executive");
 const playwrightReportDir = path.join(artifactDir, "playwright-report");
 const outputDir = path.join(artifactDir, "playwright");
+const allureResultsDir = path.join(artifactDir, "allure-results");
 const storeLabel = normalizedStore === "BS" ? "BASE_STORE" : normalizedStore === "EPP" ? "EPP" : "SMB";
 
 const env = {
@@ -61,6 +62,8 @@ const env = {
   TEST_SUITE: "P1/QST",
   PLAYWRIGHT_JSON_OUTPUT_FILE: reportFile,
   PLAYWRIGHT_HTML_OUTPUT_DIR: playwrightReportDir,
+  ALLURE_RESULTS_DIR: allureResultsDir,
+  ENABLE_ALLURE: process.env.ENABLE_ALLURE || "0",
   CL_QST_FULL_P1_COUNT: String(officialIds.length),
   SMB_EVIDENCE_DIR: path.join(artifactDir, "evidence"),
   PW_TRACE: process.env.PW_TRACE ?? (process.env.CI ? "1" : "0"),
