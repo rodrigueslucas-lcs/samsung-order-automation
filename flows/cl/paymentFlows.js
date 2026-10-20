@@ -71,7 +71,7 @@ export async function selectClNativePaymentButton(page, heading) {
   if (await method.getAttribute("aria-expanded") !== "true") await method.click();
   await expect(method).toHaveAttribute("aria-expanded", "true");
   const panel = method.locator("xpath=ancestor::mat-expansion-panel[1]");
-  const button = panel.getByRole("button", { name: /realizar pedido|pagar agora/i })
+  const button = panel.getByRole("button", { name: /realizar pedido|pagar ahora/i })
     .filter({ visible: true });
   await expect(button).toBeVisible({ timeout: 60000 });
   await expect(button).toBeEnabled();
