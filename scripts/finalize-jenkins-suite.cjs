@@ -3,14 +3,14 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { sanitizeString } = require('../reporting/evidence/sanitizer');
 
-const artifactDir = path.resolve(process.env.JENKINS_ARTIFACT_DIR || process.env.MX_JENKINS_ARTIFACT_DIR || process.env.MX_QST_ARTIFACT_DIR || 'test-results/jenkins/smb-suite');
+const artifactDir = path.resolve(process.env.JENKINS_ARTIFACT_DIR || process.env.MX_JENKINS_ARTIFACT_DIR || process.env.MX_QST_ARTIFACT_DIR || process.env.CO_QST_ARTIFACT_DIR || process.env.CL_QST_ARTIFACT_DIR || 'test-results/jenkins/smb-suite');
 const jsonFile = path.resolve(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE || path.join(artifactDir, 'results.json'));
 const executiveDir = path.join(artifactDir, 'executive');
 const runtimeSummaryFile = path.join(artifactDir, 'runtime-summary.json');
 const allureResultsDir = path.resolve(process.env.ALLURE_RESULTS_DIR || path.join(artifactDir, 'allure-results'));
 const allureReportDir = path.join(artifactDir, 'allure-report');
 const market = String(process.env.TEST_MARKET || process.env.MARKET || 'MX').toUpperCase();
-const environment = String(process.env.MX_QST_ENVIRONMENT || process.env.PE_QST_ENVIRONMENT || process.env.CO_QST_ENVIRONMENT || process.env.ENVIRONMENT || 'S1').toUpperCase();
+const environment = String(process.env.MX_QST_ENVIRONMENT || process.env.PE_QST_ENVIRONMENT || process.env.CO_QST_ENVIRONMENT || process.env.CL_QST_ENVIRONMENT || process.env.ENVIRONMENT || 'S1').toUpperCase();
 const suite = process.env.TEST_SUITE || 'SMB SUITE';
 const store = process.env.TEST_STORE || 'BASE_STORE';
 const buildNumber = process.env.BUILD_NUMBER || 'LOCAL';
@@ -105,15 +105,17 @@ function writeAllureEnvironment() {
 function enrichAllure() {
   if (!fs.existsSync(allureResultsDir) || !/P1|QST/i.test(suite)) return;
   const scriptByMarket = {
+    MX: 'scripts/enrich-allure-mx-qst.cjs',
     CO: 'scripts/enrich-allure-co-qst.cjs',
+    CL: 'scripts/enrich-allure-cl-qst.cjs',
     PE: 'scripts/enrich-allure-pe-qst.cjs',
   };
   const scriptName = scriptByMarket[market];
   if (!scriptName) return;
   const script = path.resolve(scriptName);
   if (!fs.existsSync(script)) return;
-  const args = [script, allureResultsDir, runtimeSummaryFile];
-  if (market === 'PE') args.push(path.join(artifactDir, 'evidence', 'qst-evidence.json'));
+  const evidenceRoot = path.join(artifactDir, 'evidence');
+  const args = [script, allureResultsDir, runtimeSummaryFile, evidenceRoot];
   const enriched = spawnSync(process.execPath, args, {
     stdio: 'inherit',
     env: process.env,
