@@ -1,299 +1,121 @@
-const fs = require("node:fs");
 const path = require("node:path");
+const coverage = require("../governance/mx-qst-coverage.json");
+const { enrichOfficialQst } = require("../reporting/allure/officialQstEnrichment.cjs");
+const { getMxConfig } = require("../utils/mxConfig");
 
-const resultsDir = path.resolve(process.argv[2] || "allure-results");
-const runtimeFile = path.resolve(process.argv[3] || "runtime-summary.json");
+const resultsDir = path.resolve(process.argv[2] || process.env.ALLURE_RESULTS_DIR || "allure-results");
+const runtimeFile = path.resolve(process.argv[3] || path.join(process.env.MX_QST_ARTIFACT_DIR || "test-results/jenkins/mx-qst", "runtime-summary.json"));
+const evidenceRoot = path.resolve(process.argv[4] || path.join(path.dirname(runtimeFile), "evidence"));
+const environment = String(process.env.MX_QST_ENVIRONMENT || process.env.ENVIRONMENT || "S2").toUpperCase();
+const config = getMxConfig({ ...process.env, MX_QST_ENVIRONMENT: environment });
 
-if (!fs.existsSync(resultsDir)) process.exit(0);
-const runtime = fs.existsSync(runtimeFile)
-  ? JSON.parse(fs.readFileSync(runtimeFile, "utf8"))
-  : { tests: [] };
-const byId = new Map((runtime.tests || []).map((test) => [test.samId, test]));
-const JIRA_BASE_URL = "https://jira.secext.samsung.net/browse/";
-const jiraUrl = samId => `${JIRA_BASE_URL}${samId}`;
-const campaign = process.env.TEST_SUITE === "FAST/GUEST" ? "FAST / GUEST-SAFE" : "P1 / QST";
-const targetEnvironment = String(process.env.MX_QST_ENVIRONMENT || "S1").toUpperCase();
-const environmentLabel = targetEnvironment === "S2" ? "S2 / STG2" : "S1 / STG";
-const campaignLabel = process.env.TEST_SUITE === "FAST/GUEST" ? "MX Fast Guest · Safe" : "MX Official P1/QST";
-const executionMode = runtime.executionMode || ((runtime.targetIds || []).length && (runtime.targetIds || []).length < 29 ? "TARGETED" : "FULL");
-const targetIds = (runtime.targetIds || []).join(",") || "all";
+// Explicit 29-TC active Base Store P1 audit. SAM-25006 is intentionally excluded
+// because governance marks it historical-only; it must not inflate active scope.
+const AUDITED_BASE_STORE_IDS = Object.freeze([
+  "SAM-24962", "SAM-24963", "SAM-24964", "SAM-24968", "SAM-24969",
+  "SAM-24971", "SAM-24972", "SAM-24975", "SAM-24981", "SAM-24982",
+  "SAM-24985", "SAM-24986", "SAM-24988", "SAM-24989", "SAM-24990",
+  "SAM-24991", "SAM-24992", "SAM-24993", "SAM-24994", "SAM-24995",
+  "SAM-24999", "SAM-25000", "SAM-25001", "SAM-25002", "SAM-25004",
+  "SAM-25005", "SAM-25010", "SAM-25011", "SAM-25016",
+]);
 
-function upsertLabel(labels, name, value) {
-  const next = (labels || []).filter((label) => label.name !== name);
-  if (value) next.push({ name, value });
-  return next;
-}
-function pushUniqueLabel(labels, name, value) {
-  if (value && !labels.some((label) => label.name === name && label.value === value)) labels.push({ name, value });
-  return labels;
-}
-function classifyBlocker(text = "") {
-  if (/auth|session|login|logged|account|credential/i.test(text)) return "Authentication / session";
-  if (/sku|product|eligible|data|address|order|email/i.test(text)) return "Test data / prerequisite";
-  if (/executable doesn.t exist|browser.*executable|ms-playwright|ffmpeg|spawn (eperm|enoent)|playwright.*install/i.test(text)) return "Infrastructure / Playwright";
-  if (/environment|staging|s1|backend|server|maintenance|timeout|unavailable|endpoint|cdp|network/i.test(text)) return "Environment / backend";
-  return "Prerequisite";
-}
-function inferFeature(result, runtimeTest) {
-  const value = `${runtimeTest?.title || ""} ${result.name || ""} ${result.fullName || ""}`.toLowerCase();
-  const rules = [
-    ["Order & Tracking", /track|tracking|order confirmation|pedido|confirmaci/],
-    ["Payment", /payment|pago|mercado|paypal|cash|card|tarjeta|rewards/],
-    ["Checkout", /checkout|order summary|delivery|shipping|address|direcci|customer details/],
-    ["Cart & Promotions", /cart|carrito|coupon|cup[oó]n|promo/],
-    ["Product & Catalog", /pdp|plp|product|producto|facet|filter|gnb|catalog|bc-add/],
-    ["Account & Profile", /login|account|profile|registered|registro|address book/],
-    ["Search & Navigation", /search|busca|navigation|home|banner/],
-  ];
-  return rules.find(([, pattern]) => pattern.test(value))?.[0] || "Storefront";
-}
-function inferOwner(result) {
-  return result.labels?.find((label) => label.name === "owner")?.value || "Samsung SMB QA";
-}
-function prettyStatus(status) {
-  return status === "SKIPPED-BLOCKED" || status === "BLOCKED" ? "BLOCKED" : status || "Playwright result";
-}
-function businessJourney(feature, title = "") {
-  const value = String(title).toLowerCase();
-  if (feature === "Order & Tracking") return [
-    "Prepare order / tracking test data",
-    "Open the order tracking journey",
-    "Submit order reference and customer identity",
-    "Complete verification when required",
-    "Validate registered order information",
-  ];
-  if (feature === "Payment") return [
-    "Prepare checkout test data",
-    "Reach the payment step",
-    "Load available payment methods",
-    "Select the expected payment method",
-    /order|submit|place/.test(value) ? "Submit the authorized order action" : "Validate payment controls and continuation",
-  ];
-  if (feature === "Checkout") return [
-    "Prepare cart for checkout",
-    "Open checkout",
-    "Complete delivery and customer information",
-    "Validate address / delivery prerequisites",
-    "Reach the expected checkout stage",
-  ];
-  if (feature === "Cart & Promotions") return [
-    "Prepare storefront test data",
-    "Add the target product to cart",
-    "Open and validate cart state",
-    /coupon|promo|cup[oó]n/.test(value) ? "Apply the promotion / coupon scenario" : "Exercise the cart scenario",
-    "Validate cart business result",
-  ];
-  if (feature === "Product & Catalog") return [
-    "Open the target catalog journey",
-    "Navigate to the expected PLP / PDP",
-    /facet|filter/.test(value) ? "Apply the requested catalog filter" : "Validate product information and availability",
-    "Exercise the product interaction",
-    "Validate the expected catalog result",
-  ];
-  if (feature === "Account & Profile") return [
-    "Open the customer account journey",
-    "Provide the required account context",
-    "Complete authentication / profile action",
-    "Validate customer state",
-  ];
-  if (feature === "Search & Navigation") return [
-    "Open Samsung storefront",
-    "Navigate through the requested entry point",
-    "Exercise search / navigation interaction",
-    "Validate the expected destination and content",
-  ];
-  return ["Prepare test context", "Open Samsung storefront", "Exercise the business scenario", "Validate the expected result"];
-}
-function curateBusinessSteps(feature, title, result) {
-  // Allure is a business execution report. Low-level adapter operations such as
-  // locator/request/expect/navigation belong in Playwright Trace, not the main tree.
-  const technical = /^(before hooks?|after hooks?|navigate|expect\b|wait for|waitfor|locator\b|request\b|page\.|browser\.|context\.|api\b|fixture\b)/i;
-  const explicitBusinessSteps = (result.steps || []).filter((step) => {
-    const name = String(step?.name || "").trim();
-    return name && !technical.test(name);
-  });
-  const start = Number(result.start || Date.now());
-  const stop = Number(result.stop || start);
-  const names = businessJourney(feature, title);
-  const slice = Math.max(1, Math.floor(Math.max(1, stop - start) / names.length));
-  const curated = names.map((name, index) => ({
-    name,
-    status: result.status === "passed" ? "passed" : (index === names.length - 1 ? result.status : "passed"),
-    stage: "finished",
-    start: start + (slice * index),
-    stop: index === names.length - 1 ? stop : Math.min(stop, start + (slice * (index + 1))),
-    steps: [],
-    attachments: [],
-    parameters: [],
-  }));
-  // Preserve real Playwright test.step() calls when present. For legacy tests
-  // without business steps, render a clearly-labelled journey outline instead
-  // of fabricated execution timings.
-  if (explicitBusinessSteps.length) {
-    result.steps = explicitBusinessSteps;
-    return;
-  }
-  result.steps = curated.map((step) => ({
-    ...step,
-    name: `Journey · ${step.name}`,
-    status: "skipped",
-    statusDetails: { message: "Business journey outline; add Playwright test.step() for measured execution timing." },
-  }));
-}
-function buildDescription(samId, feature, runtimeTest, reason) {
-  const status = prettyStatus(runtimeTest?.status);
-  return [
-    `### [${samId}](${jiraUrl(samId)}) · ${feature}`,
-    "",
-    `**Jira:** [Open ${samId}](${jiraUrl(samId)})`,
-    `**Official runtime:** ${status}`,
-    `**Campaign:** MX · ${targetEnvironment} · Base Store · ${campaign}`,
-    `**Store:** Base Store`,
-    `**Environment:** ${environmentLabel}`,
-    runtimeTest?.duration != null ? `**Duration:** ${(Number(runtimeTest.duration) / 1000).toFixed(1)}s` : null,
-    status === "BLOCKED" ? `**Blocker category:** ${classifyBlocker(reason)}` : null,
-    reason ? `**Reason:** ${String(reason).split("\n")[0]}` : null,
-    "",
-    "_Playwright steps and attachments below are the technical execution evidence._",
-  ].filter(Boolean).join("  \n");
-}
-function copyRuntimeAttachments(result, runtimeTest) {
-  result.attachments ||= [];
-  const normalizeName = (attachment) => {
-    const type = String(attachment?.type || attachment?.contentType || "");
-    const name = String(attachment?.name || "");
-    const source = String(attachment?.source || attachment?.path || "");
-    if (/screenshot/i.test(name) || /^image\//i.test(type) || /\.png$/i.test(source)) return "Screenshot · Final state";
-    if (/trace/i.test(name) || /\.zip$/i.test(source)) return "Playwright Trace";
-    if (/video/i.test(name) || /^video\//i.test(type) || /\.webm$/i.test(source)) return "Video · Execution";
-    if (/stdout|stderr|log/i.test(name)) return "Execution log";
-    return name || "Evidence";
-  };
-  const seen = new Set();
-  result.attachments = result.attachments.filter((attachment) => {
-    const key = String(attachment?.source || "") || `${normalizeName(attachment)}|${attachment?.type || ""}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    attachment.name = normalizeName(attachment);
-    return true;
-  });
-  if (!runtimeTest?.attachments?.length) return;
-  for (const attachment of runtimeTest.attachments) {
-    if (!attachment?.path || !fs.existsSync(attachment.path)) continue;
-    const ext = path.extname(attachment.path);
-    // Avoid copying a Playwright artifact already represented by the adapter.
-    const normalized = normalizeName(attachment);
-    // Adapter and runtime reporters often point at the same evidence using
-    // different filenames. Keep one item per evidence kind to avoid duplicate
-    // screenshot/video/trace rows in Allure.
-    if (result.attachments.some((item) => normalizeName(item) === normalized)) continue;
-    const source = `runtime-${runtimeTest.samId}-${result.attachments.length + 1}${ext}`;
-    fs.copyFileSync(attachment.path, path.join(resultsDir, source));
-    result.attachments.push({
-      name: normalizeName(attachment),
-      source,
-      type: attachment.contentType || (ext === ".png" ? "image/png" : ext === ".webm" ? "video/webm" : ext === ".zip" ? "application/zip" : "application/octet-stream"),
-    });
-  }
-}
+const DETAILS = {
+  "SAM-24969": {
+    objective: "Validate the MX buying-category/PDP journey can add the controlled product to cart.",
+    expected: "The product is added through the supported storefront path and the cart mutation is proven with SKU/network evidence.",
+    feature: "Product & Catalog",
+  },
+  "SAM-24975": {
+    objective: "Validate Samsung Rewards messaging across the supported MX cart/checkout/payment surfaces.",
+    expected: "Rewards messaging is visible in the applicable surfaces; any documented tooltip/path gap remains explicit rather than being overstated as full coverage.",
+    feature: "Checkout",
+    userType: "Rewards-capable account",
+  },
+  "SAM-24981": {
+    objective: "Validate Samsung Care+ availability and cart behavior for an eligible MX product.",
+    expected: "SC+ is reflected correctly when an eligible SKU is used; missing eligibility is reported as test-data prerequisite rather than a false product failure.",
+    feature: "Cart & Promotions",
+  },
+  "SAM-24982": {
+    objective: "Validate the MX Trade-up interaction while preserving the controlled cart product.",
+    expected: "The Trade-up journey is accessible for eligible data and its resulting cart behavior remains observable.",
+    feature: "Cart & Promotions",
+  },
+  "SAM-24985": {
+    objective: "Validate Extended Warranty can be added for an eligible MX product and is associated with the cart entry.",
+    expected: "The eligible warranty/service pack is reflected in cart with the controlled product.",
+    feature: "Cart & Promotions",
+  },
+  "SAM-24986": {
+    objective: "Validate cart isolation across the dedicated second MX account/session.",
+    expected: "Cart state from one account is not incorrectly exposed to the other account/session.",
+    feature: "Cart & Promotions",
+    userType: "Registered / second account",
+  },
+  "SAM-24991": {
+    objective: "Validate the registered MX checkout address journey represented by the current automation.",
+    expected: "New/saved address behavior that is implemented is proven while any remaining official edit-path gap stays visible in coverage metadata.",
+    feature: "Checkout",
+    userType: "Registered",
+  },
+  "SAM-24999": {
+    objective: "Validate invalid MX address/postal-code data is rejected before normal Delivery progression.",
+    expected: "A clear validation barrier is observable and checkout does not silently accept invalid address data.",
+    feature: "Checkout",
+  },
+  "SAM-25001": {
+    objective: "Validate the MX Back to Top control on cart.",
+    expected: "The control is visible after scrolling and returns the cart viewport to the top.",
+    feature: "Storefront UI",
+  },
+  "SAM-25002": {
+    objective: "Validate an authorized registered-user MX Mercado Pago card purchase end to end.",
+    expected: "The payment reaches Samsung order confirmation and exposes a valid MX Order ID when destructive submission is explicitly authorized.",
+    steps: ["Restore registered MX session", "Prepare one controlled cart item", "Reach Payment", "Populate and validate the configured test card", "Submit the authorized payment once", "Capture Order ID and payment/network evidence", "Validate Samsung confirmation"],
+    feature: "Payment",
+    userType: "Registered",
+    paymentMode: "Credit / Debit Card",
+  },
+  "SAM-25004": {
+    objective: "Validate PayPal is available/selectable in MX without claiming an order when submission is intentionally not performed.",
+    expected: "PayPal availability and controlled selection are proven safely; order success remains unclaimed without authorized submit evidence.",
+    feature: "Payment",
+    paymentMode: "PayPal",
+  },
+  "SAM-25005": {
+    objective: "Validate Pay in Cash is available/selectable in MX without claiming an order when submission is intentionally not performed.",
+    expected: "Cash-payment availability and controlled selection are proven safely; order success remains unclaimed without authorized submit evidence.",
+    feature: "Payment",
+    paymentMode: "Cash Payment",
+  },
+  "SAM-25010": {
+    objective: "Validate MX Track Order using a causal order, verification email and OTP flow.",
+    expected: "The order-tracking flow accepts the valid verification code and resolves the order unless the exact mapped RT-738525 environment defect reproduces.",
+    steps: ["Create or reuse the causal guest order", "Capture Order ID and guest mailbox", "Request Track Order verification", "Read the OTP email", "Submit the OTP", "Validate tracked order details or mapped Known Defect"],
+    feature: "Order & BackOffice",
+    userType: "Guest",
+  },
+  "SAM-25011": {
+    objective: "Validate MX BackOffice order and product search in the target staging environment.",
+    expected: "BackOffice authentication succeeds and order/product data can be located in the required search modes.",
+    feature: "Order & BackOffice",
+    userType: "BackOffice",
+  },
+};
 
-for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-result.json"))) {
-  const file = path.join(resultsDir, name);
-  const result = JSON.parse(fs.readFileSync(file, "utf8"));
-  const searchable = `${result.name || ""} ${result.fullName || ""}`;
-  const samId = searchable.match(/SAM-\d+/)?.[0];
-  if (!samId) continue;
-
-  const runtimeTest = byId.get(samId);
-  const tags = searchable.match(/@[\w-]+/g) || [];
-  const feature = inferFeature(result, runtimeTest);
-  const cleanTitle = (runtimeTest?.title || result.name || samId)
-    .replace(/\s+@(qst|mx|base-store|safe|registered|guest|destructive)\b/gi, "")
-    .trim()
-    .replace(new RegExp(`^${samId}\\s*[-–:]?\\s*`, "i"), "");
-
-  result.name = `${samId} · ${cleanTitle || feature}`;
-  result.labels = upsertLabel(result.labels, "parentSuite", "Samsung SMB Automation");
-  result.labels = upsertLabel(result.labels, "suite", `MX · ${targetEnvironment} · Base Store`);
-  result.labels = upsertLabel(result.labels, "subSuite", `P1 / QST · ${feature}`);
-  result.labels = upsertLabel(result.labels, "epic", "Samsung SMB Commerce");
-  result.labels = upsertLabel(result.labels, "feature", feature);
-  result.labels = upsertLabel(result.labels, "story", cleanTitle || samId);
-  result.labels = upsertLabel(result.labels, "severity", "critical");
-  result.labels = upsertLabel(result.labels, "owner", inferOwner(result));
-  result.labels = upsertLabel(result.labels, "testCaseId", samId);
-  result.links = (result.links || []).filter((link) => link.name !== samId && link.type !== "tms");
-  result.links.push({ name: samId, url: jiraUrl(samId), type: "tms" });
-  result.labels = upsertLabel(result.labels, "layer", "e2e");
-  result.labels = upsertLabel(result.labels, "host", "Samsung SMB");
-  for (const tag of ["MX", targetEnvironment, "Base Store", "P1", "QST", ...tags.map((tag) => tag.slice(1))]) {
-    pushUniqueLabel(result.labels, "tag", tag);
-  }
-
-  const reason = runtimeTest?.blockedReason || runtimeTest?.error || "";
-  if (runtimeTest?.status) pushUniqueLabel(result.labels, "tag", `runtime:${prettyStatus(runtimeTest.status)}`);
-  if (prettyStatus(runtimeTest?.status) === "BLOCKED") {
-    pushUniqueLabel(result.labels, "tag", "BLOCKED");
-    pushUniqueLabel(result.labels, "tag", `blocker:${classifyBlocker(reason)}`);
-  }
-  result.description = buildDescription(samId, feature, runtimeTest, reason);
-  curateBusinessSteps(feature, cleanTitle, result);
-
-  result.parameters ||= [];
-  const params = {
-    Market: "MX",
-    Environment: environmentLabel,
-    Store: "Base Store",
-    Suite: campaign,
-    "Official TC": samId,
-    Feature: feature,
-  };
-  for (const [name, value] of Object.entries(params)) {
-    result.parameters = result.parameters.filter((item) => item.name !== name);
-    result.parameters.push({ name, value });
-  }
-
-  copyRuntimeAttachments(result, runtimeTest);
-  fs.writeFileSync(file, JSON.stringify(result, null, 2));
-}
-
-const environment = [
-  "Project=Samsung SMB Automation",
-  "Platform=SAP Commerce / Hybris",
-  "Framework=Playwright",
-  "Market=MX",
-  `Environment=${targetEnvironment === "S2" ? "S2/STG2" : "S1/STG"}`,
-  "Store=Base Store",
-  `Suite=${campaign}`,
-  "Official_SMB_Scope=362",
-  "Official_P1_QST=144",
-  "Official_P2_DST=218",
-  "MX_BaseStore_P1_Selected=30",
-  `Branch=${process.env.BRANCH_NAME || process.env.GIT_BRANCH || "local"}`,
-  `Build=${process.env.BUILD_NUMBER || "local"}`,
-  `Execution_Mode=${executionMode}`,
-  `Target_IDs=${targetIds}`,
-  `Execution_Policy=${runtime.executionPolicy || process.env.EXECUTION_MODE || "unknown"}`,
-  `GitCommit=${runtime.gitCommit || process.env.GIT_COMMIT || "unknown"}`,
-].join("\n") + "\n";
-fs.writeFileSync(path.join(resultsDir, "environment.properties"), environment);
-
-fs.writeFileSync(path.join(resultsDir, "categories.json"), JSON.stringify([
-  { name: "Infrastructure / Playwright", matchedStatuses: ["failed", "broken"], messageRegex: ".*(executable doesn.t exist|browser.*executable|ms-playwright|ffmpeg|spawn (EPERM|ENOENT)|playwright.*install).*" },
-  { name: "Authentication / session", matchedStatuses: ["failed", "broken"], messageRegex: ".*(auth|session|login|logged|credential|account).*" },
-  { name: "Environment / backend", matchedStatuses: ["failed", "broken"], messageRegex: ".*(environment|backend|server|maintenance|unavailable|endpoint|timeout|network|unexpected URL.*\/cart|postal.*not found|delivery.*skeleton).*" },
-  { name: "Test data / prerequisite", matchedStatuses: ["failed", "broken"], messageRegex: ".*(sku|eligible|test data|address|order|prerequisite|product).*" },
-  { name: "Functional assertion", matchedStatuses: ["failed"], messageRegex: ".*(expect|assert|expected|received).*" },
-  { name: "Automation / selector", matchedStatuses: ["failed", "broken"], messageRegex: ".*(locator|selector|strict mode|element|click|fill).*" },
-], null, 2));
-
-if (process.env.BUILD_URL) {
-  fs.writeFileSync(path.join(resultsDir, "executor.json"), JSON.stringify({
-    name: "Samsung SMB · Jenkins",
-    type: "jenkins",
-    buildName: `Samsung SMB · ${campaignLabel} · #${process.env.BUILD_NUMBER || ""}`,
-    buildUrl: process.env.BUILD_URL,
-    reportUrl: `${process.env.BUILD_URL}${encodeURIComponent(process.env.ALLURE_REPORT_NAME || (process.env.TEST_SUITE === "FAST/GUEST" ? "Samsung MX Fast - Allure" : "Samsung MX QST - Allure")).replace(/%20/g, "_20")}/`,
-  }, null, 2));
-}
-console.log(`[allure] Enriched Samsung report: business hierarchy, parameters, categories and runtime evidence -> ${resultsDir}`);
+enrichOfficialQst({
+  market: "MX",
+  resultsDir,
+  runtimeFile,
+  evidenceRoot,
+  environment,
+  store: "BASE_STORE",
+  cases: coverage.cases,
+  auditedIds: AUDITED_BASE_STORE_IDS,
+  detailsById: DETAILS,
+  defaults: {
+    sku: process.env.MX_QST_SKU || config.sku,
+    pdpUrl: new URL(`/mx/p/${process.env.MX_QST_SKU || config.sku}`, config.baseUrl.origin).href,
+  },
+});
