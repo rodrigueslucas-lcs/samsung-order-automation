@@ -8,6 +8,7 @@ const runtimeFile = path.resolve(process.argv[3] || path.join(process.env.CO_QST
 const evidenceRoot = path.resolve(process.argv[4] || path.join(path.dirname(runtimeFile), "evidence"));
 const environment = String(process.env.CO_QST_ENVIRONMENT || process.env.ENVIRONMENT || "S2").toUpperCase();
 const config = getCoQstConfig({ ...process.env, CO_QST_ENVIRONMENT: environment });
+const cases = Object.fromEntries(Object.entries(plan.cases).map(([id, entry]) => [id, { ...entry, store: entry.store === "BS" ? "BASE_STORE" : entry.store }]));
 
 // Explicitly reviewed against governance/co-qst-plan.json on 2026-10-20.
 // This list is deliberately not generated: drift must fail loudly if the official
@@ -66,7 +67,7 @@ const DETAILS = {
   "SAM-24919": {
     objective: "Validate guest Track Order using a causal CO order and verification email.",
     expected: "The order can be located with the captured Order ID/email verification flow and its tracking details are displayed.",
-    steps: ["Create or load the causal guest order", "Capture Order ID and guest mailbox context", "Request Track Order verification", "Read the verification email", "Submit verification", "Validate tracked order details and preserve order evidence"],
+    steps: ["Create or load the causal guest order", "Capture Order ID and guest mailbox context", "Open Track Order", "Request and retrieve the verification code", "Submit verification", "Validate tracked order details and preserve order evidence"],
     feature: "Order & BackOffice",
     userType: "Guest",
   },
@@ -85,7 +86,7 @@ enrichOfficialQst({
   evidenceRoot,
   environment,
   store: "BASE_STORE",
-  cases: plan.cases,
+  cases,
   auditedIds: AUDITED_BASE_STORE_IDS,
   detailsById: DETAILS,
   defaults: {
