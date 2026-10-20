@@ -16,7 +16,7 @@ function kindOf(attachment = {}) {
   if (/screenshot/i.test(name) || /^image\//i.test(type) || /\.(png|jpe?g|webp|gif)$/i.test(source)) return "screenshot";
   if (/trace/i.test(name) || /\.zip$/i.test(source)) return "trace";
   if (/video/i.test(name) || /^video\//i.test(type) || /\.(webm|mp4)$/i.test(source)) return "video";
-  if (/error.context|context/i.test(name) || /\.md$/i.test(source)) return "context";
+  if (/error[ ._-]*context/i.test(name) || /\.md$/i.test(source)) return "error-context";
   return "artifact";
 }
 
@@ -24,7 +24,7 @@ function displayName(kind, current) {
   if (kind === "screenshot") return "Screenshot · Final state";
   if (kind === "trace") return "Playwright Trace";
   if (kind === "video") return "Video · Execution";
-  if (kind === "context") return "Error Context";
+  if (kind === "error-context") return "Error Context";
   return current || "Evidence";
 }
 
@@ -71,10 +71,6 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-r
   const before = JSON.stringify(result).match(/"source"\s*:/g)?.length || 0;
   const seen = new Set();
 
-  // Keep every semantically distinct media artifact. A Playwright browser context
-  // records one video per Page, so flows that legitimately use multiple pages
-  // (for example Storefront + Mailinator) must retain both videos. We only remove
-  // byte-identical copies introduced by reporter nesting/adapters.
   result.attachments = dedupeList(result.attachments, seen);
   visitSteps(result.steps, seen);
 
