@@ -4,7 +4,10 @@ import GuestLoginPage from "../../../../../pages/GuestLoginPage";
 import CheckoutPage from "../../../../../pages/CheckoutPage";
 import PaymentPage from "../../../../../pages/PaymentPage";
 import { testData } from "../../../../../utils/testData";
+import peBusinessEvidence from "../../../../../utils/peBusinessEvidence.cjs";
 import { test } from "@playwright/test";
+
+const { captureBusinessExchange, attachProductContext } = peBusinessEvidence;
 
 async function bootstrapPeStorefront(page, config) {
   if (!config.setupUrl) return;
@@ -18,6 +21,8 @@ async function bootstrapPeStorefront(page, config) {
 
 export async function addConfiguredProductToPeCart(page, config, { addButtonName } = {}) {
   await bootstrapPeStorefront(page, config);
+  const testInfo = test.info();
+  await attachProductContext(testInfo, config);
   const product = new ProductPage(page, {
     setupUrl: config.setupUrl?.href || null,
     sku: config.sku,
@@ -25,7 +30,9 @@ export async function addConfiguredProductToPeCart(page, config, { addButtonName
     cartUrl: config.cartUrl.href,
   });
   await test.step("Open controlled PE PDP and add configured product to cart", async () => {
-    await product.addConfiguredPdpToCart({ waitForCartMutation: true, ...(addButtonName ? { addButtonName } : {}) });
+    await captureBusinessExchange(page, testInfo, "Add to Cart", () =>
+      product.addConfiguredPdpToCart({ waitForCartMutation: true, ...(addButtonName ? { addButtonName } : {}) })
+    );
   });
 
   return new CartPage(page, {
@@ -37,37 +44,49 @@ export async function addConfiguredProductToPeCart(page, config, { addButtonName
 }
 
 export async function reachPeGuestDelivery(page, config, options = {}) {
+  const testInfo = test.info();
   const cart = await addConfiguredProductToPeCart(page, config);
   if (options.requireQuantityOne) {
     await test.step("Verify controlled PE order cart contains quantity one", () => cart.validateQuantityLowerBoundary());
   }
   await test.step("Continue from cart to guest checkout", async () => {
-    await cart.proceedToCheckout();
+    await captureBusinessExchange(page, testInfo, "Checkout Entry", () => cart.proceedToCheckout());
   });
 
   const guest = new GuestLoginPage(page);
   await test.step("Continue as guest with isolated QST email", async () => {
-    await guest.checkoutAsGuest(`pe-qst-${Date.now()}@mailinator.com`);
+    await captureBusinessExchange(page, testInfo, "Guest Checkout Session", () =>
+      guest.checkoutAsGuest(`pe-qst-${Date.now()}@mailinator.com`)
+    );
   });
 
   const checkout = new CheckoutPage(page);
   await test.step("Complete customer contact information", async () => {
-    await checkout.fillCustomerData(testData.customer);
+    await captureBusinessExchange(page, testInfo, "Checkout Contact", () =>
+      checkout.fillCustomerData(testData.customer)
+    );
   });
   return { cart, checkout };
 }
 
 export async function reachPeGuestPayment(page, config, options = {}) {
+  const testInfo = test.info();
   const { cart, checkout } = await reachPeGuestDelivery(page, config, options);
   await test.step("Complete delivery address", async () => {
-    await checkout.fillAddress(options.address || testData.address);
+    await captureBusinessExchange(page, testInfo, "Delivery Address", () =>
+      checkout.fillAddress(options.address || testData.address)
+    );
   });
   await test.step("Select shipping method and accept terms", async () => {
-    await checkout.selectShippingMethod();
-    await checkout.acceptTerms();
+    await captureBusinessExchange(page, testInfo, "Delivery Method", async () => {
+      await checkout.selectShippingMethod();
+      await checkout.acceptTerms();
+    });
   });
   await test.step("Continue to payment", async () => {
-    await checkout.continueToPayment({ expectedPaymentMode: options.expectedPaymentMode });
+    await captureBusinessExchange(page, testInfo, "Checkout to Payment", () =>
+      checkout.continueToPayment({ expectedPaymentMode: options.expectedPaymentMode })
+    );
   });
   const payment = new PaymentPage(page);
   await payment.validatePaymentPage({ expectedPaymentMode: options.expectedPaymentMode });
@@ -75,28 +94,29 @@ export async function reachPeGuestPayment(page, config, options = {}) {
 }
 
 export async function reachPeRegisteredDelivery(page, config) {
+  const testInfo = test.info();
   const cleanCart = new CartPage(page, { cartUrl: config.cartUrl.href });
   await test.step("Cart · Reset authenticated cart", () =>
     cleanCart.clearPeCartAndConfirmEmpty()
   );
   const cart = await addConfiguredProductToPeCart(page, config);
   await test.step("Checkout · Continue as registered customer", () =>
-    cart.proceedToAuthenticatedCheckout()
+    captureBusinessExchange(page, testInfo, "Registered Checkout Entry", () =>
+      cart.proceedToAuthenticatedCheckout()
+    )
   );
 
   const checkout = new CheckoutPage(page);
   await test.step("Contact · Resolve registered checkout state", async () => {
-    // S2 can open registered checkout either on Contact Info or directly on
-    // Delivery. Wait for the route transition first; checking firstName
-    // immediately races the SPA navigation and caused the registered suite to
-    // wait for Delivery while it was still loading Contact Info.
     await page.waitForURL(/CHECKOUT_STEP_(CONTACT_INFO|DELIVERY)/, {
       waitUntil: "domcontentloaded",
       timeout: 60000,
     });
 
     if (/CHECKOUT_STEP_CONTACT_INFO/.test(page.url())) {
-      await checkout.fillCustomerData(testData.customer);
+      await captureBusinessExchange(page, testInfo, "Registered Checkout Contact", () =>
+        checkout.fillCustomerData(testData.customer)
+      );
       return;
     }
 
@@ -108,12 +128,15 @@ export async function reachPeRegisteredDelivery(page, config) {
 }
 
 export async function reachPeRegisteredPayment(page, config, options = {}) {
+  const testInfo = test.info();
   const { cart, checkout } = await reachPeRegisteredDelivery(page, config);
   await test.step("Delivery · Select new address", async () => {
     await checkout.selectNewAuthenticatedAddress();
   });
   await test.step("Delivery · Fill shipping address", () =>
-    checkout.fillAddress(options.address || testData.address)
+    captureBusinessExchange(page, testInfo, "Registered Delivery Address", () =>
+      checkout.fillAddress(options.address || testData.address)
+    )
   );
 
   await test.step("Delivery · Keep profile data unchanged", async () => {
@@ -125,10 +148,14 @@ export async function reachPeRegisteredPayment(page, config, options = {}) {
     }
   });
 
-  await test.step("Delivery · Select shipping method", () => checkout.selectShippingMethod());
+  await test.step("Delivery · Select shipping method", () =>
+    captureBusinessExchange(page, testInfo, "Registered Delivery Method", () => checkout.selectShippingMethod())
+  );
   await test.step("Checkout · Accept terms", () => checkout.acceptTerms());
   await test.step("Payment · Continue to payment", () =>
-    checkout.continueToPayment({ expectedPaymentMode: options.expectedPaymentMode })
+    captureBusinessExchange(page, testInfo, "Registered Checkout to Payment", () =>
+      checkout.continueToPayment({ expectedPaymentMode: options.expectedPaymentMode })
+    )
   );
   const payment = new PaymentPage(page);
   await test.step("Payment · Validate payment page", () =>
