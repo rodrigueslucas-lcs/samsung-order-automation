@@ -9,6 +9,8 @@ if (!fs.existsSync(resultsDir)) {
   process.exit(0);
 }
 
+const TECHNICAL_STEP = /^(before hooks?|after hooks?|locator|expect\b|wait for|waitfor|page\.|browser\.|context\.|fixture|query count|evaluate|attach|api\b|click\b|fill\b|type\b|blur\b|press\b|scroll\b)/i;
+
 function kindOf(attachment = {}) {
   const name = String(attachment.name || "");
   const type = String(attachment.type || "");
@@ -28,6 +30,12 @@ function displayName(kind, current) {
   return current || "Evidence";
 }
 
+function sourceExists(attachment = {}) {
+  const source = String(attachment.source || "").trim();
+  if (!source) return false;
+  return fs.existsSync(path.join(resultsDir, source));
+}
+
 function fingerprint(attachment = {}) {
   const source = String(attachment.source || "");
   if (!source) return `meta:${kindOf(attachment)}:${attachment.name || ""}:${attachment.type || ""}`;
@@ -44,6 +52,9 @@ function dedupeList(list, seen) {
   if (!Array.isArray(list)) return [];
   const kept = [];
   for (const attachment of list) {
+    // Allure expects attachment sources to exist inside allure-results. A dangling
+    // source can make the generated detail view fail to render/fetch correctly.
+    if (!sourceExists(attachment)) continue;
     const key = fingerprint(attachment);
     if (seen.has(key)) continue;
     seen.add(key);
@@ -54,16 +65,60 @@ function dedupeList(list, seen) {
   return kept;
 }
 
-function visitSteps(steps, seen) {
-  if (!Array.isArray(steps)) return;
+function cleanSteps(steps, seen) {
+  if (!Array.isArray(steps)) return [];
+  const cleaned = [];
   for (const step of steps) {
+    const name = String(step?.name || "").trim();
+    if (!name || TECHNICAL_STEP.test(name)) continue;
     step.attachments = dedupeList(step.attachments, seen);
-    visitSteps(step.steps, seen);
+    step.steps = cleanSteps(step.steps, seen);
+    cleaned.push(step);
   }
+  return cleaned;
+}
+
+function parameterValue(result, name) {
+  return (result.parameters || []).find((item) => item?.name === name)?.value || null;
+}
+
+function hardenKnownDefect(result) {
+  const knownDefect = parameterValue(result, "Known Defect");
+  const runtimeStatus = String(parameterValue(result, "Runtime Status") || "").toUpperCase();
+  if (!knownDefect || runtimeStatus !== "BLOCKED") return false;
+
+  // "blocked" is not an Allure result status. Keep the business meaning in
+  // parameters/description, while representing the non-gating runtime as skipped.
+  result.status = "skipped";
+  result.stage = "finished";
+  result.statusDetails = {
+    message: `Known Defect ${knownDefect}: execution is blocked/non-gating. See the linked Jira defect and preserved evidence for details.`,
+    trace: "",
+  };
+
+  if (!Array.isArray(result.steps) || result.steps.length === 0) {
+    const start = Number(result.start || Date.now());
+    const stop = Number(result.stop || start);
+    result.steps = [{
+      name: `Blocked by Known Defect ${knownDefect}`,
+      status: "skipped",
+      stage: "finished",
+      start,
+      stop,
+      steps: [],
+      attachments: [],
+      parameters: [],
+      statusDetails: {
+        message: `Official scenario was not counted as a functional failure because ${knownDefect} is an active mapped defect.`,
+      },
+    }];
+  }
+  return true;
 }
 
 let files = 0;
 let removed = 0;
+let hardened = 0;
 
 for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-result.json"))) {
   const file = path.join(resultsDir, name);
@@ -72,7 +127,8 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-r
   const seen = new Set();
 
   result.attachments = dedupeList(result.attachments, seen);
-  visitSteps(result.steps, seen);
+  result.steps = cleanSteps(result.steps, seen);
+  if (hardenKnownDefect(result)) hardened += 1;
 
   const after = JSON.stringify(result).match(/"source"\s*:/g)?.length || 0;
   removed += Math.max(0, before - after);
@@ -80,4 +136,4 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-r
   fs.writeFileSync(file, JSON.stringify(result, null, 2));
 }
 
-console.log(`[allure-dedupe] Processed ${files} result file(s); removed ${removed} byte-identical duplicate attachment(s).`);
+console.log(`[allure-dedupe] Processed ${files} result file(s); removed ${removed} duplicate/dangling attachment(s); hardened ${hardened} blocked known-defect result(s).`);
