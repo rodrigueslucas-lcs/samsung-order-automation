@@ -31,7 +31,7 @@ function polishPresentation() {
   if (!fs.existsSync(script)) return false;
   const polished = spawnSync(process.execPath, [script, resultsDir], { stdio: 'inherit', env: process.env });
   if (polished.status !== 0) {
-    console.error('[allure-metadata] Presentation polish failed; raw normalized results were preserved.');
+    console.error('[allure-metadata] Presentation polish failed; normalized results were preserved.');
     return false;
   }
   return true;
@@ -65,17 +65,20 @@ function writeExecutor() {
     reportName: `Samsung SMB · ${market} ${environment} · ${suite}`,
   };
   if (jenkinsUrl) executor.url = jenkinsUrl;
-  if (buildUrl) executor.buildUrl = buildUrl;
-  if (buildUrl) executor.reportUrl = `${buildUrl}03_20_c2b7_20Samsung_20${market}_20${environment}_20${String(suite).replace(/\W+/g, '_')}_20_c2b7_20Allure_20HTML/`;
+  if (buildUrl) {
+    executor.buildUrl = buildUrl;
+    // A stable build link is more useful than guessing the encoded HTML-publisher path.
+    executor.reportUrl = buildUrl;
+  }
   fs.writeFileSync(path.join(resultsDir, 'executor.json'), JSON.stringify(executor, null, 2));
 }
 
 function writeCategories() {
   const categories = [
     {
-      name: 'Known Functional Defect',
+      name: 'Known Defect',
       matchedStatuses: ['skipped', 'failed', 'broken'],
-      messageRegex: '.*KNOWN DEFECT (RT|SAM)-[0-9]+.*',
+      messageRegex: '.*Known Defect (RT|SAM)-[0-9]+.*',
     },
     {
       name: 'Automation Stability',
@@ -83,14 +86,14 @@ function writeCategories() {
       messageRegex: '.*(AUTOMATION_RECOVERY_EXHAUSTED|bounded wait/recovery|Timeout|timed out|timeout).*',
     },
     {
-      name: 'Payment Outcome Unconfirmed',
+      name: 'Payment Outcome',
       matchedStatuses: ['failed', 'broken'],
       messageRegex: '.*PAYMENT_OUTCOME_UNCONFIRMED.*',
     },
     {
-      name: 'Authentication / Prerequisite',
+      name: 'Auth / Prerequisite',
       matchedStatuses: ['skipped', 'failed', 'broken'],
-      messageRegex: '.*(AUTH BLOCKED|authentication|credentials|required prerequisite|test data).*',
+      messageRegex: '.*(AUTH BLOCKED|authentication|credentials|required prerequisite|test data|prerequisite).*',
     },
   ];
   fs.writeFileSync(path.join(resultsDir, 'categories.json'), JSON.stringify(categories, null, 2));
@@ -99,7 +102,10 @@ function writeCategories() {
 function carryHistory() {
   const previousHistory = path.join(reportDir, 'history');
   const targetHistory = path.join(resultsDir, 'history');
-  if (!fs.existsSync(previousHistory)) return false;
+  if (!fs.existsSync(previousHistory)) {
+    console.log('[allure-metadata] No previous Allure history in this workspace yet; Trend will start after a subsequent comparable build.');
+    return false;
+  }
   fs.rmSync(targetHistory, { recursive: true, force: true });
   fs.cpSync(previousHistory, targetHistory, { recursive: true });
   return true;
@@ -110,4 +116,4 @@ writeEnvironment();
 writeExecutor();
 writeCategories();
 const historyCarried = carryHistory();
-console.log(`[allure-metadata] READY · presentation ${polished ? 'polished' : 'unchanged'} · Jenkins executor + environment + categories${historyCarried ? ' + previous history' : ''}.`);
+console.log(`[allure-metadata] READY · presentation ${polished ? 'polished' : 'unchanged'} · Jenkins executor + environment + concise categories${historyCarried ? ' + previous history' : ''}.`);
