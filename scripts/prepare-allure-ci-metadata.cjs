@@ -75,6 +75,17 @@ function polishPresentation() {
   return true;
 }
 
+function structureBusinessView() {
+  const script = path.resolve('scripts/structure-allure-business-view.cjs');
+  if (!fs.existsSync(script)) return false;
+  const structured = spawnSync(process.execPath, [script, resultsDir], { stdio: 'inherit', env: process.env });
+  if (structured.status !== 0) {
+    console.error('[allure-metadata] Structured business view failed; polished results were preserved.');
+    return false;
+  }
+  return true;
+}
+
 function writeEnvironment() {
   const file = path.join(resultsDir, 'environment.properties');
   const existing = fs.existsSync(file)
@@ -180,8 +191,9 @@ if (mode === 'save') {
 
 const businessStatusNormalized = normalizeBusinessStatus();
 const polished = polishPresentation();
+const businessViewStructured = structureBusinessView();
 writeEnvironment();
 writeExecutor();
 writeCategories();
 const historyCarried = restoreHistory();
-console.log(`[allure-metadata] READY · business status ${businessStatusNormalized ? 'normalized' : 'unchanged'} · presentation ${polished ? 'polished' : 'unchanged'} · Jenkins executor + environment + concise categories${historyCarried ? ' + Trend history' : ''}.`);
+console.log(`[allure-metadata] READY · business status ${businessStatusNormalized ? 'normalized' : 'unchanged'} · presentation ${polished ? 'polished' : 'unchanged'} · business view ${businessViewStructured ? 'structured' : 'unchanged'} · Jenkins executor + environment + concise categories${historyCarried ? ' + Trend history' : ''}.`);
