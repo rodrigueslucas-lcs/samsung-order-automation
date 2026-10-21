@@ -942,7 +942,23 @@ export default class CheckoutPage extends BasePage {
     await this.screenshot("06-delivery-address");
   }
 
-  async selectShippingMethod() {
+  async persistShippingSelection(label) {
+    // A checked radio is optimistic UI: PE saves the mode asynchronously.
+    // Subscribe before clicking and finish this update before continuing or
+    // attempting another selection. This does not submit an order/payment.
+    const saved = this.page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return /^s[12]-smb-api-cdn\.ecom-stg\.samsung\.com$/.test(url.hostname)
+        && /\/v2\/pe\/users\/current\/carts\/current\/deliverymodes\/update$/.test(url.pathname)
+        && response.request().method() === "POST";
+    }, { timeout: 90000 });
+    const [response] = await Promise.all([saved, label.click({ timeout: 30000 })]);
+    if (!response.ok()) throw new Error(`PE delivery selection update failed: HTTP ${response.status()}.`);
+    const failure = await response.finished();
+    if (failure) throw new Error("PE delivery selection response did not complete. Do not advance checkout.");
+  }
+
+  async selectShippingMethod({ reselect = false } = {}) {
     const deliveryOptions = this.page.locator(
       'input[type="radio"][name$="delivery_mode_option"]'
     );
@@ -955,7 +971,7 @@ export default class CheckoutPage extends BasePage {
       const selected = this.page.locator(
         `input[type="radio"][name="${groupName}"]:checked`
       );
-      if (await selected.count()) continue;
+      if (!reselect && await selected.count()) continue;
 
       const group = this.page.locator(
         `input[type="radio"][name="${groupName}"]`
@@ -966,7 +982,7 @@ export default class CheckoutPage extends BasePage {
       // PE renders the radio input hidden inside a visible, clickable delivery card.
       const label = option.locator("xpath=ancestor::label[1]");
       await label.waitFor({ state: "visible", timeout: 30000 });
-      await label.click({ timeout: 30000 });
+      await this.persistShippingSelection(label);
 
       const selectedAfterClick = await this.page.waitForFunction(
         (name) =>
@@ -985,7 +1001,7 @@ export default class CheckoutPage extends BasePage {
           .first();
         const currentLabel = currentOption.locator("xpath=ancestor::label[1]");
         await currentLabel.waitFor({ state: "visible", timeout: 30000 });
-        await currentLabel.click({ timeout: 30000 });
+        await this.persistShippingSelection(currentLabel);
         await this.page.waitForFunction(
           (name) =>
             [...document.querySelectorAll(`input[type="radio"][name="${name}"]`)]
@@ -1035,7 +1051,7 @@ export default class CheckoutPage extends BasePage {
 
       // Se o ST2 reclamar da entrega, reseleciona o shipping.
       if (await deliveryAlert.isVisible().catch(() => false)) {
-        await this.selectShippingMethod();
+        await this.selectShippingMethod({ reselect: true });
       }
 
       // A página pode ter mudado para Payment durante a reseleção.
