@@ -300,6 +300,16 @@ function normalizePresentation(result, defect) {
   result.description = lines.join("\n");
 }
 
+function polishFailureStatusDetails(result, defect) {
+  if (businessStatus(result) !== "FAIL") return false;
+  const detail = technicalDetail(result);
+  const readable = humanizeDetail(detail) || "The automated validation did not satisfy the expected business result.";
+  const prefix = defect ? `Known Defect ${defect.jira} — ` : "";
+  result.statusDetails ||= {};
+  result.statusDetails.message = `${prefix}${readable}\n\nBusiness-readable summary is shown here. The original technical error is preserved in Description > Technical Error and Playwright Trace.`;
+  return true;
+}
+
 function hardenKnownDefect(result) {
   const knownDefect = parameterValue(result, "Known Defect");
   const runtimeStatus = businessStatus(result);
@@ -339,6 +349,7 @@ let removed = 0;
 let hardened = 0;
 let mapped = 0;
 let normalized = 0;
+let polishedFailures = 0;
 
 for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-result.json"))) {
   const file = path.join(resultsDir, name);
@@ -356,6 +367,7 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-r
     normalized += 1;
   }
 
+  if (polishFailureStatusDetails(result, defect)) polishedFailures += 1;
   if (hardenKnownDefect(result)) hardened += 1;
 
   const after = JSON.stringify(result).match(/"source"\s*:/g)?.length || 0;
@@ -364,4 +376,4 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-r
   fs.writeFileSync(file, JSON.stringify(result, null, 2));
 }
 
-console.log(`[allure-dedupe] Processed ${files} result file(s); removed ${removed} duplicate/dangling attachment(s); mapped ${mapped} known defect result(s); normalized ${normalized} business-readable result(s); hardened ${hardened} blocked known-defect result(s).`);
+console.log(`[allure-dedupe] Processed ${files} result file(s); removed ${removed} duplicate/dangling attachment(s); mapped ${mapped} known defect result(s); normalized ${normalized} business-readable result(s); polished ${polishedFailures} failed status message(s); hardened ${hardened} blocked known-defect result(s).`);
