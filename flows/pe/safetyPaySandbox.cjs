@@ -18,12 +18,31 @@ function assertSandboxOrder({ gatewayUrl, storefrontOrigin, orderCode }) {
   }
 }
 
+async function waitForSamsungReturn(page, storefrontOrigin) {
+  const returned = await page.waitForURL(
+    url => url.origin === storefrontOrigin && url.pathname.startsWith('/pe/orderConfirmation'),
+    { timeout: 30000 }
+  ).then(() => true).catch(() => false);
+  if (returned) return;
+
+  // The bank confirmation has already happened. A refresh here only resumes the
+  // existing provider attempt; it must never repeat the payment confirmation.
+  console.log('[pe-safetypay] Samsung return did not arrive in 30s; refreshing the existing gateway attempt once.');
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+  const recovered = await page.waitForURL(
+    url => url.origin === storefrontOrigin && url.pathname.startsWith('/pe/orderConfirmation'),
+    { timeout: 30000 }
+  ).then(() => true).catch(() => false);
+  if (!recovered) {
+    throw new Error('PAYMENT_OUTCOME_UNCONFIRMED: SafetyPay bank operation succeeded, but Samsung order confirmation did not resume after one safe gateway refresh. Do not confirm or submit payment again; resume the existing attempt manually.');
+  }
+}
+
 async function completePeSafetyPaySandbox(page, { orderCode, storefrontOrigin }) {
   requirePaymentSubmitOptIn();
   assertSandboxOrder({ gatewayUrl: page.url(), storefrontOrigin, orderCode });
   const accept = page.getByRole('button', { name: 'Aceptar', exact: true });
   if (await accept.isVisible()) await accept.click();
-  // Native test-bank selection; never follow a real bank or synthesize a provider URL.
   const testBank = page.locator('a[id="0000"]');
   await expect(testBank).toBeVisible();
   await testBank.click();
@@ -33,7 +52,6 @@ async function completePeSafetyPaySandbox(page, { orderCode, storefrontOrigin })
   await page.getByRole('link', { name: 'Ir a banca por internet', exact: true }).click();
   const bank = await bankPromise;
   await bank.waitForURL(url => url.origin === 'https://sandbox-demobank.safetypay.com', { timeout: 30000 });
-  // Public demo-bank identity, never a Samsung/customer/bank credential.
   await bank.locator('input[id$="_UserName"]').fill('test');
   await bank.locator('input[type="password"]').fill('test');
   await bank.getByRole('button', { name: 'Log In', exact: true }).click();
@@ -55,8 +73,8 @@ async function completePeSafetyPaySandbox(page, { orderCode, storefrontOrigin })
   // One confirmation for this same attempt. Never retry an ambiguous payment.
   await bank.getByRole('button', { name: 'Confirm', exact: true }).click();
   await expect(bank.locator('body')).toContainText('The operation was successful.', { timeout: 60000 });
-  await page.waitForURL(url => url.origin === storefrontOrigin && url.pathname.startsWith('/pe/orderConfirmation'), { timeout: 90000 });
+  await waitForSamsungReturn(page, storefrontOrigin);
   await bank.close();
 }
 
-module.exports = { readSafetyPayAttempt, assertSandboxOrder, completePeSafetyPaySandbox };
+module.exports = { readSafetyPayAttempt, assertSandboxOrder, completePeSafetyPaySandbox, waitForSamsungReturn };
