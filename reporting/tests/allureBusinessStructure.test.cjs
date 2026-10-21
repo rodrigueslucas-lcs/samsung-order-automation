@@ -7,8 +7,12 @@ const { execFileSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '../..');
 
-function run(script, dir) {
-  execFileSync(process.execPath, [path.join(root, script), dir], { cwd: root, stdio: 'pipe' });
+function run(script, dir, env = {}) {
+  execFileSync(process.execPath, [path.join(root, script), dir], {
+    cwd: root,
+    stdio: 'pipe',
+    env: { ...process.env, ...env },
+  });
 }
 
 function fixture(overrides = {}) {
@@ -104,6 +108,50 @@ test('known defect keeps raw runtime but every presentation section is non-gatin
     assert.match(result.description, /^KNOWN DEFECT · RT-752445/m);
     assert.ok(result.steps.some((step) => /Known Defect · RT-752445/.test(step.name)));
     assert.ok(result.steps.filter((step) => /Resultado observado|Known Defect|Execução do negócio/.test(step.name)).every((step) => step.status === 'skipped'));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('business view rebuilds readable Jira links and stable Jenkins evidence fallback', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'allure-stable-links-'));
+  try {
+    const file = path.join(dir, 'known-result.json');
+    fs.writeFileSync(file, JSON.stringify(fixture({
+      name: 'SAM-24896 · Cart value when Reg user logs out',
+      fullName: 'CO S2 SAM-24896',
+      links: [
+        { name: 'SAM-24896', url: 'broken-relative-link', type: 'issue' },
+        { name: 'RT-752445', url: 'http://invalid.local/static-files/token', type: 'issue' },
+      ],
+      parameters: [
+        { name: 'Market', value: 'CO' },
+        { name: 'Environment', value: 'S2 / STG2' },
+        { name: 'Store', value: 'Base Store' },
+        { name: 'Runtime Status', value: 'FAIL' },
+        { name: 'Known Defect', value: 'RT-752445' },
+        { name: 'Known Defect Title', value: 'CO S2 Cart Items Are Lost After Registered User Logout' },
+      ],
+    }), null, 2));
+
+    run('scripts/structure-allure-business-view.cjs', dir, {
+      BUILD_URL: 'http://127.0.0.1:8080/job/SAMSUNG-SMB-AUTOMATION/999/',
+      BUILD_NUMBER: '999',
+      JENKINS_ARTIFACT_DIR: 'test-results/jenkins/co-qst',
+    });
+
+    const result = JSON.parse(fs.readFileSync(file, 'utf8'));
+    assert.deepEqual(result.links.map((link) => link.name), [
+      'Official TC · SAM-24896',
+      'Known Defect · RT-752445',
+      'Jenkins Build · #999',
+      'Jenkins Artifacts · Evidence',
+    ]);
+    assert.equal(result.links[0].url, 'https://jira.secext.samsung.net/browse/SAM-24896');
+    assert.equal(result.links[1].url, 'https://jira.secext.samsung.net/browse/RT-752445');
+    assert.equal(result.links[2].url, 'http://127.0.0.1:8080/job/SAMSUNG-SMB-AUTOMATION/999/');
+    assert.equal(result.links[3].url, 'http://127.0.0.1:8080/job/SAMSUNG-SMB-AUTOMATION/999/artifact/test-results/jenkins/co-qst/');
+    assert.ok(result.links.every((link) => !/static-files/.test(link.url)));
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
