@@ -104,6 +104,7 @@ test("Allure normalization hardens blocked known defects and removes broken deta
 
 test("final Allure normalization maps known defects and uses one presentation hierarchy globally", () => {
   const dedupe = read("scripts/dedupe-allure-evidence.cjs");
+  const polish = read("scripts/polish-allure-presentation.cjs");
   assert.match(dedupe, /governance\/known-defects\.json/);
   assert.match(dedupe, /function mappedDefect\(result\)/);
   assert.match(dedupe, /parameterValue\(result, "Market"\)/);
@@ -122,6 +123,10 @@ test("final Allure normalization maps known defects and uses one presentation hi
   assert.match(dedupe, /PASS — all automated assertions executed for this scenario were satisfied/);
   assert.match(dedupe, /BLOCKED \/ KNOWN DEFECT/);
   assert.match(dedupe, /FAIL \/ KNOWN DEFECT/);
+  assert.match(polish, /descriptionHtml/);
+  assert.match(polish, /Validation Summary/);
+  assert.match(polish, /Known Defect/);
+  assert.match(polish, /LOW_LEVEL_STEP/);
 });
 
 test("structured Allure hierarchy is applied to MX PE CO CL in both S1 and S2", () => {
@@ -156,13 +161,19 @@ test("structured Allure hierarchy is applied to MX PE CO CL in both S1 and S2", 
           labels: [],
           links: [],
           attachments: [],
-          steps: [],
+          steps: [
+            { name: "Prepare controlled cart", status: "passed", steps: [
+              { name: "Wait for selector", status: "passed", steps: [], attachments: [] },
+              { name: "Click", status: "passed", steps: [], attachments: [] },
+            ], attachments: [] },
+          ],
         };
         fs.writeFileSync(path.join(dir, `${result.uuid}-result.json`), JSON.stringify(result, null, 2));
       }
     }
 
     execFileSync(process.execPath, [path.join(root, "scripts/dedupe-allure-evidence.cjs"), dir], { cwd: root });
+    execFileSync(process.execPath, [path.join(root, "scripts/polish-allure-presentation.cjs"), dir], { cwd: root });
 
     const results = fs.readdirSync(dir)
       .filter((name) => name.endsWith("-result.json"))
@@ -179,11 +190,51 @@ test("structured Allure hierarchy is applied to MX PE CO CL in both S1 and S2", 
       assert.match(description, /Expected value or storefront content "EXPECTED-SKU" was not visible/);
       assert.match(description, /\*\*Market:\*\*/);
       assert.match(description, /\*\*Environment:\*\*/);
-      assert.match(description, /```text/);
+      assert.match(result.descriptionHtml, /Validation Summary/);
+      assert.match(result.descriptionHtml, /Expected Result/);
+      assert.match(result.descriptionHtml, /Actual Result/);
+      assert.match(result.descriptionHtml, /Execution Context/);
+      assert.doesNotMatch(JSON.stringify(result.steps), /Wait for selector|Click/);
       assert.match(result.statusDetails.message, /Expected value or storefront content "EXPECTED-SKU" was not visible/);
-      assert.match(result.statusDetails.message, /original technical error is preserved/i);
       assert.doesNotMatch(result.statusDetails.message, /expect\(locator\)\.toBeVisible\(\) failed/);
     }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("mapped known defects are visually explicit and non-gating in Allure without losing raw runtime status", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "smb-allure-known-defect-"));
+  try {
+    const result = {
+      uuid: "known-defect",
+      name: "SAM-24896 · Cart value when Reg user logs out",
+      fullName: "CO S2 SAM-24896",
+      status: "failed",
+      stage: "finished",
+      description: "## SAM-24896\n\n### Validation Summary\n**Status:** FAIL / KNOWN DEFECT RT-752445\n**Validation goal:** Validate cart persistence.\n\n### Expected Result\nCart remains available.\n\n### Actual Result\nFAIL / KNOWN DEFECT RT-752445 — cart was empty.\n\n### Technical Error\n```text\nexpect(locator).toBeVisible() failed\n```\n\n### Execution Context\n- **Market:** CO",
+      statusDetails: { message: "cart was empty", trace: "" },
+      parameters: [
+        { name: "Market", value: "CO" },
+        { name: "Environment", value: "S2 / STG2" },
+        { name: "Store", value: "Base Store" },
+        { name: "Runtime Status", value: "FAIL" },
+        { name: "Known Defect", value: "RT-752445" },
+        { name: "Known Defect Title", value: "CO S2 Cart Items Are Lost After Registered User Logout" },
+      ],
+      labels: [], links: [], attachments: [], steps: [],
+    };
+    const file = path.join(dir, "known-defect-result.json");
+    fs.writeFileSync(file, JSON.stringify(result, null, 2));
+    execFileSync(process.execPath, [path.join(root, "scripts/polish-allure-presentation.cjs"), dir], { cwd: root });
+    const polished = JSON.parse(fs.readFileSync(file, "utf8"));
+    assert.equal(polished.status, "skipped");
+    assert.equal(polished.parameters.find((item) => item.name === "Runtime Status").value, "FAIL");
+    assert.match(polished.statusDetails.message, /KNOWN DEFECT RT-752445/);
+    assert.match(polished.statusDetails.message, /Raw runtime status: FAIL/);
+    assert.match(polished.descriptionHtml, /KNOWN DEFECT · RT-752445/);
+    assert.match(polished.descriptionHtml, /CO S2 Cart Items Are Lost After Registered User Logout/);
+    assert.match(polished.steps[0].name, /Known Defect · RT-752445/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
