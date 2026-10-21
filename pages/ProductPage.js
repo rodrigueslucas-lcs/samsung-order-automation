@@ -23,10 +23,29 @@ export default class ProductPage extends BasePage {
       request.method() === 'POST' &&
       /\/users\/current\/carts\/(?:current|[^/]+)\/entries(?:\?|$)/.test(request.url());
 
-    // S2 occasionally returns an empty PDP shell for an otherwise valid SKU.
-    // Keep retries bounded, but allow one additional fresh navigation before failing.
-    const maxAttempts = 3;
+    const cartAlreadyHasSku = async ({ timeout = 8000, refresh = false } = {}) => {
+      try {
+        if (refresh || !new URL(this.page.url()).pathname.endsWith('/cart')) {
+          await this.page.goto(this.cartUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        }
+        await this.page.getByText(this.sku, { exact: true }).filter({ visible: true }).first()
+          .waitFor({ state: 'visible', timeout });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    // A missed network event must not trigger another state-changing Add action.
+    // Before every retry, prove the cart state first. Only re-click when the SKU
+    // is still absent after a fresh cart readback.
+    const maxAttempts = 2;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (attempt > 1 && await cartAlreadyHasSku({ timeout: 8000, refresh: true })) {
+        diagnostics?.push({ attempt, checkpoint: 'recovered-from-cart-readback', url: this.page.url() });
+        return;
+      }
+
       await this.safeGoto(this.pdpUrl);
       if (configureProduct) await configureProduct(this.page);
 
@@ -37,7 +56,7 @@ export default class ProductPage extends BasePage {
         .first();
 
       const buttonReady = await addButton
-        .waitFor({ state: 'visible', timeout: 30000 })
+        .waitFor({ state: 'visible', timeout: 20000 })
         .then(() => true)
         .catch(() => false);
 
@@ -59,7 +78,7 @@ export default class ProductPage extends BasePage {
           throw error;
         }
         if (attempt < maxAttempts) {
-          await this.page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
+          await this.page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
           continue;
         }
 
@@ -68,7 +87,7 @@ export default class ProductPage extends BasePage {
           .innerText({ timeout: 5000 })
           .catch(() => '');
         throw new Error(
-          `Configured PDP add-to-cart button was not rendered after controlled retry. ` +
+          `AUTOMATION_RECOVERY_EXHAUSTED: configured PDP add-to-cart button was not rendered after bounded refresh recovery. ` +
           `url=${this.page.url()} title=${await this.page.title().catch(() => '')} ` +
           `main=${String(mainText || '').replace(/\s+/g, ' ').trim().slice(0, 500) || '<empty>'}`
         );
@@ -78,12 +97,13 @@ export default class ProductPage extends BasePage {
         ? Promise.race([
             this.page.waitForResponse(
               (response) => isCartMutation(response.request()),
-              { timeout: 60000 }
+              { timeout: 20000 }
             ).then((response) => ({ response })).catch(() => null),
             this.page.waitForEvent('requestfailed', {
               predicate: isCartMutation,
-              timeout: 60000,
+              timeout: 20000,
             }).then((request) => ({ failedRequest: request })).catch(() => null),
+            this.page.waitForTimeout(20000).then(() => null),
           ])
         : Promise.resolve(null);
 
@@ -102,10 +122,6 @@ export default class ProductPage extends BasePage {
         await addButton.click({ timeout: 8000 });
       } catch (error) {
         if (!/intercepts pointer events/i.test(String(error?.message || ''))) throw error;
-
-        // S2 can leave the global navigation expanded over the PDP CTA. Escape
-        // closes the transient GNB surface; keyboard activation then preserves
-        // a real user interaction without forcing the click through an overlay.
         await this.page.keyboard.press('Escape').catch(() => {});
         await addButton.scrollIntoViewIfNeeded();
         await addButton.focus();
@@ -125,16 +141,15 @@ export default class ProductPage extends BasePage {
         throw new Error(`Configured PDP add-to-cart returned HTTP ${outcome.response.status()}.`);
       }
 
-      await this.safeGoto(this.cartUrl);
-      const cartContainsSku = await this.waitForCartSkus([this.sku], { reloadAttempts: 1 })
-        .then(() => true)
-        .catch(() => false);
-      diagnostics?.push({ attempt, checkpoint: 'cart-check', url: this.page.url(), cartContainsSku });
-      if (cartContainsSku) return;
+      if (await cartAlreadyHasSku({ timeout: 10000, refresh: true })) {
+        diagnostics?.push({ attempt, checkpoint: 'cart-check', url: this.page.url(), cartContainsSku: true });
+        return;
+      }
 
+      diagnostics?.push({ attempt, checkpoint: 'cart-check', url: this.page.url(), cartContainsSku: false });
       if (attempt === maxAttempts) {
-        const failure = outcome?.failedRequest?.failure()?.errorText || 'no successful cart mutation was observed';
-        throw new Error(`Cart did not contain ${this.sku} after controlled PDP add-to-cart retry: ${failure}.`);
+        const failure = outcome?.failedRequest?.failure()?.errorText || 'no successful cart mutation or persisted cart state was observed';
+        throw new Error(`AUTOMATION_RECOVERY_EXHAUSTED: cart did not contain ${this.sku} after one bounded refresh/retry cycle: ${failure}.`);
       }
     }
   }
