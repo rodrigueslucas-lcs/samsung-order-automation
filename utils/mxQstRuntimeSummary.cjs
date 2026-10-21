@@ -6,8 +6,10 @@ const { sanitize } = require("../reporting/evidence/sanitizer");
 const TERMINAL_FAILURES = new Set(["failed", "timedOut", "interrupted"]);
 const BLOCKED_PATTERN = /SystemParking|maintenance|auth(?:enticated)? state|credentials? (?:are|is) required|EPERM|environment prerequisite/i;
 const AUTH_FAILURE_PATTERN = /auth|session|login|logged|credential|account/i;
+const PAYMENT_OUTCOME_PATTERN = /PAYMENT_OUTCOME_UNCONFIRMED|ambiguous payment|confirmation remains unproven|existing order remains pending|do not create another order/i;
+const AUTOMATION_STABILITY_PATTERN = /AUTOMATION_RECOVERY_EXHAUSTED|AUTOMATION_STALL|test timeout of \d+ms exceeded|page\.waitForURL|Target page, context or browser has been closed/i;
 const ENVIRONMENT_FAILURE_PATTERN = /environment|backend|server|maintenance|unavailable|endpoint|cdp|network|(?:response body|request).*timed out|timeout.*(?:api|backend|delivery)|5\d\d\b/i;
-const AUTOMATION_FAILURE_PATTERN = /locator|selector|strict mode|element.*(?:not found|not visible)|playwright|executable doesn.t exist|spawn (?:EPERM|ENOENT)|fixture|test timeout of \d+ms exceeded/i;
+const AUTOMATION_FAILURE_PATTERN = /locator|selector|strict mode|element.*(?:not found|not visible)|playwright|executable doesn.t exist|spawn (?:EPERM|ENOENT)|fixture/i;
 const TEST_DATA_BLOCKED_PATTERN = /bogo|eligible|campaign|sku|product|test data|order code|address data|prerequisite/i;
 const BOGO_BLOCKED_PATTERN = /bogo.*(?:eligible|product|sku)|(?:eligible|product|sku).*bogo/i;
 const SC_PLUS_BLOCKED_PATTERN = /(?:Samsung Care\+|SC\+).*(?:eligible|expose|required|configured)|(?:eligible|expose|required|configured).*(?:Samsung Care\+|SC\+)/i;
@@ -24,6 +26,8 @@ function classifyFailure(status, reason = "") {
     return "PREREQUISITE_BLOCKED";
   }
   if (status !== "FAIL") return null;
+  if (PAYMENT_OUTCOME_PATTERN.test(reason)) return "PAYMENT_OUTCOME_UNCONFIRMED";
+  if (AUTOMATION_STABILITY_PATTERN.test(reason)) return "AUTOMATION_STABILITY_ERROR";
   if (AUTH_FAILURE_PATTERN.test(reason)) return "AUTH_BLOCKED";
   if (ENVIRONMENT_FAILURE_PATTERN.test(reason)) return "ENVIRONMENT_ERROR";
   if (AUTOMATION_FAILURE_PATTERN.test(reason)) return "TEST_AUTOMATION_ERROR";
