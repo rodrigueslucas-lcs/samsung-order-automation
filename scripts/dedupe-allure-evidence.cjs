@@ -151,32 +151,153 @@ function ensureKnownDefectMetadata(result) {
   result.links ||= [];
   result.links = result.links.filter((link) => link?.name !== defect.jira);
   if (defect.url) result.links.push({ name: defect.jira, url: defect.url, type: "issue" });
-  if (!String(result.description || "").includes("**Known defect:**")) {
-    result.description = `${String(result.description || "").trim()}\n\n**Known defect:** [${defect.jira}](${defect.url}) · ${defect.title || defect.jira}`.trim();
-  }
   return defect;
+}
+
+function cleanText(value) {
+  return String(value || "")
+    .replace(/\u001b\[[0-9;]*m/g, "")
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "")
+    .trim();
+}
+
+function descriptionField(description, labels) {
+  const source = String(description || "");
+  for (const label of labels) {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = source.match(new RegExp(`\\*\\*${escaped}:\\*\\*\\s*([^\\n]+)`, "i"));
+    if (match?.[1]) return cleanText(match[1].replace(/\s{2,}$/g, ""));
+  }
+  return null;
+}
+
+function technicalDetail(result) {
+  const message = cleanText(result.statusDetails?.message || "");
+  const trace = cleanText(result.statusDetails?.trace || "");
+  const source = message || trace;
+  if (!source) return "";
+  return source.split("\n").slice(0, 8).join("\n").slice(0, 1400).trim();
+}
+
+function humanizeDetail(detail) {
+  const text = cleanText(detail);
+  if (!text) return null;
+
+  const missingText = text.match(/getByText\(['\"]([^'\"]+)['\"]/i)?.[1];
+  if (missingText && /not found|toBeVisible|expected.*visible/i.test(text)) {
+    return `Expected value or storefront content "${missingText}" was not visible after the business action completed.`;
+  }
+
+  const receivedUrl = text.match(/Received string:\s*["']([^"']+)["']/i)?.[1];
+  if (receivedUrl && /toHaveURL|Expected pattern/i.test(text)) {
+    return `Navigation did not reach the expected destination; the browser remained at ${receivedUrl}.`;
+  }
+
+  if (/AUTOMATION_RECOVERY_EXHAUSTED/i.test(text)) {
+    return "The controlled recovery cycle was exhausted before the storefront reached the required stable state.";
+  }
+  if (/PAYMENT_OUTCOME_UNCONFIRMED/i.test(text)) {
+    return "The payment attempt produced an ambiguous outcome and was intentionally not submitted again to avoid duplicate orders or charges.";
+  }
+  if (/timeout|timed out|exceeded/i.test(text)) {
+    return "The scenario exceeded its bounded wait/recovery window before the expected storefront state became available.";
+  }
+
+  return text.split("\n")[0].replace(/^Error:\s*/i, "").slice(0, 420);
 }
 
 function actualResult(result, defect) {
   const status = businessStatus(result);
-  const detail = String(result.statusDetails?.message || "").split("\n")[0].trim();
-  if (defect && status === "BLOCKED") return `BLOCKED / KNOWN DEFECT ${defect.jira} — ${defect.title || "mapped active defect"}.`;
-  if (defect && status === "FAIL") return `FAIL / KNOWN DEFECT ${defect.jira} — ${defect.title || "mapped active defect"}.`;
+  const detail = technicalDetail(result);
+  const readable = humanizeDetail(detail);
+  if (defect && status === "BLOCKED") return `BLOCKED / KNOWN DEFECT ${defect.jira} — ${readable || defect.title || "mapped active defect"}`;
+  if (defect && status === "FAIL") return `FAIL / KNOWN DEFECT ${defect.jira} — ${readable || defect.title || "mapped active defect"}`;
   if (status === "PASS") return "PASS — all automated assertions executed for this scenario were satisfied.";
-  if (status === "BLOCKED") return detail ? `BLOCKED — ${detail}` : "BLOCKED — execution did not proceed because a prerequisite was unavailable.";
-  if (status === "FAIL") return detail ? `FAIL — ${detail}` : "FAIL — the automated validation did not satisfy the expected result.";
+  if (status === "BLOCKED") return readable ? `BLOCKED — ${readable}` : "BLOCKED — execution did not proceed because a prerequisite was unavailable.";
+  if (status === "FAIL") return readable ? `FAIL — ${readable}` : "FAIL — the automated validation did not satisfy the expected result.";
   return "NOT RUN — no executable runtime result was produced for this scenario.";
 }
 
-function ensureActualResult(result, defect) {
-  const description = String(result.description || "");
-  if (description.includes("**Actual result:**")) return;
-  const line = `**Actual result:** ${actualResult(result, defect)}`;
-  if (/\*\*Expected result:\*\*/.test(description)) {
-    result.description = description.replace(/(\*\*Expected result:\*\*[^\n]*(?:\n|$))/, `$1${line}\n`);
-  } else {
-    result.description = `${description.trim()}\n\n${line}`.trim();
-  }
+function scenarioTitle(result) {
+  const samId = samIdOf(result);
+  const name = cleanText(result.name || result.fullName || samId || "Official QST scenario");
+  return name.replace(/^SAM-\d+\s*[·:\-]?\s*/i, "").trim() || name;
+}
+
+function parameterLines(result) {
+  const preferred = [
+    ["Market", "Market"],
+    ["Environment", "Environment"],
+    ["Store", "Store"],
+    ["Feature", "Feature"],
+    ["User Type", "User Type"],
+    ["SKU", "SKU"],
+    ["Payment", "Payment"],
+    ["Order ID", "Order ID"],
+    ["Runtime Status", "Runtime Status"],
+    ["Coverage", "Automation Coverage"],
+  ];
+  return preferred
+    .map(([name, label]) => {
+      const value = parameterValue(result, name);
+      return value ? `- **${label}:** ${cleanText(value)}` : null;
+    })
+    .filter(Boolean);
+}
+
+function normalizePresentation(result, defect) {
+  const original = String(result.description || "");
+  const samId = samIdOf(result);
+  const status = businessStatus(result);
+  const objective = descriptionField(original, ["Objective", "Validation goal", "Validation Goal"])
+    || `Validate the official ${samId || "QST"} business scenario and preserve auditable execution evidence.`;
+  const expected = descriptionField(original, ["Expected result", "Expected Result"])
+    || "The official business acceptance criteria are satisfied and the observed storefront state matches the expected behavior.";
+  const blocker = descriptionField(original, ["Blocker category", "Blocker Category"]);
+  const detail = technicalDetail(result);
+  const readable = humanizeDetail(detail);
+  const title = scenarioTitle(result);
+  const context = parameterLines(result);
+  const lines = [
+    `## ${samId ? `[${samId}](https://jira.secext.samsung.net/browse/${samId}) · ` : ""}${title}`,
+    "",
+    "### Validation Summary",
+    `**Status:** ${defect ? `${status} / KNOWN DEFECT ${defect.jira}` : status}`,
+    `**Validation goal:** ${objective}`,
+    readable && status !== "PASS" ? `**What happened:** ${readable}` : null,
+    "",
+    "### Expected Result",
+    expected,
+    "",
+    "### Actual Result",
+    actualResult(result, defect),
+    "",
+    defect ? "### Known Defect" : null,
+    defect ? `**[${defect.jira}](${defect.url}) — ${defect.title || defect.jira}**` : null,
+    defect ? "This runtime result is mapped to an active defect for this exact market/environment/store/TC scope; raw execution evidence is preserved." : null,
+    defect ? "" : null,
+    status === "BLOCKED" ? "### Blocker / Prerequisite" : null,
+    status === "BLOCKED" ? `**Category:** ${blocker || "Execution prerequisite"}` : null,
+    status === "BLOCKED" ? (detail ? cleanText(detail.split("\n")[0]) : "A required prerequisite was unavailable, so the business scenario did not proceed to its final assertion.") : null,
+    status === "BLOCKED" ? "" : null,
+    status === "FAIL" ? "### Technical Error" : null,
+    status === "FAIL" ? "The business result above is the primary interpretation. The technical failure below is retained for engineering diagnosis:" : null,
+    status === "FAIL" && detail ? "```text" : null,
+    status === "FAIL" && detail ? detail : null,
+    status === "FAIL" && detail ? "```" : null,
+    status === "FAIL" ? "" : null,
+    "### Execution Context",
+    ...context,
+    "",
+    "### Links & Evidence",
+    samId ? `- **Official TC:** [${samId}](https://jira.secext.samsung.net/browse/${samId})` : null,
+    defect ? `- **Mapped defect:** [${defect.jira}](${defect.url})` : null,
+    "- **Evidence:** business steps, curated request/response attachments when captured, screenshot/video and Playwright Trace remain attached to this result.",
+    "",
+    "_Business interpretation is shown first; low-level browser/network detail remains available for debugging without overwhelming the validation summary._",
+  ].filter((line) => line !== null && line !== undefined);
+
+  result.description = lines.join("\n");
 }
 
 function hardenKnownDefect(result) {
@@ -217,7 +338,7 @@ let files = 0;
 let removed = 0;
 let hardened = 0;
 let mapped = 0;
-let actualResults = 0;
+let normalized = 0;
 
 for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-result.json"))) {
   const file = path.join(resultsDir, name);
@@ -229,9 +350,12 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-r
   result.steps = cleanSteps(result.steps, seen);
   const defect = ensureKnownDefectMetadata(result);
   if (defect) mapped += 1;
-  const hadActual = String(result.description || "").includes("**Actual result:**");
-  ensureActualResult(result, defect);
-  if (!hadActual && String(result.description || "").includes("**Actual result:**")) actualResults += 1;
+
+  if (samIdOf(result)) {
+    normalizePresentation(result, defect);
+    normalized += 1;
+  }
+
   if (hardenKnownDefect(result)) hardened += 1;
 
   const after = JSON.stringify(result).match(/"source"\s*:/g)?.length || 0;
@@ -240,4 +364,4 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-r
   fs.writeFileSync(file, JSON.stringify(result, null, 2));
 }
 
-console.log(`[allure-dedupe] Processed ${files} result file(s); removed ${removed} duplicate/dangling attachment(s); mapped ${mapped} known defect result(s); added ${actualResults} Actual Result field(s); hardened ${hardened} blocked known-defect result(s).`);
+console.log(`[allure-dedupe] Processed ${files} result file(s); removed ${removed} duplicate/dangling attachment(s); mapped ${mapped} known defect result(s); normalized ${normalized} business-readable result(s); hardened ${hardened} blocked known-defect result(s).`);
