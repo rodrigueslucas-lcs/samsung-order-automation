@@ -45,6 +45,15 @@ const dedupe = spawnSync(process.execPath, [
 ], { stdio: "inherit", env: process.env });
 if (dedupe.status !== 0) process.exit(dedupe.status || 1);
 
+const metadata = spawnSync(process.execPath, [
+  path.resolve("scripts/prepare-allure-ci-metadata.cjs"),
+  resultsDir,
+  reportDir,
+], { stdio: "inherit", env: process.env });
+if (metadata.status !== 0) {
+  console.error("[allure] Jenkins/environment metadata preparation failed; report generation will continue.");
+}
+
 const knownDefects = spawnSync(process.execPath, [
   path.resolve("scripts/annotate-known-defects-dashboard.cjs"),
   artifactDir,
