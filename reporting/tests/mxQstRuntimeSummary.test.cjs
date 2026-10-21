@@ -71,6 +71,38 @@ test("runtime summary classifies CL Trade-in and SC+ prerequisites without faili
   assert.equal(value.tests[1].failureType, "MISSING_SC_PLUS_PRODUCT");
 });
 
+test("runtime summary reports browser/test stalls as automation stability, not environment errors", () => {
+  const report = { suites: [{ specs: [{
+    title: "SAM-25061 Able to add to Cart from PDP",
+    file: "tests/markets/pe/qst/base-store/safe-reuse.spec.js",
+    tests: [{ results: [{
+      status: "timedOut",
+      duration: 180000,
+      errors: [{ message: "Test timeout of 180000ms exceeded. page.waitForURL: Target page, context or browser has been closed" }],
+      attachments: [],
+    }] }],
+  }] }] };
+  const value = buildMxQstRuntimeSummary(report, { officialIds: ["SAM-25061"], market: "PE", environment: "S2/STG2" });
+  assert.equal(value.tests[0].status, "FAIL");
+  assert.equal(value.tests[0].failureType, "AUTOMATION_STABILITY_ERROR");
+});
+
+test("runtime summary keeps an ambiguous payment outcome distinct and non-retriable", () => {
+  const report = { suites: [{ specs: [{
+    title: "SAM-25099 Verify Order Confirmation page",
+    file: "tests/markets/pe/qst/base-store/official-gap-safe.spec.js",
+    tests: [{ results: [{
+      status: "failed",
+      duration: 45000,
+      errors: [{ message: "PAYMENT_OUTCOME_UNCONFIRMED: submit was attempted once; Samsung confirmation remains unproven. Do not create another order." }],
+      attachments: [],
+    }] }],
+  }] }] };
+  const value = buildMxQstRuntimeSummary(report, { officialIds: ["SAM-25099"], market: "PE", environment: "S2/STG2" });
+  assert.equal(value.tests[0].status, "FAIL");
+  assert.equal(value.tests[0].failureType, "PAYMENT_OUTCOME_UNCONFIRMED");
+});
+
 test("auth artifacts cannot be published", () => {
   assert.equal(safeArtifact("playwright/.auth/mx-s1-user.json", process.cwd()), null);
 });
