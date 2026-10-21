@@ -139,6 +139,19 @@ function normalizeAllureEvidence() {
   }
 }
 
+function prepareAllureCiMetadata() {
+  if (!fs.existsSync(allureResultsDir)) return;
+  const script = path.resolve('scripts/prepare-allure-ci-metadata.cjs');
+  if (!fs.existsSync(script)) return;
+  const prepared = spawnSync(process.execPath, [script, allureResultsDir, allureReportDir], {
+    stdio: 'inherit',
+    env: process.env,
+  });
+  if (prepared.status !== 0) {
+    console.error('[reporting] Allure Jenkins metadata preparation failed; report generation will continue.');
+  }
+}
+
 function annotateKnownDefects() {
   if (!fs.existsSync(runtimeSummaryFile) || !fs.existsSync(path.join(executiveDir, 'index.html'))) return;
   const script = path.resolve('scripts/annotate-known-defects-dashboard.cjs');
@@ -179,5 +192,6 @@ if (!(fs.existsSync(runtimeSummaryFile) && fs.existsSync(path.join(executiveDir,
 writeAllureEnvironment();
 enrichAllure();
 normalizeAllureEvidence();
+prepareAllureCiMetadata();
 annotateKnownDefects();
 generateAllure();
