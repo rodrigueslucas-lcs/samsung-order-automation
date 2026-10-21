@@ -1,90 +1,181 @@
 # Executive Report V3
 
-`reporters/executive-v3/` is the current executive reporting layer for Samsung SMB QA Automation.
+`reporting/executive-v3/` is the current executive reporting layer for Samsung SMB QA Automation.
 
-Its purpose is to present current build health first, while preserving coverage, official scope, auditability and historical traceability behind controlled drill-downs.
+Its purpose is to present current build health first while preserving official scope, automation coverage, evidence, known-defect governance and historical traceability behind controlled drill-downs.
 
 ## Reporting principles
 
-The dashboard keeps these dimensions separate:
+The reporting stack keeps these dimensions separate:
 
-1. **Current official scope** — the Samsung P1/P2 priority model.
+1. **Current official scope** — the Samsung P1/QST and related store ownership model.
 2. **Current build runtime** — what Playwright actually executed in this build.
 3. **Automation coverage** — implementation maturity, independent from PASS/FAIL.
-4. **Technical evidence** — screenshots, trace, video, context and failure/blocker details.
-5. **Governance/history** — regional ledger, audit checks and preserved historical campaign data.
+4. **Known defect governance** — active Jira defects mapped by market/environment/store/TC.
+5. **Technical evidence** — screenshots, video, Playwright Trace, context and sanitized request/response evidence.
+6. **Governance/history** — regional scope, audit checks and preserved historical campaign data.
 
-The current official SMB model is:
+The current audited Base Store Allure surface is:
 
-- **362** total DST rows;
-- **144** P1 / QST rows;
-- **218** P2 / DST-only rows;
-- **30** MX Base Store P1 TCs in the current official runner;
-- **38** MX P1 rows overall when EPP is included.
+| Market | Official Base Store P1/QST TCs |
+| --- | ---: |
+| MX | 29 |
+| PE | 28 |
+| CO | 29 |
+| CL | 31 |
+| **Total** | **117** |
 
-The preserved 144-ID Zephyr campaign remains historical evidence. It must not be treated as the current 144 P1/QST denominator just because both totals happen to be 144.
+These counts describe the active audited automation/reporting surface. They do not imply that every scenario is executable in every environment without valid authentication, configuration and test data.
+
+## Reporting stack
+
+The project uses three complementary reporting levels.
+
+### Executive Dashboard
+
+The dashboard is executive-first and should answer:
+
+- what was in scope;
+- what executed;
+- what passed;
+- what failed;
+- what is blocked;
+- what is an active mapped Known Defect;
+- what requires QA attention.
+
+Mapped known defects are visually separated from generic blockers and current build failures. The underlying runtime data remains unchanged.
+
+### Allure
+
+Allure is the TC-level investigation and presentation layer.
+
+For audited official Base Store TCs, the report can expose:
+
+- SAM / Jira TC;
+- Objective;
+- Expected Result;
+- Actual Result;
+- Market / Environment / Store;
+- Feature;
+- User Type;
+- SKU / Product URL;
+- Payment Method;
+- Order ID when captured;
+- Runtime Status;
+- Automation Coverage;
+- Known Defect and Jira link when applicable;
+- business-oriented steps;
+- evidence attachments.
+
+Low-level Playwright API noise (`click`, `fill`, `waitFor`, locator internals, etc.) is hidden from the primary Allure presentation. Full technical browser detail remains available in Playwright Trace.
+
+### Playwright evidence
+
+Deep debugging remains available through:
+
+- Playwright Trace;
+- screenshots;
+- video;
+- stdout / error context;
+- sanitized request/response attachments where the scenario records them.
+
+This separation keeps the primary QA report readable without sacrificing diagnostics.
+
+## Result semantics
+
+The report must keep these outcomes distinct:
+
+- **PASS** — expected behavior was proven;
+- **FAIL** — unexpected functional or automation failure;
+- **BLOCKED** — prerequisite/test-data/environment dependency prevents meaningful execution;
+- **KNOWN DEFECT** — runtime item is mapped to an active Jira defect for the exact execution scope;
+- **NOT_RUN** — not executed.
+
+Known defects are resolved through `governance/known-defects.json` and are non-gating only when the runtime item matches the mapped market/environment/store/TC scope.
+
+A mapped defect must never hide an unrelated failure.
+
+## Known-defect rendering
+
+The Executive Dashboard can reclassify actionable runtime rows (`FAIL`, `BLOCKED`, `SKIPPED-BLOCKED`) as **Known Defect** when a valid active mapping exists.
+
+The Allure normalization layer also hardens blocked Known Defect results so they remain renderable and non-gating while preserving:
+
+- Jira ID;
+- defect title;
+- original runtime context;
+- evidence;
+- business-readable TC metadata.
+
+Dangling attachment references are removed before report generation to avoid broken detail panels.
+
+## Expected Result vs Actual Result
+
+Allure should make the comparison explicit.
+
+Example PASS:
+
+```text
+Expected Result:
+The registered payment reaches Samsung confirmation and produces a valid Order ID.
+
+Actual Result:
+PASS — all automated assertions executed for this scenario were satisfied.
+```
+
+Example Known Defect:
+
+```text
+Expected Result:
+The Back to Top control is rendered and returns the viewport upward.
+
+Actual Result:
+BLOCKED / KNOWN DEFECT RT-746043 — the mapped storefront control is missing in the target environment.
+```
+
+Example FAIL:
+
+```text
+Actual Result:
+FAIL — <runtime error / assertion evidence>
+```
+
+The report must not invent an Actual Result that was not supported by runtime evidence.
 
 ## Final presentation structure
 
-The generated dashboard is intentionally executive-first:
+Recommended presentation flow:
 
-1. **QA Execution Dashboard / Build Health**
-2. **Execution at a glance**
-3. **Needs Attention** — rendered only when current FAIL/BLOCKED items exist
-4. **Test Execution** — TC-level current runtime and browser evidence
-5. **MX Automation Coverage** — Full / Partial / Missing implementation maturity
-6. **Official SMB Scope** — compact 362 / 144 / 218 / current-runner reference
-7. **Coverage Details**
-   - MX Coverage by Feature
-   - Automation Gap Queue
-8. **Technical Governance** — collapsed by default
-   - Regional Validation Matrix
-   - Data Integrity
-   - Historical TC Inventory
-
-The default page intentionally avoids dumping historical tables into the primary presentation flow. Governance information is preserved, but exposed on demand.
-
-## Technical Governance
-
-`Technical Governance` groups supporting information that is useful for auditability but should not dominate the first view.
-
-### Regional Validation Matrix
-
-Shows the preserved historical market × feature execution ledger for MX, CL, CO and PE. It is a reference layer and does not replace the current official scope or current build runtime denominator.
-
-### Data Integrity
-
-The dashboard validates source consistency without mutating source data. Checks include:
-
-- official registry totals;
-- expected unique official IDs by market;
-- MX coverage denominator consistency;
-- Full + Partial + Missing reconciliation;
-- ledger IDs belonging to the expected official registry;
-- canonical executed statuses.
-
-The executive view shows a compact audit summary first; full check details remain available inside governance.
-
-### Historical TC Inventory
-
-The preserved 144-ID Zephyr campaign remains available for traceability, but is collapsed by default and constrained to a scrollable drill-down so it does not make the executive dashboard visually overwhelming.
+1. **Project / regional scope**
+2. **Market-first architecture**
+3. **Jenkins execution**
+4. **Executive Dashboard / Build Health**
+5. **Execution at a glance**
+6. **Needs Attention** when applicable
+7. **Known Defects / blockers**
+8. **Allure TC drill-down**
+9. **Objective / Expected / Actual / business steps**
+10. **SKU / request-response / Order ID evidence**
+11. **Playwright Trace** for deep debugging
+12. **Scalability / governance**
 
 ## Current build evidence
 
-The current runtime is rendered independently from historical governance.
-
-For each TC, the report can expose:
+For each current TC, the reporting stack may expose:
 
 - SAM/Jira ID;
 - runtime status;
 - failure/blocker category;
 - duration;
+- known-defect mapping;
 - screenshot;
 - video when enabled;
 - Playwright trace;
-- error context.
+- error context;
+- sanitized request/response evidence;
+- product/order/payment metadata when captured.
 
-A clean build does not render a large `Needs Attention` section. FAIL/BLOCKED rows remain explicit and are never hidden behind a healthy aggregate.
+A clean build does not need a large `Needs Attention` section. FAIL/BLOCKED/Known Defect rows remain explicit when they exist.
 
 ## Trace Viewer behavior
 
@@ -92,47 +183,54 @@ A clean build does not render a large `Needs Attention` section. FAIL/BLOCKED ro
 
 The Jenkins artifact must be browser-reachable. Authentication, CORS and local-network browser policy can block remote loading even when the trace ZIP itself is valid.
 
-When Jenkins is served from `localhost`, Chromium-based browsers may require **Local Network Access** permission for `trace.playwright.dev` before the viewer can fetch the local Jenkins artifact.
+When Jenkins is served from `localhost`, Chromium-based browsers may require Local Network Access permission for `trace.playwright.dev` before the viewer can fetch the local Jenkins artifact.
 
 ## Generator
 
-Direct generation:
-
-```bash
-node reporters/executive-v3/generateExecutiveV3.cjs
-```
-
-Default output:
+Direct generation is implemented under:
 
 ```text
-test-results/executive-v3/index.html
+reporting/executive-v3/generateExecutiveV3.cjs
 ```
 
-The Jenkins pipeline generates the presentation copy under:
+Market runners typically generate presentation copies inside their Jenkins artifact directory, for example:
 
 ```text
-test-results/jenkins/mx-qst/executive/index.html
+test-results/jenkins/<market-or-suite>/executive/index.html
 ```
 
-The generator accepts optional ledger/output/history/execution arguments according to the implementation in `generateExecutiveV3.cjs`.
+The exact artifact folder is runner-specific and must be derived from the runner configuration rather than assumed globally.
 
 ## Non-fabrication rules
 
-The dashboard must never:
+The dashboard and Allure must never:
 
 - infer PASS from missing runtime evidence;
 - mix current runtime totals with historical ledger totals;
 - present automation coverage as execution status;
 - fabricate feature/store metadata for unknown cases;
 - silently hide an audit inconsistency;
-- convert environment/authentication failures into automation PASS.
+- convert environment/authentication failures into automation PASS;
+- convert a generic blocker into a Known Defect without a valid mapping;
+- treat a mapped defect as permission to hide unrelated failures;
+- claim order creation without Order ID/outcome evidence.
 
 When no real Playwright runtime is supplied, execution-specific metrics remain unavailable rather than being invented.
 
 ## Presentation usage
 
-Recommended presentation flow:
+The recommended storytelling is:
 
-`Executive Dashboard → current build health → TC evidence → Allure drilldown → Jenkins pipeline/stages → regional scalability`
+```text
+Official TC
+ -> market/runtime selection
+ -> Jenkins
+ -> Playwright business journey
+ -> Executive build health
+ -> Allure TC detail
+ -> evidence / Order ID / request-response
+ -> Known Defect or PASS/FAIL classification
+ -> Trace Viewer when needed
+```
 
-The Executive Dashboard answers the release/execution question first. Allure and Playwright remain the detailed technical investigation layers; Jenkins demonstrates how the reporting and evidence are produced automatically.
+The Executive Dashboard answers the release/execution question first. Allure explains the TC in business language. Playwright Trace remains the technical forensic layer.
