@@ -7,6 +7,11 @@ if (!fs.existsSync(resultsDir)) {
   process.exit(0);
 }
 
+const buildUrl = String(process.env.BUILD_URL || '').trim();
+const artifactDir = String(process.env.JENKINS_ARTIFACT_DIR || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+const buildNumber = String(process.env.BUILD_NUMBER || '').trim();
+const jiraBase = 'https://jira.secext.samsung.net/browse/';
+
 function clean(value) {
   return String(value || '')
     .replace(/\u001b\[[0-9;]*m/g, '')
@@ -20,6 +25,15 @@ function parameter(result, name) {
 
 function samId(result) {
   return `${result.name || ''} ${result.fullName || ''}`.match(/SAM-\d+/)?.[0] || '';
+}
+
+function issueKey(value) {
+  return clean(value).match(/(?:SAM|RT)-\d+/i)?.[0]?.toUpperCase() || '';
+}
+
+function jiraUrl(key) {
+  const normalized = issueKey(key);
+  return normalized ? `${jiraBase}${encodeURIComponent(normalized)}` : '';
 }
 
 function runtimeStatus(result) {
@@ -105,8 +119,37 @@ function businessStatusForStep(status, defect) {
   return status === 'FAIL' ? 'failed' : status === 'BLOCKED' ? 'skipped' : 'passed';
 }
 
+function stableArtifactsUrl() {
+  if (!buildUrl || !artifactDir) return '';
+  const prefix = buildUrl.endsWith('/') ? buildUrl : `${buildUrl}/`;
+  return `${prefix}artifact/${artifactDir}/`;
+}
+
+function normalizeLinks(result, id, defect) {
+  const links = [];
+  const tcUrl = jiraUrl(id);
+  const defectUrl = jiraUrl(defect);
+
+  if (tcUrl) links.push({ name: `Official TC · ${issueKey(id)}`, url: tcUrl, type: 'tms' });
+  if (defectUrl) links.push({ name: `Known Defect · ${issueKey(defect)}`, url: defectUrl, type: 'issue' });
+
+  if (buildUrl) {
+    links.push({
+      name: `Jenkins Build${buildNumber ? ` · #${buildNumber}` : ''}`,
+      url: buildUrl,
+      type: 'link',
+    });
+  }
+
+  const artifactsUrl = stableArtifactsUrl();
+  if (artifactsUrl) links.push({ name: 'Jenkins Artifacts · Evidence', url: artifactsUrl, type: 'link' });
+
+  result.links = links;
+}
+
 let structured = 0;
 let hiddenParameters = 0;
+let normalizedLinks = 0;
 
 for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith('-result.json'))) {
   const file = path.join(resultsDir, name);
@@ -115,7 +158,7 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith('-r
   if (!id) continue;
 
   const status = runtimeStatus(result);
-  const defect = clean(parameter(result, 'Known Defect'));
+  const defect = issueKey(parameter(result, 'Known Defect'));
   const defectTitle = clean(parameter(result, 'Known Defect Title'));
   const originalDescription = String(result.description || '');
   const sectionStatus = businessStatusForStep(status, defect);
@@ -137,6 +180,8 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith('-r
 
   hideNoisyParameters(result);
   hiddenParameters += (result.parameters || []).filter((item) => item?.mode === 'hidden').length;
+  normalizeLinks(result, id, defect);
+  normalizedLinks += result.links.length;
 
   const sections = [];
   sections.push(section('01 · O que foi validado', [child(objective)]));
@@ -171,6 +216,14 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith('-r
     next += 1;
   }
 
+  const evidenceChildren = [];
+  if (buildUrl) evidenceChildren.push(child(`Jenkins Build${buildNumber ? ` #${buildNumber}` : ''}`));
+  if (stableArtifactsUrl()) evidenceChildren.push(child('Jenkins Artifacts · stable evidence fallback'));
+  if (evidenceChildren.length) {
+    sections.push(section(`${String(next).padStart(2, '0')} · Links e evidências`, evidenceChildren));
+    next += 1;
+  }
+
   if (actualSteps.length) {
     sections.push({
       ...section(`${String(next).padStart(2, '0')} · Execução do negócio`, [], sectionStatus),
@@ -189,4 +242,4 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith('-r
   structured += 1;
 }
 
-console.log(`[allure-business-view] READY · ${structured} official TC(s) structured; ${hiddenParameters} repeated parameter field(s) hidden from suite rows.`);
+console.log(`[allure-business-view] READY · ${structured} official TC(s) structured; ${hiddenParameters} repeated parameter field(s) hidden from suite rows; ${normalizedLinks} stable link(s) published.`);
