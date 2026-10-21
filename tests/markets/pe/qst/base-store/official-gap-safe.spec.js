@@ -8,6 +8,7 @@ import PaymentPage from "../../../../../pages/PaymentPage";
 import OrderConfirmationPage from "../../../../../pages/OrderConfirmationPage";
 import { testData } from "../../../../../utils/testData";
 import safetyPaySandbox from "../../../../../flows/pe/safetyPaySandbox.cjs";
+import peBogoEvidence from "../../../../../flows/pe/bogoEvidence.cjs";
 import { addConfiguredProductToPeCart, reachPeGuestPayment } from "./peQstFlows";
 
 const { getPeQstConfig } = peConfigModule;
@@ -74,16 +75,31 @@ test.describe("PE QST - official safe gap reconciliation", () => {
       await expect(sourceSku.first(), "PE BOGO cart must contain the eligible source SKU.").toBeVisible({ timeout: 30000 });
       expect(await sourceSku.count(), "PE BOGO campaign may repeat the source SKU in paid and promotional cart entries.").toBeGreaterThanOrEqual(1);
     });
-    await test.step("Validate promotional BOGO gifts in cart", async () => {
+    const promotion = await test.step("Validate persisted free BOGO gifts and unchanged cart total", async () => {
+      const readback = page.waitForResponse(response => response.request().method() === "GET" &&
+        new URL(response.url()).hostname === `${cfg.environment.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com` &&
+        new URL(response.url()).pathname === "/tokocommercewebservices/v2/pe/users/current/carts/current", { timeout: 60000 });
+      await page.reload({ waitUntil: "domcontentloaded" });
+      const response = await readback;
+      expect(response.status(), "BOGO cart readback must succeed.").toBe(200);
+      const expectedGifts = cfg.environment === "S2" && bogoSku === "SM-S931BDBLLTP"
+        ? ["SM-S931BDBLLTP", "SM-R630NZAALTA"] : null;
+      const proof = peBogoEvidence.validatePeBogoCart(await response.json(), bogoSku, expectedGifts);
+      const main = page.getByRole("main");
+      for (const gift of proof.gifts) {
+        // The API proves promotional identity and zero price; the UI proves each
+        // gift entry is rendered, including the free duplicate of the paid SKU.
+        await expect(main.getByText(gift.sku, { exact: true }).filter({ visible: true }))
+          .toHaveCount(gift.sku === bogoSku ? 2 : 1, { timeout: 30000 });
+      }
       const giftLabels = page.getByText(/BOGO\s*Gift/i, { exact: true }).filter({ visible: true });
-      await expect(giftLabels.first(), "PE BOGO cart must expose the BOGO Gift label.").toBeVisible({ timeout: 30000 });
-      expect(await giftLabels.count(), "PE BOGO cart should expose the promotional gift entries.").toBeGreaterThanOrEqual(1);
-      expect(await giftLabels.count(), "PE BOGO cart should expose at least one promotional BOGO gift.").toBeGreaterThanOrEqual(1);
+      return { ...proof, promotionLabelCount: await giftLabels.count() };
     });
+    await testInfo.attach("PE BOGO persisted cart proof", { body: JSON.stringify(promotion), contentType: "application/json" });
     recordBusinessEvidence(testInfo, {
       bogoSku,
       bogoPdp: target.href,
-      promotionLabel: "BOGO Gift",
+      ...promotion,
       freeGiftValidated: true,
     });
   });
