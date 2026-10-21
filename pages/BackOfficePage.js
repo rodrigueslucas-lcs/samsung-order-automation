@@ -58,8 +58,8 @@ export default class BackOfficePage extends BasePage {
     await this.page.locator("#zk_proc").waitFor({ state: "hidden", timeout });
   }
 
-  async waitForZkUpdate(action) {
-    await this.waitForZkReady();
+  async waitForZkUpdate(action, { timeout = 30000 } = {}) {
+    await this.waitForZkReady({ timeout });
     const requests = new Set();
     const origin = new URL(this.url).origin;
     const track = request => {
@@ -70,11 +70,11 @@ export default class BackOfficePage extends BasePage {
     };
     this.page.on("request", track);
     try {
-      const responsePromise = this.page.waitForResponse(response => requests.has(response.request()), { timeout: 30000 });
+      const responsePromise = this.page.waitForResponse(response => requests.has(response.request()), { timeout });
       const [response] = await Promise.all([responsePromise, action()]);
       if (!response.ok()) throw new Error(`BackOffice ZK update returned HTTP ${response.status()}.`);
       if (await response.finished()) throw new Error("BackOffice ZK update response did not finish successfully.");
-      await this.waitForZkReady();
+      await this.waitForZkReady({ timeout });
     } finally {
       this.page.off("request", track);
     }

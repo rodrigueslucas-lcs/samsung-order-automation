@@ -7,7 +7,7 @@ const source = fs.readFileSync('pages/BackOfficePage.js', 'utf8')
   .replace(/^import .*;\r?\n/gm, '').replace(/^export default /gm, '').replace(/^export /gm, '');
 const BackOfficePage = vm.runInNewContext(`${source}\nBackOfficePage;`, { BasePage: class {}, URL, process });
 
-function scenario({ status = 200, failedBody = false, actionFails = false } = {}) {
+function scenario({ status = 200, failedBody = false, actionFails = false, timeout = 30000 } = {}) {
   const events = [];
   let listener, resolveResponse, predicate;
   const request = (host, method = 'POST') => ({ method: () => method, url: () => `https://${host}/backoffice/zkau` });
@@ -16,10 +16,10 @@ function scenario({ status = 200, failedBody = false, actionFails = false } = {}
   const bo = Object.create(BackOfficePage.prototype);
   bo.url = 'https://bo-s2.example/backoffice/';
   bo.page = {
-    locator: selector => ({ waitFor: async ({ state }) => { assert.equal(selector, '#zk_proc'); assert.equal(state, 'hidden'); events.push('ui-ready'); } }),
+    locator: selector => ({ waitFor: async ({ state, timeout: actualTimeout }) => { assert.equal(actualTimeout, timeout); assert.equal(selector, '#zk_proc'); assert.equal(state, 'hidden'); events.push('ui-ready'); } }),
     on: (_, callback) => { listener = callback; },
     off: (_, callback) => { assert.equal(callback, listener); events.push('listener-removed'); },
-    waitForResponse: check => { predicate = check; return new Promise(resolve => { resolveResponse = resolve; }); },
+    waitForResponse: (check, options) => { assert.equal(options.timeout, timeout); predicate = check; return new Promise(resolve => { resolveResponse = resolve; }); },
   };
   const action = async () => {
     assert.equal(predicate({ request: () => old }), false, 'Ignore a response initiated before the action.');
@@ -32,8 +32,14 @@ function scenario({ status = 200, failedBody = false, actionFails = false } = {}
     resolveResponse(response);
     if (actionFails) throw new Error('action failed');
   };
-  return { run: () => bo.waitForZkUpdate(action), events };
+  return { run: () => bo.waitForZkUpdate(action, { timeout }), events };
 }
+
+test('slow read-only queries retain one action and the explicit response/UI deadline', async () => {
+  const s = scenario({ timeout: 90000 });
+  await s.run();
+  assert.deepEqual(s.events, ['ui-ready', 'body-finished', 'ui-ready', 'listener-removed']);
+});
 
 test('BO waits for the initiated AU body and unblocked UI, ignoring unrelated responses', async () => {
   const s = scenario(); await s.run();

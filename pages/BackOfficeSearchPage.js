@@ -64,7 +64,9 @@ export default class BackOfficeSearchPage extends BackOfficeOrderPage {
         .getByRole("button", { name: "Search", exact: true })
         .filter({ visible: true })
         .last();
-      await this.waitForZkUpdate(() => searchButton.click());
+      // Advanced order queries can remain Processing beyond 30s. Keep the
+      // original request in flight; never click Search again while it runs.
+      await this.waitForZkUpdate(() => searchButton.click(), { timeout: 90000 });
 
       const result = this.page.getByRole("row", {
         name: new RegExp(`Order Nr\\.: ${this.escapeRegExp(orderCode)}(?:,|$)`),
