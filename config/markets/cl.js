@@ -45,6 +45,8 @@ function getClQstConfig(environment = process.env) {
 
   const scPlusSku = String(environment.CL_QST_SC_PLUS_SKU || (envName === "S2" ? "SM-S918BZKILTL" : "")).trim();
   const scPlusPlanSku = String(environment.CL_QST_SC_PLUS_PLAN_SKU || (envName === "S2" ? "P-GT-HKXXHP2C" : "")).trim();
+  const paymentSku = String(environment.CL_QST_PAYMENT_SKU || (envName === "S2" ? "SM-S928BZKKLTL" : sku)).trim();
+  if (!/^[A-Z0-9-]+$/i.test(paymentSku)) throw new Error("CL_QST_PAYMENT_SKU must be a CL product code.");
 
   return Object.freeze({
     market: "CL",
@@ -61,6 +63,8 @@ function getClQstConfig(environment = process.env) {
     eppUrl,
     scPlusSku,
     scPlusPlanSku,
+    paymentSku,
+    paymentPdpUrl: new URL(`/cl/p/${paymentSku}`, baseUrl),
   });
 }
 

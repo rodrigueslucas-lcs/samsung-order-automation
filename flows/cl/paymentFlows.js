@@ -7,10 +7,8 @@ import evidenceContext from "../../reporting/evidence/evidenceContext.js";
 
 const { recordBusinessEvidence } = evidenceContext;
 const CL_S2_RT_751761_BLOCKED_IDS = new Set([
-  "SAM-24822",
   "SAM-24823",
   "SAM-24824",
-  "SAM-24826",
 ]);
 
 function blockClS2OrderClosureKnownDefect(testInfo, environment) {
@@ -106,7 +104,7 @@ export async function executeClPaymentOrder(browser, testInfo, { reachDelivery, 
   const environment = String(process.env.CL_QST_ENVIRONMENT || process.env.TEST_ENV || "").toUpperCase();
   blockClS2OrderClosureKnownDefect(testInfo, environment);
   test.skip(process.env.ALLOW_PAYMENT_SUBMIT !== "1", "Set ALLOW_PAYMENT_SUBMIT=1 to authorize a CL test order.");
-  const cardProvider = String(process.env.CL_QST_CARD_PROVIDER || "webpay").toLowerCase();
+  const cardProvider = String(process.env.CL_QST_CARD_PROVIDER || (environment === "S2" ? "mercado" : "webpay")).toLowerCase();
   if (!["webpay", "mercado"].includes(cardProvider)) throw new Error("CL_QST_CARD_PROVIDER must be webpay or mercado.");
   const flowCard = kind === "card" && cardProvider === "webpay";
   const paymentMode = flowCard ? "Webpay Credit / Debit Card" :
@@ -119,7 +117,7 @@ export async function executeClPaymentOrder(browser, testInfo, { reachDelivery, 
     authorizedSubmit: true,
   });
 
-  const { context, page } = await reachDelivery(browser, { singleItem: true });
+  const { context, page } = await reachDelivery(browser, { singleItem: true, paymentProduct: true });
   installBusinessNetworkEvidence(page, testInfo, "CL");
   try {
     await test.step("Choose the registered delivery address and continue to CL Payment", async () => {
@@ -150,14 +148,16 @@ export async function executeClPaymentOrder(browser, testInfo, { reachDelivery, 
         submitResponsePathPattern: /^\/tokocommercewebservices\/v2\/cl\/users\/[^/]+\/carts\/[^/]+\/paymentmodes\/cl-[^/]+\/submitOrder$/i,
       } : {});
       expect(result.orderCode).toMatch(/^CL\d{6}-\d{8}(?:_\d+)?$/i);
+      const publicOrderCode = result.orderCode.replace(/_\d+$/, "");
       if (new URL(page.url()).hostname === "sandbox.flow.cl") {
         await completeClFlowSandbox(page, { orderCode: result.orderCode, storefrontOrigin });
       }
       await expect(page).toHaveURL(/confirmation|confirmacion|order-confirmation|checkout\/order|success/i, { timeout: 90000 });
-      await expect(page.getByText(result.orderCode, { exact: false }).first()).toBeVisible({ timeout: 30000 });
+      await expect(page.getByText(publicOrderCode, { exact: false }).first()).toBeVisible({ timeout: 30000 });
 
       recordBusinessEvidence(testInfo, {
         orderCode: result.orderCode,
+        publicOrderCode,
         paymentMode,
         outcome: result.outcome,
         authorizedSubmit: true,
@@ -167,6 +167,7 @@ export async function executeClPaymentOrder(browser, testInfo, { reachDelivery, 
           market: "CL",
           environment: environment || null,
           orderId: result.orderCode,
+          publicOrderCode,
           paymentMode,
           outcome: result.outcome,
           finalUrl: result.finalUrl,

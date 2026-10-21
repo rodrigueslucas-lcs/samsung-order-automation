@@ -13,6 +13,7 @@ import clAuthLoginReturn from "../../../../../utils/clAuthLoginReturn.cjs";
 import { addConfiguredProductToClCart, bootstrapClStorefront, selectClCheckoutOption } from "../../../../../flows/cl/qstFlows";
 import { executeClPaymentOrder } from "../../../../../flows/cl/paymentFlows";
 import clCareFlows from "../../../../../flows/cl/careFlows.cjs";
+import clPaymentCart from "../../../../../flows/cl/paymentCart.cjs";
 import authBrowserWindow from "../../../../../utils/authBrowserWindow.cjs";
 
 const test = base.extend({
@@ -94,13 +95,15 @@ test.describe("CL QST - Base Store Official P1", () => {
     });
   }
 
-  async function clRegisteredDelivery(browser, { singleItem = false } = {}) {
-    const cfg = config();
+  async function clRegisteredDelivery(browser, { singleItem = false, paymentProduct = false } = {}) {
+    const configured = config();
+    const cfg = paymentProduct ? { ...configured, sku: configured.paymentSku, pdpUrl: configured.paymentPdpUrl } : configured;
     const { context, page } = await authenticatedPage(browser, cfg);
     if (singleItem) {
       await page.setViewportSize({ width: 1920, height: 1080 });
       await getClAuthState().validateCurrentPageAuthenticated(page);
     }
+    if (paymentProduct) await clPaymentCart.prepareClPaymentCart(page, cfg);
     await page.goto(cfg.cartUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
     const existingProduct = await page.getByText(cfg.sku, { exact: true }).first()
       .waitFor({ state: "visible", timeout: 20000 }).then(() => true, () => false);
@@ -774,7 +777,7 @@ test.describe("CL QST - Base Store Official P1", () => {
 
   test("SAM-24826 @destructive @qst @cl @base-store @registered - Order confirmation screen", async ({ browser }, testInfo) => {
     await test.step("Validate CL order confirmation screen", async () => {
-      await executeClPaymentOrder(browser, testInfo, { reachDelivery: clRegisteredDelivery, kind: "transfer" });
+      await executeClPaymentOrder(browser, testInfo, { reachDelivery: clRegisteredDelivery, kind: "card" });
     });
   });
 

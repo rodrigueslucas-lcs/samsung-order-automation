@@ -3,6 +3,18 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const { getClTestCard } = require('../../utils/clTestCard.cjs');
+const { getClQstConfig } = require('../../config/markets/cl.js');
+
+test('CL S2 order fixture uses the verified card product without changing Care/base fixtures', () => {
+  const cfg = getClQstConfig({ CL_QST_ENVIRONMENT: 'S2' });
+  assert.equal(cfg.paymentSku, 'SM-S928BZKKLTL');
+  assert.equal(cfg.paymentPdpUrl.href, 'https://stg2.shop.samsung.com/cl/p/SM-S928BZKKLTL');
+  assert.equal(cfg.scPlusSku, 'SM-S918BZKILTL');
+  assert.equal(cfg.sku, 'SM-S918BZKILTL');
+  const s1 = getClQstConfig({ CL_QST_ENVIRONMENT: 'S1', CL_QST_SKU: 'CL-S1-QA' });
+  assert.equal(s1.paymentSku, s1.sku);
+  assert.throws(() => getClQstConfig({ CL_QST_PAYMENT_SKU: '../mx/p/OTHER' }), /CL product code/);
+});
 
 test('CL capture scopes rejection and order identity to CL commerce endpoints', async () => {
   const source = fs.readFileSync('pages/MarketPaymentPage.js', 'utf8')

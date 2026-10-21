@@ -8,7 +8,7 @@ const registry = require("../../governance/known-defects.json");
 const paymentFlow = fs.readFileSync(path.join(root, "flows/cl/paymentFlows.js"), "utf8");
 const clSpec = fs.readFileSync(path.join(root, "tests/markets/cl/qst/base-store/official-p1.spec.js"), "utf8");
 
-const blockedIds = ["SAM-24822", "SAM-24823", "SAM-24824", "SAM-24826"];
+const blockedIds = ["SAM-24823", "SAM-24824"];
 
 function findDefect(samId) {
   return registry.defects.find((defect) =>
@@ -46,6 +46,17 @@ test("CL S2 order-dependent TCs hard-skip before payment execution while RT-7517
 });
 
 test("SAM-24825 keeps its independent Rewards prerequisite blocker", () => {
-  assert.match(clSpec, /SAM-24825 @blocked @qst @cl @base-store - Payment using Rewards/);
+  assert.match(clSpec, /\["SAM-24825", "Payment using Rewards", "Missing Rewards test data:/);
+  assert.match(clSpec, /test\(`\$\{id\} @blocked @qst @cl @base-store - \$\{title\}`,[\s\S]{0,80}blocked\(reason\)/);
   assert.doesNotMatch(paymentFlow, /CL_S2_RT_751761_BLOCKED_IDS[\s\S]{0,200}"SAM-24825"/);
+});
+
+test("normal CL card and confirmation execute while installments and transfer stay blocked", () => {
+  const blockerSet = paymentFlow.match(/CL_S2_RT_751761_BLOCKED_IDS = new Set\(\[([\s\S]*?)\]\)/)[1];
+  for (const id of ["SAM-24822", "SAM-24826"]) {
+    assert.doesNotMatch(blockerSet, new RegExp(id));
+    assert.equal(findDefect(id), undefined, 'new failures in reactivated scenarios must not be masked by the old blanket defect');
+  }
+  assert.match(clSpec, /SAM-24826[\s\S]{0,400}kind: "card"/);
+  assert.match(paymentFlow, /singleItem: true, paymentProduct: true/);
 });
