@@ -117,6 +117,8 @@ test("final Allure normalization maps known defects and uses one presentation hi
   assert.match(dedupe, /### Blocker \/ Prerequisite/);
   assert.match(dedupe, /### Execution Context/);
   assert.match(dedupe, /### Links & Evidence/);
+  assert.match(dedupe, /function polishFailureStatusDetails/);
+  assert.match(dedupe, /Business-readable summary is shown here/);
   assert.match(dedupe, /PASS — all automated assertions executed for this scenario were satisfied/);
   assert.match(dedupe, /BLOCKED \/ KNOWN DEFECT/);
   assert.match(dedupe, /FAIL \/ KNOWN DEFECT/);
@@ -178,6 +180,9 @@ test("structured Allure hierarchy is applied to MX PE CO CL in both S1 and S2", 
       assert.match(description, /\*\*Market:\*\*/);
       assert.match(description, /\*\*Environment:\*\*/);
       assert.match(description, /```text/);
+      assert.match(result.statusDetails.message, /Expected value or storefront content "EXPECTED-SKU" was not visible/);
+      assert.match(result.statusDetails.message, /original technical error is preserved/i);
+      assert.doesNotMatch(result.statusDetails.message, /expect\(locator\)\.toBeVisible\(\) failed/);
     }
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
