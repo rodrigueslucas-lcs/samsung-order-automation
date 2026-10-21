@@ -22,6 +22,7 @@ import authBrowserWindow from "../../../../../utils/authBrowserWindow.cjs";
 import { addProductFromPreQaBc } from "../../../../../flows/smb/preQaBcCart";
 import coLogoutCart from "../../../../../flows/co/logoutCart.cjs";
 import coNotificationReminder from "../../../../../flows/co/notificationReminder.cjs";
+import coShippingReadiness from "../../../../../flows/co/shippingReadiness.cjs";
 
 const test = base.extend({
   qstBusinessScenario: [async ({}, use, testInfo) => {
@@ -229,11 +230,7 @@ async function coSelectOption(page,delivery,name,option){
 }
 async function coFillNewShipping(page,delivery,secondaryNumber="113-43"){
   const department=delivery.locator('mat-select[name="regionIso"]');
-  const radio=delivery.locator('input[name="addressOptionShipping"][value="NEW_ADDRESS"]');
-  await Promise.race([
-    department.waitFor({state:"visible",timeout:30000}),
-    radio.waitFor({state:"visible",timeout:30000}),
-  ]);
+  await coShippingReadiness.waitForCoShippingForm(delivery);
   if(!await department.isVisible()){
     try{await coSelectAddressMode(page,delivery,"Shipping","NEW_ADDRESS");}
     catch(error){if(!await department.isVisible())throw error;}

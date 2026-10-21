@@ -4,6 +4,7 @@ import CartPage from "../../../../../pages/CartPage";
 import { attachNetworkEvidence } from "../../../../../utils/networkEvidence";
 import { installBusinessNetworkEvidence } from "../../../../../utils/businessNetworkEvidence";
 import evidenceContext from "../../../../../reporting/evidence/evidenceContext";
+import coPdpReadiness from "../../../../../flows/co/pdpReadiness.cjs";
 
 const { recordBusinessEvidence } = evidenceContext;
 
@@ -67,7 +68,10 @@ export async function addConfiguredProductToCoCart(page, config) {
       const url=new URL(response.url());
       return request.method()==="POST" && /\/co\/users\/[^/]+\/carts\/[^/]+\/entries(?:\/|$)/i.test(url.pathname);
     },{timeout:60000}).catch(()=>null);
-    await product.addConfiguredPdpToCart({waitForCartMutation:true});
+    const recovery=coPdpReadiness.createCoPdpRecovery(page,{pdpUrl:resolved.pdpUrl.href});
+    try {
+      await product.addConfiguredPdpToCart({waitForCartMutation:true,recoverBlankPdp:recovery.recover});
+    } finally { recovery.dispose(); }
     const response=await addResponse;
     if(response) await attachNetworkEvidence(testInfo,"Add to Cart",{response});
     return new CartPage(page,{

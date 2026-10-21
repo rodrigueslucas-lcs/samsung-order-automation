@@ -17,7 +17,7 @@ export default class ProductPage extends BasePage {
   }
 
   async addConfiguredPdpToCart({ waitForCartMutation = false, configureProduct, diagnostics,
-    addButtonName = /Agregar al (?:carro|carrito)|Add to cart|Add to basket/i } = {}) {
+    recoverBlankPdp, addButtonName = /Agregar al (?:carro|carrito)|Add to cart|Add to basket/i } = {}) {
     if (!this.pdpUrl) throw new Error('A configured PDP URL is required.');
     const isCartMutation = (request) =>
       request.method() === 'POST' &&
@@ -55,10 +55,15 @@ export default class ProductPage extends BasePage {
         .filter({ visible: true })
         .first();
 
-      const buttonReady = await addButton
+      let buttonReady = await addButton
         .waitFor({ state: 'visible', timeout: 20000 })
         .then(() => true)
         .catch(() => false);
+
+      if (!buttonReady && recoverBlankPdp && await recoverBlankPdp()) {
+        buttonReady = await addButton.waitFor({ state: 'visible', timeout: 30000 })
+          .then(() => true, () => false);
+      }
 
       if (!buttonReady) {
         diagnostics?.push({ attempt, checkpoint: 'button-not-visible', url: this.page.url() });

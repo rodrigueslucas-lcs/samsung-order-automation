@@ -20,6 +20,7 @@ function scenario({direct=false,hydrating=false,replaceDuringClick=false,selecti
   const fill={fill:async()=>{assert.equal(visible,true);fills++;}};
   const delivery={locator:selector=>selector.includes('regionIso')?department:selector.includes('addressOptionShipping')?radio:fill};
   const run=vm.runInNewContext(`${source.slice(start,end)}\ncoFillNewShipping;`,{
+    coShippingReadiness:{waitForCoShippingForm:async()=>{if(hydrating)visible=true;}},
     expect:locator=>({toBeVisible:async()=>assert.equal(await locator.isVisible(),true)}),
     coSelectAddressMode:async()=>{
       clicks++;
