@@ -203,7 +203,7 @@ function injectKnownDefectPanel(html, active) {
 function injectKnownDefectStyles(html) {
   if (html.includes('--defect:#7047c7')) return html;
 
-  const css = `<style id="known-defect-style">:root{--defect:#7047c7;--defect-soft:#f3edff;--defect-line:#cbb9f4}.chip.defect-chip{background:var(--defect-soft);color:#5932aa;border:1px solid var(--defect-line)}.result-bar span.defect{background:var(--defect)}.result-legend i.defect{background:var(--defect)}.kpi.defect-kpi{border-color:var(--defect-line);background:linear-gradient(145deg,#fff,var(--defect-soft))}.kpi.defect-kpi b{color:var(--defect)}.defect-link{display:inline-flex;margin-left:7px;padding:3px 7px;border-radius:999px;background:var(--defect-soft);border:1px solid var(--defect-line);color:#5932aa!important;font-size:9px;font-weight:800;text-decoration:none}.defect-link:hover{background:#e9ddff}.attention-list article.known-defect{border-color:var(--defect-line);box-shadow:inset 4px 0 0 var(--defect)}.known-defect-row td:first-child{box-shadow:inset 3px 0 0 var(--defect)}.defect-category{color:#5932aa!important}.known-defect-registry{margin:16px 0;padding:16px;border:1px solid var(--defect-line);border-radius:12px;background:linear-gradient(145deg,#fff 0,#faf7ff 100%)}.known-defect-registry h3{margin:4px 0;font-size:15px}.known-defect-registry>div>small{color:#69778d}.known-defect-items{display:grid;gap:8px;margin-top:12px}.known-defect-items article{display:grid;grid-template-columns:minmax(220px,1fr) auto;gap:7px 12px;padding:12px;border:1px solid #e0d5f8;border-radius:10px;background:#fff}.known-defect-items article strong,.known-defect-items article span{display:block}.known-defect-items article div:first-child span{font-size:10px;color:#69778d;margin-top:2px}.known-defect-items .defect-meta{grid-column:1/-1;display:flex;gap:7px;align-items:center;flex-wrap:wrap}.known-defect-items .defect-meta .defect-link{margin-left:0}.known-defect-items .defect-meta>span{font-size:9px;padding:3px 7px;border-radius:999px;background:#f3f5f8;color:#59697e}.known-defect-items p{grid-column:1/-1;margin:0;color:#69778d;font-size:10px}.runtime-kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important}</style>`;
+  const css = `<style id="known-defect-style">:root{--defect:#7047c7;--defect-soft:#f3edff;--defect-line:#cbb9f4}.chip.defect-chip{background:var(--defect-soft);color:#5932aa;border:1px solid var(--defect-line)}.result-bar span.defect{background:var(--defect)}.result-legend i.defect{background:var(--defect)}.kpi.defect-kpi{border-color:var(--defect-line);background:linear-gradient(145deg,#fff,var(--defect-soft))}.kpi.defect-kpi b{color:var(--defect)}.defect-link{display:inline-flex;margin-left:7px;padding:3px 7px;border-radius:999px;background:var(--defect-soft);border:1px solid var(--defect-line);color:#5932aa!important;font-size:9px;font-weight:800;text-decoration:none}.defect-link:hover{background:#e9ddff}.attention-list article.known-defect{border-color:var(--defect-line);background:linear-gradient(145deg,#fff,#f8f4ff);box-shadow:inset 4px 0 0 var(--defect)}.attention-list article.known-defect .defect-category{display:inline-flex;justify-self:start;padding:3px 7px;border:1px solid var(--defect-line);border-radius:999px;background:var(--defect-soft);color:#5932aa!important}.known-defect-row td:first-child{box-shadow:inset 3px 0 0 var(--defect)}.defect-category{color:#5932aa!important}.known-defect-registry{margin:16px 0;padding:16px;border:1px solid var(--defect-line);border-radius:12px;background:linear-gradient(145deg,#fff 0,#faf7ff 100%)}.known-defect-registry h3{margin:4px 0;font-size:15px}.known-defect-registry>div>small{color:#69778d}.known-defect-items{display:grid;gap:8px;margin-top:12px}.known-defect-items article{display:grid;grid-template-columns:minmax(220px,1fr) auto;gap:7px 12px;padding:12px;border:1px solid #e0d5f8;border-radius:10px;background:#fff}.known-defect-items article strong,.known-defect-items article span{display:block}.known-defect-items article div:first-child span{font-size:10px;color:#44546a;font-weight:600;margin-top:2px}.known-defect-items .defect-meta{grid-column:1/-1;display:flex;gap:7px;align-items:center;flex-wrap:wrap}.known-defect-items .defect-meta .defect-link{margin-left:0}.known-defect-items .defect-meta>span{font-size:9px;padding:3px 7px;border-radius:999px;background:#f3f5f8;color:#59697e}.known-defect-items p{grid-column:1/-1;margin:0;color:#526176;font-size:10px;font-weight:500}.runtime-kpis{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))!important}</style>`;
   return html.replace('</head>', `${css}</head>`);
 }
 
@@ -245,8 +245,15 @@ function applyBlockedPresentation(html) {
   output = applyCoS1BlockedLabels(output);
   if (output.includes('blocked-prerequisite-style')) return output;
 
-  const css = `<style id="blocked-prerequisite-style">.attention-list article:has(.chip.warn-chip){border-color:#efd59f;background:linear-gradient(145deg,#fff,#fffaf0)}.attention-list article:has(.chip.warn-chip) .category,.blocked-category{display:inline-flex;justify-self:start;padding:3px 7px;border:1px solid #efd59f;border-radius:999px;background:#fff2d9;color:var(--amber)!important}</style>`;
+  const css = `<style id="blocked-prerequisite-style">.attention-list article:has(.chip.warn-chip){border-color:#efd59f;background:linear-gradient(145deg,#fff,#fffaf0);box-shadow:inset 4px 0 0 #d99a1c}.attention-list article:has(.chip.warn-chip) .category,.blocked-category{display:inline-flex;justify-self:start;padding:3px 7px;border:1px solid #efd59f;border-radius:999px;background:#fff2d9;color:var(--amber)!important}</style>`;
   return output.replace('</head>', `${css}</head>`);
+}
+
+function applyAttentionStatusPresentation(html) {
+  if (html.includes('attention-status-style')) return html;
+
+  const css = `<style id="attention-status-style">.attention-list article:has(.chip.bad-chip){border-color:#f2b7bf;background:linear-gradient(145deg,#fff,#fff3f4);box-shadow:inset 4px 0 0 var(--bad)}.attention-list article:has(.chip.bad-chip) .category{display:inline-flex;justify-self:start;padding:3px 7px;border:1px solid #f2b7bf;border-radius:999px;background:#fff0f2;color:var(--bad)!important}.attention-list article>div:first-child span{color:#334155!important;font-weight:600}.attention-list article p{color:#475569!important;font-weight:500}.attention-list article .sam-link{font-weight:800}.attention-list article.known-defect>div:first-child span{color:#3f3650!important}.attention-list article.known-defect p{color:#514761!important}</style>`;
+  return html.replace('</head>', `${css}</head>`);
 }
 
 function annotateDashboard({ artifactDir: inputArtifactDir = artifactDir } = {}) {
@@ -272,6 +279,7 @@ function annotateDashboard({ artifactDir: inputArtifactDir = artifactDir } = {})
   }
 
   html = applyBlockedPresentation(html);
+  html = applyAttentionStatusPresentation(html);
   fs.writeFileSync(dashboard, html);
 
   if (!active.length) {
@@ -295,5 +303,6 @@ module.exports = {
   activeKnownDefects,
   applyCoS1BlockedLabels,
   applyBlockedPresentation,
+  applyAttentionStatusPresentation,
   annotateDashboard,
 };
