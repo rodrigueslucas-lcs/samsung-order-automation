@@ -16,10 +16,13 @@ export default class BackOfficeCatalogPage extends BackOfficePage {
       await expand.click();
     }
     await productRow.waitFor({ state: "visible", timeout: 30000 });
-    await productRow.click();
+    // The previous Orders toolbar remains visible while Products loads.
+    // Do not fill/click that stale toolbar before the navigation AU finishes.
+    await this.waitForZkUpdate(() => productRow.click());
 
     await this.page
       .getByPlaceholder("Type to search", { exact: true })
+      .filter({ visible: true })
       .last()
       .waitFor({ state: "visible", timeout: 30000 });
   }
@@ -27,6 +30,7 @@ export default class BackOfficeCatalogPage extends BackOfficePage {
   async searchAdminProductBasic(productCode) {
     const searchInput = this.page
       .getByPlaceholder("Type to search", { exact: true })
+      .filter({ visible: true })
       .last();
     await searchInput.fill(productCode);
     const toolbar = searchInput.locator("xpath=../..");

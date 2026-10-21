@@ -334,12 +334,16 @@ export default class ProfilePage extends MyAccountPage {
   }
 
   async expandClAddressesUntil(marker) {
+    // Address controls render before the address-list request has completed.
+    await this.addressCards.first().waitFor({ state: "visible", timeout: 30000 });
     for (let attempt = 0; attempt < 10; attempt++) {
       if (await this.page.getByText(marker, { exact: false }).first().isVisible().catch(() => false)) return;
       const more = this.page.getByRole("button", { name: /Ver m[aá]s/i }).filter({ visible: true }).first();
       if (!(await more.isVisible().catch(() => false))) return;
+      const before = await this.addressCards.count();
       await more.click();
-      await this.page.waitForTimeout(300);
+      await expect.poll(() => this.addressCards.count(), { timeout: 15000 })
+        .toBeGreaterThan(before);
     }
   }
 
