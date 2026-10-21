@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { getClQstConfig } = require('../../config/markets/cl');
-const { clCareEvidence } = require('../../flows/cl/careFlows.cjs');
+const { clCareEvidence, openClCareServices } = require('../../flows/cl/careFlows.cjs');
 const plan = require('../cl-qst-plan.json');
 
 test('CL Care+ uses verified S2 data and requires explicit S1 data', () => {
@@ -34,4 +34,28 @@ test('Care+ proof requires both source linkage and a persisted priced service en
     const value = cart(); mutate(value);
     assert.throws(() => clCareEvidence(value, { sku: 'phone', planSku: 'care' }), /did not persist/);
   }
+});
+
+test('CL Care+ cart preparation waits for the exact product services response body', async () => {
+  const events = [];
+  const config = { environment: 'S2', sku: 'phone', cartUrl: new URL('https://stg2.shop.samsung.com/cl/cart') };
+  const response = path => ({ url: () => `https://s2-smb-api-cdn.ecom-stg.samsung.com${path}`,
+    request: () => ({ method: () => 'GET' }), ok: () => true,
+    finished: async () => events.push('services-body'), json: async () => ({ entries: [] }) });
+  const page = {
+    waitForResponse: async predicate => {
+      const service = response('/tokocommercewebservices/v2/cl/servicesv2/externalService/phone');
+      if (predicate(service)) {
+        assert.equal(predicate(response('/tokocommercewebservices/v2/cl/servicesv2/externalService/other')), false);
+        return service;
+      }
+      const cart = response('/tokocommercewebservices/v2/cl/users/current/carts/current');
+      assert.equal(predicate(cart), true);
+      return cart;
+    },
+    getByRole: () => ({ locator: () => ({ press: async key => { assert.equal(key, 'Enter'); events.push('activate'); } }) }),
+  };
+  await openClCareServices(page, config);
+  events.push('ready-to-open');
+  assert.deepEqual(events, ['activate', 'services-body', 'ready-to-open']);
 });

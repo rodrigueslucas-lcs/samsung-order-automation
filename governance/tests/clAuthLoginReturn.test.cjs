@@ -152,3 +152,13 @@ test('CL checkout human verification remains bounded and never creates a success
     hostname: target.hostname,
   }), /window closed/);
 });
+
+test('CL checkout login is declared before the campaign and does not wait ten minutes for CAPTCHA', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const source = fs.readFileSync(path.join(__dirname, '../../tests/markets/cl/qst/base-store/official-p1.spec.js'), 'utf8');
+  assert.ok(source.indexOf('test("SAM-24807') < source.indexOf('test("SAM-24784'));
+  assert.match(source, /checkoutLoginTest = test\.extend\(\{ trace: "off", screenshot: "off", video: "off" \}\)/);
+  assert.match(source, /waitForStep\(password, 120000\)/);
+  assert.doesNotMatch(source, /waitForStep\(password, 600000\)/);
+});

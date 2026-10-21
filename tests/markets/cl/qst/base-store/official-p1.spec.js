@@ -149,6 +149,113 @@ test.describe("CL QST - Base Store Official P1", () => {
       .toBeVisible({ timeout: 60000 });
   }
 
+  {
+    const test = checkoutLoginTest;
+    test("SAM-24807 @qst @cl @base-store @registered - Login from Checkout page", async ({ browser }, testInfo) => {
+      test.setTimeout(420000);
+      expect(hasClAuthState(), "Refresh the legitimate CL Samsung Account session before this login scenario.").toBe(true);
+      const cfg = config();
+      const state = JSON.parse(fs.readFileSync(CL_AUTH_STATE_PATH, "utf8"));
+      const accountHosts = new Set(["account.samsung.com", "sts.secsso.net", "wds.samsung.com"]);
+      const context = await browser.newContext({
+        storageState: { cookies: state.cookies.filter(cookie => accountHosts.has(cookie.domain.replace(/^\./, ""))), origins: [] },
+        viewport: { width: 1440, height: 900 },
+        deviceScaleFactor: 1,
+      });
+      const page = await context.newPage();
+      try {
+        const maximize = async () => {
+          await page.bringToFront();
+          const cdp = await context.newCDPSession(page);
+          try {
+            const { windowId } = await cdp.send("Browser.getWindowForTarget");
+            await cdp.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "maximized" } });
+            await expect.poll(async () => {
+              const { bounds } = await cdp.send("Browser.getWindowBounds", { windowId });
+              return bounds.windowState;
+            }, { timeout: 5000, message: "CL checkout login requires a maximized Chrome window." }).toBe("maximized");
+          } finally {
+            await cdp.detach();
+          }
+        };
+        await maximize();
+        page.on("framenavigated", frame => {
+          if (frame === page.mainFrame()) void maximize().catch(() => {});
+        });
+        const { cart: current } = await cart(page);
+        await current.proceedToCheckout();
+        await expect(page).toHaveURL(/\/cl\/guestlogin\/checkout/i, { timeout: 60000 });
+        const login = page.getByRole("button", { name: /Samsung Checkout Express|Iniciar sesi[oó]n/i }).filter({ visible: true });
+        await expect(login).toHaveCount(1, { timeout: 30000 });
+        let samsungAccountReached = false;
+        page.on("framenavigated", frame => {
+          if (frame === page.mainFrame() && new URL(frame.url()).hostname === "account.samsung.com") samsungAccountReached = true;
+        });
+        await login.click();
+        await expect.poll(() => samsungAccountReached, { timeout: 60000, message: "Checkout login must visit legitimate Samsung Account." }).toBe(true);
+        const credentials = clSamsungCredentials.readClSamsungCredentials();
+        expect(Boolean(credentials.email && credentials.password), "Legitimate CL Samsung Account credentials are required for checkout login.").toBe(true);
+        const email = page.locator('input#account, input[type="email"], input[name="userId"], input[name="email"]').filter({ visible: true }).first();
+        const waitForStep = (field, timeout) => clAuthLoginReturn.waitForClCheckoutLoginStep(page, field, {
+          hostname: cfg.baseUrl.hostname, timeout,
+        });
+        if (await waitForStep(email, 60000) === "field") {
+          await email.fill(credentials.email);
+          const next = page.getByRole("button", { name: /Siguiente|Continuar|Next|Sign in/i }).filter({ visible: true }).first();
+          await next.click();
+          const password = page.locator('input[type="password"]').filter({ visible: true }).first();
+          let passwordStep = await waitForStep(password, 15000).catch(() => "pending");
+          if (passwordStep === "pending") {
+            const captchaVisible = await page.locator("iframe").evaluateAll(frames => frames.some(frame => {
+              const bounds = frame.getBoundingClientRect();
+              return /reCAPTCHA/i.test(frame.title) && /desaf[ií]o|challenge|expira|expires/i.test(frame.title) && bounds.width > 0 && bounds.height > 0;
+            }));
+            if (!captchaVisible) throw new Error("Samsung Account did not advance from email to password; no visible CAPTCHA challenge was detected.");
+            if (process.env.CI) throw new Error("Samsung Account requires an interactive CAPTCHA during checkout login; CI cannot complete this human verification.");
+            await page.bringToFront();
+            console.log("[cl-checkout-login] CAPTCHA visible: complete it manually in the maximized Chrome and click Siguiente; the test will resume automatically.");
+            passwordStep = await waitForStep(password, 120000);
+          }
+          if (passwordStep === "field") {
+            await password.fill(credentials.password);
+            console.log("[cl-checkout-login] Password step reached; submitting legitimate primary-account login.");
+            await page.getByRole("button", { name: /Iniciar sesi[oó]n|Sign in|Continuar/i }).filter({ visible: true }).last().click();
+            console.log("[cl-checkout-login] Login submitted; waiting for authenticated CL checkout.");
+          }
+        }
+        await page.waitForURL(url => url.hostname === cfg.baseUrl.hostname && /\/cl\/checkout\/one/i.test(url.pathname), { timeout: 60000 }).catch(() => {
+          return page.evaluate(() => {
+            const text = document.body?.innerText || "";
+            return {
+              host: location.hostname,
+              passwordRejected: /contrase[ñn]a incorrecta|incorrect password|invalid password|password is incorrect/i.test(text),
+              verificationRequired: /verificaci[oó]n en dos pasos|two.step verification|c[oó]digo de verificaci[oó]n|verification code/i.test(text),
+              consentRequired: /aceptar todo|agree to all|t[eé]rminos y condiciones/i.test(text),
+              passwordVisible: [...document.querySelectorAll('input[type="password"]')].some(input => input.getBoundingClientRect().height > 0),
+            };
+          }).then(status => {
+            throw new Error(`Samsung Account did not return to CL checkout. Safe login diagnostics: ${JSON.stringify(status)}`);
+          });
+        });
+        await completeClRegisteredContact(page);
+        await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i, { timeout: 60000 });
+        await expect(page.getByText(/Direcci[oó]n de despacho/i).filter({ visible: true }).first()).toBeVisible({ timeout: 60000 });
+        const checkoutUrl = page.url();
+        await bootstrapClStorefront(page, cfg);
+        await maximize();
+        await getClAuthState().validateCurrentPageAuthenticated(page);
+        await page.goto(checkoutUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+        await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i, { timeout: 60000 });
+        await expect(page.getByText(/Direcci[oó]n de despacho/i).filter({ visible: true }).first()).toBeVisible({ timeout: 60000 });
+      } finally {
+        if (new URL(page.url()).hostname === cfg.baseUrl.hostname) {
+          await page.screenshot({ fullPage: true }).then(body => testInfo.attach("cl-checkout-login", { body, contentType: "image/png" })).catch(() => {});
+        }
+        await context.close();
+      }
+    });
+  }
+
   test("SAM-24784 @qst @cl @base-store @registered - Login Home page", async ({ browser }) => {
     await test.step("Validate CL login home page", async () => {
       const cfg = config();
@@ -341,113 +448,6 @@ test.describe("CL QST - Base Store Official P1", () => {
     expect(attributes.footerVisible).toBe(true);
     expect(await page.locator("img").count()).toBeGreaterThan(0);
   });
-
-  {
-    const test = checkoutLoginTest;
-    test("SAM-24807 @qst @cl @base-store @registered - Login from Checkout page", async ({ browser }, testInfo) => {
-      test.setTimeout(900000);
-      expect(hasClAuthState(), "Refresh the legitimate CL Samsung Account session before this login scenario.").toBe(true);
-      const cfg = config();
-      const state = JSON.parse(fs.readFileSync(CL_AUTH_STATE_PATH, "utf8"));
-      const accountHosts = new Set(["account.samsung.com", "sts.secsso.net", "wds.samsung.com"]);
-      const context = await browser.newContext({
-        storageState: { cookies: state.cookies.filter(cookie => accountHosts.has(cookie.domain.replace(/^\./, ""))), origins: [] },
-        viewport: { width: 1440, height: 900 },
-        deviceScaleFactor: 1,
-      });
-      const page = await context.newPage();
-      try {
-        const maximize = async () => {
-          await page.bringToFront();
-          const cdp = await context.newCDPSession(page);
-          try {
-            const { windowId } = await cdp.send("Browser.getWindowForTarget");
-            await cdp.send("Browser.setWindowBounds", { windowId, bounds: { windowState: "maximized" } });
-            await expect.poll(async () => {
-              const { bounds } = await cdp.send("Browser.getWindowBounds", { windowId });
-              return bounds.windowState;
-            }, { timeout: 5000, message: "CL checkout login requires a maximized Chrome window." }).toBe("maximized");
-          } finally {
-            await cdp.detach();
-          }
-        };
-        await maximize();
-        page.on("framenavigated", frame => {
-          if (frame === page.mainFrame()) void maximize().catch(() => {});
-        });
-        const { cart: current } = await cart(page);
-        await current.proceedToCheckout();
-        await expect(page).toHaveURL(/\/cl\/guestlogin\/checkout/i, { timeout: 60000 });
-        const login = page.getByRole("button", { name: /Samsung Checkout Express|Iniciar sesi[oó]n/i }).filter({ visible: true });
-        await expect(login).toHaveCount(1, { timeout: 30000 });
-        let samsungAccountReached = false;
-        page.on("framenavigated", frame => {
-          if (frame === page.mainFrame() && new URL(frame.url()).hostname === "account.samsung.com") samsungAccountReached = true;
-        });
-        await login.click();
-        await expect.poll(() => samsungAccountReached, { timeout: 60000, message: "Checkout login must visit legitimate Samsung Account." }).toBe(true);
-        const credentials = clSamsungCredentials.readClSamsungCredentials();
-        expect(Boolean(credentials.email && credentials.password), "Legitimate CL Samsung Account credentials are required for checkout login.").toBe(true);
-        const email = page.locator('input#account, input[type="email"], input[name="userId"], input[name="email"]').filter({ visible: true }).first();
-        const waitForStep = (field, timeout) => clAuthLoginReturn.waitForClCheckoutLoginStep(page, field, {
-          hostname: cfg.baseUrl.hostname, timeout,
-        });
-        if (await waitForStep(email, 60000) === "field") {
-          await email.fill(credentials.email);
-          const next = page.getByRole("button", { name: /Siguiente|Continuar|Next|Sign in/i }).filter({ visible: true }).first();
-          await next.click();
-          const password = page.locator('input[type="password"]').filter({ visible: true }).first();
-          let passwordStep = await waitForStep(password, 15000).catch(() => "pending");
-          if (passwordStep === "pending") {
-            const captchaVisible = await page.locator("iframe").evaluateAll(frames => frames.some(frame => {
-              const bounds = frame.getBoundingClientRect();
-              return /reCAPTCHA/i.test(frame.title) && /desaf[ií]o|challenge|expira|expires/i.test(frame.title) && bounds.width > 0 && bounds.height > 0;
-            }));
-            if (!captchaVisible) throw new Error("Samsung Account did not advance from email to password; no visible CAPTCHA challenge was detected.");
-            if (process.env.CI) throw new Error("Samsung Account requires an interactive CAPTCHA during checkout login; CI cannot complete this human verification.");
-            await page.bringToFront();
-            console.log("[cl-checkout-login] CAPTCHA visible: complete it manually in the maximized Chrome and click Siguiente; the test will resume automatically.");
-            passwordStep = await waitForStep(password, 600000);
-          }
-          if (passwordStep === "field") {
-            await password.fill(credentials.password);
-            console.log("[cl-checkout-login] Password step reached; submitting legitimate primary-account login.");
-            await page.getByRole("button", { name: /Iniciar sesi[oó]n|Sign in|Continuar/i }).filter({ visible: true }).last().click();
-            console.log("[cl-checkout-login] Login submitted; waiting for authenticated CL checkout.");
-          }
-        }
-        await page.waitForURL(url => url.hostname === cfg.baseUrl.hostname && /\/cl\/checkout\/one/i.test(url.pathname), { timeout: 60000 }).catch(() => {
-          return page.evaluate(() => {
-            const text = document.body?.innerText || "";
-            return {
-              host: location.hostname,
-              passwordRejected: /contrase[ñn]a incorrecta|incorrect password|invalid password|password is incorrect/i.test(text),
-              verificationRequired: /verificaci[oó]n en dos pasos|two.step verification|c[oó]digo de verificaci[oó]n|verification code/i.test(text),
-              consentRequired: /aceptar todo|agree to all|t[eé]rminos y condiciones/i.test(text),
-              passwordVisible: [...document.querySelectorAll('input[type="password"]')].some(input => input.getBoundingClientRect().height > 0),
-            };
-          }).then(status => {
-            throw new Error(`Samsung Account did not return to CL checkout. Safe login diagnostics: ${JSON.stringify(status)}`);
-          });
-        });
-        await completeClRegisteredContact(page);
-        await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i, { timeout: 60000 });
-        await expect(page.getByText(/Direcci[oó]n de despacho/i).filter({ visible: true }).first()).toBeVisible({ timeout: 60000 });
-        const checkoutUrl = page.url();
-        await bootstrapClStorefront(page, cfg);
-        await maximize();
-        await getClAuthState().validateCurrentPageAuthenticated(page);
-        await page.goto(checkoutUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
-        await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i, { timeout: 60000 });
-        await expect(page.getByText(/Direcci[oó]n de despacho/i).filter({ visible: true }).first()).toBeVisible({ timeout: 60000 });
-      } finally {
-        if (new URL(page.url()).hostname === cfg.baseUrl.hostname) {
-          await page.screenshot({ fullPage: true }).then(body => testInfo.attach("cl-checkout-login", { body, contentType: "image/png" })).catch(() => {});
-        }
-        await context.close();
-      }
-    });
-  }
 
   test("SAM-24808 @qst @cl @base-store - Checkout button on cart page", async ({ page }) => {
     await test.step("Validate CL checkout button on cart page", async () => {

@@ -23,6 +23,17 @@ async function readClCart(page, config) {
   return result.json();
 }
 
+async function openClCareServices(page, config) {
+  const services = page.waitForResponse(r => r.request().method() === 'GET' &&
+    new URL(r.url()).hostname === `${config.environment.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com` &&
+    new URL(r.url()).pathname === `/tokocommercewebservices/v2/cl/servicesv2/externalService/${config.sku}`, { timeout: 60000 });
+  // Native keyboard activation avoids losing the pointer target during hydration.
+  const [available] = await Promise.all([services,
+    page.getByRole('main').locator('button[data-an-la="add service:samsung care"]').press('Enter')]);
+  if (!available.ok()) throw new Error(`CL Care+ services failed with HTTP ${available.status()}.`);
+  await available.finished();
+}
+
 async function addAndValidateClCare(page, config) {
   if (!['https://stg.shop.samsung.com', 'https://stg2.shop.samsung.com'].includes(config.cartUrl.origin) ||
       config.cartUrl.pathname !== '/cl/cart') throw new Error('CL SC+ validation requires the CL staging cart.');
@@ -31,9 +42,10 @@ async function addAndValidateClCare(page, config) {
   if (product?.quantity !== 1 || product.selectedAddedServices?.length || before.entries?.some(entry => entry.isServiceEntry)) {
     throw new Error('CL SC+ requires a quantity-one source cart without an existing service; inspect before adding.');
   }
-  await page.getByRole('main').locator('button[data-an-la="add service:samsung care"]').click();
+  await expect(page.getByRole('main').getByText(config.sku, { exact: true })).toBeVisible({ timeout: 60000 });
+  await openClCareServices(page, config);
   const dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('heading', { name: 'Servicios Adicionales', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'Servicios Adicionales', exact: true })).toBeVisible({ timeout: 30000 });
   const plan = dialog.locator('mat-radio-button').filter({ hasText: config.scPlusPlanSku });
   await expect(plan).toHaveCount(1);
   await plan.click();
@@ -63,4 +75,4 @@ async function addAndValidateClCare(page, config) {
   return evidence;
 }
 
-module.exports = { clCareEvidence, addAndValidateClCare };
+module.exports = { clCareEvidence, openClCareServices, addAndValidateClCare };
