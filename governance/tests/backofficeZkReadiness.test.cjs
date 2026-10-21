@@ -41,6 +41,18 @@ test('slow read-only queries retain one action and the explicit response/UI dead
   assert.deepEqual(s.events, ['ui-ready', 'body-finished', 'ui-ready', 'listener-removed']);
 });
 
+test('BO tree native click and navigation AU share the bounded mask recovery budget', async () => {
+  const bo = Object.create(BackOfficePage.prototype);
+  let clicks = 0, updates = 0;
+  bo.waitForZkReady = async () => {};
+  bo.page = { getByRole: () => ({ waitFor: async () => {}, click: async options => {
+    assert.equal(options.timeout, 90000); clicks++;
+  } }) };
+  bo.waitForZkUpdate = async (action, options) => { assert.equal(options.timeout, 90000); updates++; await action(); };
+  await bo.openTreeRow('Order');
+  assert.equal(clicks, 1); assert.equal(updates, 1);
+});
+
 test('BO waits for the initiated AU body and unblocked UI, ignoring unrelated responses', async () => {
   const s = scenario(); await s.run();
   assert.deepEqual(s.events, ['ui-ready', 'body-finished', 'ui-ready', 'listener-removed']);

@@ -232,6 +232,8 @@ export default class BackOfficePage extends BasePage {
     });
     await this.waitForZkReady({ timeout: 60000 });
     await row.waitFor({ state: "visible", timeout: 30000 });
-    await row.click();
+    // ZK may show a new processing mask after the initial readiness check.
+    // Let the native click wait for it, then await this navigation's AU.
+    await this.waitForZkUpdate(() => row.click({ timeout: 90000 }), { timeout: 90000 });
   }
 }

@@ -21,6 +21,7 @@ import atomicJson from "../../../../../utils/atomicJson";
 import authBrowserWindow from "../../../../../utils/authBrowserWindow.cjs";
 import { addProductFromPreQaBc } from "../../../../../flows/smb/preQaBcCart";
 import coLogoutCart from "../../../../../flows/co/logoutCart.cjs";
+import coNotificationReminder from "../../../../../flows/co/notificationReminder.cjs";
 
 const test = base.extend({
   qstBusinessScenario: [async ({}, use, testInfo) => {
@@ -125,6 +126,7 @@ async function coGuestCheckout(page,cartPage,guestEmail=`co-qst-${Date.now()}@ma
   }
 }
 async function fillCoGuestContact(page,{recoverStalledTransition=false,guestEmail}={}){
+  await coNotificationReminder.installCoNotificationReminder(page);
   const firstName=page.getByRole("textbox",{name:"firstName",exact:true});
   await expect(firstName).toBeVisible({timeout:60000});
   if(guestEmail){
