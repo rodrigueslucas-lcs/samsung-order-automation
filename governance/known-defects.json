@@ -157,6 +157,20 @@
     },
     {
       "market": "CO",
+      "environment": "S2",
+      "store": "BASE_STORE",
+      "samId": "SAM-24896",
+      "jira": "RT-752445",
+      "url": "https://jira.secext.samsung.net/browse/RT-752445",
+      "title": "CO S2 Cart Items Are Lost After Registered User Logout",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "TBD",
+      "rootCause": "Storefront Issue",
+      "notes": "CO S2 registered-user logout completes successfully, but the previously populated cart becomes empty after logout. SAM-24896 is mapped to RT-752445 and remains non-gating while the defect is active."
+    },
+    {
+      "market": "CO",
       "environment": "S1",
       "store": "BASE_STORE",
       "samId": "SAM-24806",
