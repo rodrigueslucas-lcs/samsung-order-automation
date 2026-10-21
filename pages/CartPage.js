@@ -1,5 +1,6 @@
 import BasePage from './BasePage';
 import { expect } from '@playwright/test';
+import peCartRemovalReadback from '../utils/peCartRemovalReadback.cjs';
 
 export default class CartPage extends BasePage {
   constructor(page, options = {}) {
@@ -80,16 +81,10 @@ export default class CartPage extends BasePage {
       const entryNumber = Math.max(...cart.entries.map(entry => entry.entryNumber));
       const entryUrl = new URL(apiUrl);
       entryUrl.pathname += `/entries/${entryNumber}`;
-      const response = await request.delete(entryUrl.href, options);
-      if (!response.ok()) throw new Error(`PE setup cart removal returned HTTP ${response.status()}.`);
-      let persisted = true;
-      for (let poll = 0; poll < 10; poll += 1) {
-        cart = await readCart();
-        persisted = cart.entries.some(entry => entry.entryNumber === entryNumber);
-        if (!persisted) break;
-        await this.page.waitForTimeout(500);
-      }
-      if (persisted) throw new Error('PE setup cart removal was acknowledged but did not persist; no mutation was retried.');
+      cart = await peCartRemovalReadback.removePeEntryAndReadBack({
+        remove: () => request.delete(entryUrl.href, options), readCart, entryNumber,
+        pause: ms => this.page.waitForTimeout(ms),
+      });
     }
     if (cart.entries.length) throw new Error('PE cart cleanup exceeded the 10-row safety limit.');
     await this.page.reload({ waitUntil: 'domcontentloaded' });

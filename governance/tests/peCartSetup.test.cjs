@@ -8,6 +8,7 @@ function setupCart({ base = 'https://stg.shop.samsung.com/pe/cart', persist = tr
     .replace(/^import .*;\r?\n/gm, '').replace('export default class CartPage', 'class CartPage');
   const CartPage = vm.runInNewContext(`${source}\nCartPage;`, {
     BasePage: class {}, URL,
+    peCartRemovalReadback: require('../../utils/peCartRemovalReadback.cjs'),
     expect: () => ({ toHaveCount: async count => assert.equal(count, 0) }),
   });
   const cart = Object.create(CartPage.prototype);

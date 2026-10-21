@@ -23,13 +23,21 @@ function safeEndpoint(rawUrl) {
   }
 }
 
-async function serializeExchange(response) {
+async function serializeExchange(response, { bodyTimeoutMs = 5000 } = {}) {
   const request = response.request();
   const responseContentType = String(response.headers()["content-type"] || "");
   const requestContentType = String(request.headers()["content-type"] || "");
   let responseBody = null;
   if (/json|text/i.test(responseContentType)) {
-    responseBody = await response.text().then(parseBody).catch(() => null);
+    let timer;
+    try {
+      responseBody = await Promise.race([
+        response.text().then(parseBody).catch(() => null),
+        new Promise(resolve => {
+          timer = setTimeout(() => resolve({ unavailable: 'response-body-timeout' }), bodyTimeoutMs);
+        }),
+      ]);
+    } finally { clearTimeout(timer); }
   }
   const requestBody = parseBody(request.postData());
   return sanitize({
@@ -56,11 +64,11 @@ async function attachJson(testInfo, name, value) {
   });
 }
 
-async function captureBusinessExchange(page, testInfo, name, action, { matcher = BUSINESS_URL, max = 8 } = {}) {
+async function captureBusinessExchange(page, testInfo, name, action, { matcher = BUSINESS_URL, max = 8, bodyTimeoutMs = 5000 } = {}) {
   const pending = [];
   const onResponse = (response) => {
-    if (!matcher.test(response.request().url())) return;
-    pending.push(serializeExchange(response));
+    if (pending.length >= max || !matcher.test(response.request().url())) return;
+    pending.push(serializeExchange(response, { bodyTimeoutMs }));
   };
 
   page.on("response", onResponse);

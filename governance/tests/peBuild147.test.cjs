@@ -67,7 +67,8 @@ test('blank PDP, another SKU or unrelated text remain failures, never missing-ma
   for (const text of ['', 'OTHER-SKU Sold out. Get stock alert', 'SM-S931BDBLLTP unexpected loading problem']) {
     const state = unavailableProduct(text);
     await assert.rejects(state.product.addConfiguredPdpToCart(), error => !error.code && /button was not rendered/.test(error.message));
-    assert.equal(state.navigations(), 3);
+    // ba5751b deliberately bounds PDP recovery to two attempts.
+    assert.equal(state.navigations(), 2);
   }
 });
 

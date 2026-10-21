@@ -1,6 +1,8 @@
 import { expect } from "@playwright/test";
 import BasePage from "./BasePage";
 import destructiveGuards from "../utils/destructiveGuards";
+import paymentSubmitRejectionModule from "../utils/paymentSubmitRejection.cjs";
+import peBankPaymentReadiness from "../utils/peBankPaymentReadiness.cjs";
 
 const { requirePaymentSubmitOptIn } = destructiveGuards;
 
@@ -137,6 +139,7 @@ export default class PaymentPage extends BasePage {
   }
 
   async selectPaymentMode(name, screenshotName) {
+    this.selectedPaymentAction = null;
     const paymentMode = this.page.getByRole("button", {
       name,
     });
@@ -153,11 +156,18 @@ export default class PaymentPage extends BasePage {
   }
 
   async selectBancaPorInternet() {
+    // Register before opening the lazy panel. Its visible button can precede
+    // the bank details/checksum and still use the previous card-mode handler.
+    const bankReady = peBankPaymentReadiness.waitForPeBankDetails(this.page);
+    bankReady.catch(() => {});
     const paymentMode = await this.selectPaymentMode(
       /^Banca por Internet\b/i,
       "09-banca-por-internet-selected"
     );
     await this.validateControlledPaymentPanel(paymentMode, "Banca por Internet");
+    await bankReady;
+    this.selectedPaymentAction = this.selectedPaymentPanel.getByRole("button", { name: /^Pagar Ahora/i });
+    await expect(this.selectedPaymentAction).toBeVisible({ timeout: 15000 });
   }
 
   async selectPagoEfectivo() {
@@ -218,7 +228,7 @@ export default class PaymentPage extends BasePage {
     const pageAction = this.page.getByRole("button", {
       name: /^Pagar Ahora/i,
     });
-    const submitAction = pageAction;
+    const submitAction = this.selectedPaymentAction || pageAction;
     await submitAction.waitFor({ state: "visible", timeout: 30000 });
     if (await submitAction.isDisabled().catch(() => false)) {
       throw new Error("The selected payment action is disabled.");
@@ -227,6 +237,8 @@ export default class PaymentPage extends BasePage {
     const initialUrl = this.page.url();
     const responses = [];
     let responseOrderCode = null;
+    let reportRejection;
+    const backendRejection = new Promise(resolve => { reportRejection = resolve; });
     const recordResponse = (response) => {
       if (/payment|checkout|order|placeorder|transaction/i.test(response.url())) {
         responses.push({
@@ -235,6 +247,12 @@ export default class PaymentPage extends BasePage {
           endpoint: new URL(response.url()).origin + new URL(response.url()).pathname,
         });
         response.text().then((text) => {
+          if (response.request().method() === "POST" && /\/paymentmodes\/[^/]+\/submitOrder$/.test(new URL(response.url()).pathname)) {
+            let data;
+            try { data = JSON.parse(text); } catch {}
+            const rejected = paymentSubmitRejectionModule.paymentSubmitRejection(data);
+            if (rejected) reportRejection({ type: "BACKEND_REJECTION", ...rejected, target: this.page });
+          }
           responseOrderCode ||= text.match(/\bPE\d{6}-\d{8}(?:_\d+)?\b/i)?.[0] || null;
         }).catch(() => {});
       }
@@ -249,6 +267,7 @@ export default class PaymentPage extends BasePage {
     await submitAction.click();
 
     const result = await Promise.race([
+      backendRejection,
       this.page.waitForURL(
         /confirmation|confirmacion|order-confirmation|checkout\/order|success/i,
         { timeout: 90000 }
@@ -266,6 +285,10 @@ export default class PaymentPage extends BasePage {
     ]);
 
     this.page.off("response", recordResponse);
+    if (result?.type === "BACKEND_REJECTION") {
+      await this.screenshot("11-payment-backend-rejection");
+      throw new Error(`PAYMENT_BACKEND_REJECTED: submitOrder returned business code ${result.code} (${result.reason}). HTTP 200 is not proof of payment or order creation. No submit was retried; inspect the staging payment configuration.`);
+    }
     const target = result?.target || this.page;
     await target.waitForLoadState("domcontentloaded", { timeout: 30000 }).catch(() => {});
     const rawFinalUrl = target.url();
