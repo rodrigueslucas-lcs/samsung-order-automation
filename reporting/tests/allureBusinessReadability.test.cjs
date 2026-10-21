@@ -1,7 +1,9 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
+const { execFileSync } = require("node:child_process");
 
 const root = path.resolve(__dirname, "../..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8").replace(/\r\n/g, "\n");
@@ -57,6 +59,7 @@ test("every active official Base Store TC keeps an explicit business journey aft
   assert.equal(inventories.CO.length, 29);
   assert.equal(inventories.CL.length, 31);
   assert.equal(inventories.PE.length, 28);
+  assert.equal(Object.values(inventories).reduce((sum, ids) => sum + ids.length, 0), 117);
 
   for (const market of ["MX", "CO", "CL", "PE"]) {
     assert.deepEqual(
@@ -99,7 +102,7 @@ test("Allure normalization hardens blocked known defects and removes broken deta
   assert.match(dedupe, /blocked\/non-gating/);
 });
 
-test("final Allure normalization maps known defects for every market and publishes Actual Result", () => {
+test("final Allure normalization maps known defects and uses one presentation hierarchy globally", () => {
   const dedupe = read("scripts/dedupe-allure-evidence.cjs");
   assert.match(dedupe, /governance\/known-defects\.json/);
   assert.match(dedupe, /function mappedDefect\(result\)/);
@@ -107,8 +110,76 @@ test("final Allure normalization maps known defects for every market and publish
   assert.match(dedupe, /parameterValue\(result, "Environment"\)/);
   assert.match(dedupe, /parameterValue\(result, "Store"\)/);
   assert.match(dedupe, /Known Defect Title/);
-  assert.match(dedupe, /\*\*Actual result:\*\*/);
+  assert.match(dedupe, /### Validation Summary/);
+  assert.match(dedupe, /### Expected Result/);
+  assert.match(dedupe, /### Actual Result/);
+  assert.match(dedupe, /### Technical Error/);
+  assert.match(dedupe, /### Blocker \/ Prerequisite/);
+  assert.match(dedupe, /### Execution Context/);
+  assert.match(dedupe, /### Links & Evidence/);
   assert.match(dedupe, /PASS — all automated assertions executed for this scenario were satisfied/);
   assert.match(dedupe, /BLOCKED \/ KNOWN DEFECT/);
   assert.match(dedupe, /FAIL \/ KNOWN DEFECT/);
+});
+
+test("structured Allure hierarchy is applied to MX PE CO CL in both S1 and S2", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "smb-allure-presentation-"));
+  try {
+    const markets = ["MX", "PE", "CO", "CL"];
+    const environments = ["S1 / STG", "S2 / STG2"];
+    let index = 0;
+    for (const market of markets) {
+      for (const environment of environments) {
+        const samId = `SAM-9${String(index++).padStart(4, "0")}`;
+        const result = {
+          uuid: `${market}-${environment}`.replace(/\W/g, "-"),
+          name: `${samId} · Synthetic official validation`,
+          fullName: `${market} ${environment} ${samId}`,
+          status: "failed",
+          stage: "finished",
+          description: `### [${samId}](https://jira.secext.samsung.net/browse/${samId}) · Synthetic official validation\n\n**Objective:** Validate ${market} ${environment} business behavior.\n**Expected result:** The expected storefront state is rendered.`,
+          statusDetails: {
+            message: "Error: expect(locator).toBeVisible() failed\nLocator: getByText('EXPECTED-SKU', { exact: true }).first()\nError: element(s) not found",
+            trace: "",
+          },
+          parameters: [
+            { name: "Market", value: market },
+            { name: "Environment", value: environment },
+            { name: "Store", value: "Base Store" },
+            { name: "Feature", value: "Cart & Promotions" },
+            { name: "User Type", value: "Guest" },
+            { name: "SKU", value: "EXPECTED-SKU" },
+            { name: "Runtime Status", value: "FAIL" },
+          ],
+          labels: [],
+          links: [],
+          attachments: [],
+          steps: [],
+        };
+        fs.writeFileSync(path.join(dir, `${result.uuid}-result.json`), JSON.stringify(result, null, 2));
+      }
+    }
+
+    execFileSync(process.execPath, [path.join(root, "scripts/dedupe-allure-evidence.cjs"), dir], { cwd: root });
+
+    const results = fs.readdirSync(dir)
+      .filter((name) => name.endsWith("-result.json"))
+      .map((name) => JSON.parse(fs.readFileSync(path.join(dir, name), "utf8")));
+    assert.equal(results.length, 8);
+    for (const result of results) {
+      const description = result.description;
+      assert.match(description, /### Validation Summary/);
+      assert.match(description, /### Expected Result/);
+      assert.match(description, /### Actual Result/);
+      assert.match(description, /### Technical Error/);
+      assert.match(description, /### Execution Context/);
+      assert.match(description, /### Links & Evidence/);
+      assert.match(description, /Expected value or storefront content "EXPECTED-SKU" was not visible/);
+      assert.match(description, /\*\*Market:\*\*/);
+      assert.match(description, /\*\*Environment:\*\*/);
+      assert.match(description, /```text/);
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
