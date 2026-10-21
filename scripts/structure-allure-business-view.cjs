@@ -75,9 +75,6 @@ function section(name, children, status = 'passed') {
 }
 
 function hideNoisyParameters(result) {
-  // All of these values stay in result JSON and are repeated in the structured
-  // business sections below. Hidden mode prevents Allure from appending the whole
-  // technical parameter list to every row in Suites/Categories.
   const hide = new Set([
     'Environment', 'Market', 'Project', 'Runtime Status', 'Technical Result',
     'SKU', 'Store', 'User Type', 'Feature', 'Payment', 'Order ID', 'Coverage',
@@ -99,14 +96,15 @@ function contextChildren(result) {
     ['Payment', parameter(result, 'Payment')],
     ['Order ID', parameter(result, 'Order ID')],
     ['Runtime status', parameter(result, 'Runtime Status')],
+    ['Technical result', parameter(result, 'Technical Result')],
   ].filter(([, value]) => clean(value)).map(([label, value]) => child(`${label} · ${clean(value)}`));
 }
 
-function businessStatusForStep(status) {
+function businessStatusForStep(status, defect) {
+  if (defect) return 'skipped';
   return status === 'FAIL' ? 'failed' : status === 'BLOCKED' ? 'skipped' : 'passed';
 }
 
-let files = 0;
 let structured = 0;
 let hiddenParameters = 0;
 
@@ -120,6 +118,7 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith('-r
   const defect = clean(parameter(result, 'Known Defect'));
   const defectTitle = clean(parameter(result, 'Known Defect Title'));
   const originalDescription = String(result.description || '');
+  const sectionStatus = businessStatusForStep(status, defect);
 
   const objective = readField(originalDescription, ['Validated', 'Objective', 'Validation goal', 'O que foi validado'])
     || `Validate the official ${id} business scenario.`;
@@ -129,8 +128,6 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith('-r
     || clean(result.statusDetails?.message || 'Execution completed without a curated business observation.').split('\n')[0];
   const prerequisite = readField(originalDescription, ['Prerequisite', 'Blocker', 'Pré-requisito / desbloqueio']);
 
-  // Keep only the actual authored business execution steps; this script may run more
-  // than once, so drop previous synthetic presentation sections before rebuilding.
   const actualSteps = (result.steps || []).filter((step) => {
     const stepName = clean(step?.name);
     return !/^(?:0[1-9]|1[0-9]) · /.test(stepName)
@@ -144,7 +141,7 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith('-r
   const sections = [];
   sections.push(section('01 · O que foi validado', [child(objective)]));
   sections.push(section('02 · Resultado esperado', [child(expected)]));
-  sections.push(section('03 · Resultado observado', [child(observed, businessStatusForStep(status))], businessStatusForStep(status)));
+  sections.push(section('03 · Resultado observado', [child(observed, sectionStatus)], sectionStatus));
 
   let next = 4;
   if (defect) {
@@ -176,22 +173,19 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith('-r
 
   if (actualSteps.length) {
     sections.push({
-      ...section(`${String(next).padStart(2, '0')} · Execução do negócio`, [], businessStatusForStep(status)),
+      ...section(`${String(next).padStart(2, '0')} · Execução do negócio`, [], sectionStatus),
       steps: actualSteps,
     });
   }
 
   result.steps = sections;
 
-  // Description is intentionally short. All detailed business information is now
-  // organized under Test body, where this Allure UI renders hierarchy reliably.
   const headline = defect
     ? `KNOWN DEFECT · ${defect}${defectTitle ? ` — ${defectTitle}` : ''}`
     : `${status} · ${id}`;
   result.description = `${headline}\n${objective}`;
 
   fs.writeFileSync(file, JSON.stringify(result, null, 2));
-  files += 1;
   structured += 1;
 }
 
