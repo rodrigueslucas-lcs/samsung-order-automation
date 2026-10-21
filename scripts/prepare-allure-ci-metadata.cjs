@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 
 const resultsDir = path.resolve(process.argv[2] || process.env.ALLURE_RESULTS_DIR || 'allure-results');
 const reportDir = path.resolve(process.argv[3] || path.join(path.dirname(resultsDir), 'allure-report'));
@@ -24,6 +25,17 @@ const buildNumber = String(process.env.BUILD_NUMBER || 'LOCAL');
 const gitCommit = String(process.env.GIT_COMMIT || 'unknown');
 const buildUrl = String(process.env.BUILD_URL || '');
 const jenkinsUrl = String(process.env.JENKINS_URL || buildUrl || '');
+
+function polishPresentation() {
+  const script = path.resolve('scripts/polish-allure-presentation.cjs');
+  if (!fs.existsSync(script)) return false;
+  const polished = spawnSync(process.execPath, [script, resultsDir], { stdio: 'inherit', env: process.env });
+  if (polished.status !== 0) {
+    console.error('[allure-metadata] Presentation polish failed; raw normalized results were preserved.');
+    return false;
+  }
+  return true;
+}
 
 function writeEnvironment() {
   const file = path.join(resultsDir, 'environment.properties');
@@ -63,7 +75,7 @@ function writeCategories() {
     {
       name: 'Known Functional Defect',
       matchedStatuses: ['skipped', 'failed', 'broken'],
-      messageRegex: '.*Known Defect (RT|SAM)-[0-9]+.*',
+      messageRegex: '.*KNOWN DEFECT (RT|SAM)-[0-9]+.*',
     },
     {
       name: 'Automation Stability',
@@ -93,8 +105,9 @@ function carryHistory() {
   return true;
 }
 
+const polished = polishPresentation();
 writeEnvironment();
 writeExecutor();
 writeCategories();
 const historyCarried = carryHistory();
-console.log(`[allure-metadata] READY · Jenkins executor + environment + categories${historyCarried ? ' + previous history' : ''}.`);
+console.log(`[allure-metadata] READY · presentation ${polished ? 'polished' : 'unchanged'} · Jenkins executor + environment + categories${historyCarried ? ' + previous history' : ''}.`);
