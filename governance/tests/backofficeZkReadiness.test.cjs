@@ -53,6 +53,25 @@ test('BO tree native click and navigation AU share the bounded mask recovery bud
   assert.equal(clicks, 1); assert.equal(updates, 1);
 });
 
+for (const initial of ['true', 'false']) {
+  test(`Order branch opening is idempotent from expanded=${initial}`, async () => {
+    const bo = Object.create(BackOfficePage.prototype);
+    let expanded = initial, clicks = 0, updates = 0;
+    const row = { waitFor: async () => {}, getAttribute: async () => 'false',
+      getByTitle: title => ({ isVisible: async () => title === 'Collapse' && expanded === 'true', click: async () => {
+        assert.equal(title, 'Expand'); assert.equal(expanded, 'false'); clicks++; expanded = 'true';
+      }, waitFor: async () => { assert.equal(title, expanded === 'true' ? 'Collapse' : 'Expand'); } }) };
+    bo.page = { getByRole: () => row };
+    bo.waitForZkReady = async () => {};
+    bo.waitForZkUpdate = async action => { updates++; await action(); };
+    await bo.ensureTreeBranchExpanded('Order');
+    await bo.ensureTreeBranchExpanded('Order');
+    assert.equal(expanded, 'true');
+    assert.equal(clicks, initial === 'false' ? 1 : 0);
+    assert.equal(updates, clicks);
+  });
+}
+
 test('BO waits for the initiated AU body and unblocked UI, ignoring unrelated responses', async () => {
   const s = scenario(); await s.run();
   assert.deepEqual(s.events, ['ui-ready', 'body-finished', 'ui-ready', 'listener-removed']);

@@ -20,7 +20,7 @@ export default class BackOfficeOrderPage extends BackOfficePage {
   }
 
   async openAdminOrders() {
-    await this.openTreeRow("Order");
+    await this.ensureTreeBranchExpanded("Order");
     await this.openTreeRow("Orders");
     await this.page
       .getByText("Orders", { exact: true })

@@ -225,6 +225,23 @@ export default class BackOfficePage extends BasePage {
     await this.waitForZkReady({ timeout: 60000 });
   }
 
+  async ensureTreeBranchExpanded(name) {
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const row = this.page.getByRole("row", {
+      name: new RegExp(`^${escapedName}(?: selected)?$`),
+    });
+    await this.waitForZkReady({ timeout: 60000 });
+    await row.waitFor({ state: "visible", timeout: 30000 });
+    // ZK can leave aria-expanded stale after updating the actual tree widgets.
+    const collapse = row.getByTitle("Collapse", { exact: true });
+    if (await collapse.isVisible()) return;
+    const expand = row.getByTitle("Expand", { exact: true });
+    await expand.waitFor({ state: "visible", timeout: 30000 });
+    // Reopening Orders must not toggle its already-expanded parent closed.
+    await this.waitForZkUpdate(() => expand.click({ timeout: 90000 }), { timeout: 90000 });
+    await collapse.waitFor({ state: "visible", timeout: 30000 });
+  }
+
   async openTreeRow(name) {
     const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const row = this.page.getByRole("row", {
