@@ -139,16 +139,16 @@ function normalizeAllureEvidence() {
   }
 }
 
-function prepareAllureCiMetadata() {
-  if (!fs.existsSync(allureResultsDir)) return;
+function prepareAllureCiMetadata(mode = 'prepare') {
+  if (!fs.existsSync(allureResultsDir) && mode !== 'save') return;
   const script = path.resolve('scripts/prepare-allure-ci-metadata.cjs');
   if (!fs.existsSync(script)) return;
-  const prepared = spawnSync(process.execPath, [script, allureResultsDir, allureReportDir], {
+  const prepared = spawnSync(process.execPath, [script, allureResultsDir, allureReportDir, mode], {
     stdio: 'inherit',
     env: process.env,
   });
   if (prepared.status !== 0) {
-    console.error('[reporting] Allure Jenkins metadata preparation failed; report generation will continue.');
+    console.error(`[reporting] Allure Jenkins metadata/history ${mode} failed; report processing will continue.`);
   }
 }
 
@@ -166,16 +166,20 @@ function annotateKnownDefects() {
 }
 
 function generateAllure() {
-  if (!fs.existsSync(allureResultsDir)) return;
+  if (!fs.existsSync(allureResultsDir)) return false;
   const allureCli = process.platform === 'win32'
     ? path.resolve('node_modules/.bin/allure.cmd')
     : path.resolve('node_modules/.bin/allure');
-  if (!fs.existsSync(allureCli)) return;
+  if (!fs.existsSync(allureCli)) return false;
   const result = spawnSync(allureCli, ['generate', allureResultsDir, '--clean', '-o', allureReportDir], {
     stdio: 'inherit',
     shell: process.platform === 'win32',
   });
-  if (result.status !== 0) console.error('[reporting] Allure HTML generation failed; raw results were preserved.');
+  if (result.status !== 0) {
+    console.error('[reporting] Allure HTML generation failed; raw results were preserved.');
+    return false;
+  }
+  return true;
 }
 
 fs.mkdirSync(artifactDir, { recursive: true });
@@ -192,6 +196,6 @@ if (!(fs.existsSync(runtimeSummaryFile) && fs.existsSync(path.join(executiveDir,
 writeAllureEnvironment();
 enrichAllure();
 normalizeAllureEvidence();
-prepareAllureCiMetadata();
+prepareAllureCiMetadata('prepare');
 annotateKnownDefects();
-generateAllure();
+if (generateAllure()) prepareAllureCiMetadata('save');
