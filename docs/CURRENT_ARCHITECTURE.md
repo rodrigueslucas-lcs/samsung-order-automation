@@ -132,11 +132,31 @@ CL has the same Jenkins session-bundle publishing surface as MX/PE/CO through `a
 
 CAPTCHA/MFA remains a legitimate human security boundary and is never bypassed.
 
-## 8. Safety contract
+## 8. Reporting and safety contract
 
 Payment/order/profile mutations remain guarded. Production is not a fallback. Ambiguous order/payment submission is never blindly retried.
 
-PASS, FAIL, BLOCKED, KNOWN BUG and NOT_RUN remain distinct reporting states.
+Runtime/reporting outcomes remain distinct:
+
+```text
+PASS
+FAIL
+BLOCKED
+KNOWN DEFECT
+NOT_RUN
+```
+
+`KNOWN DEFECT` is only valid when the current market/environment/store/TC is mapped to an active Jira item in `governance/known-defects.json`. A mapped defect may be non-gating, but it must never mask an unrelated failure.
+
+The reporting architecture is layered:
+
+```text
+Executive Dashboard -> build/release health
+Allure              -> business-readable TC detail and evidence
+Playwright Trace    -> low-level technical diagnostics
+```
+
+Official Base Store Allure reporting currently audits 117 TCs across MX, PE, CO and CL, each with explicit Objective, Expected Result and business journey definition.
 
 ## 9. Architecture gates
 
