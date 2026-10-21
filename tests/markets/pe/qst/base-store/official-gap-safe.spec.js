@@ -31,6 +31,36 @@ async function recoverPeCart(page, cfg, cart, label) {
   await cart.validateProductInCart();
 }
 
+async function resolvePePaymentOutcomePage(page, result, cfg) {
+  if (cfg.environment === "S1") return page;
+
+  const context = page.context();
+  const isSafetyPayGateway = (candidate) => {
+    try {
+      return new URL(candidate.url()).origin === "https://sandbox-gateway.safetypay.com";
+    } catch {
+      return false;
+    }
+  };
+
+  let gatewayPage = context.pages().find(isSafetyPayGateway) || null;
+  const resultPointsToGateway = /^https:\/\/sandbox-gateway\.safetypay\.com(?:\/|$)/i.test(result?.finalUrl || "");
+  const popupOutcome = result?.type === "POPUP";
+
+  if (!gatewayPage && (resultPointsToGateway || popupOutcome)) {
+    await expect.poll(() => {
+      gatewayPage = context.pages().find(isSafetyPayGateway) || null;
+      return Boolean(gatewayPage);
+    }, {
+      message: "SafetyPay popup must become observable before the sandbox flow continues",
+      timeout: 30000,
+      intervals: [250, 500, 1000],
+    }).toBe(true);
+  }
+
+  return gatewayPage || page;
+}
+
 test.describe("PE QST - official safe gap reconciliation", () => {
   test.describe.configure({ timeout: 420000 });
 
@@ -204,7 +234,7 @@ test.describe("PE QST - official safe gap reconciliation", () => {
   });
 
   test("SAM-25099 @destructive @qst @pe @base-store - Verify Order Confirmation page", async ({ page }, testInfo) => {
-    test.setTimeout(300000);
+    test.setTimeout(420000);
     requirePaymentSubmitOptIn();
     evidence(testInfo, "SAM-25099");
     const cfg = config();
@@ -245,29 +275,32 @@ test.describe("PE QST - official safe gap reconciliation", () => {
       }
     });
 
+    const outcomePage = await resolvePePaymentOutcomePage(page, result, cfg);
     await test.step("Validate visible new order confirmation screen", async () => {
-      if (!useCard && new URL(page.url()).origin === 'https://sandbox-gateway.safetypay.com') {
-        await safetyPaySandbox.completePeSafetyPaySandbox(page, {
-          orderCode: result.orderCode, storefrontOrigin: cfg.baseUrl.origin,
+      if (!useCard && new URL(outcomePage.url()).origin === "https://sandbox-gateway.safetypay.com") {
+        await safetyPaySandbox.completePeSafetyPaySandbox(outcomePage, {
+          orderCode: result.orderCode,
+          storefrontOrigin: cfg.baseUrl.origin,
         });
       }
-      const outcomeUrl = new URL(page.url());
+      const outcomeUrl = new URL(outcomePage.url());
       if (outcomeUrl.hostname !== cfg.baseUrl.hostname) {
         throw new Error(`PAYMENT_OUTCOME_UNCONFIRMED: PE order ${result.orderCode} reached ${outcomeUrl.origin}${outcomeUrl.pathname}; Samsung confirmation remains unproven. Do not create another order; resume the existing attempt.`);
       }
-      const confirmation = new OrderConfirmationPage(page);
+      const confirmation = new OrderConfirmationPage(outcomePage);
       const confirmationOrder = await confirmation.validateOrderCreated();
       const baseOrderCode = result.orderCode.match(/^PE\d{6}-\d{8}/i)[0];
       expect(confirmationOrder).toContain(baseOrderCode.replace(/^PE/i, ""));
     });
 
     const paymentMode = useCard ? "Tarjeta de Crédito / Débito" : "Banca por Internet";
+    const actualFinalUrl = `${new URL(outcomePage.url()).origin}${new URL(outcomePage.url()).pathname}`;
     await attachOrderEvidence(testInfo, {
       sku: cfg.sku,
       orderCode: result.orderCode,
       outcome: result.outcome ?? result.type,
       paymentMode,
-      finalUrl: result.finalUrl || `${new URL(page.url()).origin}${new URL(page.url()).pathname}`,
+      finalUrl: actualFinalUrl,
       networkSummary: result.responses || [],
       authorizedSubmit: true,
       confirmationValidated: true,
