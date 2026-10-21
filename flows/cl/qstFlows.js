@@ -90,6 +90,30 @@ async function resolveProduct(page, config) {
   return { pdpUrl, sku: decodeURIComponent(match[1]) };
 }
 
+async function waitForClPdpHydration(page, { sku, initialTimeout = 90000, retryTimeout = 75000 } = {}) {
+  const addButton = page
+    .getByRole("main")
+    .getByRole("button", { name: /Agregar al (?:carro|carrito)|Add to cart|Add to basket/i })
+    .filter({ visible: true })
+    .first();
+
+  const waitUntilReady = async (timeout) =>
+    addButton.waitFor({ state: "visible", timeout }).then(() => true).catch(() => false);
+
+  if (await waitUntilReady(initialTimeout)) return;
+
+  console.log(`[cl-pdp] ${sku || "configured SKU"} did not expose Add to Cart within ${initialTimeout}ms; refreshing once before the final hydration wait.`);
+  await page.reload({ waitUntil: "domcontentloaded", timeout: 60000 }).catch(() => {});
+
+  if (await waitUntilReady(retryTimeout)) return;
+
+  const mainText = await page.getByRole("main").innerText({ timeout: 5000 }).catch(() => "");
+  throw new Error(
+    `AUTOMATION_RECOVERY_EXHAUSTED: CL PDP ${sku || "configured SKU"} did not finish hydrating after one bounded refresh. ` +
+    `url=${page.url()} main=${String(mainText || "").replace(/\s+/g, " ").trim().slice(0, 500) || "<empty>"}`
+  );
+}
+
 export async function addConfiguredProductToClCart(page, config) {
   return test.step("Add the configured CL product to cart and wait for the cart mutation", async () => {
     const resolved = await resolveProduct(page, config);
@@ -122,7 +146,10 @@ export async function addConfiguredProductToClCart(page, config) {
       const url = new URL(response.url());
       return request.method() === "POST" && /\/cl\/users\/[^/]+\/carts\/[^/]+\/entries(?:\/|$)/i.test(url.pathname);
     }, { timeout: 60000 }).catch(() => null);
-    await product.addConfiguredPdpToCart({ waitForCartMutation: true });
+    await product.addConfiguredPdpToCart({
+      waitForCartMutation: true,
+      configureProduct: () => waitForClPdpHydration(page, { sku: resolved.sku }),
+    });
     const response = await addResponse;
     if (response) await attachNetworkEvidence(testInfo, "Add to Cart", { response });
     return new CartPage(page, {
