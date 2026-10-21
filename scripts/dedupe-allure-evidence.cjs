@@ -10,9 +10,13 @@ if (!fs.existsSync(resultsDir)) {
   process.exit(0);
 }
 
-const TECHNICAL_STEP = /^(before hooks?|after hooks?|locator|expect\b|wait for|waitfor|page\.|browser\.|context\.|fixture|query count|evaluate|attach|api\b|click\b|fill\b|type\b|blur\b|press\b|scroll\b)/i;
+// Allure already has Playwright Trace for browser-level diagnostics. Keep the visible
+// result tree focused on business actions and remove reporter/API noise globally.
+const TECHNICAL_STEP = /^(before hooks?|after hooks?|locator|expect\b|wait\b|wait for|waitfor|page\.|browser\.|context\.|fixture|query count|evaluate|attach|api\b|click\b|fill\b|type\b|blur\b|press\b|scroll\b|scroll into view|screenshot\b|check\b|uncheck\b|hover\b|select option|set input files|goto\b|reload\b|focus\b|dispatch event)/i;
+
 const registry = (() => {
-  try { return JSON.parse(fs.readFileSync(registryFile, "utf8")); } catch { return { defects: [] }; }
+  try { return JSON.parse(fs.readFileSync(registryFile, "utf8")); }
+  catch { return { defects: [] }; }
 })();
 
 function normalizeEnvironment(value) {
@@ -58,9 +62,9 @@ function kindOf(attachment = {}) {
 
 function displayName(kind, current) {
   if (kind === "screenshot") return "Screenshot · Final state";
-  if (kind === "trace") return "Playwright Trace";
-  if (kind === "video") return "Video · Execution";
-  if (kind === "error-context") return "Error Context";
+  if (kind === "trace") return "Playwright Trace · Engineering detail";
+  if (kind === "video") return "Video · Business execution";
+  if (kind === "error-context") return "Error Context · Raw diagnostic";
   return current || "Evidence";
 }
 
@@ -117,7 +121,9 @@ function upsertParameter(result, name, value) {
 
 function addTag(result, value) {
   result.labels ||= [];
-  if (!result.labels.some((label) => label?.name === "tag" && label?.value === value)) result.labels.push({ name: "tag", value });
+  if (!result.labels.some((label) => label?.name === "tag" && label?.value === value)) {
+    result.labels.push({ name: "tag", value });
+  }
 }
 
 function samIdOf(result) {
@@ -144,6 +150,7 @@ function mappedDefect(result) {
 function ensureKnownDefectMetadata(result) {
   const defect = mappedDefect(result);
   if (!defect) return null;
+  // Preserve raw runtime truth separately from the Allure visual/non-gating state.
   upsertParameter(result, "Runtime Status", businessStatus(result));
   upsertParameter(result, "Known Defect", defect.jira);
   upsertParameter(result, "Known Defect Title", defect.title || defect.jira);
@@ -161,12 +168,28 @@ function cleanText(value) {
     .trim();
 }
 
+function escapeHtml(value) {
+  return cleanText(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function descriptionField(description, labels) {
   const source = String(description || "");
   for (const label of labels) {
     const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const match = source.match(new RegExp(`\\*\\*${escaped}:\\*\\*\\s*([^\\n]+)`, "i"));
-    if (match?.[1]) return cleanText(match[1].replace(/\s{2,}$/g, ""));
+    const patterns = [
+      new RegExp(`\\*\\*${escaped}:\\*\\*\\s*([^\\n]+)`, "i"),
+      new RegExp(`^${escaped}:\\s*([^\\n]+)`, "im"),
+      new RegExp(`^${escaped}\\s*\\n([^\\n]+)`, "im"),
+    ];
+    for (const pattern of patterns) {
+      const match = source.match(pattern);
+      if (match?.[1]) return cleanText(match[1].replace(/\s{2,}$/g, ""));
+    }
   }
   return null;
 }
@@ -176,7 +199,7 @@ function technicalDetail(result) {
   const trace = cleanText(result.statusDetails?.trace || "");
   const source = message || trace;
   if (!source) return "";
-  return source.split("\n").slice(0, 8).join("\n").slice(0, 1400).trim();
+  return source.split("\n").slice(0, 10).join("\n").slice(0, 1800).trim();
 }
 
 function humanizeDetail(detail) {
@@ -202,6 +225,9 @@ function humanizeDetail(detail) {
   if (/timeout|timed out|exceeded/i.test(text)) {
     return "The scenario exceeded its bounded wait/recovery window before the expected storefront state became available.";
   }
+  if (/credentials|required for checkout login|authentication/i.test(text)) {
+    return "The scenario could not continue because a required authenticated-session prerequisite was unavailable.";
+  }
 
   return text.split("\n")[0].replace(/^Error:\s*/i, "").slice(0, 420);
 }
@@ -210,12 +236,16 @@ function actualResult(result, defect) {
   const status = businessStatus(result);
   const detail = technicalDetail(result);
   const readable = humanizeDetail(detail);
-  if (defect && status === "BLOCKED") return `BLOCKED / KNOWN DEFECT ${defect.jira} — ${readable || defect.title || "mapped active defect"}`;
-  if (defect && status === "FAIL") return `FAIL / KNOWN DEFECT ${defect.jira} — ${readable || defect.title || "mapped active defect"}`;
-  if (status === "PASS") return "PASS — all automated assertions executed for this scenario were satisfied.";
-  if (status === "BLOCKED") return readable ? `BLOCKED — ${readable}` : "BLOCKED — execution did not proceed because a prerequisite was unavailable.";
-  if (status === "FAIL") return readable ? `FAIL — ${readable}` : "FAIL — the automated validation did not satisfy the expected result.";
-  return "NOT RUN — no executable runtime result was produced for this scenario.";
+  if (defect && status === "BLOCKED") {
+    return `Execution was blocked before the final business assertion. The TC remains linked to ${defect.jira}; the prerequisite blocker is preserved separately and the defect is not claimed as freshly reproduced.`;
+  }
+  if (defect && status === "FAIL") {
+    return `Runtime failed and is mapped to active defect ${defect.jira}. ${readable || defect.title || "Raw evidence remains attached for engineering confirmation."}`;
+  }
+  if (status === "PASS") return "All automated assertions executed for this scenario were satisfied.";
+  if (status === "BLOCKED") return readable || "Execution did not proceed because a required prerequisite was unavailable.";
+  if (status === "FAIL") return readable || "The automated validation did not satisfy the expected business result.";
+  return "No executable runtime result was produced for this scenario.";
 }
 
 function scenarioTitle(result) {
@@ -224,7 +254,7 @@ function scenarioTitle(result) {
   return name.replace(/^SAM-\d+\s*[·:\-]?\s*/i, "").trim() || name;
 }
 
-function parameterLines(result) {
+function contextEntries(result) {
   const preferred = [
     ["Market", "Market"],
     ["Environment", "Environment"],
@@ -235,69 +265,128 @@ function parameterLines(result) {
     ["Payment", "Payment"],
     ["Order ID", "Order ID"],
     ["Runtime Status", "Runtime Status"],
-    ["Coverage", "Automation Coverage"],
+    ["Coverage", "Coverage"],
   ];
   return preferred
     .map(([name, label]) => {
       const value = parameterValue(result, name);
-      return value ? `- **${label}:** ${cleanText(value)}` : null;
+      return value ? [label, cleanText(value)] : null;
     })
     .filter(Boolean);
+}
+
+function statusVisual(status, defect) {
+  if (defect) return { label: "KNOWN DEFECT", fg: "#6941c6", bg: "#f4f0ff", border: "#d9d0ff" };
+  if (status === "PASS") return { label: "PASS", fg: "#067647", bg: "#ecfdf3", border: "#abefc6" };
+  if (status === "BLOCKED") return { label: "BLOCKED", fg: "#b54708", bg: "#fffaeb", border: "#fedf89" };
+  if (status === "FAIL") return { label: "FAIL", fg: "#b42318", bg: "#fef3f2", border: "#fecdca" };
+  return { label: "NOT RUN", fg: "#475467", bg: "#f2f4f7", border: "#d0d5dd" };
+}
+
+function card(title, body, accent = "#d0d5dd", background = "#ffffff") {
+  return `<section style="border:1px solid ${accent};border-left:4px solid ${accent};border-radius:8px;padding:12px 14px;margin:10px 0;background:${background}">` +
+    `<div style="font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">${escapeHtml(title)}</div>` +
+    `<div style="line-height:1.55">${body}</div></section>`;
+}
+
+function renderBusinessHtml(result, defect, model) {
+  const { samId, title, status, objective, expected, observed, blocker, detail, context } = model;
+  const visual = statusVisual(status, defect);
+  const jiraUrl = samId ? `https://jira.secext.samsung.net/browse/${samId}` : null;
+  const header = `<div style="margin-bottom:12px">` +
+    `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">` +
+    `<span style="display:inline-block;padding:4px 9px;border-radius:999px;font-weight:700;color:${visual.fg};background:${visual.bg};border:1px solid ${visual.border}">${visual.label}</span>` +
+    (samId ? `<a href="${jiraUrl}" style="font-weight:700">${escapeHtml(samId)}</a>` : "") +
+    `</div>` +
+    `<h3 style="margin:8px 0 2px;font-size:18px">${escapeHtml(title)}</h3>` +
+    `</div>`;
+
+  const summary = card(
+    "Resumo da validação",
+    `<strong>O que foi validado:</strong> ${escapeHtml(objective)}` +
+      (status !== "PASS" ? `<br><strong>Leitura do resultado:</strong> ${escapeHtml(observed)}` : ""),
+    visual.border,
+    visual.bg
+  );
+
+  const expectedCard = card("Resultado esperado", escapeHtml(expected), "#84caff", "#f5fbff");
+  const observedCard = card("Resultado observado", escapeHtml(observededOrObserved(observed)), visual.border, visual.bg);
+
+  let special = "";
+  if (defect) {
+    special += card(
+      "Known Defect",
+      `<strong><a href="${escapeHtml(defect.url || "#")}">${escapeHtml(defect.jira)}</a> — ${escapeHtml(defect.title || defect.jira)}</strong>` +
+      `<br><span>Mapeamento ativo somente para este TC / market / environment / store. A evidência bruta do runtime continua preservada.</span>`,
+      "#bdb4fe",
+      "#f4f0ff"
+    );
+  }
+  if (status === "BLOCKED") {
+    special += card(
+      "Pré-requisito / desbloqueio",
+      `<strong>Categoria:</strong> ${escapeHtml(blocker || "Execution prerequisite")}` +
+      `<br>${escapeHtml(humanizeDetail(detail) || detail.split("\n")[0] || "A required prerequisite must be restored before a conclusive validation can run.")}`,
+      "#fec84b",
+      "#fffaeb"
+    );
+  }
+  if (status === "FAIL" && detail) {
+    special += `<details style="margin:10px 0"><summary style="cursor:pointer;font-weight:700">Detalhe técnico (debug)</summary>` +
+      `<pre style="white-space:pre-wrap;border:1px solid #e4e7ec;border-radius:8px;padding:12px;margin-top:8px;overflow:auto"><code>${escapeHtml(detail)}</code></pre></details>`;
+  }
+
+  const contextRows = context.map(([label, value]) =>
+    `<tr><td style="padding:5px 12px 5px 0;font-weight:700;white-space:nowrap">${escapeHtml(label)}</td><td style="padding:5px 0">${escapeHtml(value)}</td></tr>`
+  ).join("");
+  const contextCard = card("Contexto da execução", `<table style="border-collapse:collapse;width:100%"><tbody>${contextRows}</tbody></table>`, "#d0d5dd", "#fcfcfd");
+
+  const links = [
+    samId ? `<a href="${jiraUrl}">TC oficial ${escapeHtml(samId)}</a>` : null,
+    defect ? `<a href="${escapeHtml(defect.url || "#")}">Defeito ${escapeHtml(defect.jira)}</a>` : null,
+  ].filter(Boolean).join(" &nbsp;·&nbsp; ");
+  const linksCard = card(
+    "Links e evidências",
+    `${links || "Links disponíveis na seção Links do Allure."}<br><span>Screenshot, vídeo, request/response curado e Playwright Trace permanecem anexados quando capturados.</span>`,
+    "#d0d5dd",
+    "#fcfcfd"
+  );
+
+  return `<div>${header}${summary}${expectedCard}${observedCard}${special}${contextCard}${linksCard}</div>`;
+}
+
+function observededOrObserved(value) {
+  return value || "No business observation was recorded.";
 }
 
 function normalizePresentation(result, defect) {
   const original = String(result.description || "");
   const samId = samIdOf(result);
   const status = businessStatus(result);
-  const objective = descriptionField(original, ["Objective", "Validation goal", "Validation Goal"])
+  const objective = descriptionField(original, ["Objective", "Validation goal", "Validation Goal", "What was validated"])
     || `Validate the official ${samId || "QST"} business scenario and preserve auditable execution evidence.`;
-  const expected = descriptionField(original, ["Expected result", "Expected Result"])
+  const expected = descriptionField(original, ["Expected result", "Expected Result", "Expected"])
     || "The official business acceptance criteria are satisfied and the observed storefront state matches the expected behavior.";
-  const blocker = descriptionField(original, ["Blocker category", "Blocker Category"]);
+  const blocker = descriptionField(original, ["Blocker category", "Blocker Category", "Blocker"]);
   const detail = technicalDetail(result);
-  const readable = humanizeDetail(detail);
   const title = scenarioTitle(result);
-  const context = parameterLines(result);
-  const lines = [
-    `## ${samId ? `[${samId}](https://jira.secext.samsung.net/browse/${samId}) · ` : ""}${title}`,
-    "",
-    "### Validation Summary",
-    `**Status:** ${defect ? `${status} / KNOWN DEFECT ${defect.jira}` : status}`,
-    `**Validation goal:** ${objective}`,
-    readable && status !== "PASS" ? `**What happened:** ${readable}` : null,
-    "",
-    "### Expected Result",
-    expected,
-    "",
-    "### Actual Result",
-    actualResult(result, defect),
-    "",
-    defect ? "### Known Defect" : null,
-    defect ? `**[${defect.jira}](${defect.url}) — ${defect.title || defect.jira}**` : null,
-    defect ? "This runtime result is mapped to an active defect for this exact market/environment/store/TC scope; raw execution evidence is preserved." : null,
-    defect ? "" : null,
-    status === "BLOCKED" ? "### Blocker / Prerequisite" : null,
-    status === "BLOCKED" ? `**Category:** ${blocker || "Execution prerequisite"}` : null,
-    status === "BLOCKED" ? (detail ? cleanText(detail.split("\n")[0]) : "A required prerequisite was unavailable, so the business scenario did not proceed to its final assertion.") : null,
-    status === "BLOCKED" ? "" : null,
-    status === "FAIL" ? "### Technical Error" : null,
-    status === "FAIL" ? "The business result above is the primary interpretation. The technical failure below is retained for engineering diagnosis:" : null,
-    status === "FAIL" && detail ? "```text" : null,
-    status === "FAIL" && detail ? detail : null,
-    status === "FAIL" && detail ? "```" : null,
-    status === "FAIL" ? "" : null,
-    "### Execution Context",
-    ...context,
-    "",
-    "### Links & Evidence",
-    samId ? `- **Official TC:** [${samId}](https://jira.secext.samsung.net/browse/${samId})` : null,
-    defect ? `- **Mapped defect:** [${defect.jira}](${defect.url})` : null,
-    "- **Evidence:** business steps, curated request/response attachments when captured, screenshot/video and Playwright Trace remain attached to this result.",
-    "",
-    "_Business interpretation is shown first; low-level browser/network detail remains available for debugging without overwhelming the validation summary._",
-  ].filter((line) => line !== null && line !== undefined);
+  const observed = actualResult(result, defect);
+  const context = contextEntries(result);
 
-  result.description = lines.join("\n");
+  const model = { samId, title, status, objective, expected, observed, blocker, detail, context };
+  result.descriptionHtml = renderBusinessHtml(result, defect, model);
+
+  // Keep a concise plain-text fallback for consumers that ignore descriptionHtml.
+  const fallback = [
+    `${samId ? `${samId} · ` : ""}${title}`,
+    `Status: ${defect ? `KNOWN DEFECT ${defect.jira} (runtime ${status})` : status}`,
+    `Validated: ${objective}`,
+    `Expected: ${expected}`,
+    `Observed: ${observed}`,
+    defect ? `Known defect: ${defect.jira} · ${defect.title || defect.jira}` : null,
+    status === "BLOCKED" ? `Prerequisite: ${blocker || humanizeDetail(detail) || "required test prerequisite unavailable"}` : null,
+  ].filter(Boolean);
+  result.description = fallback.join("\n");
 }
 
 function polishFailureStatusDetails(result, defect) {
@@ -306,21 +395,21 @@ function polishFailureStatusDetails(result, defect) {
   const readable = humanizeDetail(detail) || "The automated validation did not satisfy the expected business result.";
   const prefix = defect ? `Known Defect ${defect.jira} — ` : "";
   result.statusDetails ||= {};
-  result.statusDetails.message = `${prefix}${readable}\n\nBusiness-readable summary is shown here. The original technical error is preserved in Description > Technical Error and Playwright Trace.`;
+  result.statusDetails.message = `${prefix}${readable}\n\nSee the business summary first. Raw technical detail remains in the expandable debug section and Playwright Trace.`;
   return true;
 }
 
 function hardenKnownDefect(result) {
   const knownDefect = parameterValue(result, "Known Defect");
   const runtimeStatus = businessStatus(result);
-  if (!knownDefect || runtimeStatus !== "BLOCKED") return false;
+  if (!knownDefect || !["BLOCKED", "FAIL"].includes(runtimeStatus)) return false;
 
   const defectTitle = parameterValue(result, "Known Defect Title");
   const defectSummary = defectTitle ? `${knownDefect} · ${defectTitle}` : knownDefect;
   result.status = "skipped";
   result.stage = "finished";
   result.statusDetails = {
-    message: `Known Defect ${defectSummary}: execution is blocked/non-gating. See the linked Jira defect and preserved evidence for details.`,
+    message: `Known Defect ${defectSummary}. Runtime status: ${runtimeStatus}. This mapped result is non-gating; see the preserved business summary and evidence.`,
     trace: "",
   };
 
@@ -328,7 +417,7 @@ function hardenKnownDefect(result) {
     const start = Number(result.start || Date.now());
     const stop = Number(result.stop || start);
     result.steps = [{
-      name: `Blocked by Known Defect ${knownDefect}`,
+      name: `Known Defect · ${knownDefect}`,
       status: "skipped",
       stage: "finished",
       start,
@@ -337,7 +426,7 @@ function hardenKnownDefect(result) {
       attachments: [],
       parameters: [],
       statusDetails: {
-        message: `Official scenario was not counted as a functional failure because ${defectSummary} is an active mapped defect.`,
+        message: `${defectSummary} is active for this exact scope. Raw runtime status ${runtimeStatus} remains available in parameters.`,
       },
     }];
   }
@@ -376,4 +465,4 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith("-r
   fs.writeFileSync(file, JSON.stringify(result, null, 2));
 }
 
-console.log(`[allure-dedupe] Processed ${files} result file(s); removed ${removed} duplicate/dangling attachment(s); mapped ${mapped} known defect result(s); normalized ${normalized} business-readable result(s); polished ${polishedFailures} failed status message(s); hardened ${hardened} blocked known-defect result(s).`);
+console.log(`[allure-dedupe] Processed ${files} result file(s); removed ${removed} duplicate/dangling attachment(s); mapped ${mapped} known defect result(s); normalized ${normalized} polished business result(s); polished ${polishedFailures} failed banner(s); hardened ${hardened} mapped known-defect result(s).`);
