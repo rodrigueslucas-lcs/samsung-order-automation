@@ -49,6 +49,7 @@ const metadata = spawnSync(process.execPath, [
   path.resolve("scripts/prepare-allure-ci-metadata.cjs"),
   resultsDir,
   reportDir,
+  "prepare",
 ], { stdio: "inherit", env: process.env });
 if (metadata.status !== 0) {
   console.error("[allure] Jenkins/environment metadata preparation failed; report generation will continue.");
@@ -79,4 +80,15 @@ if (generated.status !== 0) {
   console.error("[allure] Final enriched report generation failed; raw results were preserved.");
   process.exit(generated.status || 1);
 }
+
+const savedHistory = spawnSync(process.execPath, [
+  path.resolve("scripts/prepare-allure-ci-metadata.cjs"),
+  resultsDir,
+  reportDir,
+  "save",
+], { stdio: "inherit", env: process.env });
+if (savedHistory.status !== 0) {
+  console.error("[allure] Trend history persistence failed; generated report was preserved.");
+}
+
 console.log(`[allure] Final Samsung MX QST report generated: ${reportDir}`);
