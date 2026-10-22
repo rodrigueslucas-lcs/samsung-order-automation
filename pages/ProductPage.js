@@ -9,6 +9,8 @@ export default class ProductPage extends BasePage {
       : options.setupUrl;
     this.sku = options.sku || 'RB45DG6300B1PE';
     this.pdpUrl = options.pdpUrl || null;
+    this.cartReadback = options.cartReadback;
+    this.reuseLoadedPdp = options.reuseLoadedPdp === true;
 
     this.addToCartUrl =
       'https://stg2.shop.samsung.com/pe/ng/p4v1/addToCart?products[0].productCode=RB45DG6300B1PE&products[0].quantity=1&callback=jQuery111305177703263619047_1595407056965&_=1595407056969';
@@ -24,6 +26,7 @@ export default class ProductPage extends BasePage {
       /\/users\/current\/carts\/(?:current|[^/]+)\/entries(?:\?|$)/.test(request.url());
 
     const cartAlreadyHasSku = async ({ timeout = 8000, refresh = false } = {}) => {
+      if (this.cartReadback) return this.cartReadback(this.page, { cartUrl: this.cartUrl, sku: this.sku, timeout });
       try {
         if (refresh || !new URL(this.page.url()).pathname.endsWith('/cart')) {
           await this.page.goto(this.cartUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -46,7 +49,9 @@ export default class ProductPage extends BasePage {
         return;
       }
 
-      await this.safeGoto(this.pdpUrl);
+      const loadedPdp = this.reuseLoadedPdp && this.page.url() === String(this.pdpUrl) &&
+        await this.page.getByText(this.sku, { exact: true }).first().isVisible();
+      if (!loadedPdp) await this.safeGoto(this.pdpUrl);
       if (configureProduct) await configureProduct(this.page);
 
       const addButton = this.page
@@ -145,6 +150,13 @@ export default class ProductPage extends BasePage {
       if (outcome?.response && !outcome.response.ok()) {
         throw new Error(`Configured PDP add-to-cart returned HTTP ${outcome.response.status()}.`);
       }
+      if (this.cartReadback && outcome?.response) {
+        if (await outcome.response.finished()) throw new Error('MX Add response was interrupted; Add will not be repeated.');
+        const body = await outcome.response.json();
+        if (body.statusCode !== 'success' || body.entry?.product?.code !== this.sku) {
+          throw new Error('MX Add response did not confirm the configured product; Add will not be repeated.');
+        }
+      }
 
       if (await cartAlreadyHasSku({ timeout: 10000, refresh: true })) {
         diagnostics?.push({ attempt, checkpoint: 'cart-check', url: this.page.url(), cartContainsSku: true });
@@ -152,6 +164,9 @@ export default class ProductPage extends BasePage {
       }
 
       diagnostics?.push({ attempt, checkpoint: 'cart-check', url: this.page.url(), cartContainsSku: false });
+      if (this.cartReadback && outcome?.response) {
+        throw new Error('MX cart lost the configured product after acknowledged Add; Add will not be repeated.');
+      }
       if (attempt === maxAttempts) {
         const failure = outcome?.failedRequest?.failure()?.errorText || 'no successful cart mutation or persisted cart state was observed';
         throw new Error(`AUTOMATION_RECOVERY_EXHAUSTED: cart did not contain ${this.sku} after one bounded refresh/retry cycle: ${failure}.`);

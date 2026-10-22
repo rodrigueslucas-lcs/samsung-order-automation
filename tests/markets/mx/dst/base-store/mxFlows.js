@@ -2,9 +2,12 @@ import { test, expect } from "@playwright/test";
 import ProductPage from "../../../../../pages/ProductPage";
 import CartPage from "../../../../../pages/CartPage";
 import MxCheckoutPage from "../../../../../pages/MxCheckoutPage";
+import mxCartReadback from "../../../../../utils/mxCartReadback.cjs";
 
 function configuredProduct(page, config) {
   return new ProductPage(page, {
+    cartReadback: mxCartReadback.readMxCartSku,
+    reuseLoadedPdp: true,
     setupUrl: config.bootstrapUrl.toString(),
     sku: config.sku,
     pdpUrl: config.pdpUrl.toString(),

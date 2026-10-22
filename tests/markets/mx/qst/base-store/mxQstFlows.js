@@ -3,6 +3,7 @@ import CartPage from "../../../../../pages/CartPage";
 import ProductPage from "../../../../../pages/ProductPage";
 import cartPresentation from "../../../../../flows/smb/cartPresentation";
 import mxStagingGuard from "../../../../../utils/mxStagingGuard";
+import mxCartReadback from "../../../../../utils/mxCartReadback.cjs";
 
 const { validateCartItemPresentation, validateStickyControl } = cartPresentation;
 const { assertMxStagingPage } = mxStagingGuard;
@@ -237,6 +238,8 @@ export async function prepareMxQstCart(page, config) {
   await openMxQstPdp(page, config);
 
   const product = new ProductPage(page, {
+    cartReadback: mxCartReadback.readMxCartSku,
+    reuseLoadedPdp: true,
     setupUrl: config.bootstrapUrl.toString(),
     sku: config.sku,
     pdpUrl: config.pdpUrl.toString(),
