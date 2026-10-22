@@ -19,6 +19,15 @@ function clean(value) {
     .trim();
 }
 
+function esc(value) {
+  return clean(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 function parameter(result, name) {
   return (result.parameters || []).find((item) => item?.name === name)?.value || '';
 }
@@ -34,6 +43,11 @@ function issueKey(value) {
 function jiraUrl(key) {
   const normalized = issueKey(key);
   return normalized ? `${jiraBase}${encodeURIComponent(normalized)}` : '';
+}
+
+function scenarioTitle(result) {
+  const id = samId(result);
+  return clean(result.name || result.fullName || id).replace(new RegExp(`^${id}\\s*[·:\\-]?\\s*`, 'i'), '').trim();
 }
 
 function runtimeStatus(result) {
@@ -55,6 +69,7 @@ function readField(description, labels) {
     const patterns = [
       new RegExp(`^${escaped}:\\s*(.+)$`, 'im'),
       new RegExp(`\\*\\*${escaped}:?\\*\\*\\s*(.+)$`, 'im'),
+      new RegExp(`^${escaped}\\s*\\n([^\\n]+)$`, 'im'),
     ];
     for (const pattern of patterns) {
       const match = source.match(pattern);
@@ -65,27 +80,11 @@ function readField(description, labels) {
 }
 
 function child(name, status = 'passed') {
-  return {
-    name: clean(name),
-    status,
-    stage: 'finished',
-    steps: [],
-    attachments: [],
-    parameters: [],
-    statusDetails: {},
-  };
+  return { name: clean(name), status, stage: 'finished', steps: [], attachments: [], parameters: [], statusDetails: {} };
 }
 
 function section(name, children, status = 'passed') {
-  return {
-    name,
-    status,
-    stage: 'finished',
-    steps: children.filter((item) => item && clean(item.name)),
-    attachments: [],
-    parameters: [],
-    statusDetails: {},
-  };
+  return { name, status, stage: 'finished', steps: children.filter((item) => item && clean(item.name)), attachments: [], parameters: [], statusDetails: {} };
 }
 
 function hideNoisyParameters(result) {
@@ -99,19 +98,23 @@ function hideNoisyParameters(result) {
   );
 }
 
-function contextChildren(result) {
+function contextPairs(result) {
   return [
     ['Market', parameter(result, 'Market')],
     ['Environment', parameter(result, 'Environment')],
     ['Store', parameter(result, 'Store')],
     ['Feature', parameter(result, 'Feature')],
-    ['User type', parameter(result, 'User Type')],
+    ['User Type', parameter(result, 'User Type')],
     ['SKU', parameter(result, 'SKU')],
     ['Payment', parameter(result, 'Payment')],
     ['Order ID', parameter(result, 'Order ID')],
-    ['Runtime status', parameter(result, 'Runtime Status')],
-    ['Technical result', parameter(result, 'Technical Result')],
-  ].filter(([, value]) => clean(value)).map(([label, value]) => child(`${label} · ${clean(value)}`));
+    ['Runtime Status', parameter(result, 'Runtime Status')],
+    ['Technical Result', parameter(result, 'Technical Result')],
+  ].filter(([, value]) => clean(value));
+}
+
+function contextChildren(result) {
+  return contextPairs(result).map(([label, value]) => child(`${label} · ${clean(value)}`));
 }
 
 function businessStatusForStep(status, defect) {
@@ -129,22 +132,75 @@ function normalizeLinks(result, id, defect) {
   const links = [];
   const tcUrl = jiraUrl(id);
   const defectUrl = jiraUrl(defect);
-
   if (tcUrl) links.push({ name: `Official TC · ${issueKey(id)}`, url: tcUrl, type: 'tms' });
   if (defectUrl) links.push({ name: `Known Defect · ${issueKey(defect)}`, url: defectUrl, type: 'issue' });
-
-  if (buildUrl) {
-    links.push({
-      name: `Jenkins Build${buildNumber ? ` · #${buildNumber}` : ''}`,
-      url: buildUrl,
-      type: 'link',
-    });
-  }
-
+  if (buildUrl) links.push({ name: `Jenkins Build${buildNumber ? ` · #${buildNumber}` : ''}`, url: buildUrl, type: 'link' });
   const artifactsUrl = stableArtifactsUrl();
   if (artifactsUrl) links.push({ name: 'Jenkins Artifacts · Evidence', url: artifactsUrl, type: 'link' });
-
   result.links = links;
+}
+
+function visual(status, defect) {
+  if (defect) return { label: 'KNOWN DEFECT', icon: '◆', fg: '#7f56d9', bg: '#f4f0ff', border: '#bdb4fe' };
+  if (status === 'PASS') return { label: 'PASS', icon: '✓', fg: '#067647', bg: '#ecfdf3', border: '#75e0a7' };
+  if (status === 'BLOCKED') return { label: 'BLOCKED', icon: '!', fg: '#b54708', bg: '#fffaeb', border: '#fec84b' };
+  if (status === 'FAIL') return { label: 'FAIL', icon: '×', fg: '#b42318', bg: '#fef3f2', border: '#f97066' };
+  return { label: 'NOT RUN', icon: '•', fg: '#475467', bg: '#f2f4f7', border: '#d0d5dd' };
+}
+
+function htmlSection(title, body, accent, background = '#101828') {
+  return `<div style="border:1px solid ${accent};border-left:5px solid ${accent};border-radius:10px;padding:14px 16px;margin:12px 0;background:${background};">` +
+    `<div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${accent};margin-bottom:7px">${esc(title)}</div>` +
+    `<div style="font-size:14px;line-height:1.65;color:#f2f4f7">${body}</div></div>`;
+}
+
+function renderDescriptionHtml({ result, id, title, status, defect, defectTitle, objective, expected, observed, prerequisite }) {
+  const v = visual(status, defect);
+  const tcLink = jiraUrl(id);
+  const defectLink = jiraUrl(defect);
+  const context = contextPairs(result);
+
+  let html = `<div style="max-width:920px;font-family:Arial,sans-serif">`;
+  html += `<div style="border:1px solid ${v.border};background:${v.bg};border-radius:12px;padding:16px 18px;margin-bottom:14px">` +
+    `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">` +
+    `<span style="display:inline-block;padding:5px 10px;border-radius:999px;border:1px solid ${v.border};background:#fff;color:${v.fg};font-size:12px;font-weight:800">${v.icon} ${v.label}</span>` +
+    `<a href="${tcLink}" style="font-size:13px;font-weight:800;text-decoration:none">${esc(id)}</a>` +
+    `</div><div style="font-size:20px;line-height:1.35;font-weight:800;color:#101828">${esc(title)}</div></div>`;
+
+  if (defect) {
+    html += htmlSection(
+      `Known Defect · ${defect}`,
+      `<div style="font-weight:800;margin-bottom:4px"><a href="${defectLink}">${esc(defect)}</a>${defectTitle ? ` — ${esc(defectTitle)}` : ''}</div>` +
+      `<div>Este resultado está mapeado para um defeito conhecido neste escopo. O runtime técnico original permanece preservado para diagnóstico.</div>`,
+      '#bdb4fe', '#211a33'
+    );
+  }
+
+  html += htmlSection('O que foi validado', esc(objective), '#53b1fd');
+  html += htmlSection('Resultado esperado', esc(expected), '#84caff');
+  html += htmlSection('Resultado observado', esc(observed), v.border, status === 'PASS' && !defect ? '#10261d' : status === 'FAIL' && !defect ? '#2b1716' : status === 'BLOCKED' && !defect ? '#2d2613' : '#211a33');
+
+  if (status === 'BLOCKED') {
+    html += htmlSection('Pré-requisito / desbloqueio', esc(prerequisite || observed || 'Restaurar o pré-requisito antes de uma validação conclusiva.'), '#fec84b', '#2d2613');
+  }
+
+  if (context.length) {
+    html += `<div style="border:1px solid #344054;border-radius:10px;padding:14px 16px;margin:12px 0;background:#111827">` +
+      `<div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#98a2b3;margin-bottom:8px">Contexto da execução</div>` +
+      `<table style="border-collapse:collapse;width:100%;font-size:13px">${context.map(([key, value]) =>
+        `<tr><td style="padding:5px 14px 5px 0;width:160px;color:#98a2b3;font-weight:700">${esc(key)}</td><td style="padding:5px 0;color:#f2f4f7">${esc(value)}</td></tr>`
+      ).join('')}</table></div>`;
+  }
+
+  const links = [];
+  if (tcLink) links.push(`<a href="${tcLink}" style="font-weight:700">Official TC · ${esc(id)}</a>`);
+  if (defectLink) links.push(`<a href="${defectLink}" style="font-weight:700">Known Defect · ${esc(defect)}</a>`);
+  if (buildUrl) links.push(`<a href="${buildUrl}" style="font-weight:700">Jenkins Build${buildNumber ? ` · #${esc(buildNumber)}` : ''}</a>`);
+  if (stableArtifactsUrl()) links.push(`<a href="${stableArtifactsUrl()}" style="font-weight:700">Jenkins Artifacts · Evidence</a>`);
+  if (links.length) html += htmlSection('Links e evidências', links.join('<br>'), '#667085', '#111827');
+
+  html += `</div>`;
+  return html;
 }
 
 let structured = 0;
@@ -157,6 +213,7 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith('-r
   const id = samId(result);
   if (!id) continue;
 
+  const title = scenarioTitle(result);
   const status = runtimeStatus(result);
   const defect = issueKey(parameter(result, 'Known Defect'));
   const defectTitle = clean(parameter(result, 'Known Defect Title'));
@@ -192,10 +249,7 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith('-r
   if (defect) {
     sections.push(section(
       `${String(next).padStart(2, '0')} · Known Defect · ${defect}`,
-      [
-        child(defectTitle || 'Mapped known functional defect.', 'skipped'),
-        child(`Runtime preservado · ${status}`, 'skipped'),
-      ],
+      [child(defectTitle || 'Mapped known functional defect.', 'skipped'), child(`Runtime preservado · ${status}`, 'skipped')],
       'skipped'
     ));
     next += 1;
@@ -225,21 +279,24 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith('-r
   }
 
   if (actualSteps.length) {
-    sections.push({
-      ...section(`${String(next).padStart(2, '0')} · Execução do negócio`, [], sectionStatus),
-      steps: actualSteps,
-    });
+    sections.push({ ...section(`${String(next).padStart(2, '0')} · Execução do negócio`, [], sectionStatus), steps: actualSteps });
   }
 
   result.steps = sections;
+  result.descriptionHtml = renderDescriptionHtml({ result, id, title, status, defect, defectTitle, objective, expected, observed, prerequisite });
 
-  const headline = defect
-    ? `KNOWN DEFECT · ${defect}${defectTitle ? ` — ${defectTitle}` : ''}`
-    : `${status} · ${id}`;
-  result.description = `${headline}\n${objective}`;
+  const v = visual(status, defect);
+  const shortLines = [
+    `${v.icon} ${v.label} · ${id}`,
+    title,
+    `Validação: ${objective}`,
+  ];
+  if (defect) shortLines.push(`Defeito conhecido: ${defect}${defectTitle ? ` — ${defectTitle}` : ''}`);
+  if (status === 'BLOCKED') shortLines.push(`Desbloqueio: ${prerequisite || observed}`);
+  result.description = shortLines.join('\n');
 
   fs.writeFileSync(file, JSON.stringify(result, null, 2));
   structured += 1;
 }
 
-console.log(`[allure-business-view] READY · ${structured} official TC(s) structured; ${hiddenParameters} repeated parameter field(s) hidden from suite rows; ${normalizedLinks} stable link(s) published.`);
+console.log(`[allure-business-view] READY · ${structured} official TC(s) structured with final PASS/FAIL/BLOCKED/KNOWN DEFECT visual template; ${hiddenParameters} repeated parameter field(s) hidden; ${normalizedLinks} stable link(s) published.`);
