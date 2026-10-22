@@ -61,6 +61,8 @@ pipeline {
 
           env.JENKINS_SUITE_LABEL = suiteLabel
           env.JENKINS_ARTIFACT_DIR = artifactDir
+          env.OFFICIAL_P1_NO_RESULTS = params.TEST_SUITE == 'official-p1' ? '1' : '0'
+          env.OFFICIAL_P1_RESULT_FILE = "${artifactDir}/${params.MARKET == 'MX' ? 'mx-qst-safe-results.json' : 'results.json'}"
           env.MX_JENKINS_ARTIFACT_DIR = artifactDir
           env.MX_QST_ARTIFACT_DIR = artifactDir
           env.PE_QST_ARTIFACT_DIR = artifactDir
@@ -137,6 +139,17 @@ pipeline {
           if (params.P1_TARGET_IDS?.trim() && (!['MX', 'PE', 'CL', 'CO'].contains(params.MARKET) || params.TEST_SUITE != 'official-p1')) error('P1_TARGET_IDS is supported only for MX/PE/CL/CO official-p1.')
           if (params.TEST_SUITE == 'official-p1' && params.EXECUTION_MODE != 'authorized-destructive') error("${params.MARKET} official P1 contains payment/order scenarios. Select EXECUTION_MODE=authorized-destructive for the campaign.")
           echo "Validated request: ${params.MARKET} ${params.ENVIRONMENT} · ${params.TEST_SUITE} · ${params.EXECUTION_MODE}"
+          if (params.TEST_SUITE == 'official-p1') {
+            // Reset before credential installation/auth checks, not only when
+            // the runner starts: a rejected session must not publish old PASSes.
+            def lane = params.P1_TARGET_IDS?.trim() ? 'qst-targeted' : 'qst'
+            def expectedDir = "test-results/jenkins/${params.MARKET.toLowerCase()}-${lane}"
+            if (env.JENKINS_ARTIFACT_DIR != expectedDir) error('Refusing cleanup outside the selected Jenkins P1 artifact lane.')
+            dir(expectedDir) { deleteDir() }
+            if (params.MARKET == 'MX') {
+              dir('playwright-report') { deleteDir() }
+            }
+          }
         }
       }
     }
@@ -589,6 +602,14 @@ pipeline {
       when { expression { return params.TEST_SUITE != 'allure-smoke' } }
       steps {
         script {
+          if (params.TEST_SUITE == 'official-p1') {
+            if (!fileExists(env.OFFICIAL_P1_RESULT_FILE)) {
+              currentBuild.result = 'FAILURE'
+              echo 'NO CURRENT RUNTIME RESULTS: check authentication/preflight or runner startup. Previous reports will not be published.'
+              return
+            }
+            env.OFFICIAL_P1_NO_RESULTS = '0'
+          }
           def resultsPath = "${env.JENKINS_ARTIFACT_DIR}/allure-results"
           if (params.MARKET == 'MX' && ['official-p1', 'fast-guest'].contains(params.TEST_SUITE)) {
             env.ALLURE_REPORT_NAME = "Samsung ${params.MARKET} ${params.ENVIRONMENT} ${env.JENKINS_SUITE_LABEL} - Allure"
@@ -616,7 +637,9 @@ pipeline {
           echo " ENVIRONMENT  : ${params.ENVIRONMENT}"
           echo " SUITE        : ${suiteLabel}"
           echo " BUILD        : #${env.BUILD_NUMBER}"
-          echo " REPORTS      : Executive Dashboard · Playwright · Allure"
+          echo(env.OFFICIAL_P1_NO_RESULTS == '1'
+            ? ' REPORTS      : Not published - no current runtime results'
+            : ' REPORTS      : Executive Dashboard · Playwright · Allure')
           echo '============================================================'
         }
       }
@@ -633,6 +656,8 @@ pipeline {
       script {
         if (env.PREQA2_PREFLIGHT_FAILED == '1') {
           echo 'PREQA2 PREFLIGHT FAILURE: no Official P1 runtime/report artifacts published because no TCs were executed.'
+        } else if (env.OFFICIAL_P1_NO_RESULTS == '1') {
+          echo 'NO CURRENT RUNTIME RESULTS: no test reports archived or published. Check authentication/preflight or runner startup in the console.'
         } else {
           archiveArtifacts artifacts: 'test-results/**/*, playwright-report/**/*', allowEmptyArchive: true, fingerprint: true
           if (params.TEST_SUITE == 'allure-smoke') {
@@ -684,6 +709,10 @@ pipeline {
           currentBuild.displayName = "#${env.BUILD_NUMBER} · ${params.MARKET} · ${params.ENVIRONMENT} · ${suiteLabel} · PREQA2 PREFLIGHT FAILURE"
           currentBuild.description = 'PREQA2 PREFLIGHT FAILURE | Official P1 not started; restore WMC/PreQA2 CDP session.'
           echo 'PREQA2 PREFLIGHT FAILURE · Official P1 did not run. No test result was produced.'
+        } else if (env.OFFICIAL_P1_NO_RESULTS == '1') {
+          currentBuild.displayName = "#${env.BUILD_NUMBER} · ${params.MARKET} · ${params.ENVIRONMENT} · ${suiteLabel} · NO CURRENT RESULTS"
+          currentBuild.description = "${currentBuild.currentResult} | No current P1 results: check authentication/preflight or runner startup. Previous reports were not published."
+          echo 'NO CURRENT RESULTS · The campaign did not produce a current result file. No current TC result is available; inspect authentication/preflight or runner startup.'
         } else {
           currentBuild.displayName = "#${env.BUILD_NUMBER} · ${params.MARKET} · ${params.ENVIRONMENT} · ${suiteLabel} · ${currentBuild.currentResult}"
           currentBuild.description = "${currentBuild.currentResult} | Samsung SMB | ${params.MARKET} ${params.ENVIRONMENT} | ${suiteLabel} | Review Executive Dashboard / Playwright / Allure"
