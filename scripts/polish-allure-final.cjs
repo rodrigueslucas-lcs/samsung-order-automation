@@ -170,6 +170,17 @@ function contextRows(result) {
   });
 }
 
+function hideRepeatedParameters(result) {
+  const hidden = new Set([
+    'Environment', 'Market', 'Store', 'Feature', 'User Type', 'SKU',
+    'Payment', 'Payment Method', 'Order ID', 'Runtime Status', 'Technical Result',
+    'Known Defect', 'Known Defect Title', 'Coverage',
+  ]);
+  result.parameters = (result.parameters || []).map((item) =>
+    hidden.has(String(item?.name || '')) ? { ...item, mode: 'hidden', excluded: true } : item
+  );
+}
+
 function visual(status, defect) {
   if (defect) return { label: 'KNOWN DEFECT', icon: '◆', fg: '#7F56D9', bg: '#F4F0FF', border: '#BDB4FE' };
   if (status === 'PASS') return { label: 'PASS', icon: '✓', fg: '#067647', bg: '#ECFDF3', border: '#75E0A7' };
@@ -179,9 +190,9 @@ function visual(status, defect) {
 }
 
 function card(title, body, accent, background) {
-  return `<section style="border:1px solid ${accent};border-left:5px solid ${accent};border-radius:10px;padding:14px 16px;margin:12px 0;background:${background}">` +
+  return `<section style="border:1px solid ${accent};border-left:5px solid ${accent};border-radius:10px;padding:14px 16px;margin:12px 0;background:${background};box-shadow:0 1px 2px rgba(16,24,40,.06)">` +
     `<div style="font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:${accent};margin-bottom:7px">${esc(title)}</div>` +
-    `<div style="font-size:14px;line-height:1.65">${body}</div></section>`;
+    `<div style="font-size:14px;line-height:1.7;color:#101828">${body}</div></section>`;
 }
 
 function formatPresentation(result) {
@@ -206,29 +217,29 @@ function formatPresentation(result) {
   const v = visual(status, defect);
 
   const jira = `https://jira.secext.samsung.net/browse/${id}`;
-  let html = `<div style="max-width:920px;font-family:Arial,sans-serif">`;
-  html += `<div style="border:1px solid ${v.border};background:${v.bg};border-radius:12px;padding:16px 18px;margin-bottom:14px">` +
+  let html = `<div style="max-width:920px;font-family:Arial,sans-serif;color:#101828">`;
+  html += `<div style="border:1px solid ${v.border};background:${v.bg};border-radius:12px;padding:16px 18px;margin-bottom:14px;box-shadow:0 1px 3px rgba(16,24,40,.08)">` +
     `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">` +
     `<span style="display:inline-block;padding:5px 10px;border-radius:999px;border:1px solid ${v.border};background:#fff;color:${v.fg};font-size:12px;font-weight:800">${v.icon} ${v.label}</span>` +
-    `<a href="${jira}" style="font-size:13px;font-weight:800;text-decoration:none">${esc(id)}</a></div>` +
+    `<a href="${jira}" style="font-size:13px;font-weight:800;text-decoration:none;color:${v.fg}">${esc(id)}</a></div>` +
     `<div style="font-size:20px;line-height:1.35;font-weight:800;color:#101828">${esc(title)}</div></div>`;
 
   if (defect) {
     const defectUrl = `https://jira.secext.samsung.net/browse/${defect}`;
-    html += card('Known Defect', `<strong><a href="${defectUrl}">${esc(defect)}</a>${defectTitle ? ` — ${esc(defectTitle)}` : ''}</strong><br>Resultado conhecido e mapeado para este escopo. O runtime técnico continua preservado para diagnóstico.`, '#7F56D9', '#F4F0FF');
+    html += card('Known Defect', `<strong style="color:#6941C6"><a href="${defectUrl}" style="color:#6941C6">${esc(defect)}</a>${defectTitle ? ` — ${esc(defectTitle)}` : ''}</strong><br><span>Resultado conhecido e mapeado para este escopo. O runtime técnico continua preservado para diagnóstico.</span>`, '#7F56D9', '#F4F0FF');
   }
 
   html += card('O que foi validado', `<strong>${esc(objective)}</strong>`, '#2E90FA', '#F5FBFF');
   html += card('Resultado esperado', esc(expected), '#53B1FD', '#F5FBFF');
-  html += card('Resultado observado', `<strong>${esc(observed)}</strong>`, v.border, v.bg);
+  html += card('Resultado observado', `<strong style="color:${v.fg}">${esc(observed)}</strong>`, v.border, v.bg);
 
   if (status === 'BLOCKED') {
-    html += card('Pré-requisito / desbloqueio', esc(prerequisite), '#FEC84B', '#FFFAEB');
+    html += card('Pré-requisito / desbloqueio', `<strong>${esc(prerequisite)}</strong>`, '#FEC84B', '#FFFAEB');
   }
 
   const context = contextRows(result);
   if (context.length) {
-    const rows = context.map(([label, value]) => `<tr><td style="padding:5px 14px 5px 0;width:160px;color:#667085;font-weight:700">${esc(label)}</td><td style="padding:5px 0;color:#101828">${esc(value)}</td></tr>`).join('');
+    const rows = context.map(([label, value]) => `<tr><td style="padding:6px 14px 6px 0;width:160px;color:#667085;font-weight:700;border-bottom:1px solid #EAECF0">${esc(label)}</td><td style="padding:6px 0;color:#101828;border-bottom:1px solid #EAECF0">${esc(value)}</td></tr>`).join('');
     html += card('Contexto da execução', `<table style="border-collapse:collapse;width:100%;font-size:13px">${rows}</table>`, '#D0D5DD', '#FCFCFD');
   }
 
@@ -239,30 +250,12 @@ function formatPresentation(result) {
     : 'Evidências técnicas permanecem disponíveis nos artefatos do build.';
   html += card('Links e evidências', `<a href="${jira}"><strong>TC oficial · ${esc(id)}</strong></a><br>${evidenceText}`, '#98A2B3', '#FCFCFD');
   html += '</div>';
-  result.descriptionHtml = html;
 
-  // Markdown/plain fallback for Allure views that do not render descriptionHtml.
-  const plain = [
-    `${v.icon} **${v.label} · ${id}**`,
-    `**${title}**`,
-    '',
-    '**O que foi validado**',
-    objective,
-    '',
-    '**Resultado esperado**',
-    expected,
-    '',
-    '**Resultado observado**',
-    observed,
-  ];
-  if (defect) plain.push('', '**Known Defect**', `${defect}${defectTitle ? ` — ${defectTitle}` : ''}`);
-  if (status === 'BLOCKED') plain.push('', '**Pré-requisito / desbloqueio**', prerequisite);
-  if (context.length) {
-    plain.push('', '**Contexto da execução**');
-    for (const [label, value] of context) plain.push(`- **${label}:** ${value}`);
-  }
-  plain.push('', '**Links e evidências**', `- TC oficial: ${id}`, `- ${evidenceText.replace(/<[^>]+>/g, '')}`);
-  result.description = plain.join('\n');
+  result.descriptionHtml = html;
+  // This Allure UI prefers the plain description when both are present.
+  // Publish HTML only so the presentation cannot regress to a wall of Markdown/plain text.
+  delete result.description;
+  hideRepeatedParameters(result);
 
   // Final Allure visual status. Runtime truth remains in Runtime Status / Technical Result.
   if (defect) result.status = 'unknown';
@@ -274,8 +267,10 @@ function formatPresentation(result) {
   result.statusDetails ||= {};
   if (defect) {
     result.statusDetails.message = `KNOWN DEFECT ${defect}${defectTitle ? ` — ${defectTitle}` : ''}. Runtime status preservado: ${status}.`;
+    result.statusDetails.trace = '';
   } else if (status === 'PASS') {
     result.statusDetails.message = 'PASS · Critérios automatizados do cenário atendidos.';
+    result.statusDetails.trace = '';
   } else if (status === 'BLOCKED') {
     result.statusDetails.message = `BLOCKED · ${prerequisite}`;
   } else if (status === 'FAIL') {
