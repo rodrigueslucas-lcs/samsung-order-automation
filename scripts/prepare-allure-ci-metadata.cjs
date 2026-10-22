@@ -86,6 +86,17 @@ function structureBusinessView() {
   return true;
 }
 
+function enforceGlobalContract() {
+  const script = path.resolve('scripts/enforce-allure-global-contract.cjs');
+  if (!fs.existsSync(script)) return false;
+  const enforced = spawnSync(process.execPath, [script, resultsDir], { stdio: 'inherit', env: process.env });
+  if (enforced.status !== 0) {
+    console.error('[allure-metadata] Global Allure contract failed; structured results were preserved.');
+    return false;
+  }
+  return true;
+}
+
 function writeEnvironment() {
   const file = path.join(resultsDir, 'environment.properties');
   const existing = fs.existsSync(file)
@@ -126,8 +137,8 @@ function writeCategories() {
   const categories = [
     {
       name: 'Known Defect',
-      matchedStatuses: ['skipped', 'failed', 'broken'],
-      messageRegex: '.*Known Defect (RT|SAM)-[0-9]+.*',
+      matchedStatuses: ['unknown', 'skipped', 'failed', 'broken'],
+      messageRegex: '.*KNOWN DEFECT.*(RT|SAM)-[0-9]+.*',
     },
     {
       name: 'Auth / Prerequisite',
@@ -192,8 +203,9 @@ if (mode === 'save') {
 const businessStatusNormalized = normalizeBusinessStatus();
 const polished = polishPresentation();
 const businessViewStructured = structureBusinessView();
+const globalContractEnforced = enforceGlobalContract();
 writeEnvironment();
 writeExecutor();
 writeCategories();
 const historyCarried = restoreHistory();
-console.log(`[allure-metadata] READY · business status ${businessStatusNormalized ? 'normalized' : 'unchanged'} · presentation ${polished ? 'polished' : 'unchanged'} · business view ${businessViewStructured ? 'structured' : 'unchanged'} · Jenkins executor + environment + concise categories${historyCarried ? ' + Trend history' : ''}.`);
+console.log(`[allure-metadata] READY · business status ${businessStatusNormalized ? 'normalized' : 'unchanged'} · presentation ${polished ? 'polished' : 'unchanged'} · business view ${businessViewStructured ? 'structured' : 'unchanged'} · global contract ${globalContractEnforced ? 'enforced' : 'unchanged'} · Jenkins executor + environment + concise categories${historyCarried ? ' + Trend history' : ''}.`);
