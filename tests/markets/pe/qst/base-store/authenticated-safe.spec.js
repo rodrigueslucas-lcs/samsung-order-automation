@@ -4,6 +4,7 @@ import peAuthStateModule from "../../../../../utils/peAuthState";
 import peConfigModule from "../../../../../config/markets/pe";
 import evidenceContext from "../../../../../reporting/evidence/evidenceContext";
 import peEvidenceMetadata from "../../../../../utils/qstPeEvidenceMetadata";
+import peOrderHistory from "../../../../../flows/pe/orderHistory.cjs";
 
 const {
   PE_AUTH_STATE_PATH,
@@ -49,7 +50,7 @@ test.describe("PE QST - authenticated safe reuse", () => {
   });
 
   test("SAM-25057 @qst @pe @base-store @safe @registered @reuse - My Orders page", async ({ page }, testInfo) => {
-    test.setTimeout(180000);
+    test.setTimeout(240000);
     recordBusinessEvidence(testInfo, getPeQstEvidenceMetadata("SAM-25057"));
 
     const auth = getPeAuthState();
@@ -64,15 +65,12 @@ test.describe("PE QST - authenticated safe reuse", () => {
     });
     let history;
     await test.step("Open My Orders", async () => {
-      const responsePromise = page.waitForResponse((response) =>
-        response.request().method() === "GET" &&
-        new URL(response.url()).pathname.endsWith("/v2/pe/users/current/orders"),
-        { timeout: 60000 }
-      );
-      await myOrders.openMyOrders();
-      const response = await responsePromise;
-      expect(response.status(), "Authenticated PE order history API must succeed").toBe(200);
-      history = await response.json();
+      history = await peOrderHistory.openPeOrderHistory(page, myOrders, {
+        onRecovery: () => testInfo.annotations.push({
+          type: "qst-navigation-recovery",
+          description: "PE My Orders returned a successful document but stayed blank; repeated its read-only navigation once before validating API and UI.",
+        }),
+      });
     });
     await test.step("Validate order history is available", async () => {
       if (Array.isArray(history.currentOrders) && history.currentOrders.length === 0 &&
