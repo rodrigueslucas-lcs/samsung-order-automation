@@ -38,7 +38,7 @@ function baseResult(id, status, runtimeStatus, extra = {}) {
   };
 }
 
-test('final polish enforces status colors, readable description and promoted screenshot globally', () => {
+test('final polish enforces HTML-only status presentation and promoted screenshot globally', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'allure-final-polish-'));
   try {
     writeResult(dir, 'pass', baseResult('SAM-10001', 'passed', 'PASS'));
@@ -82,12 +82,18 @@ test('final polish enforces status colors, readable description and promoted scr
     assert.equal(blocked.status, 'broken');
     assert.equal(defect.status, 'unknown');
 
-    assert.match(pass.description, /\*\*PASS · SAM-10001\*\*/);
-    assert.match(fail.description, /\*\*Resultado observado\*\*/);
-    assert.match(fail.description, /HTTP 500/i);
-    assert.match(blocked.description, /\*\*Pré-requisito \/ desbloqueio\*\*/);
-    assert.match(defect.description, /\*\*Known Defect\*\*/);
-    assert.match(defect.description, /RT-999999/);
+    assert.equal(Object.hasOwn(pass, 'description'), false);
+    assert.equal(Object.hasOwn(fail, 'description'), false);
+    assert.equal(Object.hasOwn(blocked, 'description'), false);
+    assert.equal(Object.hasOwn(defect, 'description'), false);
+
+    assert.match(pass.descriptionHtml, /PASS/i);
+    assert.match(pass.descriptionHtml, /O que foi validado/i);
+    assert.match(fail.descriptionHtml, /Resultado observado/i);
+    assert.match(fail.descriptionHtml, /HTTP 500/i);
+    assert.match(blocked.descriptionHtml, /Pré-requisito \/ desbloqueio/i);
+    assert.match(defect.descriptionHtml, /Known Defect/i);
+    assert.match(defect.descriptionHtml, /RT-999999/);
 
     assert.match(pass.descriptionHtml, /#ECFDF3/i);
     assert.match(fail.descriptionHtml, /#FEF3F2/i);
@@ -95,6 +101,8 @@ test('final polish enforces status colors, readable description and promoted scr
     assert.match(defect.descriptionHtml, /#F4F0FF/i);
 
     assert.equal(fail.attachments[0].name, 'Screenshot · Estado final');
+    assert.equal(pass.parameters.find((item) => item.name === 'Market')?.mode, 'hidden');
+    assert.equal(defect.parameters.find((item) => item.name === 'Known Defect')?.mode, 'hidden');
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
