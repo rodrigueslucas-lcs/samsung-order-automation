@@ -5,6 +5,8 @@ const reusePlan = require("../governance/co-qst-plan.json");
 const { testTitles } = require("../utils/qstS1Implementation");
 const { buildMxQstRuntimeSummary, writeRuntimeSummary } = require("../utils/mxQstRuntimeSummary.cjs");
 const { getCoQstConfig } = require("../config/markets/co");
+const knownDefectRegistry = require("../governance/known-defects.json");
+const { evaluateCoCampaignExit } = require("./co-qst-exit-policy.cjs");
 
 const listOnly = process.argv.includes("--list");
 const targetEnvironment = String(process.env.CO_QST_ENVIRONMENT || process.env.ENVIRONMENT || "S2").toUpperCase();
@@ -160,8 +162,10 @@ const executionEnv = {
 
 const titles = Object.fromEntries(implementedTitles.map((title) => [title.match(/SAM-\d+/)?.[0], title]));
 const phaseReports = [];
+const phaseOutcomes = [];
 let result = { status: 0 };
 let registeredPhaseFailed = false;
+let sessionGateFailed = false;
 
 function readPhaseReport(reportPath, label, htmlDir) {
   if (!fs.existsSync(reportPath)) return null;
@@ -185,7 +189,10 @@ function runPhase({ label, ids, reportPath, outputDir, htmlDir, evidenceDir }) {
     env: phaseEnv,
     stdio: "inherit",
   });
-  return { status: phaseResult.status ?? 1, report: readPhaseReport(reportPath, label, htmlDir) };
+  const outcome = { status: phaseResult.status ?? 1, error: phaseResult.error,
+    signal: phaseResult.signal, report: readPhaseReport(reportPath, label, htmlDir) };
+  phaseOutcomes.push(outcome);
+  return outcome;
 }
 
 function writePlaywrightReportHub() {
@@ -230,6 +237,7 @@ if (sessionGateIds.length) {
   }
 
   if (result.status !== 0) {
+    sessionGateFailed = true;
     console.error("[co-qst] Authenticated validation failed. Remaining registered and guest/safe TCs will not run.");
   }
 }
@@ -310,16 +318,12 @@ if (fs.existsSync(reportFile)) {
   console.log(" Reports  : Executive Dashboard · Playwright · Allure");
   console.log("============================================================");
 
-  // Intentionally skipped/blocked TCs are reported for visibility but do not
-  // make the campaign fail, matching the PE QST policy.
-  const targeted = requestedTargetIds.length > 0;
-  if (runtimeSummary.summary.failed > 0) {
-    process.exitCode = result.status || 1;
-  } else if (!targeted && runtimeSummary.summary.notRun > 0) {
-    process.exitCode = result.status || 1;
-  } else {
-    process.exitCode = result.status ?? 1;
+  const policy = evaluateCoCampaignExit({ runtime: runtimeSummary, report, phases: phaseOutcomes,
+    registry: knownDefectRegistry, targeted: requestedTargetIds.length > 0, sessionGateFailed });
+  if (policy.knownDefectIds.length) {
+    console.log(`[co-qst] Non-gating known defects (proven signature): ${policy.knownDefectIds.join(", ")}. Technical FAIL evidence is preserved.`);
   }
+  process.exitCode = policy.exitCode;
 } else {
-  process.exitCode = result.status ?? 1;
+  process.exitCode = result.status || 1;
 }
