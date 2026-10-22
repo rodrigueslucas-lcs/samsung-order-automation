@@ -946,12 +946,24 @@ export default class CheckoutPage extends BasePage {
     // A checked radio is optimistic UI: PE saves the mode asynchronously.
     // Subscribe before clicking and finish this update before continuing or
     // attempting another selection. This does not submit an order/payment.
+    let transientResponses = 0;
     const saved = this.page.waitForResponse(response => {
       const url = new URL(response.url());
-      return /^s[12]-smb-api-cdn\.ecom-stg\.samsung\.com$/.test(url.hostname)
+      const matches = /^s[12]-smb-api-cdn\.ecom-stg\.samsung\.com$/.test(url.hostname)
         && /\/v2\/pe\/users\/current\/carts\/current\/deliverymodes\/update$/.test(url.pathname)
         && response.request().method() === "POST";
-    }, { timeout: 90000 });
+      if (!matches) return false;
+      // The storefront can retry this pre-payment update itself after a 5xx.
+      // Keep the original listener alive so an already-started native retry
+      // is not lost. Never replay the click; persistent errors still fail.
+      if ([500, 502, 503, 504].includes(response.status()) && ++transientResponses <= 2) return false;
+      return true;
+    }, { timeout: 90000 }).catch(error => {
+      if (transientResponses) {
+        throw new Error(`PE delivery selection did not recover after ${transientResponses} transient server response(s). No selection or payment was resubmitted.`, { cause: error });
+      }
+      throw error;
+    });
     const [response] = await Promise.all([saved, label.click({ timeout: 30000 })]);
     if (!response.ok()) throw new Error(`PE delivery selection update failed: HTTP ${response.status()}.`);
     const failure = await response.finished();
