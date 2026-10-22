@@ -14,6 +14,17 @@ if (!fs.existsSync(resultsDir)) {
   process.exit(0);
 }
 
+function polish(phase) {
+  const polished = spawnSync(process.execPath, [
+    path.resolve("scripts/polish-allure-final.cjs"),
+    resultsDir,
+    phase,
+  ], { stdio: "inherit", env: process.env });
+  if (polished.status !== 0) {
+    console.error(`[allure] Final polish (${phase}) failed; processing will continue with preserved results.`);
+  }
+}
+
 const enrich = spawnSync(process.execPath, [
   path.resolve("scripts/enrich-allure-mx-qst.cjs"),
   resultsDir,
@@ -39,11 +50,17 @@ filtered.push(
 );
 fs.writeFileSync(environmentFile, `${filtered.join("\n")}\n`);
 
+// Preserve screenshots/trace/video from technical steps before dedupe removes technical step noise.
+polish("evidence");
+
 const dedupe = spawnSync(process.execPath, [
   path.resolve("scripts/dedupe-allure-evidence.cjs"),
   resultsDir,
 ], { stdio: "inherit", env: process.env });
 if (dedupe.status !== 0) process.exit(dedupe.status || 1);
+
+// Enforce the same final visual contract used by PE/CO/CL after known-defect mapping and cleanup.
+polish("final");
 
 const metadata = spawnSync(process.execPath, [
   path.resolve("scripts/prepare-allure-ci-metadata.cjs"),
