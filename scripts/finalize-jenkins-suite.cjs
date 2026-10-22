@@ -126,6 +126,19 @@ function enrichAllure() {
   }
 }
 
+function polishAllure(phase) {
+  if (!fs.existsSync(allureResultsDir)) return;
+  const script = path.resolve('scripts/polish-allure-final.cjs');
+  if (!fs.existsSync(script)) return;
+  const polished = spawnSync(process.execPath, [script, allureResultsDir, phase], {
+    stdio: 'inherit',
+    env: process.env,
+  });
+  if (polished.status !== 0) {
+    console.error(`[reporting] Final Allure polish (${phase}) failed; processing will continue with preserved results.`);
+  }
+}
+
 function normalizeAllureEvidence() {
   if (!fs.existsSync(allureResultsDir)) return;
   const script = path.resolve('scripts/dedupe-allure-evidence.cjs');
@@ -195,7 +208,11 @@ if (!(fs.existsSync(runtimeSummaryFile) && fs.existsSync(path.join(executiveDir,
 }
 writeAllureEnvironment();
 enrichAllure();
+// First pass: preserve screenshots/trace/video from technical steps before the global cleanup removes those steps.
+polishAllure('evidence');
 normalizeAllureEvidence();
+// Second pass: enforce the final global PASS/FAIL/BLOCKED/KNOWN DEFECT presentation after market enrichment + defect mapping.
+polishAllure('final');
 prepareAllureCiMetadata('prepare');
 annotateKnownDefects();
 if (generateAllure()) prepareAllureCiMetadata('save');
