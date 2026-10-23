@@ -52,7 +52,10 @@ function resultFor({ market, environment, state, index }) {
       '**Resultado observado:** Runtime observation for the scenario.',
     ].join('\n'),
     steps: [],
-    attachments: [],
+    attachments: [
+      { name: 'stdout', source: 'stdout.txt', type: 'text/plain' },
+      { name: 'Screenshot · Estado final', source: 'final.png', type: 'image/png' },
+    ],
     links: [],
   };
 }
@@ -97,27 +100,29 @@ test('global Allure contract is identical for MX/PE/CO/CL in S1/S2 and all busin
           assert.equal(labels.suite, 'Base Store · P1/QST');
           assert.equal(labels.subSuite, `${market} QST · Base Store Official P1`);
 
-          assert.equal(Object.hasOwn(result, 'description'), false, `${market} ${environment} ${state} must be HTML-only`);
-          assert.match(result.descriptionHtml, /font-weight:800/i);
-          assert.match(result.descriptionHtml, /O que foi validado/i);
-          assert.match(result.descriptionHtml, /Resultado esperado/i);
-          assert.match(result.descriptionHtml, /Resultado observado/i);
-          assert.match(result.descriptionHtml, /Contexto da execução/i);
+          assert.equal(Object.hasOwn(result, 'descriptionHtml'), false, `${market} ${environment} ${state} must use one Markdown description`);
+          assert.match(result.description, /^## [🟢🔴🟡🟣⚪]/u);
+          assert.match(result.description, /### \*\*O que foi validado\*\*/i);
+          assert.match(result.description, /### \*\*Resultado esperado\*\*/i);
+          assert.match(result.description, /### \*\*Resultado observado\*\*/i);
+          assert.match(result.description, /### \*\*Contexto da execução\*\*/i);
+          assert.match(result.description, /\| Campo \| Valor \|/i);
+          assert.equal((result.attachments || []).some((item) => /^(stdout|stderr)$/i.test(item.name || '')), false);
+          assert.equal((result.attachments || []).some((item) => /Screenshot · Estado final/i.test(item.name || '')), true);
 
           if (state === 'PASS') {
             assert.equal(result.status, 'passed');
-            assert.match(result.descriptionHtml, /#ecfdf3/i);
+            assert.match(result.description, /🟢 \*\*PASS\*\*/u);
           } else if (state === 'FAIL') {
             assert.equal(result.status, 'failed');
-            assert.match(result.descriptionHtml, /#fef3f2/i);
+            assert.match(result.description, /🔴 \*\*FAIL\*\*/u);
           } else if (state === 'BLOCKED') {
             assert.equal(result.status, 'broken');
-            assert.match(result.descriptionHtml, /#fffaeb/i);
-            assert.match(result.descriptionHtml, /Pré-requisito \/ desbloqueio/i);
+            assert.match(result.description, /🟡 \*\*BLOCKED\*\*/u);
           } else {
             assert.equal(result.status, 'unknown');
-            assert.match(result.descriptionHtml, /#f4f0ff/i);
-            assert.match(result.descriptionHtml, /Known Defect/i);
+            assert.match(result.description, /🟣 \*\*KNOWN DEFECT\*\*/u);
+            assert.match(result.description, /### \*\*Known Defect\*\*/i);
           }
         }
       }
