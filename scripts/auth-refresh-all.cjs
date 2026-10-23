@@ -1,19 +1,45 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const { refreshAll, normalizeMarkets } = require('../utils/authRefreshAllRunner.cjs');
+const { refreshAll, normalizeMarkets, normalizeSlot } = require('../utils/authRefreshAllRunner.cjs');
 
-const cliMarkets = process.argv.slice(2);
-const markets = cliMarkets.length
-  ? normalizeMarkets(cliMarkets)
-  : normalizeMarkets(process.env.AUTH_REFRESH_MARKETS || process.env.MARKETS || 'mx,pe,co,cl');
+function parseArgs(argv) {
+  const markets = [];
+  let slot = process.env.AUTH_REFRESH_SLOT || 'primary';
+  let publish = process.env.JENKINS_AUTH_PUBLISH === '1';
+  for (const arg of argv) {
+    if (arg === '--publish') publish = true;
+    else if (arg === '--no-publish') publish = false;
+    else if (arg.startsWith('--slot=')) slot = arg.slice('--slot='.length);
+    else markets.push(arg);
+  }
+  slot = normalizeSlot(slot);
+  return { markets, slot, publish };
+}
+
+const args = parseArgs(process.argv.slice(2));
+const requestedMarkets = args.markets.length
+  ? args.markets
+  : (process.env.AUTH_REFRESH_MARKETS || process.env.MARKETS || '');
+const markets = normalizeMarkets(requestedMarkets, args.slot);
 const environment = process.env.AUTH_REFRESH_ENVIRONMENT || process.env.ENVIRONMENT || 'S2';
+const runtimeEnv = {
+  ...process.env,
+  AUTH_REFRESH_SLOT: args.slot,
+  JENKINS_AUTH_PUBLISH: args.publish ? '1' : '0',
+};
 
 function writeSummary(summary) {
-  const output = path.resolve('test-results/auth-refresh', `regional-${summary.environment.toLowerCase()}-summary.json`);
+  const publishSuffix = args.publish ? '-jenkins' : '';
+  const output = path.resolve(
+    'test-results/auth-refresh',
+    `regional-${summary.environment.toLowerCase()}-${summary.slot}${publishSuffix}-summary.json`,
+  );
   fs.mkdirSync(path.dirname(output), { recursive: true });
   const payload = {
     generatedAt: new Date().toISOString(),
     environment: summary.environment,
+    slot: summary.slot,
+    publishJenkins: args.publish,
     markets: summary.markets,
     ready: summary.ready,
     human: summary.human,
@@ -22,6 +48,7 @@ function writeSummary(summary) {
     results: summary.results.map((result) => ({
       market: result.market,
       environment: result.environment,
+      slot: result.slot,
       status: result.status,
       code: result.code,
       signal: result.signal,
@@ -33,7 +60,9 @@ function writeSummary(summary) {
   console.log(`[auth:refresh:all] Summary written to ${output}`);
 }
 
-refreshAll({ markets, environment, env: process.env })
+console.log(`[auth:refresh:all] Jenkins publish: ${args.publish ? 'enabled' : 'disabled'}.`);
+
+refreshAll({ markets, environment, slot: args.slot, env: runtimeEnv })
   .then((summary) => {
     writeSummary(summary);
     if (!summary.ok) process.exitCode = summary.human > 0 && summary.failed === 0 ? 2 : 1;
@@ -42,3 +71,5 @@ refreshAll({ markets, environment, env: process.env })
     console.error(`[auth:refresh:all] FAILED · ${String(error.message || error).split('\n')[0]}`);
     process.exitCode = 1;
   });
+
+module.exports = { parseArgs };
