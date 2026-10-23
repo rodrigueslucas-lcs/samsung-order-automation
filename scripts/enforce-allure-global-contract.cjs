@@ -125,8 +125,8 @@ function markdownDescription(result, status, defect, market, environment, store)
   const id = samId(result);
   const title = scenarioTitle(result, id);
   const visual = statusVisual(status, defect);
-  const objective = stepValue(result, '01 · ') || `Validate the official ${id} business scenario.`;
-  const expected = stepValue(result, '02 · ') || 'The expected business acceptance criteria should be satisfied.';
+  const objective = stepValue(result, '01 · ') || `Validar o cenário oficial ${id}: ${title}.`;
+  const expected = stepValue(result, '02 · ') || `O comportamento funcional “${title}” deve atender aos critérios de aceite definidos para o TC sem divergências.`;
   const observed = stepValue(result, '03 · ') || statusMessage(result, status, defect);
   const prerequisiteStep = (result.steps || []).find((item) => /Pré-requisito|desbloqueio/i.test(clean(item?.name)));
   const prerequisite = clean(prerequisiteStep?.steps?.[0]?.name || '');
@@ -157,12 +157,6 @@ function markdownDescription(result, status, defect, market, environment, store)
 
   lines.push('', '### **Contexto da execução**', '', '| Campo | Valor |', '|---|---|');
   for (const [label, value] of context) lines.push(`| **${label}** | ${value} |`);
-
-  if ((result.links || []).length) {
-    lines.push('', '### **Links e evidências**');
-    for (const link of result.links) lines.push(`- [${clean(link.name)}](${link.url})`);
-  }
-
   return lines.join('\n');
 }
 
@@ -181,6 +175,7 @@ function removeConsoleNoiseFromSteps(steps) {
 
 let processed = 0;
 let suiteNormalized = 0;
+let behaviorNormalized = 0;
 let consoleNoiseRemoved = 0;
 const counts = { passed: 0, failed: 0, blocked: 0, defect: 0, other: 0 };
 
@@ -194,11 +189,20 @@ for (const fileName of fs.readdirSync(resultsDir).filter((name) => name.endsWith
   const store = storeOf(result);
   const defect = knownDefect(result);
   const status = runtimeStatus(result);
+  const id = samId(result);
+  const title = scenarioTitle(result, id);
 
   upsertLabel(result, 'parentSuite', `${market} · ${environment}`);
   upsertLabel(result, 'suite', `${store} · P1/QST`);
   upsertLabel(result, 'subSuite', `${market} QST · ${store} Official P1`);
   suiteNormalized += 1;
+
+  // Behaviors/Overview must represent the complete official campaign, not only
+  // the subset of specs that happened to declare feature/story annotations.
+  upsertLabel(result, 'epic', 'Samsung SMB QST');
+  upsertLabel(result, 'feature', `${market} · ${store} · P1/QST`);
+  upsertLabel(result, 'story', `${id} · ${title}`);
+  behaviorNormalized += 1;
 
   if (defect) {
     result.status = 'unknown';
@@ -224,11 +228,10 @@ for (const fileName of fs.readdirSync(resultsDir).filter((name) => name.endsWith
   if (defect || status === 'PASS') result.statusDetails.trace = '';
 
   // Keep both representations until generation: rich HTML is the source of
-  // truth for the published report; Markdown is only a readable fallback for
-  // Allure variants that prefer `description` during generation.
+  // truth for the published report; Markdown is only a readable fallback.
   result.description = markdownDescription(result, status, defect, market, environment, store);
   if (!clean(result.descriptionHtml)) {
-    console.error(`[allure-global-contract] Missing rich HTML description for ${samId(result)}.`);
+    console.error(`[allure-global-contract] Missing rich HTML description for ${id}.`);
   }
 
   if (Array.isArray(result.attachments)) {
@@ -242,4 +245,4 @@ for (const fileName of fs.readdirSync(resultsDir).filter((name) => name.endsWith
   processed += 1;
 }
 
-console.log(`[allure-global-contract] READY · ${processed} official TC(s) · suites=${suiteNormalized} · console-noise-removed=${consoleNoiseRemoved} · PASS=${counts.passed} FAIL=${counts.failed} BLOCKED=${counts.blocked} KNOWN_DEFECT=${counts.defect} OTHER=${counts.other}.`);
+console.log(`[allure-global-contract] READY · ${processed} official TC(s) · suites=${suiteNormalized} · behaviors=${behaviorNormalized} · console-noise-removed=${consoleNoiseRemoved} · PASS=${counts.passed} FAIL=${counts.failed} BLOCKED=${counts.blocked} KNOWN_DEFECT=${counts.defect} OTHER=${counts.other}.`);
