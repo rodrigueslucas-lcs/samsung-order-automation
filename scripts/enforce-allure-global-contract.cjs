@@ -110,9 +110,7 @@ function stepValue(result, prefix) {
 
 function contextMap(result) {
   const labels = ['Market', 'Environment', 'Store', 'User Type', 'SKU', 'Payment', 'Order ID', 'Runtime Status', 'Technical Result'];
-  return labels
-    .map((label) => [label, parameter(result, label)])
-    .filter(([, value]) => value);
+  return labels.map((label) => [label, parameter(result, label)]).filter(([, value]) => value);
 }
 
 function statusVisual(status, defect) {
@@ -154,12 +152,8 @@ function markdownDescription(result, status, defect, market, environment, store)
     `**${visual.icon} ${observed}**`,
   ];
 
-  if (defect) {
-    lines.push('', '### **Known Defect**', `🟣 **${defect}**${defectTitle ? ` — ${defectTitle}` : ''}`, 'O runtime técnico original permanece preservado nas evidências para diagnóstico.');
-  }
-  if (status === 'BLOCKED' && prerequisite) {
-    lines.push('', '### **Pré-requisito / desbloqueio**', `🟡 ${prerequisite}`);
-  }
+  if (defect) lines.push('', '### **Known Defect**', `🟣 **${defect}**${defectTitle ? ` — ${defectTitle}` : ''}`, 'O runtime técnico original permanece preservado nas evidências para diagnóstico.');
+  if (status === 'BLOCKED' && prerequisite) lines.push('', '### **Pré-requisito / desbloqueio**', `🟡 ${prerequisite}`);
 
   lines.push('', '### **Contexto da execução**', '', '| Campo | Valor |', '|---|---|');
   for (const [label, value] of context) lines.push(`| **${label}** | ${value} |`);
@@ -229,10 +223,13 @@ for (const fileName of fs.readdirSync(resultsDir).filter((name) => name.endsWith
   result.statusDetails.message = statusMessage(result, status, defect);
   if (defect || status === 'PASS') result.statusDetails.trace = '';
 
-  // Allure 2 reliably renders Markdown in `description`. Keep one authoritative
-  // representation so the UI cannot fall back to the old cramped plain text.
+  // Keep both representations until generation: rich HTML is the source of
+  // truth for the published report; Markdown is only a readable fallback for
+  // Allure variants that prefer `description` during generation.
   result.description = markdownDescription(result, status, defect, market, environment, store);
-  delete result.descriptionHtml;
+  if (!clean(result.descriptionHtml)) {
+    console.error(`[allure-global-contract] Missing rich HTML description for ${samId(result)}.`);
+  }
 
   if (Array.isArray(result.attachments)) {
     const before = result.attachments.length;
@@ -245,7 +242,4 @@ for (const fileName of fs.readdirSync(resultsDir).filter((name) => name.endsWith
   processed += 1;
 }
 
-console.log(
-  `[allure-global-contract] READY · ${processed} official TC(s) · suites=${suiteNormalized} · console-noise-removed=${consoleNoiseRemoved} · ` +
-  `PASS=${counts.passed} FAIL=${counts.failed} BLOCKED=${counts.blocked} KNOWN_DEFECT=${counts.defect} OTHER=${counts.other}.`
-);
+console.log(`[allure-global-contract] READY · ${processed} official TC(s) · suites=${suiteNormalized} · console-noise-removed=${consoleNoiseRemoved} · PASS=${counts.passed} FAIL=${counts.failed} BLOCKED=${counts.blocked} KNOWN_DEFECT=${counts.defect} OTHER=${counts.other}.`);
