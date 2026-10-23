@@ -1,3 +1,4 @@
+const { waitForManualStorefront } = require("../utils/authManualReturn.cjs");
 const { chromium } = require("@playwright/test");
 const { connectAuthBrowser } = require("../utils/authDedicatedBrowser.cjs");
 const { completeAccountLogin } = require("../utils/authAccountLogin.cjs");
@@ -189,14 +190,9 @@ async function loginPeSamsungAccount() {
 
       if (menuState === "signed-out" && manualLogin) {
         console.log(`[auth:login:pe] Samsung Account login is ready in the visible Chrome. Complete login/CAPTCHA/MFA manually; automation will resume after the authenticated PE ${ENV_NAME} return.`);
-        const returnedPage = await Promise.race([
-          page.waitForURL((url) => url.hostname === HOSTNAME, { timeout: interactiveTimeout }).then(() => page),
-          context.waitForEvent("page", { timeout: interactiveTimeout }).then(async (candidate) => {
-            await candidate.waitForURL((url) => url.hostname === HOSTNAME, { timeout: interactiveTimeout });
-            return candidate;
-          }),
-        ]);
-        page = returnedPage;
+        page = await waitForManualStorefront(context, page, {
+          hostname: HOSTNAME, market: "pe", timeout: interactiveTimeout,
+        });
       } else if (menuState === "signed-out") {
         await completeAccountLogin(page, { market: "pe", hostname: HOSTNAME, credentials: resolveRuntimeCredentials, timeout: interactiveTimeout });
       }
