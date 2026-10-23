@@ -5,7 +5,7 @@ const { hasNativeAuthWindow } = require('./authBrowserWindow.cjs');
 
 async function connectAuthBrowser({ chromium, profileDir, market, environment, slot = 'primary' }, {
   hasWindow = hasNativeAuthWindow, log = console.log,
-  launch = script => spawnSync(process.execPath, [script], { stdio: 'inherit' }),
+  launch = script => spawnSync(process.execPath, [script], { stdio: 'inherit', env: { ...process.env, SAMSUNG_AUTH_MANAGED: '1' } }),
   pause = ms => new Promise(resolve => setTimeout(resolve, ms)), now = Date.now,
 } = {}) {
   if (!['mx', 'pe', 'co', 'cl'].includes(market) || !['S1', 'S2'].includes(environment) || !['primary', 'second'].includes(slot)) throw new Error('Dedicated auth browser requires an explicit staging identity.');

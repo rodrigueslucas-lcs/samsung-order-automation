@@ -71,6 +71,10 @@ chrome.once("error", (error) => {
 
 chrome.once("spawn", () => {
   chrome.unref();
+  if (process.env.SAMSUNG_AUTH_MANAGED === "1") {
+    console.log(`[auth:login:mx] maximized ${target.name} ${accountSlot} Chrome opened; refresh will continue automatically.`);
+    return;
+  }
   console.log(`A maximized Chrome window was opened with the dedicated ${target.name} MX QA profile.`);
   console.log("");
   console.log("Complete these steps manually:");

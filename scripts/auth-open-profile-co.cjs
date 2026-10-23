@@ -54,6 +54,10 @@ chrome.once("error", (error) => {
 
 chrome.once("spawn", () => {
   chrome.unref();
+  if (process.env.SAMSUNG_AUTH_MANAGED === "1") {
+    console.log(`[auth:login:co] maximized ${config.environment} ${accountSlot} Chrome opened; refresh will continue automatically.`);
+    return;
+  }
   console.log(`A maximized Chrome window was opened with the dedicated ${config.environment} CO ${accountSlot === "second" ? "second-account" : "QA"} profile.`);
   console.log("");
   console.log("Complete these steps manually:");
