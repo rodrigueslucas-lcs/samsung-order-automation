@@ -57,8 +57,8 @@ function runtimeStatus(result) {
   if (/FAIL|TIMEDOUT|INTERRUPTED|UNEXPECTED/.test(explicit)) return 'FAIL';
   const status = clean(result.status).toLowerCase();
   if (status === 'passed') return 'PASS';
-  if (status === 'skipped') return 'BLOCKED';
-  if (['failed', 'broken', 'unknown'].includes(status)) return 'FAIL';
+  if (status === 'skipped' || status === 'broken') return 'BLOCKED';
+  if (['failed', 'unknown'].includes(status)) return 'FAIL';
   return 'NOT RUN';
 }
 
@@ -79,6 +79,20 @@ function readField(description, labels) {
   return '';
 }
 
+function isGenericBusinessText(value) {
+  const text = clean(value);
+  return !text || /Validate the official SAM-\d+ business scenario/i.test(text) || /expected business acceptance criteria should be satisfied/i.test(text);
+}
+
+function humanizeTechnical(result) {
+  const raw = clean(result.statusDetails?.message || result.statusDetails?.trace || '');
+  if (!raw) return '';
+  if (/HTTP\s*500/i.test(raw)) return 'O backend retornou HTTP 500 durante o fluxo e impediu a conclusão esperada do cenário.';
+  if (/timeout|timed out|exceeded/i.test(raw)) return 'O cenário excedeu a janela controlada de espera antes de atingir o estado funcional esperado.';
+  if (/authentication|session|credentials/i.test(raw)) return 'A execução não pôde continuar porque o pré-requisito de autenticação/sessão não estava disponível.';
+  return raw.split('\n')[0].replace(/^Error:\s*/i, '').slice(0, 520);
+}
+
 function child(name, status = 'passed') {
   return { name: clean(name), status, stage: 'finished', steps: [], attachments: [], parameters: [], statusDetails: {} };
 }
@@ -88,14 +102,8 @@ function section(name, children, status = 'passed') {
 }
 
 function hideNoisyParameters(result) {
-  const hide = new Set([
-    'Environment', 'Market', 'Project', 'Runtime Status', 'Technical Result',
-    'SKU', 'Store', 'User Type', 'Feature', 'Payment', 'Order ID', 'Coverage',
-    'Known Defect', 'Known Defect Title',
-  ]);
-  result.parameters = (result.parameters || []).map((item) =>
-    hide.has(String(item?.name || '')) ? { ...item, mode: 'hidden', excluded: true } : item
-  );
+  const hide = new Set(['Environment', 'Market', 'Project', 'Runtime Status', 'Technical Result', 'SKU', 'Store', 'User Type', 'Feature', 'Payment', 'Order ID', 'Coverage', 'Known Defect', 'Known Defect Title']);
+  result.parameters = (result.parameters || []).map((item) => hide.has(String(item?.name || '')) ? { ...item, mode: 'hidden', excluded: true } : item);
 }
 
 function contextPairs(result) {
@@ -149,9 +157,7 @@ function visual(status, defect) {
 }
 
 function htmlSection(title, body, accent, background = '#101828') {
-  return `<div style="border:1px solid ${accent};border-left:5px solid ${accent};border-radius:10px;padding:14px 16px;margin:12px 0;background:${background};">` +
-    `<div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${accent};margin-bottom:7px">${esc(title)}</div>` +
-    `<div style="font-size:14px;line-height:1.65;color:#f2f4f7">${body}</div></div>`;
+  return `<div style="border:1px solid ${accent};border-left:5px solid ${accent};border-radius:10px;padding:14px 16px;margin:12px 0;background:${background};"><div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${accent};margin-bottom:7px">${esc(title)}</div><div style="font-size:14px;line-height:1.65;color:#f2f4f7">${body}</div></div>`;
 }
 
 function renderDescriptionHtml({ result, id, title, status, defect, defectTitle, objective, expected, observed, prerequisite }) {
@@ -159,46 +165,22 @@ function renderDescriptionHtml({ result, id, title, status, defect, defectTitle,
   const tcLink = jiraUrl(id);
   const defectLink = jiraUrl(defect);
   const context = contextPairs(result);
-
   let html = `<div style="max-width:920px;font-family:Arial,sans-serif">`;
-  html += `<div style="border:1px solid ${v.border};background:${v.bg};border-radius:12px;padding:16px 18px;margin-bottom:14px">` +
-    `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">` +
-    `<span style="display:inline-block;padding:5px 10px;border-radius:999px;border:1px solid ${v.border};background:#fff;color:${v.fg};font-size:12px;font-weight:800">${v.icon} ${v.label}</span>` +
-    `<a href="${tcLink}" style="font-size:13px;font-weight:800;text-decoration:none">${esc(id)}</a>` +
-    `</div><div style="font-size:20px;line-height:1.35;font-weight:800;color:#101828">${esc(title)}</div></div>`;
-
-  if (defect) {
-    html += htmlSection(
-      `Known Defect · ${defect}`,
-      `<div style="font-weight:800;margin-bottom:4px"><a href="${defectLink}">${esc(defect)}</a>${defectTitle ? ` — ${esc(defectTitle)}` : ''}</div>` +
-      `<div>Este resultado está mapeado para um defeito conhecido neste escopo. O runtime técnico original permanece preservado para diagnóstico.</div>`,
-      '#bdb4fe', '#211a33'
-    );
-  }
-
-  html += htmlSection('O que foi validado', esc(objective), '#53b1fd');
+  html += `<div style="border:1px solid ${v.border};background:${v.bg};border-radius:12px;padding:16px 18px;margin-bottom:14px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><span style="display:inline-block;padding:5px 10px;border-radius:999px;border:1px solid ${v.border};background:#fff;color:${v.fg};font-size:12px;font-weight:800">${v.icon} ${v.label}</span><a href="${tcLink}" style="font-size:13px;font-weight:800;text-decoration:none">${esc(id)}</a></div><div style="font-size:20px;line-height:1.35;font-weight:800;color:#101828">${esc(title)}</div></div>`;
+  if (defect) html += htmlSection(`Known Defect · ${defect}`, `<div style="font-weight:800;margin-bottom:4px"><a href="${defectLink}">${esc(defect)}</a>${defectTitle ? ` — ${esc(defectTitle)}` : ''}</div><div>Resultado conhecido e mapeado neste escopo. O runtime técnico original permanece preservado nas evidências.</div>`, '#bdb4fe', '#211a33');
+  html += htmlSection('O que foi validado', `<strong>${esc(objective)}</strong>`, '#53b1fd');
   html += htmlSection('Resultado esperado', esc(expected), '#84caff');
-  html += htmlSection('Resultado observado', esc(observed), v.border, status === 'PASS' && !defect ? '#10261d' : status === 'FAIL' && !defect ? '#2b1716' : status === 'BLOCKED' && !defect ? '#2d2613' : '#211a33');
-
-  if (status === 'BLOCKED') {
-    html += htmlSection('Pré-requisito / desbloqueio', esc(prerequisite || observed || 'Restaurar o pré-requisito antes de uma validação conclusiva.'), '#fec84b', '#2d2613');
-  }
-
+  html += htmlSection('Resultado observado', `<strong style="color:${v.fg}">${esc(observed)}</strong>`, v.border, status === 'PASS' && !defect ? '#10261d' : status === 'FAIL' && !defect ? '#2b1716' : status === 'BLOCKED' && !defect ? '#2d2613' : '#211a33');
+  if (status === 'BLOCKED') html += htmlSection('Pré-requisito / desbloqueio', `<strong>${esc(prerequisite || observed || 'Restaurar o pré-requisito antes de uma validação conclusiva.')}</strong>`, '#fec84b', '#2d2613');
   if (context.length) {
-    html += `<div style="border:1px solid #344054;border-radius:10px;padding:14px 16px;margin:12px 0;background:#111827">` +
-      `<div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#98a2b3;margin-bottom:8px">Contexto da execução</div>` +
-      `<table style="border-collapse:collapse;width:100%;font-size:13px">${context.map(([key, value]) =>
-        `<tr><td style="padding:5px 14px 5px 0;width:160px;color:#98a2b3;font-weight:700">${esc(key)}</td><td style="padding:5px 0;color:#f2f4f7">${esc(value)}</td></tr>`
-      ).join('')}</table></div>`;
+    html += `<div style="border:1px solid #344054;border-radius:10px;padding:14px 16px;margin:12px 0;background:#111827"><div style="font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#98a2b3;margin-bottom:8px">Contexto da execução</div><table style="border-collapse:collapse;width:100%;font-size:13px">${context.map(([key, value]) => `<tr><td style="padding:5px 14px 5px 0;width:160px;color:#98a2b3;font-weight:700">${esc(key)}</td><td style="padding:5px 0;color:#f2f4f7">${esc(value)}</td></tr>`).join('')}</table></div>`;
   }
-
   const links = [];
   if (tcLink) links.push(`<a href="${tcLink}" style="font-weight:700">Official TC · ${esc(id)}</a>`);
   if (defectLink) links.push(`<a href="${defectLink}" style="font-weight:700">Known Defect · ${esc(defect)}</a>`);
   if (buildUrl) links.push(`<a href="${buildUrl}" style="font-weight:700">Jenkins Build${buildNumber ? ` · #${esc(buildNumber)}` : ''}</a>`);
   if (stableArtifactsUrl()) links.push(`<a href="${stableArtifactsUrl()}" style="font-weight:700">Jenkins Artifacts · Evidence</a>`);
   if (links.length) html += htmlSection('Links e evidências', links.join('<br>'), '#667085', '#111827');
-
   html += `</div>`;
   return html;
 }
@@ -220,19 +202,24 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith('-r
   const originalDescription = String(result.description || '');
   const sectionStatus = businessStatusForStep(status, defect);
 
-  const objective = readField(originalDescription, ['Validated', 'Objective', 'Validation goal', 'O que foi validado'])
-    || `Validate the official ${id} business scenario.`;
-  const expected = readField(originalDescription, ['Expected', 'Expected result', 'Resultado esperado'])
-    || 'The expected business acceptance criteria should be satisfied.';
-  const observed = readField(originalDescription, ['Observed', 'Actual Result', 'Resultado observado'])
-    || clean(result.statusDetails?.message || 'Execution completed without a curated business observation.').split('\n')[0];
-  const prerequisite = readField(originalDescription, ['Prerequisite', 'Blocker', 'Pré-requisito / desbloqueio']);
+  let objective = readField(originalDescription, ['Validated', 'Objective', 'Validation goal', 'O que foi validado']);
+  if (isGenericBusinessText(objective)) objective = `Validar o cenário oficial ${id}: ${title}.`;
+  let expected = readField(originalDescription, ['Expected', 'Expected result', 'Resultado esperado']);
+  if (isGenericBusinessText(expected)) expected = `O comportamento funcional “${title}” deve atender aos critérios de aceite definidos para o TC sem divergências.`;
+  const observedFromDescription = readField(originalDescription, ['Observed', 'Actual Result', 'Resultado observado']);
+  const technical = humanizeTechnical(result);
+  const observed = observedFromDescription || (defect
+    ? `O cenário encontrou o comportamento já mapeado em ${defect}${defectTitle ? ` — ${defectTitle}` : ''}.`
+    : status === 'PASS'
+      ? 'Todas as validações automatizadas previstas para o cenário foram atendidas.'
+      : status === 'BLOCKED'
+        ? technical || 'A execução foi interrompida por um pré-requisito indisponível.'
+        : technical || 'O comportamento observado não atendeu ao resultado esperado.');
+  const prerequisite = readField(originalDescription, ['Prerequisite', 'Blocker', 'Pré-requisito / desbloqueio']) || (status === 'BLOCKED' ? observed : '');
 
   const actualSteps = (result.steps || []).filter((step) => {
     const stepName = clean(step?.name);
-    return !/^(?:0[1-9]|1[0-9]) · /.test(stepName)
-      && !/^Known Defect · /i.test(stepName)
-      && !/^Business execution$/i.test(stepName);
+    return !/^(?:0[1-9]|1[0-9]) · /.test(stepName) && !/^Known Defect · /i.test(stepName) && !/^Business execution$/i.test(stepName);
   });
 
   hideNoisyParameters(result);
@@ -240,36 +227,26 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith('-r
   normalizeLinks(result, id, defect);
   normalizedLinks += result.links.length;
 
-  const sections = [];
-  sections.push(section('01 · O que foi validado', [child(objective)]));
-  sections.push(section('02 · Resultado esperado', [child(expected)]));
-  sections.push(section('03 · Resultado observado', [child(observed, sectionStatus)], sectionStatus));
+  const sections = [
+    section('01 · O que foi validado', [child(objective)]),
+    section('02 · Resultado esperado', [child(expected)]),
+    section('03 · Resultado observado', [child(observed, sectionStatus)], sectionStatus),
+  ];
 
   let next = 4;
   if (defect) {
-    sections.push(section(
-      `${String(next).padStart(2, '0')} · Known Defect · ${defect}`,
-      [child(defectTitle || 'Mapped known functional defect.', 'skipped'), child(`Runtime preservado · ${status}`, 'skipped')],
-      'skipped'
-    ));
+    sections.push(section(`${String(next).padStart(2, '0')} · Known Defect · ${defect}`, [child(defectTitle || 'Defeito funcional conhecido e mapeado.', 'skipped'), child(`Runtime preservado · ${status}`, 'skipped')], 'skipped'));
     next += 1;
   }
-
   if (status === 'BLOCKED') {
-    sections.push(section(
-      `${String(next).padStart(2, '0')} · Pré-requisito / desbloqueio`,
-      [child(prerequisite || observed || 'A required prerequisite must be restored before conclusive validation.', 'skipped')],
-      'skipped'
-    ));
+    sections.push(section(`${String(next).padStart(2, '0')} · Pré-requisito / desbloqueio`, [child(prerequisite, 'skipped')], 'skipped'));
     next += 1;
   }
-
   const context = contextChildren(result);
   if (context.length) {
     sections.push(section(`${String(next).padStart(2, '0')} · Contexto da execução`, context));
     next += 1;
   }
-
   const evidenceChildren = [];
   if (buildUrl) evidenceChildren.push(child(`Jenkins Build${buildNumber ? ` #${buildNumber}` : ''}`));
   if (stableArtifactsUrl()) evidenceChildren.push(child('Jenkins Artifacts · stable evidence fallback'));
@@ -277,26 +254,14 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith('-r
     sections.push(section(`${String(next).padStart(2, '0')} · Links e evidências`, evidenceChildren));
     next += 1;
   }
-
-  if (actualSteps.length) {
-    sections.push({ ...section(`${String(next).padStart(2, '0')} · Execução do negócio`, [], sectionStatus), steps: actualSteps });
-  }
+  if (actualSteps.length) sections.push({ ...section(`${String(next).padStart(2, '0')} · Execução do negócio`, [], sectionStatus), steps: actualSteps });
 
   result.steps = sections;
   result.descriptionHtml = renderDescriptionHtml({ result, id, title, status, defect, defectTitle, objective, expected, observed, prerequisite });
-
-  const v = visual(status, defect);
-  const shortLines = [
-    `${v.icon} ${v.label} · ${id}`,
-    title,
-    `Validação: ${objective}`,
-  ];
-  if (defect) shortLines.push(`Defeito conhecido: ${defect}${defectTitle ? ` — ${defectTitle}` : ''}`);
-  if (status === 'BLOCKED') shortLines.push(`Desbloqueio: ${prerequisite || observed}`);
-  result.description = shortLines.join('\n');
+  result.description = [`${visual(status, defect).label} · ${id}`, title, `O que foi validado: ${objective}`, `Resultado esperado: ${expected}`, `Resultado observado: ${observed}`].join('\n');
 
   fs.writeFileSync(file, JSON.stringify(result, null, 2));
   structured += 1;
 }
 
-console.log(`[allure-business-view] READY · ${structured} official TC(s) structured with final PASS/FAIL/BLOCKED/KNOWN DEFECT visual template; ${hiddenParameters} repeated parameter field(s) hidden; ${normalizedLinks} stable link(s) published.`);
+console.log(`[allure-business-view] READY · ${structured} official TC(s) structured with scenario-aware PASS/FAIL/BLOCKED/KNOWN DEFECT descriptions; ${hiddenParameters} repeated parameter field(s) hidden; ${normalizedLinks} stable link(s) published.`);
