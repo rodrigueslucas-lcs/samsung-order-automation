@@ -58,8 +58,11 @@ async function readMxCartSku(page, { cartUrl, sku, timeout = 20000 }) {
       }
     }
 
+    if (!sameCart()) throw new Error('MX cart readback left the configured staging cart.');
     await main.waitFor({ state: 'attached', timeout: 30000 }).catch(() => {});
-    const state = await readStableState(timeout);
+    // The Add caller's short SKU probe is not enough for a cold commerce load.
+    // Keep the remote bounded recovery and require a definitive rendered state.
+    const state = await readStableState(Math.max(timeout, 30000));
     if (state === 'present') return true;
     if (state === 'empty') return false;
 
