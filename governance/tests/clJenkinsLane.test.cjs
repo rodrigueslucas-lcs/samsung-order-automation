@@ -6,7 +6,7 @@ const stage = source.slice(source.indexOf("stage('08 · Official P1')"));
 const cl = stage.slice(stage.indexOf("if (params.MARKET == 'CL') {"), stage.indexOf("} else if (params.MARKET == 'CO')"));
 
 test('CL Jenkins Base Store supports S1/S2 and discovers exactly its BS scope', () => {
-  assert.match(source, /choices: \['S1', 'S2'\]/);
+  assert.match(source, /choice\(name: 'ENVIRONMENT', choices: [^\r\n]+\? \['S2', 'S1'\] : \['S1', 'S2'\]/);
   assert.doesNotMatch(source, /params\.MARKET == 'CL' && params\.ENVIRONMENT != 'S2'/);
   assert.match(source, /env\.CL_QST_ENVIRONMENT = params\.ENVIRONMENT/);
   assert.match(source, /env\.CL_QST_STORE = 'BS'/);

@@ -15,6 +15,8 @@ The existing `disableConcurrentBuilds()` remains useful: it prevents two builds 
 
 The `Jenkinsfile` pins `MARKET` to the suffix of these four exact job names. Keep the same names when provisioning: subsequent builds retain the single market choice instead of restoring the original four-market selector. The original `SAMSUNG-SMB-AUTOMATION` job continues to offer all four markets.
 
+The four sibling jobs default to `ENVIRONMENT=S2`, `TEST_SUITE=official-p1`, `EXECUTION_MODE=authorized-destructive`, `BROWSER_MODE=headless`, `EVIDENCE_MODE=screenshots-trace-video`, `AUTH_SOURCE=session-bundle` and an empty `P1_TARGET_IDS`. Operators can override these parameters for each build; only `MARKET` is fixed. The original job retains its existing defaults.
+
 Configure the Windows Jenkins node with at least 4 executors. Jenkins will allocate independent workspaces to the four jobs, so `playwright/.auth`, `test-results`, Playwright output, Allure results/report, local Allure history/cache and Executive Dashboard files remain isolated by job workspace.
 
 ## Operator flow

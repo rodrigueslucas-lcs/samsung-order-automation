@@ -12,11 +12,11 @@ pipeline {
 
   parameters {
     choice(name: 'MARKET', choices: env.JOB_BASE_NAME ==~ /Samsung-SMB-(MX|PE|CO|CL)/ ? [env.JOB_BASE_NAME.tokenize('-').last()] : ['MX', 'PE', 'CL', 'CO'], description: 'SMB market / storefront target. Sibling market jobs are pinned to their own market; the original job keeps all four choices.')
-    choice(name: 'ENVIRONMENT', choices: ['S1', 'S2'], description: 'Target staging environment. S1 = stg, S2 = stg2.')
-    choice(name: 'TEST_SUITE', choices: ['fast-guest', 'authenticated-safe', 'official-p1', 'backoffice-safe', 'allure-smoke'], description: 'Execution profile. Functional suites use the shared Executive Dashboard + Playwright + Allure reporting standard.')
-    choice(name: 'EXECUTION_MODE', choices: ['safe', 'authorized-destructive'], description: 'Safety mode. Full official-p1 payment/order execution requires authorized-destructive.')
+    choice(name: 'ENVIRONMENT', choices: env.JOB_BASE_NAME ==~ /Samsung-SMB-(MX|PE|CO|CL)/ ? ['S2', 'S1'] : ['S1', 'S2'], description: 'Target staging environment. S1 = stg, S2 = stg2.')
+    choice(name: 'TEST_SUITE', choices: env.JOB_BASE_NAME ==~ /Samsung-SMB-(MX|PE|CO|CL)/ ? ['official-p1', 'fast-guest', 'authenticated-safe', 'backoffice-safe', 'allure-smoke'] : ['fast-guest', 'authenticated-safe', 'official-p1', 'backoffice-safe', 'allure-smoke'], description: 'Execution profile. Functional suites use the shared Executive Dashboard + Playwright + Allure reporting standard.')
+    choice(name: 'EXECUTION_MODE', choices: env.JOB_BASE_NAME ==~ /Samsung-SMB-(MX|PE|CO|CL)/ ? ['authorized-destructive', 'safe'] : ['safe', 'authorized-destructive'], description: 'Safety mode. Full official-p1 payment/order execution requires authorized-destructive.')
     choice(name: 'BROWSER_MODE', choices: ['headless', 'headed'], description: 'Browser mode. Headless is recommended on Jenkins.')
-    choice(name: 'EVIDENCE_MODE', choices: ['screenshots-trace', 'screenshots-trace-video'], description: 'Evidence capture. Video requires FFmpeg on the Jenkins agent.')
+    choice(name: 'EVIDENCE_MODE', choices: env.JOB_BASE_NAME ==~ /Samsung-SMB-(MX|PE|CO|CL)/ ? ['screenshots-trace-video', 'screenshots-trace'] : ['screenshots-trace', 'screenshots-trace-video'], description: 'Evidence capture. Video requires FFmpeg on the Jenkins agent.')
     choice(name: 'AUTH_SOURCE', choices: ['session-bundle', 'legacy-files'], description: 'MX authenticated session source. session-bundle is the default and consumes the single ephemeral bundle managed by auth:refresh:mx + auth:publish:jenkins; legacy-files remains available only as a fallback.')
     string(name: 'P1_TARGET_IDS', defaultValue: '', description: 'Optional MX/PE/CL/CO official-p1 stabilization filter. Comma/space separated active SAM IDs. Leave empty for the full market P1.')
     string(name: 'CL_ORDER_CODE', defaultValue: '', description: 'Optional CL order from the selected environment, verified in SHIPPING_REQUESTED, for SAM-24831. Never reuse an S2 order as S1 test data.')
