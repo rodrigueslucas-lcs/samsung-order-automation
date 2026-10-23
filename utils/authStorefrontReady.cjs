@@ -104,6 +104,11 @@ async function prepareAuthStorefront(page, {
         await marker().waitFor({ state: 'visible', timeout: controlTimeoutMs });
         return;
       } catch (error) {
+        if (page.isClosed() || /Target page, context or browser has been closed|Browser has been closed|browser.*disconnected/i.test(String(error.message))) {
+          const closed = new Error(`${market.toUpperCase()} dedicated browser/page closed while ${label}; profile readiness could not be checked.`, { cause: error });
+          closed.exitCode = 75;
+          throw closed;
+        }
         if (attempt || page.isClosed() || error.name !== 'TimeoutError' || !(await blank())) {
           if (!page.isClosed()) await healthCheck(page.context().request, {
             market: market.toUpperCase(), environment: home.hostname.startsWith('stg2.') ? 'S2' : 'S1',

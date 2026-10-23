@@ -49,6 +49,21 @@ test('blank document recovery repeats only a safe storefront GET once', async ()
   finally { await s.close(); }
 });
 
+test('a closed storefront tab is classified as browser loss instead of a missing profile timeout', async () => {
+  const s = await fixture('cl', 'S1');
+  const navigate = s.options.navigate;
+  s.options.navigate = async (page, url, options) => {
+    const response = await navigate(page, url, options);
+    if (new URL(url).pathname === '/cl/') await page.close();
+    return response;
+  };
+  s.options.healthCheck = async () => assert.fail('A closed browser is not staging maintenance');
+  try {
+    await assert.rejects(prepareAuthStorefront(s.page, s.options), error => error.exitCode === 75 && /browser\/page closed/.test(error.message));
+    assert.deepEqual(s.counts(), { homes: 1, setups: 1 });
+  } finally { await s.close(); }
+});
+
 test('late Angular My Profile control is awaited without repeating home or login', async () => {
   const s = await fixture('cl', 'S2');
   const navigate = s.options.navigate;

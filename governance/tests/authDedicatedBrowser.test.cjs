@@ -38,6 +38,24 @@ test('wrong market/slot profile is rejected before connecting or launching', asy
   await assert.rejects(connectAuthBrowser({ market: 'mx', environment: 'S2', slot: 'second', profileDir: '/fixture/s2-mx-qa', chromium: {} }), /does not match/);
 });
 
+test('a CDP handle closed during native-window inspection reconnects to the same profile', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auth-cdp-'));
+  const directory = path.join(root, 's1-co-qa'); fs.mkdirSync(directory);
+  const port = path.join(directory, 'DevToolsActivePort'); fs.writeFileSync(port, '12345\n');
+  let connections = 0, launches = 0, disconnected = 0;
+  const stale = { close: async () => { disconnected++; } }, live = {};
+  try {
+    const result = await connectAuthBrowser({ market: 'co', environment: 'S1', profileDir: directory,
+      chromium: { connectOverCDP: async () => ++connections === 1 ? stale : live },
+    }, { hasWindow: async browser => { if (browser === stale) throw Error('browser.newBrowserCDPSession: Target page, context or browser has been closed'); return true; },
+      launch: () => { launches++; return { status: 0 }; }, log() {},
+    });
+    assert.equal(result, live);
+    assert.equal(connections, 2); assert.equal(launches, 1); assert.equal(disconnected, 1);
+    assert.equal(fs.readFileSync(port, 'utf8'), '12345\n');
+  } finally { fs.unlinkSync(port); fs.rmdirSync(directory); fs.rmdirSync(root); }
+});
+
 test('a transient CDP timeout retains the live endpoint for a later reconnect', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auth-cdp-'));
   const directory = path.join(root, 's2-cl-qa'); fs.mkdirSync(directory);

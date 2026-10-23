@@ -20,8 +20,17 @@ async function connectAuthBrowser({ chromium, profileDir, market, environment, s
   const connect = async port => chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 5000 }).catch(() => null);
   log(`[auth:login:${market}] connecting to dedicated ${environment} ${slot} Chrome`);
   const port = readPort();
-  const existing = port ? await connect(port) : null;
-  if (existing && await hasWindow(existing)) return existing;
+  let existing = port ? await connect(port) : null;
+  const accessible = async browser => {
+    try { return await hasWindow(browser); }
+    catch (error) {
+      if (!/Target page, context or browser has been closed|Browser has been closed|browser.*disconnected/i.test(String(error.message))) throw error;
+      await browser.close?.().catch(() => {});
+      if (browser === existing) existing = null;
+      return false;
+    }
+  };
+  if (existing && await accessible(existing)) return existing;
   // A CDP timeout does not prove the browser is dead. Keep its endpoint so a
   // temporarily busy Chrome remains reconnectable; a new Chrome replaces it.
   log(`[auth:login:${market}] opening its maximized Chrome window`);
@@ -29,11 +38,11 @@ async function connectAuthBrowser({ chromium, profileDir, market, environment, s
   if (result.status !== 0) throw new Error(`Dedicated ${market.toUpperCase()} Chrome launcher failed.`);
   const deadline = now() + 30000;
   while (now() < deadline) {
-    if (existing && await hasWindow(existing)) return existing;
+    if (existing && await accessible(existing)) return existing;
     if (!existing) {
       const next = readPort();
       const browser = next ? await connect(next) : null;
-      if (browser && await hasWindow(browser)) return browser;
+      if (browser && await accessible(browser)) return browser;
       await browser?.close().catch(() => {});
     }
     await pause(250);
