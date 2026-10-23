@@ -44,54 +44,14 @@ function slug(value) {
 
 const historyVariant = targetIds ? 'targeted' : 'full';
 const historyCacheRoot = path.resolve(process.env.ALLURE_HISTORY_CACHE_DIR || '.allure-history-cache');
-const historyCacheDir = path.join(
-  historyCacheRoot,
-  slug(market),
-  slug(environment),
-  slug(suite),
-  slug(store),
-  historyVariant,
-);
+const historyCacheDir = path.join(historyCacheRoot, slug(market), slug(environment), slug(suite), slug(store), historyVariant);
 
-function normalizeBusinessStatus() {
-  const script = path.resolve('scripts/normalize-allure-business-status.cjs');
+function runOptional(scriptName, failureMessage) {
+  const script = path.resolve(scriptName);
   if (!fs.existsSync(script)) return false;
-  const normalized = spawnSync(process.execPath, [script, resultsDir], { stdio: 'inherit', env: process.env });
-  if (normalized.status !== 0) {
-    console.error('[allure-metadata] Business-status normalization failed; existing Allure statuses were preserved.');
-    return false;
-  }
-  return true;
-}
-
-function polishPresentation() {
-  const script = path.resolve('scripts/polish-allure-presentation.cjs');
-  if (!fs.existsSync(script)) return false;
-  const polished = spawnSync(process.execPath, [script, resultsDir], { stdio: 'inherit', env: process.env });
-  if (polished.status !== 0) {
-    console.error('[allure-metadata] Presentation polish failed; normalized results were preserved.');
-    return false;
-  }
-  return true;
-}
-
-function structureBusinessView() {
-  const script = path.resolve('scripts/structure-allure-business-view.cjs');
-  if (!fs.existsSync(script)) return false;
-  const structured = spawnSync(process.execPath, [script, resultsDir], { stdio: 'inherit', env: process.env });
-  if (structured.status !== 0) {
-    console.error('[allure-metadata] Structured business view failed; polished results were preserved.');
-    return false;
-  }
-  return true;
-}
-
-function enforceGlobalContract() {
-  const script = path.resolve('scripts/enforce-allure-global-contract.cjs');
-  if (!fs.existsSync(script)) return false;
-  const enforced = spawnSync(process.execPath, [script, resultsDir], { stdio: 'inherit', env: process.env });
-  if (enforced.status !== 0) {
-    console.error('[allure-metadata] Global Allure contract failed; structured results were preserved.');
+  const result = spawnSync(process.execPath, [script, resultsDir], { stdio: 'inherit', env: process.env });
+  if (result.status !== 0) {
+    console.error(failureMessage);
     return false;
   }
   return true;
@@ -99,12 +59,9 @@ function enforceGlobalContract() {
 
 function writeEnvironment() {
   const file = path.join(resultsDir, 'environment.properties');
-  const existing = fs.existsSync(file)
-    ? fs.readFileSync(file, 'utf8').split(/\r?\n/).filter(Boolean)
-    : [];
-  const managedKeys = new Set(['Market', 'Environment', 'Suite', 'Store', 'Build', 'GitCommit', 'HistoryScope']);
-  const kept = existing.filter((line) => !managedKeys.has(line.split('=')[0]));
-  kept.push(
+  // Keep the published Allure Overview executive-readable. Internal scope and
+  // exclusion bookkeeping remains in runtime/governance artifacts, not here.
+  const lines = [
     `Market=${market}`,
     `Environment=${environment}`,
     `Suite=${suite}`,
@@ -112,8 +69,8 @@ function writeEnvironment() {
     `Build=${buildNumber}`,
     `GitCommit=${gitCommit}`,
     `HistoryScope=${market}-${environment}-${historyVariant}`,
-  );
-  fs.writeFileSync(file, `${kept.join('\n')}\n`);
+  ];
+  fs.writeFileSync(file, `${lines.join('\n')}\n`);
 }
 
 function writeExecutor() {
@@ -135,26 +92,10 @@ function writeExecutor() {
 
 function writeCategories() {
   const categories = [
-    {
-      name: 'Known Defect',
-      matchedStatuses: ['unknown', 'skipped', 'failed', 'broken'],
-      messageRegex: '.*KNOWN DEFECT.*(RT|SAM)-[0-9]+.*',
-    },
-    {
-      name: 'Auth / Prerequisite',
-      matchedStatuses: ['skipped', 'failed', 'broken'],
-      messageRegex: '.*(BLOCKED|AUTH BLOCKED|authentication|credentials|required prerequisite|test data|prerequisite).*',
-    },
-    {
-      name: 'Automation Stability',
-      matchedStatuses: ['failed', 'broken'],
-      messageRegex: '.*(AUTOMATION_RECOVERY_EXHAUSTED|bounded wait/recovery|Timeout|timed out|timeout).*',
-    },
-    {
-      name: 'Payment Outcome',
-      matchedStatuses: ['failed', 'broken'],
-      messageRegex: '.*PAYMENT_OUTCOME_UNCONFIRMED.*',
-    },
+    { name: 'Known Defect', matchedStatuses: ['unknown', 'skipped', 'failed', 'broken'], messageRegex: '.*KNOWN DEFECT.*(RT|SAM)-[0-9]+.*' },
+    { name: 'Auth / Prerequisite', matchedStatuses: ['skipped', 'failed', 'broken'], messageRegex: '.*(BLOCKED|AUTH BLOCKED|authentication|credentials|required prerequisite|test data|prerequisite).*' },
+    { name: 'Automation Stability', matchedStatuses: ['failed', 'broken'], messageRegex: '.*(AUTOMATION_RECOVERY_EXHAUSTED|bounded wait/recovery|Timeout|timed out|timeout).*' },
+    { name: 'Payment Outcome', matchedStatuses: ['failed', 'broken'], messageRegex: '.*PAYMENT_OUTCOME_UNCONFIRMED.*' },
   ];
   fs.writeFileSync(path.join(resultsDir, 'categories.json'), JSON.stringify(categories, null, 2));
 }
@@ -163,17 +104,11 @@ function restoreHistory() {
   const targetHistory = path.join(resultsDir, 'history');
   const cachedHistory = path.join(historyCacheDir, 'history');
   const previousReportHistory = path.join(reportDir, 'history');
-  const source = fs.existsSync(cachedHistory)
-    ? cachedHistory
-    : fs.existsSync(previousReportHistory)
-      ? previousReportHistory
-      : null;
-
+  const source = fs.existsSync(cachedHistory) ? cachedHistory : fs.existsSync(previousReportHistory) ? previousReportHistory : null;
   if (!source) {
     console.log(`[allure-history] No baseline yet for ${market} ${environment} ${suite} ${historyVariant}; this build will seed the Trend cache.`);
     return false;
   }
-
   fs.rmSync(targetHistory, { recursive: true, force: true });
   fs.cpSync(source, targetHistory, { recursive: true });
   console.log(`[allure-history] Restored Trend baseline for ${market} ${environment} ${suite} ${historyVariant} from ${source}.`);
@@ -186,7 +121,6 @@ function saveHistory() {
     console.log(`[allure-history] Generated report has no history to persist for ${market} ${environment}.`);
     return false;
   }
-
   const target = path.join(historyCacheDir, 'history');
   fs.mkdirSync(historyCacheDir, { recursive: true });
   fs.rmSync(target, { recursive: true, force: true });
@@ -200,12 +134,12 @@ if (mode === 'save') {
   process.exit(0);
 }
 
-const businessStatusNormalized = normalizeBusinessStatus();
-const polished = polishPresentation();
-const businessViewStructured = structureBusinessView();
-const globalContractEnforced = enforceGlobalContract();
+const businessStatusNormalized = runOptional('scripts/normalize-allure-business-status.cjs', '[allure-metadata] Business-status normalization failed; existing Allure statuses were preserved.');
+const polished = runOptional('scripts/polish-allure-presentation.cjs', '[allure-metadata] Presentation polish failed; normalized results were preserved.');
+const businessViewStructured = runOptional('scripts/structure-allure-business-view.cjs', '[allure-metadata] Structured business view failed; polished results were preserved.');
+const globalContractEnforced = runOptional('scripts/enforce-allure-global-contract.cjs', '[allure-metadata] Global Allure contract failed; structured results were preserved.');
 writeEnvironment();
 writeExecutor();
 writeCategories();
 const historyCarried = restoreHistory();
-console.log(`[allure-metadata] READY · business status ${businessStatusNormalized ? 'normalized' : 'unchanged'} · presentation ${polished ? 'polished' : 'unchanged'} · business view ${businessViewStructured ? 'structured' : 'unchanged'} · global contract ${globalContractEnforced ? 'enforced' : 'unchanged'} · Jenkins executor + environment + concise categories${historyCarried ? ' + Trend history' : ''}.`);
+console.log(`[allure-metadata] READY · business status ${businessStatusNormalized ? 'normalized' : 'unchanged'} · presentation ${polished ? 'polished' : 'unchanged'} · business view ${businessViewStructured ? 'structured' : 'unchanged'} · global contract ${globalContractEnforced ? 'enforced' : 'unchanged'} · Jenkins executor + concise environment + categories${historyCarried ? ' + Trend history' : ''}.`);
