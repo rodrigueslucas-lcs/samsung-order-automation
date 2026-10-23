@@ -47,26 +47,46 @@ function decorateBusinessLinks(html) {
       `<a href="$1" style="${pillStyle}">📎 Evidências</a>`);
 }
 
-function suppressNoisyOverviewTrend() {
-  const trendFile = path.join(widgetsDir, 'history-trend.json');
-  if (!fs.existsSync(trendFile)) return false;
+function backupAndEmptyWidget(fileName, backupName = fileName.replace(/\.json$/i, '-full.json')) {
+  const widgetFile = path.join(widgetsDir, fileName);
+  if (!fs.existsSync(widgetFile)) return false;
 
-  const raw = fs.readFileSync(trendFile, 'utf8');
+  const raw = fs.readFileSync(widgetFile, 'utf8');
   let parsed;
   try {
     parsed = JSON.parse(raw);
   } catch {
     return false;
   }
-  if (!Array.isArray(parsed) || parsed.length === 0) return false;
 
-  // Preserve the complete generated trend data for diagnostics/audit, but feed
-  // an empty series to Allure's Overview. The stock stacked-area widget is hard
-  // to read for a fixed 29-TC campaign and duplicates the clearer Executive
-  // Dashboard. Per-TC History and the underlying report/history files remain intact.
-  fs.writeFileSync(path.join(widgetsDir, 'history-trend-full.json'), JSON.stringify(parsed));
-  fs.writeFileSync(trendFile, '[]');
+  const hasData = Array.isArray(parsed)
+    ? parsed.length > 0
+    : parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0;
+  if (!hasData) return false;
+
+  fs.writeFileSync(path.join(widgetsDir, backupName), JSON.stringify(parsed));
+  fs.writeFileSync(widgetFile, Array.isArray(parsed) ? '[]' : '{}');
   return true;
+}
+
+function simplifyStockGraphs() {
+  const suppressed = [];
+
+  // The stock Allure trend widgets are useful for raw diagnostics but noisy for
+  // this fixed-size SMB campaign. Keep full backups for audit while presenting
+  // only Status, Duration and Duration trend on the Graphs page.
+  const widgetsToSuppress = [
+    ['history-trend.json', 'history-trend-full.json'],
+    ['retries-trend.json', 'retries-trend-full.json'],
+    ['categories-trend.json', 'categories-trend-full.json'],
+    ['severity.json', 'severity-full.json'],
+  ];
+
+  for (const [fileName, backupName] of widgetsToSuppress) {
+    if (backupAndEmptyWidget(fileName, backupName)) suppressed.push(fileName);
+  }
+
+  return suppressed;
 }
 
 if (!fs.existsSync(resultsDir) || !fs.existsSync(testCasesDir)) {
@@ -114,7 +134,7 @@ for (const name of fs.readdirSync(testCasesDir).filter((file) => file.endsWith('
   polished += 1;
 }
 
-const overviewTrendSuppressed = suppressNoisyOverviewTrend();
+const suppressedGraphWidgets = simplifyStockGraphs();
 
-console.log(`[allure-generated-polish] READY · ${polished} TC(s) polished in generated report · console-noise-removed=${consoleNoiseRemoved} · duplicate-links-removed=${duplicateLinksRemoved} · overview-trend=${overviewTrendSuppressed ? 'suppressed' : 'unchanged'} · missing-rich-html=${missingHtml}.`);
+console.log(`[allure-generated-polish] READY · ${polished} TC(s) polished in generated report · console-noise-removed=${consoleNoiseRemoved} · duplicate-links-removed=${duplicateLinksRemoved} · graph-widgets-suppressed=${suppressedGraphWidgets.join(',') || 'none'} · missing-rich-html=${missingHtml}.`);
 if (missingHtml > 0) process.exitCode = 2;
