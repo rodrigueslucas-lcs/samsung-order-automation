@@ -3,9 +3,11 @@ import evidenceContext from "../../../../../reporting/evidence/evidenceContext.j
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import { test, expect } from "./mxQst.fixture";
 import preQaCustomerState from "../../../../../utils/preQaCustomerState.js";
+import bcCareChoice from "../../../../../utils/mxBcCareChoice.cjs";
 
 const { recordBusinessEvidence } = evidenceContext;
 const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
+const { resolveMxBcCareChoice } = bcCareChoice;
 
 const PRE_QA_ORIGIN = "https://p6-pre-qa2.samsung.com";
 const PRE_QA_PLP = `${PRE_QA_ORIGIN}/mx/smartphones/all-smartphones/`;
@@ -127,6 +129,7 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
     .filter({ has: page.getByText(PRE_QA_MODEL_CODE, { exact: true }) }).first()
     .getByRole("textbox", { name: "Quantity", exact: true });
   let cartCountBefore = 0;
+  let careEvidence;
 
   try {
     await test.step("Bootstrap S2 and read the selected SKU quantity before BC add", async () => {
@@ -201,24 +204,22 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
       if (!tradeSelected) await noTradeIn.click();
       await expect(noTradeIn, "The Galaxy Canje opt-out must actually be selected.")
         .toHaveAttribute("aria-selected", "true", { timeout: 30000 });
-      // Declining Galaxy Canje does not resolve the mandatory Care+ choice.
-      // Explicitly opt out so the buying tool enables this product's CTA.
+      // Some configurations offer Care+, others enable the exact SKU directly.
+      // Never require an absent optional service or bypass a disabled CTA.
       const noCare = page.getByRole("tab", { name: /Sin protecci[oó]n para mi Galaxy/i });
-      await expect(noCare,
-        `Care+ choice must render before Add. S2 /mx/servicesv2/getSmcSimpleInfo HTTP statuses: ${JSON.stringify(careServiceStatuses)}`)
-        .toBeVisible({ timeout: 30000 });
-      await noCare.click();
-      const careChoice = noCare.locator("xpath=..");
-      // Asynchronous service rendering can replace the choice. Retry only the
-      // optional selection once, before any Add mutation is submitted.
-      const selected = await expect(careChoice).toHaveClass(/\bis-checked\b/, { timeout: 5000 })
-        .then(() => true, () => false);
-      if (!selected) await noCare.click();
-      await expect(careChoice, "The Care+ opt-out must actually be selected.")
-        .toHaveClass(/\bis-checked\b/, { timeout: 30000 });
-      await expect(page.locator('[canaddtocart="true"]').filter({ visible: true }).first(),
-        "The configured PreQA product must become purchasable after declining Galaxy Canje and Care+.")
-        .toBeVisible({ timeout: 30000 });
+      const enabledAdd = page.getByRole("button", {
+        name: /Añadir al carrito|Agregar al carrito|Add to cart|Add to bag/i,
+      }).and(page.locator(`[data-modelcode="${PRE_QA_MODEL_CODE}"][canaddtocart="true"]`))
+        .filter({ visible: true }).first();
+      careEvidence = await resolveMxBcCareChoice({ noCare, enabledAdd, selectOptOut: async () => {
+        await noCare.click();
+        const careChoice = noCare.locator("xpath=..");
+        const selected = await expect(careChoice).toHaveClass(/\bis-checked\b/, { timeout: 5000 })
+          .then(() => true, () => false);
+        if (!selected) await noCare.click();
+        await expect(careChoice, "The offered Care+ opt-out must actually be selected.")
+          .toHaveClass(/\bis-checked\b/, { timeout: 30000 });
+      } });
       const addToCart = await waitForPreQaAddToCart(page, testInfo);
       await expect(addToCart).toHaveAttribute("data-modelcode", PRE_QA_MODEL_CODE);
       await expect(addToCart).toHaveAttribute("canaddtocart", "true");
@@ -252,7 +253,8 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
       skuQuantityAfter: cartCountAfter,
       addToCartStatus: addResponse?.status() ?? null,
       addedFromPdp: true,
-      careProtectionDeclined: true,
+      careServiceStatuses,
+      ...careEvidence,
     });
   } finally {
     // Capture the actual CDP page before closing it, on success or failure.

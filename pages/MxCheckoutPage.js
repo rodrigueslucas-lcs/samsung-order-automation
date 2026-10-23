@@ -1,4 +1,7 @@
 import BasePage from "./BasePage";
+import contactTransition from "../utils/mxContactTransition.cjs";
+
+const { continueMxContactToDelivery } = contactTransition;
 
 export default class MxCheckoutPage extends BasePage {
   constructor(page) {
@@ -90,8 +93,7 @@ export default class MxCheckoutPage extends BasePage {
     if (!(await this.contactContinue.isEnabled())) {
       throw new Error("MX registered Contact continue remained disabled after required QA data.");
     }
-    await this.contactContinue.click();
-    await this.page.waitForURL(/CHECKOUT_STEP_DELIVERY/, { timeout: 60000 });
+    await continueMxContactToDelivery(this.page, this.contactContinue);
   }
 
   async waitForRegisteredAddressModes() {
