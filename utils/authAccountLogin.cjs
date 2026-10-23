@@ -7,6 +7,7 @@ async function completeAccountLogin(page, { market, hostname, credentials, timeo
   const email = page.locator('input#account, input[type="email"], input[name="email"], #iptLgnPlnID').filter({ visible: true }).first();
   const password = page.locator('input[type="password"], #iptLgnPlnPD').filter({ visible: true }).first();
   let emailSubmitted = false, passwordSubmitted = false, human = false;
+  let emailFilled = false, passwordFilled = false;
   let resolvedCredentials;
   const configured = () => resolvedCredentials ||= (typeof credentials === 'function' ? credentials() : credentials) || {};
   const returned = () => {
@@ -17,6 +18,9 @@ async function completeAccountLogin(page, { market, hostname, credentials, timeo
   const deadline = now() + timeout;
   while (now() < deadline) {
     if (returned()) return;
+    // The provider may replace its document with about:blank while returning
+    // from verification. Wait within the same deadline; never fill there.
+    if (page.url() === 'about:blank') { await pause(250); continue; }
     const url = new URL(page.url());
     if (url.protocol !== 'https:') throw new Error('Samsung Account login requires HTTPS; no credentials were submitted.');
     if (url.hostname !== 'account.samsung.com') {
@@ -27,22 +31,33 @@ async function completeAccountLogin(page, { market, hostname, credentials, timeo
     }
     const challenge = await page.locator('iframe[title="reCAPTCHA" i], iframe[title*="challenge" i], iframe[title*="desaf" i], iframe[src*="bframe"]').filter({ visible: true }).count();
     const mfa = await page.getByText(/Two-step verification|Verification code|c[oó]digo de verificaci[oó]n|Verificaci[oó]n en dos pasos/i).first().isVisible();
-    if (challenge || mfa) {
+    if (mfa) {
+      if (!human) report('CAPTCHA/MFA requires human completion in this window. The login and credentials will not be restarted.');
+      human = true; await pause(250); continue;
+    }
+    try {
+    // A reCAPTCHA can be visible alongside the normal credentials form.
+    // Populate that form once, but leave verification and submission to the
+    // human until its challenge disappears. Never populate an MFA form.
+    if (!emailSubmitted && !passwordSubmitted && !emailFilled && await email.isVisible()) {
+      if (!configured().email) throw new Error('Configured Samsung Account email is unavailable.');
+      await email.fill(configured().email); emailFilled = true;
+    }
+    if (!passwordSubmitted && !passwordFilled && await password.isVisible()) {
+      if (!configured().password) throw new Error('Configured Samsung Account password is unavailable.');
+      await password.fill(configured().password); passwordFilled = true;
+    }
+    if (challenge) {
       if (!human) report('CAPTCHA/MFA requires human completion in this window. The login and credentials will not be restarted.');
       human = true; await pause(250); continue;
     }
     human = false;
-    try {
     if (!passwordSubmitted && await password.isVisible()) {
-      if (!configured().password) throw new Error('Configured Samsung Account password is unavailable.');
       report('completing the visible password step once');
-      await password.fill(configured().password);
       await page.getByRole('button', { name: /^(?:Iniciar sesi[oó]n|Sign in|Continuar)$/i }).filter({ visible: true }).last().click({ timeout: 10000 });
       passwordSubmitted = true;
     } else if (!emailSubmitted && !passwordSubmitted && await email.isVisible()) {
-      if (!configured().email) throw new Error('Configured Samsung Account email is unavailable.');
       report('completing the visible email step once');
-      await email.fill(configured().email);
       await page.getByRole('button', { name: /^(?:Siguiente|Next|Continuar|Sign in)$/i }).filter({ visible: true }).first().click({ timeout: 10000 });
       emailSubmitted = true;
     }

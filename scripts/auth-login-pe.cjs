@@ -147,7 +147,6 @@ async function loginPeSamsungAccount() {
     try { return new URL(candidate.url()).hostname === ACCOUNT_HOSTNAME; } catch { return false; }
   });
   let page = existingAccountPage || await findRenderedPePage(context) || await context.newPage();
-  let authenticated = false;
   page.setDefaultTimeout(120000);
 
   try {
@@ -219,9 +218,7 @@ async function loginPeSamsungAccount() {
     console.log("[auth:login:pe] authenticated PE profile menu validated");
     await exportAuthenticatedState(context, page);
     console.log("[auth:login:pe] ignored PE auth state exported successfully");
-    authenticated = true;
   } finally {
-    if (authenticated) await page.close().catch(() => {});
     await browser.close().catch(() => {});
   }
 }

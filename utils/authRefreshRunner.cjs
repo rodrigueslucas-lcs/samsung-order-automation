@@ -56,6 +56,7 @@ function runAuthChild(script, env, { label, log, timeoutMs, heartbeatMs = 15000,
 
 async function refreshAuth({ market, environment, slot = 'primary', env, publishScript }, {
   runChild = runAuthChild, acquire = acquireRefreshLock, log = console.log,
+  captureBrowser = require('./authBrowserLifecycle.cjs').captureAuthBrowser,
 } = {}) {
   if (!['mx', 'pe', 'co', 'cl'].includes(market) || !['S1', 'S2'].includes(environment) || !['primary', 'second'].includes(slot)) {
     throw new Error('Refresh requires a supported market, S1/S2 environment and primary/second slot.');
@@ -63,6 +64,7 @@ async function refreshAuth({ market, environment, slot = 'primary', env, publish
   const prefix = `[auth:refresh:${market}]`;
   const report = text => log(`${prefix} ${text}`);
   const release = acquire(market, environment, slot);
+  let ownedBrowser;
   try {
     const interactiveMs = Number(env[`${market.toUpperCase()}_AUTH_INTERACTIVE_TIMEOUT_MS`] || 600000);
     if (!Number.isFinite(interactiveMs) || interactiveMs < 1000) throw new Error('Auth interactive timeout must be at least 1000ms.');
@@ -94,10 +96,17 @@ async function refreshAuth({ market, environment, slot = 'primary', env, publish
         throw new Error(`${label} failed (exit ${status}). No blind login retry; inspect the visible browser and the specific message above.`);
       }
       report(`${phase} complete`);
+      if (phase === 'login' && !(market === 'co' && env.CO_STOREFRONT_URL && new URL(env.CO_STOREFRONT_URL).hostname === 'p6-pre-qa2.samsung.com')) {
+        ownedBrowser = await captureBrowser({ market, environment, slot });
+      }
+    }
+    if (ownedBrowser) {
+      await ownedBrowser.closeVerified();
+      report('Verified dedicated Chrome closed.');
     }
     report(`READY · ${market.toUpperCase()} ${environment} ${slot} authenticated session refreshed, verified and packaged.`);
     report('CAPTCHA/MFA remains a human security gate when Samsung Account requests it.');
-  } finally { release(); }
+  } finally { try { await ownedBrowser?.dispose(); } finally { release(); } }
 }
 
 module.exports = { refreshAuth, runAuthChild, acquireRefreshLock };

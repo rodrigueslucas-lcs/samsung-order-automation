@@ -283,7 +283,6 @@ async function loginCoSamsungAccount() {
     try { return new URL(candidate.url()).hostname === ACCOUNT_HOSTNAME; } catch { return false; }
   });
   let page = existingAccountPage || await findRenderedCoPage(context) || context.pages().slice(-1)[0] || await context.newPage();
-  let authenticated = false;
   page.setDefaultTimeout(120000);
 
   try {
@@ -371,9 +370,7 @@ async function loginCoSamsungAccount() {
     console.log("[auth:login:co] authenticated CO profile menu validated");
     await exportAuthenticatedState(context, page);
     console.log("[auth:login:co] ignored CO auth state exported successfully");
-    authenticated = true;
   } finally {
-    if (authenticated) await page.close().catch(() => {});
     await browser.close().catch(() => {});
   }
 }

@@ -40,7 +40,7 @@ test('unresolved human verification is typed and never resubmits credentials', a
   assert.deepEqual(s.calls, []);
 });
 
-test('visible reCAPTCHA checkbox modal is human verification even before its challenge frame opens', async () => {
+test('visible CAPTCHA permits filling both credentials once but never submits them', async () => {
   let fills = 0, clock = 0;
   const locator = visible => ({ filter() { return this; }, first() { return this; }, last() { return this; },
     count: async () => Number(visible), isVisible: async () => visible, fill: async () => { fills++; } });
@@ -49,9 +49,19 @@ test('visible reCAPTCHA checkbox modal is human verification even before its cha
     getByText: () => locator(false),
   };
   await assert.rejects(completeAccountLogin(page, { market: 'cl', hostname: 'stg2.shop.samsung.com',
-    credentials: {}, timeout: 1000, now: () => clock, pause: async ms => { clock += ms; }, log() {},
+    credentials: { email: 'fixture@example.test', password: 'fixture-only' }, timeout: 1000, now: () => clock, pause: async ms => { clock += ms; }, log() {},
   }), error => error.exitCode === 79);
-  assert.equal(fills, 0);
+  assert.equal(fills, 2);
+});
+
+test('provider blank transition waits without filling credentials on the blank document', async () => {
+  let clock = 0;
+  const locator = { filter() { return this; }, first() { return this; } };
+  await completeAccountLogin({ isClosed: () => false, url: () => clock < 500 ? 'about:blank' : 'https://stg2.shop.samsung.com/pe/', locator: () => locator }, {
+    market: 'pe', hostname: 'stg2.shop.samsung.com', credentials() { throw new Error('must not resolve credentials'); },
+    timeout: 1000, now: () => clock, pause: async ms => { clock += ms; }, log() {},
+  });
+  assert.equal(clock, 500);
 });
 test('warm SSO does not attempt to find or fill an obsolete provider field', async () => {
   const s = scenario({ warm: true }); await s.run(); assert.deepEqual(s.calls, []);
@@ -65,4 +75,22 @@ test('insecure or foreign targets never receive credentials', async () => {
     }));
   }
   assert.equal(fills, 0);
+});
+
+test('MFA never receives saved credentials even when it renders a password input', async () => {
+  let clock = 0;
+  const loc = { filter() { return this; }, first() { return this; }, isVisible: async () => true, count: async () => 0, fill() { throw new Error('MFA must remain manual'); } };
+  await assert.rejects(completeAccountLogin({ isClosed: () => false, url: () => 'https://account.samsung.com/accounts/fixture', locator: () => loc, getByText: () => loc }, {
+    market: 'mx', hostname: 'stg2.shop.samsung.com', credentials() { throw new Error('must not resolve credentials'); }, timeout: 1000, now: () => clock, pause: async ms => { clock += ms; }, log() {},
+  }), error => error.exitCode === 79);
+});
+
+test('combined login form fills email before password and submits only once', async () => {
+  let returned = false;
+  const actions = [];
+  const loc = name => ({ filter() { return this; }, first() { return this; }, last() { return this; }, isVisible: async () => true, count: async () => 0, fill: async () => actions.push(name), click: async () => { actions.push('submit'); returned = true; } });
+  await completeAccountLogin({ isClosed: () => false, url: () => returned ? 'https://stg.shop.samsung.com/co/' : 'https://account.samsung.com/accounts/fixture', locator: s => loc(s.includes('password') ? 'password' : 'email'), getByText: () => ({first() {return this;}, isVisible: async () => false}), getByRole: () => loc('button') }, {
+    market: 'co', hostname: 'stg.shop.samsung.com', credentials: {email: 'fixture@example.test', password: 'fixture-only'}, pause: async () => {}, log() {},
+  });
+  assert.deepEqual(actions, ['email', 'password', 'submit']);
 });
