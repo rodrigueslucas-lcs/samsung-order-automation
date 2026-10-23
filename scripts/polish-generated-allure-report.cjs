@@ -33,6 +33,19 @@ function cleanSteps(steps) {
   return removed;
 }
 
+function decorateBusinessLinks(html) {
+  const pillStyle = 'display:inline-block;margin:4px 8px 4px 0;padding:6px 10px;border:1px solid #475467;border-radius:999px;background:#182230;color:#d1e9ff;text-decoration:none;font-weight:700;line-height:1.25';
+  return String(html || '')
+    .replace(/<a href="([^"]+)" style="font-weight:700">Official TC · ([^<]+)<\/a>/g,
+      `<a href="$1" style="${pillStyle}">🧾 TC oficial · $2</a>`)
+    .replace(/<a href="([^"]+)" style="font-weight:700">Known Defect · ([^<]+)<\/a>/g,
+      `<a href="$1" style="${pillStyle}">🐞 Defeito conhecido · $2</a>`)
+    .replace(/<a href="([^"]+)" style="font-weight:700">Jenkins Build([^<]*)<\/a>/g,
+      `<a href="$1" style="${pillStyle}">▶ Jenkins$2</a>`)
+    .replace(/<a href="([^"]+)" style="font-weight:700">Jenkins Artifacts · Evidence<\/a>/g,
+      `<a href="$1" style="${pillStyle}">📎 Evidências</a>`);
+}
+
 if (!fs.existsSync(resultsDir) || !fs.existsSync(testCasesDir)) {
   console.log('[allure-generated-polish] Results/report data missing; nothing to polish.');
   process.exit(0);
@@ -62,7 +75,7 @@ for (const name of fs.readdirSync(testCasesDir).filter((file) => file.endsWith('
 
   const richHtml = clean(source.descriptionHtml);
   if (richHtml) {
-    testCase.descriptionHtml = source.descriptionHtml;
+    testCase.descriptionHtml = decorateBusinessLinks(source.descriptionHtml);
     delete testCase.description;
     // The rich Description already exposes Official TC / Known Defect /
     // Jenkins / artifacts as clickable links. Hide Allure's native duplicate
