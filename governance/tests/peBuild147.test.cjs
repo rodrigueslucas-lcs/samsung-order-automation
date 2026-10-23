@@ -72,15 +72,11 @@ test('blank PDP, another SKU or unrelated text remain failures, never missing-ma
   }
 });
 
-test('PE refresh stops after a non-retryable login failure and reports the actual attempts without READY', () => {
-  const source = fs.readFileSync('scripts/auth-refresh-pe.cjs', 'utf8');
-  const calls = [], messages = [], runtime = { env: { PE_QST_ENVIRONMENT: 'S2' }, execPath: 'node' };
-  vm.runInNewContext(source, {
-    require: name => { assert.equal(name, 'node:child_process'); return { spawnSync: (_, args) => { calls.push(args[0]); return { status: 1 }; } }; },
-    process: runtime, console: { log: text => messages.push(text), error: text => messages.push(text) },
-  });
-  assert.deepEqual(calls, ['scripts/auth-login-pe.cjs']);
-  assert.equal(runtime.exitCode, 1);
-  assert.ok(messages.some(text => /failed after 1 attempt/.test(text)));
-  assert.ok(!messages.some(text => /READY/.test(text)));
+test('PE refresh stops after a non-retryable login failure without READY', async () => {
+  const { runRefreshFixture } = require('../fixtures/authRefreshHarness.cjs');
+  const result = await runRefreshFixture('pe', { PE_QST_ENVIRONMENT: 'S2' }, [1]);
+  assert.deepEqual(result.calls.map(call => call.script), ['scripts/auth-login-pe.cjs']);
+  assert.equal(result.exitCode, 1);
+  assert.match(result.output, /No blind login retry/);
+  assert.doesNotMatch(result.output, /READY/);
 });

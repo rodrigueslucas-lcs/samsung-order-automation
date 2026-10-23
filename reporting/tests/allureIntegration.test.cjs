@@ -44,7 +44,7 @@ test('generic Jenkins finalizer normalizes Allure evidence before generating the
   assert.match(finalizer, /dedupe-allure-evidence\.cjs/);
   const normalizeAt = finalizer.indexOf('normalizeAllureEvidence();');
   const annotateAt = finalizer.indexOf('annotateKnownDefects();');
-  const generateAt = finalizer.indexOf('generateAllure();');
+  const generateAt = finalizer.lastIndexOf('generateAllure()');
   assert.ok(normalizeAt >= 0, 'generic finalizer must normalize Allure evidence');
   assert.ok(generateAt >= 0, 'generic finalizer must generate the Allure HTML report');
   assert.ok(normalizeAt < generateAt, 'Allure evidence must be normalized before HTML generation');

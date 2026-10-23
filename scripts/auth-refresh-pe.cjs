@@ -1,34 +1,15 @@
-const { spawnSync } = require("node:child_process");
+const { refreshAuth } = require("../utils/authRefreshRunner.cjs");
 const environment = String(process.env.PE_QST_ENVIRONMENT || process.env.ENVIRONMENT || "S2").toUpperCase();
 if (!["S1", "S2"].includes(environment)) throw new Error(`Unsupported PE auth environment: ${environment}.`);
-const baseEnv = { ...process.env, PE_QST_ENVIRONMENT: environment };
-function run(label, script, attempts = 1) {
-  let lastStatus;
-  let attempted = 0;
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    attempted = attempt;
-    console.log(`\n[auth:refresh:pe] ${label}${attempts > 1 ? ` (attempt ${attempt}/${attempts})` : ""}`);
-    const result = spawnSync(process.execPath, [script], { env: baseEnv, stdio: "inherit" });
-    lastStatus = result.status;
-    if (result.status === 0) return;
-    if (result.status === 75 && attempt < attempts) {
-      console.warn(`[auth:refresh:pe] Login attempt lost its browser/page; retrying in 2500ms.`);
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2500);
-    } else break;
-  }
-  throw new Error(`${label} failed after ${attempted} attempt(s) with exit code ${lastStatus ?? "unknown"}.`);
-}
-try {
-  run(`Refreshing Samsung Account session for ${environment}`, "scripts/auth-login-pe.cjs", 3);
-  run(`Verifying Samsung Account session for ${environment}`, "scripts/auth-verify-pe.cjs");
-  run(`Packaging verified PE ${environment} session for CI handoff`, "scripts/auth-package-pe.cjs");
-
-  if (process.env.JENKINS_AUTH_PUBLISH === "1") {
-    run(`Publishing PE ${environment} session bundle to Jenkins`, "scripts/auth-publish-jenkins-pe.cjs");
-  }
-  console.log(`\n[auth:refresh:pe] READY · PE ${environment} authenticated session refreshed, verified and packaged.`);
-  console.log("[auth:refresh:pe] CAPTCHA/MFA remains a human security gate when Samsung Account requests it.");
-} catch (error) {
-  console.error(`[auth:refresh:pe] FAILED · ${error.message}`);
-  process.exitCode = 1;
-}
+const accountSlot = "primary";
+if (!["primary", "second"].includes(accountSlot)) throw new Error(`Unsupported PE auth slot: ${accountSlot}.`);
+const baseEnv = {
+  ...process.env, PE_QST_ENVIRONMENT: environment, PE_AUTH_SLOT: accountSlot,
+  PE_AUTH_MANUAL: accountSlot === "second" ? "1" : process.env.PE_AUTH_MANUAL,
+};
+refreshAuth({ market: "pe", environment, slot: accountSlot, env: baseEnv,
+  publishScript: "scripts/auth-publish-jenkins-pe.cjs",
+}).catch(error => {
+  console.error("[auth:refresh:pe] " + (error.code === "AUTH_HUMAN_REQUIRED" ? "WAITING HUMAN · " : "FAILED · ") + String(error.message).split("\n", 1)[0]);
+  process.exitCode = error.code === "AUTH_HUMAN_REQUIRED" ? 2 : 1;
+});

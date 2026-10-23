@@ -1,16 +1,17 @@
 const { chromium } = require("@playwright/test");
-const { spawnSync } = require("node:child_process");
+const { connectAuthBrowser } = require("../utils/authDedicatedBrowser.cjs");
+const { completeAccountLogin } = require("../utils/authAccountLogin.cjs");
+const { authProfileControl, openAuthProfile, prepareAuthStorefront } = require("../utils/authStorefrontReady.cjs");
 const fs = require("node:fs");
 const { writeJsonAtomically } = require("../utils/atomicJson");
 const { createAuthNavigation } = require("../utils/authNavigation.cjs");
-const { assertAuthStorefrontHealth } = require("../utils/authStorefrontHealth.cjs");
 const gotoWithTransientRetry = createAuthNavigation("pe");
 const path = require("node:path");
 const { getPeQstConfig } = require("../config/markets/pe");
 
 const CONFIG = getPeQstConfig();
 const HOSTNAME = CONFIG.baseUrl.hostname;
-const API_HOSTNAME = "pe-smb-api-cdn.ecom-stg.samsung.com";
+const API_HOSTNAME = `${CONFIG.environment.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com`;
 const ENV_NAME = CONFIG.environment;
 const ENV_SUFFIX = ENV_NAME.toLowerCase();
 const ACCOUNT_HOSTNAME = "account.samsung.com";
@@ -20,7 +21,6 @@ const profileDir = path.resolve(`playwright/profiles/${ENV_SUFFIX}-pe-qa`);
 const authDir = path.resolve("playwright/.auth");
 const authFile = path.join(authDir, `pe-${ENV_SUFFIX}-user.json`);
 const sessionStorageFile = path.join(authDir, `pe-${ENV_SUFFIX}-session-storage.json`);
-const devToolsActivePortFile = path.join(profileDir, "DevToolsActivePort");
 const interactiveTimeout = Number(process.env.PE_AUTH_INTERACTIVE_TIMEOUT_MS || 600000);
 const manualLogin = process.env.PE_AUTH_MANUAL === "1";
 
@@ -51,36 +51,8 @@ function resolveRuntimeCredentials() {
   return { email, password };
 }
 
-function readDevToolsPort() {
-  if (!fs.existsSync(devToolsActivePortFile)) return null;
-  const port = Number(fs.readFileSync(devToolsActivePortFile, "utf8").split(/\r?\n/)[0]);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
-  return port;
-}
-
 async function connectDedicatedChrome() {
-  const existingPort = readDevToolsPort();
-  if (existingPort) {
-    const existing = await chromium.connectOverCDP(`http://127.0.0.1:${existingPort}`).catch(() => null);
-    if (existing) return existing;
-  }
-
-  fs.rmSync(devToolsActivePortFile, { force: true });
-  const launcher = spawnSync(process.execPath, [path.resolve("scripts/auth-open-profile-pe.cjs")], {
-    stdio: "inherit",
-  });
-  if (launcher.status !== 0) throw new Error("Dedicated PE Chrome could not be launched automatically.");
-
-  const deadline = Date.now() + 30000;
-  while (Date.now() < deadline) {
-    const port = readDevToolsPort();
-    if (port) {
-      const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`).catch(() => null);
-      if (browser) return browser;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  throw new Error("Dedicated PE Chrome did not expose CDP within 30 seconds.");
+  return connectAuthBrowser({ chromium, profileDir, market: "pe", environment: ENV_NAME, slot: "primary" });
 }
 
 function assertAllowedHost(page, allowed, step) {
@@ -98,7 +70,7 @@ function isPeStorefront(page) {
 
 async function hasRenderedStorefront(page, timeout = 3000) {
   if (!isPeStorefront(page)) return false;
-  return page.getByRole("button", { name: "My Profile", exact: true })
+  return authProfileControl(page)
     .waitFor({ state: "visible", timeout })
     .then(() => true)
     .catch(() => false);
@@ -120,7 +92,7 @@ async function findAccountLoginPage(context, timeoutMs = 60000) {
       if (candidate.isClosed()) continue;
       try {
         if (new URL(candidate.url()).hostname !== ACCOUNT_HOSTNAME) continue;
-        if (await candidate.locator('input#account').isVisible().catch(() => false)) return candidate;
+        return candidate;
       } catch { /* The Samsung redirect may replace the tab while we inspect it. */ }
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -129,76 +101,14 @@ async function findAccountLoginPage(context, timeoutMs = 60000) {
 }
 
 async function waitForProfileMenu(page) {
-  await require("../utils/authBrowserWindow.cjs").prepareAuthBrowserWindow(page);
-  const profile = page.getByRole("button", { name: "My Profile", exact: true });
-  await profile.waitFor({ state: "visible", timeout: 120000 });
-  await profile.hover();
-  await page.waitForFunction(() => {
-    return [...document.querySelectorAll('[role="menu"].profile-menu')].some(
-      (current) => current.offsetParent !== null &&
-        !current.classList.contains("mat-menu-panel-animating") &&
-        /Cerrar Sesi[oó]n|Iniciar Sesi[oó]n/i.test(current.innerText)
-    );
-  }, null, { timeout: 30000 });
-  const menu = page.locator('[role="menu"].profile-menu')
-    .filter({ hasText: /Cerrar Sesi[oó]n|Iniciar Sesi[oó]n/i })
-    .filter({ visible: true })
-    .last();
-  await menu.waitFor({ state: "visible", timeout: 30000 });
-  return { profile, menu };
+  return openAuthProfile(page, { market: "pe" });
 }
 
-async function openPeHome(page, context) {
-  await require("../utils/authBrowserWindow.cjs").prepareAuthBrowserWindow(page);
-  const renderedBeforeNavigation = await findRenderedPePage(context, page);
-  if (renderedBeforeNavigation) {
-    console.log(`[auth:login:pe] reusing an already rendered PE ${ENV_NAME} storefront tab`);
-    return renderedBeforeNavigation;
-  }
-
-  await gotoWithTransientRetry(page, setupUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
-  assertAllowedHost(page, [HOSTNAME], "PE setup");
-  await page.getByText(/You can access pages now/i).waitFor({ timeout: 60000 });
-  await assertAuthStorefrontHealth(context.request, { market: "PE", environment: ENV_NAME });
-
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    await gotoWithTransientRetry(page, homeUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
-    assertAllowedHost(page, [HOSTNAME], "PE storefront");
-    if (await hasRenderedStorefront(page, 30000)) return page;
-
-    const renderedSibling = await findRenderedPePage(context);
-    if (renderedSibling) {
-      console.log("[auth:login:pe] current PE tab is blank; switching to a rendered sibling PE tab");
-      return renderedSibling;
-    }
-    if (attempt < 3) await page.waitForTimeout(3000);
-  }
-  throw new Error(`PE ${ENV_NAME} storefront did not render My Profile after 3 navigation attempts and no rendered sibling tab was available.`);
-}
-
-async function waitForStorefrontOrVerification(page) {
-  const verification = page
-    .getByText(/captcha|c[oó]digo de verificaci[oó]n|verifica tu identidad|autenticaci[oó]n de dos pasos|confirma que eres t[uú]/i)
-    .filter({ visible: true }).first();
-  const outcome = await Promise.race([
-    page.waitForURL((url) => url.hostname === HOSTNAME, { timeout: 180000 }).then(() => "storefront"),
-    verification.waitFor({ timeout: 180000 }).then(() => "verification"),
-    page.waitForTimeout(180000).then(() => "timeout"),
-  ]);
-  if (outcome === "verification") {
-    console.log("[auth:login:pe] Samsung Account requires human verification; complete it in the open Chrome window.");
-    await page.waitForURL((url) => url.hostname === HOSTNAME, { timeout: interactiveTimeout });
-    return;
-  }
-  if (outcome !== "storefront") throw new Error(`Samsung Account did not return to the PE ${ENV_NAME} storefront within the allowed time.`);
-}
-
-async function hasVisibleCaptchaChallenge(page) {
-  return page.evaluate(() => [...document.querySelectorAll("iframe")].some((frame) => {
-    const title = frame.title || "";
-    const bounds = frame.getBoundingClientRect();
-    return /reCAPTCHA/i.test(title) && /desafio|challenge|expira|expires/i.test(title) && bounds.width > 0 && bounds.height > 0;
-  }));
+async function openPeHome(page, context, { fresh = false } = {}) {
+  const rendered = await findRenderedPePage(context, page);
+  return prepareAuthStorefront(rendered || page, {
+    market: "pe", setupUrl, homeUrl, navigate: gotoWithTransientRetry, fresh,
+  });
 }
 
 function writeJsonSecurely(destination, value) {
@@ -210,7 +120,7 @@ async function exportAuthenticatedState(context, page) {
   const peState = {
     cookies: fullState.cookies.filter((cookie) => {
       const domain = cookie.domain.replace(/^\./, "");
-      return domain === HOSTNAME || domain === API_HOSTNAME || cookie.domain === ".samsung.com";
+      return domain === HOSTNAME || domain === API_HOSTNAME || domain === "pe-smb-api-cdn.ecom-stg.samsung.com" || cookie.domain === ".samsung.com";
     }),
     origins: fullState.origins.filter(({ origin }) => new URL(origin).hostname === HOSTNAME),
   };
@@ -229,9 +139,6 @@ async function exportAuthenticatedState(context, page) {
 }
 
 async function loginPeSamsungAccount() {
-  const credentials = manualLogin ? null : resolveRuntimeCredentials();
-  const email = credentials?.email ?? null;
-  const password = credentials?.password ?? null;
   const browser = await connectDedicatedChrome();
   const context = browser.contexts()[0];
   if (!context) throw new Error("Dedicated PE Chrome did not expose a browser context.");
@@ -243,20 +150,17 @@ async function loginPeSamsungAccount() {
   page.setDefaultTimeout(120000);
 
   try {
-    let menu;
     let menuState = "signed-out";
     let login;
     if (existingAccountPage) {
       console.log("[auth:login:pe] resuming the existing Samsung Account tab in dedicated Chrome");
     } else {
       console.log(`[auth:login:pe] opening PE ${ENV_NAME} storefront in dedicated Chrome`);
-      page = await openPeHome(page, context);
+      page = await openPeHome(page, context, { fresh: true });
       console.log(`[auth:login:pe] PE ${ENV_NAME} My Profile is visible`);
-      page = await openPeHome(page, context);
-      ({ menu } = await waitForProfileMenu(page));
+      ({ state: menuState, login } = await waitForProfileMenu(page));
       console.log("[auth:login:pe] PE profile menu is stable");
-      login = menu.locator('[data-an-la="login"]').filter({ visible: true });
-      menuState = /Cerrar Sesi[oó]n/i.test(await menu.innerText()) ? "authenticated" : "signed-out";
+
     }
     if (menuState === "signed-out") {
       if (!existingAccountPage) {
@@ -266,7 +170,7 @@ async function loginPeSamsungAccount() {
         if (!accountCandidate) {
           const storefrontPage = await findRenderedPePage(context);
           const currentMenu = storefrontPage ? await waitForProfileMenu(storefrontPage).catch(() => null) : null;
-          if (currentMenu && /Cerrar Sesi[oó]n/i.test(await currentMenu.menu.innerText())) {
+          if (currentMenu?.state === "authenticated") {
             console.log("[auth:login:pe] storefront became authenticated without an account-page navigation");
             page = storefrontPage;
             menuState = "authenticated";
@@ -294,35 +198,7 @@ async function loginPeSamsungAccount() {
         ]);
         page = returnedPage;
       } else if (menuState === "signed-out") {
-        const emailInput = page.locator('input#account');
-        const passwordInput = page.locator('input[type="password"]').first();
-        let emailStepComplete = false;
-        if (!(await hasVisibleCaptchaChallenge(page))) await emailInput.fill(email);
-        for (let attempt = 1; attempt <= 2 && !(await hasVisibleCaptchaChallenge(page)); attempt += 1) {
-          const nextButton = page.getByRole("button", { name: /^Siguiente$/i });
-          if (!(await nextButton.isEnabled())) break;
-          if (await hasVisibleCaptchaChallenge(page)) break;
-          await nextButton.click({ timeout: 10000 });
-          emailStepComplete = await passwordInput.waitFor({ state: "visible", timeout: 15000 }).then(() => true).catch(() => false);
-          if (emailStepComplete) break;
-          if (!(await emailInput.isVisible().catch(() => false))) break;
-        }
-        if (!emailStepComplete) {
-          if (await hasVisibleCaptchaChallenge(page)) {
-            console.log("[auth:login:pe] CAPTCHA is visible in the dedicated Chrome. Complete it manually and click Siguiente; automation will resume at the password step.");
-            await passwordInput.waitFor({ state: "visible", timeout: interactiveTimeout });
-            emailStepComplete = true;
-          } else {
-            throw new Error("Samsung Account did not advance from the email step to a password field; inspect the visible account page before retrying login.");
-          }
-        }
-        console.log("[auth:login:pe] Samsung Account password step is visible");
-        await passwordInput.click();
-        await passwordInput.pressSequentially(password, { delay: 35 });
-        await passwordInput.press("Tab");
-        await page.getByRole("button", { name: /^Iniciar sesi[oó]n$/i }).click();
-        console.log("[auth:login:pe] Samsung Account password step completed");
-        await waitForStorefrontOrVerification(page);
+        await completeAccountLogin(page, { market: "pe", hostname: HOSTNAME, credentials: resolveRuntimeCredentials, timeout: interactiveTimeout });
       }
     }
 
@@ -331,8 +207,7 @@ async function loginPeSamsungAccount() {
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       page = await openPeHome(page, context);
       const menuResult = await waitForProfileMenu(page).catch(() => null);
-      if (menuResult && /Cerrar Sesi[oó]n/i.test(await menuResult.menu.innerText())) {
-        menu = menuResult.menu;
+      if (menuResult?.state === "authenticated") {
         authenticatedMenu = menuResult;
         break;
       }
@@ -359,5 +234,5 @@ loginPeSamsungAccount().catch((error) => {
   const summary = String(error.message || "unknown error").split("\n", 1)[0]
     .replace(/([?&][^=\s]+)=([^&\s]+)/g, "$1=<redacted>");
   console.error(`[auth:login:pe] ${error.name}: ${summary}`);
-  process.exitCode = /Target page, context or browser has been closed|browser has been closed|Target closed|frame was detached/i.test(summary) ? 75 : 1;
+  process.exitCode = error.exitCode || (/Target page, context or browser has been closed|browser has been closed|Target closed|frame was detached/i.test(summary) ? 75 : 1);
 });

@@ -1,4 +1,7 @@
 const { chromium } = require("@playwright/test");
+const { connectAuthBrowser } = require("../utils/authDedicatedBrowser.cjs");
+const { completeAccountLogin } = require("../utils/authAccountLogin.cjs");
+const { openAuthProfile, prepareAuthStorefront } = require("../utils/authStorefrontReady.cjs");
 const { createAuthNavigation } = require("../utils/authNavigation.cjs");
 const gotoWithTransientRetry = createAuthNavigation("cl");
 const fs = require("node:fs");
@@ -42,28 +45,6 @@ function readCredentials() {
   return { email, password };
 }
 
-function profileButton(page) {
-  return page.getByRole("button", { name: "My Profile", exact: true })
-    .or(page.locator('button[data-an-la="L0_13_login"]'))
-    .or(page.locator("button.nv00-gnb-v4__utility-user"))
-    .filter({ visible: true }).first();
-}
-
-function accountActions(page) {
-  const login = page
-    .locator('[data-an-la="login"], a.loginBtn')
-    .or(page.getByRole("button", { name: /Iniciar Sesi[oó]n|Sign in/i }))
-    .or(page.getByRole("link", { name: /Iniciar Sesi[oó]n|Sign in/i }))
-    .or(page.getByText(/^Iniciar Sesi[oó]n$|^Sign in$/i))
-    .filter({ visible: true })
-    .first();
-  const logout = page
-    .getByText(/Cerrar Sesi[oó]n|Sign out/i)
-    .filter({ visible: true })
-    .first();
-  return { login, logout };
-}
-
 async function dismissNotificationTutorial(page) {
   const notice = page.getByText(/^¡Listo!$|^Got it$/i).filter({ visible: true }).first();
   if (!(await notice.isVisible().catch(() => false))) return;
@@ -80,34 +61,8 @@ async function maximizeClWindow(page) {
 
 async function accountState(page) {
   await installClChatNoticeDismissal(page);
-  await maximizeClWindow(page);
   await dismissNotificationTutorial(page);
-  const profile = profileButton(page);
-  await profile.waitFor({ state: "visible", timeout: 120000 });
-  await page.bringToFront().catch(() => {});
-  await page.evaluate(() => window.scrollTo(0, 0)).catch(() => {});
-
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    await dismissNotificationTutorial(page);
-    await page.mouse.move(0, 0);
-    await profile.hover();
-    const { login, logout } = accountActions(page);
-    const waitForActions = (timeout) => Promise.any([
-      logout.waitFor({ state: "visible", timeout }).then(() => "authenticated"),
-      login.waitFor({ state: "visible", timeout }).then(() => "signed-out"),
-    ]).catch(() => null);
-    let state = await waitForActions(6000);
-    if (!state) {
-      await profile.click({ timeout: 10000 });
-      state = await waitForActions(10000);
-    }
-    if (state) return { state, login, logout };
-    if (attempt < 3) {
-      await page.keyboard.press("Escape").catch(() => {});
-      await page.waitForTimeout(750);
-    }
-  }
-  throw new Error("CL profile control is visible, but login/logout actions did not render after maximized hover/click retries.");
+  return openAuthProfile(page, { market: "cl", prepareWindow: maximizeClWindow });
 }
 
 async function findAccountPage(context, timeoutMs = 60000) {
@@ -163,14 +118,13 @@ async function exportState(context, page) {
 }
 
 (async () => {
-  fs.mkdirSync(profileDir, { recursive: true });
-  const context = await chromium.launchPersistentContext(profileDir, {
-    channel: "chrome",
-    headless: false,
-    viewport: null,
-    args: ["--start-maximized", "--disable-background-mode", "--hide-crash-restore-bubble"],
-  });
-  let page = context.pages()[0] || await context.newPage();
+  const browser = await connectAuthBrowser({ chromium, profileDir, market: "cl", environment: config.environment, slot });
+  const context = browser.contexts()[0];
+  if (!context) throw new Error("Dedicated CL Chrome has no browser context.");
+  const existingAccountPage = context.pages().find(candidate => { try { return new URL(candidate.url()).hostname === accountHostname; } catch { return false; } });
+  let page = existingAccountPage || context.pages().slice().reverse().find(candidate => {
+    try { const url = new URL(candidate.url()); return url.origin === config.baseUrl.origin && url.pathname.replace(/\/$/, "") === "/cl"; } catch { return false; }
+  }) || await context.newPage();
   const observePage = candidate => {
     candidate.on("response", async response => {
       const url = new URL(response.url());
@@ -204,20 +158,30 @@ async function exportState(context, page) {
     console.log(`[auth:login:cl] ${config.environment} ${slot}: Chrome opened; preparing storefront`);
     await installClChatNoticeDismissal(page);
     page.setDefaultTimeout(120000);
-    if (config.setupUrl) {
-      await gotoWithTransientRetry(page, config.setupUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
-      await page.getByText(/You can access pages now/i).waitFor({ timeout: 60000 });
+    if (existingAccountPage) {
+      console.log("[auth:login:cl] resuming the existing Samsung Account tab; preserving login/CAPTCHA/MFA");
+      await maximizeClWindow(page);
+      if (!manual) await completeAccountLogin(page, { market: "cl", hostname: config.baseUrl.hostname, credentials: readCredentials, timeout: interactiveTimeout });
+      page = await waitForClAuthenticatedReturn(context, { hostname: config.baseUrl.hostname, accountPage: existingAccountPage, readAccountState: accountState, timeout: interactiveTimeout });
+      await exportState(context, page);
+      return;
     }
-    const configuration = page.waitForResponse(response => {
+    let configuration = Promise.resolve(null);
+    let ssoInfo = Promise.resolve(null);
+    await prepareAuthStorefront(page, { market: "cl", setupUrl: config.setupUrl?.href, fresh: true,
+      homeUrl: config.baseUrl.href, navigate: gotoWithTransientRetry, prepareWindow: maximizeClWindow,
+      beforeHome: () => {
+    configuration = page.waitForResponse(response => {
       return new URL(response.url()).pathname.endsWith("/v2/cl/currentConfig");
     }, { timeout: 30000 }).then(async response => {
       const body = await response.json().catch(() => ({}));
       return { status: response.status(), errorType: body.errors?.[0]?.type };
     }).catch(() => null);
-    const ssoInfo = page.waitForResponse(response => {
+    ssoInfo = page.waitForResponse(response => {
       return new URL(response.url()).pathname.endsWith("/v2/cl/ssoInfo");
     }, { timeout: 30000 }).then(response => response.ok() ? response.json() : null).catch(() => null);
-    await gotoWithTransientRetry(page, config.baseUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
+      },
+    });
     console.log("[auth:login:cl] storefront loaded; maximizing and checking profile actions");
     await dismissNotificationTutorial(page);
     let state = await accountState(page);
@@ -274,28 +238,7 @@ async function exportState(context, page) {
       if (manual) {
         console.log("[auth:login:cl] Complete Samsung Account login/CAPTCHA/MFA manually in the opened browser.");
       } else if (new URL(page.url()).hostname === accountHostname) {
-        console.log("[auth:login:cl] Samsung Account: completing configured login; CAPTCHA/MFA remains manual if requested");
-        const emailInput = page.locator('input#account, input[type="email"], input[name="userId"], input[name="email"]').filter({ visible: true }).first();
-        await emailInput.waitFor({ state: "visible", timeout: 60000 });
-        await emailInput.fill(credentials.email);
-        const next = page.getByRole("button", { name: /Siguiente|Continuar|Next|Sign in/i }).filter({ visible: true }).first();
-        if (await next.isVisible().catch(() => false)) await next.click();
-        const passwordInput = page.locator('input[type="password"]').filter({ visible: true }).first();
-        const passwordReady = await passwordInput.waitFor({ state: "visible", timeout: 15000 }).then(() => true, () => false);
-        if (!passwordReady) {
-          const captcha = await page.locator('iframe[title*="reCAPTCHA"]').evaluateAll(frames => frames.some(frame => {
-            const bounds = frame.getBoundingClientRect();
-            return bounds.width > 0 && bounds.height > 0;
-          }));
-          if (!captcha) throw new Error("Samsung Account did not show the password step after email submission; inspect the login window.");
-          if (process.env.CI) throw new Error("Samsung Account requires a human CAPTCHA; CI cannot complete this verification.");
-          await page.bringToFront();
-          console.log("[auth:login:cl] CAPTCHA visible. Complete it in this Chrome window and click Siguiente; the refresh will continue automatically.");
-          await passwordInput.waitFor({ state: "visible", timeout: interactiveTimeout });
-        }
-        await passwordInput.fill(credentials.password);
-        const signIn = page.getByRole("button", { name: /Iniciar sesi[oó]n|Sign in|Continuar/i }).filter({ visible: true }).last();
-        await signIn.click();
+        await completeAccountLogin(page, { market: "cl", hostname: config.baseUrl.hostname, credentials, timeout: interactiveTimeout });
       }
 
       console.log("[auth:login:cl] waiting for authenticated CL return; leaving the login window intact");
@@ -309,7 +252,7 @@ async function exportState(context, page) {
 
     await exportState(context, page);
   } finally {
-    await context.close();
+    await browser.close().catch(() => {});
   }
 })().catch((error) => {
   if (/Opening in existing browser session|ProcessSingleton|profile.*already in use/i.test(String(error.message))) {

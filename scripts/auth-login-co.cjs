@@ -1,8 +1,10 @@
 const { chromium } = require("@playwright/test");
+const { connectAuthBrowser } = require("../utils/authDedicatedBrowser.cjs");
+const { completeAccountLogin } = require("../utils/authAccountLogin.cjs");
+const { authProfileControl, openAuthProfile, prepareAuthStorefront } = require("../utils/authStorefrontReady.cjs");
 const { createAuthNavigation } = require("../utils/authNavigation.cjs");
 const gotoWithTransientRetry = createAuthNavigation("co");
-const { prepareAuthBrowserWindow, hasNativeAuthWindow } = require("../utils/authBrowserWindow.cjs");
-const { spawnSync } = require("node:child_process");
+const { prepareAuthBrowserWindow } = require("../utils/authBrowserWindow.cjs");
 const fs = require("node:fs");
 const { writeJsonAtomically } = require("../utils/atomicJson");
 const path = require("node:path");
@@ -24,7 +26,6 @@ const profileDir = path.resolve(`playwright/profiles/${ENV_SUFFIX}-co-${accountS
 const authDir = path.resolve("playwright/.auth");
 const authFile = path.join(authDir, `co-${ENV_SUFFIX}-${accountSlot === "second" ? "second-user" : "user"}.json`);
 const sessionStorageFile = path.join(authDir, `co-${ENV_SUFFIX}-${accountSlot === "second" ? "second-session-storage" : "session-storage"}.json`);
-const devToolsActivePortFile = path.join(profileDir, "DevToolsActivePort");
 const interactiveTimeout = Number(process.env.CO_AUTH_INTERACTIVE_TIMEOUT_MS || 600000);
 const manualLogin = process.env.CO_AUTH_MANUAL === "1";
 const preQa2CdpUrl = process.env.PREQA2_CDP_URL || "http://127.0.0.1:9223";
@@ -62,47 +63,8 @@ function resolveRuntimeCredentials() {
   return { email, password };
 }
 
-function readDevToolsPort() {
-  if (!fs.existsSync(devToolsActivePortFile)) return null;
-  const port = Number(fs.readFileSync(devToolsActivePortFile, "utf8").split(/\r?\n/)[0]);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
-  return port;
-}
-
 async function connectDedicatedChrome() {
-  const existingPort = readDevToolsPort();
-  if (existingPort) {
-    const existing = await chromium.connectOverCDP(`http://127.0.0.1:${existingPort}`).catch(() => null);
-    if (existing) {
-      if (await hasNativeAuthWindow(existing)) return existing;
-      console.log("[auth:login:co] dedicated Chrome has only onboarding/background targets; opening its storefront window");
-      const launcher = spawnSync(process.execPath, [path.resolve("scripts/auth-open-profile-co.cjs")], { stdio: "inherit" });
-      if (launcher.status !== 0) throw new Error("Dedicated CO Chrome window could not be opened.");
-      const deadline = Date.now() + 30000;
-      while (Date.now() < deadline) {
-        if (await hasNativeAuthWindow(existing)) return existing;
-        await new Promise((resolve) => setTimeout(resolve, 250));
-      }
-      throw new Error("Dedicated CO Chrome did not expose a native storefront window within 30 seconds.");
-    }
-  }
-
-  fs.rmSync(devToolsActivePortFile, { force: true });
-  const launcher = spawnSync(process.execPath, [path.resolve("scripts/auth-open-profile-co.cjs")], {
-    stdio: "inherit",
-  });
-  if (launcher.status !== 0) throw new Error("Dedicated CO Chrome could not be launched automatically.");
-
-  const deadline = Date.now() + 30000;
-  while (Date.now() < deadline) {
-    const port = readDevToolsPort();
-    if (port) {
-      const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`).catch(() => null);
-      if (browser) return browser;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  throw new Error("Dedicated CO Chrome did not expose CDP within 30 seconds.");
+  return connectAuthBrowser({ chromium, profileDir, market: "co", environment: ENV_NAME, slot: accountSlot });
 }
 
 function assertAllowedHost(page, allowed, step) {
@@ -118,41 +80,7 @@ function isCoStorefront(page) {
   }
 }
 
-function profileControl(page) {
-  return page
-    .getByRole("button", { name: "My Profile", exact: true })
-    .or(page.locator('button[data-an-la="L0_13_login"]'))
-    .or(page.locator("button.nv00-gnb-v4__utility-user"))
-    .filter({ visible: true })
-    .first();
-}
-
-function accountActions(page) {
-  const login = page
-    .locator('[data-an-la="login"], a.loginBtn')
-    .or(page.getByRole("button", { name: /Iniciar Sesi[oó]n|Sign in/i }))
-    .or(page.getByRole("link", { name: /Iniciar Sesi[oó]n/i }))
-    .or(page.getByText(/^Iniciar Sesi[oó]n$/i))
-    .filter({ visible: true })
-    .first();
-  const logout = page
-    .getByText(/Cerrar Sesi[oó]n/i)
-    .filter({ visible: true })
-    .first();
-  return { login, logout };
-}
-
-async function visibleAccountState(page, timeout = 5000) {
-  const { login, logout } = accountActions(page);
-  const state = await Promise.any([
-    logout.waitFor({ state: "visible", timeout }).then(() => "authenticated"),
-    login.waitFor({ state: "visible", timeout }).then(() => "signed-out"),
-  ]).catch(() => null);
-  if (state) return { state, login, logout };
-  if (await logout.isVisible().catch(() => false)) return { state: "authenticated", login, logout };
-  if (await login.isVisible().catch(() => false)) return { state: "signed-out", login, logout };
-  return null;
-}
+function profileControl(page) { return authProfileControl(page); }
 
 async function hasRenderedStorefront(page, timeout = 3000) {
   if (!isCoStorefront(page)) return false;
@@ -212,27 +140,7 @@ async function findRenderedCoPage(context, preferredPage = null) {
 }
 
 async function waitForProfileMenu(page) {
-  const profile = profileControl(page);
-  await profile.waitFor({ state: "visible", timeout: 30000 });
-  await page.bringToFront().catch(() => {});
-  await page.evaluate(() => window.scrollTo(0, 0)).catch(() => {});
-
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    const alreadyOpen = await visibleAccountState(page, 1000);
-    if (alreadyOpen) return { profile, ...alreadyOpen };
-
-    await profile.click({ timeout: 10000 }).catch(() => {});
-
-    const opened = await visibleAccountState(page, attempt === 1 ? 6000 : 10000);
-    if (opened) return { profile, ...opened };
-
-    if (attempt < 3) {
-      await page.keyboard.press("Escape").catch(() => {});
-      await page.waitForTimeout(750);
-    }
-  }
-
-  throw new Error("CO profile control is visible, but login/logout actions did not render after click retries.");
+  return openAuthProfile(page, { market: "co", prepareWindow: maximizeDedicatedChrome });
 }
 
 async function clickSamsungAccountSignIn(page) {
@@ -259,61 +167,13 @@ async function clickSamsungAccountSignIn(page) {
   throw new Error("CO sign-in action was visible, but the Samsung Account navigation could not be dispatched after 3 menu reopen attempts.");
 }
 
-async function openCoHome(page, context) {
+async function openCoHome(page, context, { fresh = false } = {}) {
   await closeDedicatedDevTools(context);
-  await maximizeDedicatedChrome(page);
-  const renderedBeforeNavigation = await findRenderedCoPage(context, page);
-  if (renderedBeforeNavigation) {
-    console.log(`[auth:login:co] reusing an already rendered CO ${ENV_NAME} storefront tab`);
-    return renderedBeforeNavigation;
-  }
-
-  console.log(`[auth:login:co] checking CO ${ENV_NAME} storefront setup`);
-  await gotoWithTransientRetry(page, setupUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
-  assertAllowedHost(page, [HOSTNAME], "CO setup");
-  await page.getByText(/You can access pages now/i).waitFor({ timeout: 60000 });
-
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    console.log(`[auth:login:co] loading CO ${ENV_NAME} home (${attempt}/3)`);
-    await gotoWithTransientRetry(page, homeUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
-    await closeDedicatedDevTools(context);
-    await maximizeDedicatedChrome(page);
-    assertAllowedHost(page, [HOSTNAME], "CO storefront");
-    if (await hasRenderedStorefront(page, 15000)) return page;
-
-    const renderedSibling = await findRenderedCoPage(context);
-    if (renderedSibling) {
-      console.log("[auth:login:co] current CO tab is blank; switching to a rendered sibling CO tab");
-      return renderedSibling;
-    }
-    if (attempt < 3) await page.waitForTimeout(3000);
-  }
-  throw new Error(`CO ${ENV_NAME} storefront did not render My Profile after 3 navigation attempts and no rendered sibling tab was available.`);
-}
-
-async function waitForStorefrontOrVerification(page) {
-  const verification = page
-    .getByText(/captcha|c[oó]digo de verificaci[oó]n|verifica tu identidad|autenticaci[oó]n de dos pasos|confirma que eres t[uú]/i)
-    .filter({ visible: true }).first();
-  const outcome = await Promise.race([
-    page.waitForURL((url) => url.hostname === HOSTNAME, { timeout: 180000 }).then(() => "storefront"),
-    verification.waitFor({ timeout: 180000 }).then(() => "verification"),
-    page.waitForTimeout(180000).then(() => "timeout"),
-  ]);
-  if (outcome === "verification") {
-    console.log("[auth:login:co] Samsung Account requires human verification; complete it in the open Chrome window.");
-    await page.waitForURL((url) => url.hostname === HOSTNAME, { timeout: interactiveTimeout });
-    return;
-  }
-  if (outcome !== "storefront") throw new Error(`Samsung Account did not return to the CO ${ENV_NAME} storefront within the allowed time.`);
-}
-
-async function hasVisibleCaptchaChallenge(page) {
-  return page.evaluate(() => [...document.querySelectorAll("iframe")].some((frame) => {
-    const title = frame.title || "";
-    const bounds = frame.getBoundingClientRect();
-    return /reCAPTCHA/i.test(title) && /desafio|challenge|expira|expires/i.test(title) && bounds.width > 0 && bounds.height > 0;
-  }));
+  const rendered = await findRenderedCoPage(context, page);
+  return prepareAuthStorefront(rendered || page, {
+    market: "co", setupUrl, homeUrl, navigate: gotoWithTransientRetry, fresh,
+    prepareWindow: maximizeDedicatedChrome,
+  });
 }
 
 function writeJsonSecurely(destination, value) {
@@ -325,7 +185,7 @@ async function exportAuthenticatedState(context, page) {
   const coState = {
     cookies: fullState.cookies.filter((cookie) => {
       const domain = cookie.domain.replace(/^\./, "");
-      return domain === HOSTNAME || domain === API_HOSTNAME ||
+      return domain === HOSTNAME || domain === API_HOSTNAME || domain === `${ENV_SUFFIX}-smb-api-cdn.ecom-stg.samsung.com` ||
         (HOSTNAME === "p6-pre-qa2.samsung.com" &&
           ["wds.samsung.com", "sts.secsso.net", "account.samsung.com"].includes(domain)) ||
         (cookie.domain === ".samsung.com" &&
@@ -414,9 +274,6 @@ async function loginCoPreQa2SharedChrome() {
 }
 
 async function loginCoSamsungAccount() {
-  const credentials = manualLogin ? null : resolveRuntimeCredentials();
-  const email = credentials?.email ?? null;
-  const password = credentials?.password ?? null;
   const browser = await connectDedicatedChrome();
   const context = browser.contexts()[0];
   if (!context) throw new Error("Dedicated CO Chrome did not expose a browser context.");
@@ -437,7 +294,7 @@ async function loginCoSamsungAccount() {
       console.log("[auth:login:co] resuming the existing Samsung Account tab in dedicated Chrome");
     } else {
       console.log(`[auth:login:co] opening CO ${ENV_NAME} storefront in dedicated Chrome`);
-      page = await openCoHome(page, context);
+      page = await openCoHome(page, context, { fresh: true });
       console.log(`[auth:login:co] CO ${ENV_NAME} My Profile is visible`);
       const menuResult = await waitForProfileMenu(page);
       console.log(`[auth:login:co] CO profile actions are stable (${menuResult.state})`);
@@ -493,35 +350,7 @@ async function loginCoSamsungAccount() {
         ]);
         page = returnedPage;
       } else if (menuState === "signed-out") {
-        const emailInput = page.locator('input#account');
-        const passwordInput = page.locator('input[type="password"]').first();
-        let emailStepComplete = false;
-        if (!(await hasVisibleCaptchaChallenge(page))) await emailInput.fill(email);
-        for (let attempt = 1; attempt <= 2 && !(await hasVisibleCaptchaChallenge(page)); attempt += 1) {
-          const nextButton = page.getByRole("button", { name: /^Siguiente$/i });
-          if (!(await nextButton.isEnabled())) break;
-          if (await hasVisibleCaptchaChallenge(page)) break;
-          await nextButton.click({ timeout: 10000 });
-          emailStepComplete = await passwordInput.waitFor({ state: "visible", timeout: 15000 }).then(() => true).catch(() => false);
-          if (emailStepComplete) break;
-          if (!(await emailInput.isVisible().catch(() => false))) break;
-        }
-        if (!emailStepComplete) {
-          if (await hasVisibleCaptchaChallenge(page)) {
-            console.log("[auth:login:co] CAPTCHA is visible in the dedicated Chrome. Complete it manually and click Siguiente; automation will resume at the password step.");
-            await passwordInput.waitFor({ state: "visible", timeout: interactiveTimeout });
-            emailStepComplete = true;
-          } else {
-            throw new Error("Samsung Account did not advance from the email step to a password field; inspect the visible account page before retrying login.");
-          }
-        }
-        console.log("[auth:login:co] Samsung Account password step is visible");
-        await passwordInput.click();
-        await passwordInput.pressSequentially(password, { delay: 35 });
-        await passwordInput.press("Tab");
-        await page.getByRole("button", { name: /^Iniciar sesi[oó]n$/i }).click();
-        console.log("[auth:login:co] Samsung Account password step completed");
-        await waitForStorefrontOrVerification(page);
+        await completeAccountLogin(page, { market: "co", hostname: HOSTNAME, credentials: resolveRuntimeCredentials, timeout: interactiveTimeout });
       }
     }
 
@@ -559,5 +388,5 @@ async function loginCoSamsungAccount() {
   const summary = String(error.message || "unknown error").split("\n", 1)[0]
     .replace(/([?&][^=\s]+)=([^&\s]+)/g, "$1=<redacted>");
   console.error(`[auth:login:co] ${error.name}: ${summary}`);
-  process.exitCode = 1;
+  process.exitCode = error.exitCode || (/Target page, context or browser has been closed|browser has been closed|Target closed|frame was detached/i.test(summary) ? 75 : 1);
 });

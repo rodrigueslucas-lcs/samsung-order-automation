@@ -1,12 +1,14 @@
 const { chromium } = require("@playwright/test");
+const { connectAuthBrowser } = require("../utils/authDedicatedBrowser.cjs");
 const { createAuthNavigation } = require("../utils/authNavigation.cjs");
+const { authProfileControl, openAuthProfile, prepareAuthStorefront } = require("../utils/authStorefrontReady.cjs");
 const gotoWithTransientRetry = createAuthNavigation("mx");
-const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const { writeJsonAtomically } = require("../utils/atomicJson");
 const path = require("node:path");
 const { resolveMxEnvironment } = require("../utils/mxConfig");
-const { hasMxAccountReturned, waitForMxAccountField, redactMxAuthError } = require("../utils/mxAuthLoginStep.cjs");
+const { hasMxAccountReturned, redactMxAuthError } = require("../utils/mxAuthLoginStep.cjs");
+const { completeAccountLogin } = require("../utils/authAccountLogin.cjs");
 
 const TARGET = resolveMxEnvironment();
 const HOSTNAME = TARGET.hostname;
@@ -22,7 +24,6 @@ const profileDir = path.resolve(`playwright/profiles/${ENV_SUFFIX}-mx-${accountS
 const authDir = path.resolve("playwright/.auth");
 const authFile = path.join(authDir, `mx-${ENV_SUFFIX}-${accountSlot === "second" ? "second-user" : "user"}.json`);
 const sessionStorageFile = path.join(authDir, `mx-${ENV_SUFFIX}-${accountSlot === "second" ? "second-session-storage" : "session-storage"}.json`);
-const devToolsActivePortFile = path.join(profileDir, "DevToolsActivePort");
 const interactiveTimeout = Number(process.env.MX_AUTH_INTERACTIVE_TIMEOUT_MS || 600000);
 const manualLogin = process.env.MX_AUTH_MANUAL === "1";
 
@@ -63,36 +64,8 @@ function resolveRuntimeCredentials() {
   return { email, password };
 }
 
-function readDevToolsPort() {
-  if (!fs.existsSync(devToolsActivePortFile)) return null;
-  const port = Number(fs.readFileSync(devToolsActivePortFile, "utf8").split(/\r?\n/)[0]);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) return null;
-  return port;
-}
-
 async function connectDedicatedChrome() {
-  const existingPort = readDevToolsPort();
-  if (existingPort) {
-    const existing = await chromium.connectOverCDP(`http://127.0.0.1:${existingPort}`).catch(() => null);
-    if (existing) return existing;
-  }
-
-  fs.rmSync(devToolsActivePortFile, { force: true });
-  const launcher = spawnSync(process.execPath, [path.resolve("scripts/auth-open-profile-mx.cjs")], {
-    stdio: "inherit",
-  });
-  if (launcher.status !== 0) throw new Error("Dedicated MX Chrome could not be launched automatically.");
-
-  const deadline = Date.now() + 30000;
-  while (Date.now() < deadline) {
-    const port = readDevToolsPort();
-    if (port) {
-      const browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`).catch(() => null);
-      if (browser) return browser;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  throw new Error("Dedicated MX Chrome did not expose CDP within 30 seconds.");
+  return connectAuthBrowser({ chromium, profileDir, market: "mx", environment: ENV_NAME, slot: accountSlot });
 }
 
 function assertAllowedHost(page, allowed, step) {
@@ -110,7 +83,7 @@ function isMxStorefront(page) {
 
 async function hasRenderedStorefront(page, timeout = 3000) {
   if (!isMxStorefront(page)) return false;
-  return page.getByRole("button", { name: "My Profile", exact: true })
+  return authProfileControl(page)
     .waitFor({ state: "visible", timeout })
     .then(() => true)
     .catch(() => false);
@@ -130,44 +103,24 @@ async function prepareMxWindow(page) {
 }
 
 async function waitForProfileMenu(page) {
-  await prepareMxWindow(page);
-  const profile = page.getByRole("button", { name: "My Profile", exact: true });
-  await profile.waitFor({ state: "visible", timeout: 120000 });
-  await profile.hover();
-  await page.waitForFunction(() => {
-    return [...document.querySelectorAll('[role="menu"].profile-menu')].some(
-      (current) => current.offsetParent !== null &&
-        !current.classList.contains("mat-menu-panel-animating") &&
-        /Cerrar Sesi[oó]n|Iniciar Sesi[oó]n/i.test(current.innerText)
-    );
-  }, null, { timeout: 120000 });
+  return openAuthProfile(page, { market: "mx", prepareWindow: prepareMxWindow });
 }
 
 async function isAuthenticated(page) {
   if (!isMxStorefront(page)) return false;
   try {
-    await waitForProfileMenu(page);
-    const menu = page.locator('[role="menu"].profile-menu').filter({ visible: true }).first();
-    const text = await menu.innerText();
-    return /Cerrar Sesi[oó]n/i.test(text) && !/Iniciar Sesi[oó]n/i.test(text);
+    return (await waitForProfileMenu(page)).state === "authenticated";
   } catch {
     return false;
   }
 }
 
 async function goToMxStorefront(page) {
-  await gotoWithTransientRetry(page, setupUrl, { waitUntil: "domcontentloaded", timeout: 120000 });
-  assertAllowedHost(page, [HOSTNAME], "MX setup");
-  if (page.url() !== homeUrl) {
-    await gotoWithTransientRetry(page, homeUrl, { waitUntil: "domcontentloaded", timeout: 120000 });
-  }
-  assertAllowedHost(page, [HOSTNAME], "MX storefront");
+  return prepareAuthStorefront(page, { market: "mx", setupUrl, homeUrl, navigate: gotoWithTransientRetry, prepareWindow: prepareMxWindow, fresh: true });
 }
 
 async function startLogin(page) {
-  await waitForProfileMenu(page);
-  const menu = page.locator('[role="menu"].profile-menu').filter({ visible: true }).first();
-  const login = menu.getByText(/Iniciar Sesi[oó]n/i).first();
+  const { login } = await waitForProfileMenu(page);
   if (!(await login.isVisible().catch(() => false))) return false;
   await login.click();
   return true;
@@ -192,27 +145,8 @@ async function waitForSamsungAccountPage(context, currentPage) {
 }
 
 async function fillSamsungAccount(page, credentials) {
-  try {
-    await prepareMxWindow(page, true);
-    const stepOptions = { hostname: HOSTNAME, timeout: interactiveTimeout };
-    const email = page.locator('input[type="email"], input[name="email"], #iptLgnPlnID, #account').filter({ visible: true }).first();
-    if (await waitForMxAccountField(page, email, stepOptions) === "returned") return;
-    await email.fill(credentials.email);
-
-    const password = page.locator('input[type="password"], input[name="password"], #iptLgnPlnPD').filter({ visible: true }).first();
-    if (!(await password.isVisible().catch(() => false))) {
-      const next = page.getByRole("button", { name: /Siguiente|Next|Continuar/i }).first();
-      if (await next.isVisible().catch(() => false)) await next.click();
-    }
-    if (await waitForMxAccountField(page, password, stepOptions) === "returned") return;
-    await password.fill(credentials.password);
-
-    const signIn = page.getByRole("button", { name: /Iniciar sesi[oó]n|Sign in/i }).first();
-    await signIn.click();
-  } catch (error) {
-    // A redirect during fill/click also hands off to positive auth verification.
-    if (!hasMxAccountReturned(page, HOSTNAME)) throw error;
-  }
+  await prepareMxWindow(page, true);
+  await completeAccountLogin(page, { market: "mx", hostname: HOSTNAME, credentials, timeout: interactiveTimeout });
 }
 
 async function waitForAuthenticatedStorefront(context, preferredPage) {
@@ -241,21 +175,31 @@ async function exportState(context, page) {
     const context = contexts[0];
     if (!context) throw new Error("Dedicated MX Chrome has no browser context.");
 
-    let page = context.pages()[0] || await context.newPage();
+    const existingAccountPage = context.pages().find(candidate => {
+      try { return new URL(candidate.url()).hostname === ACCOUNT_HOSTNAME; } catch { return false; }
+    });
+    let page = existingAccountPage || await findRenderedMxPage(context) || await context.newPage();
     await prepareMxWindow(page, true);
-    await goToMxStorefront(page);
+    if (!existingAccountPage) {
+      console.log(`[auth:login:mx] preparing ${ENV_NAME} ${accountSlot} storefront`);
+      await goToMxStorefront(page);
+    } else {
+      console.log("[auth:login:mx] resuming the existing Samsung Account tab; preserving login/CAPTCHA/MFA");
+    }
 
     if (await isAuthenticated(page)) {
       await exportState(context, page);
       return;
     }
 
-    await startLogin(page);
-    const accountPage = await waitForSamsungAccountPage(context, page);
+    if (!existingAccountPage) {
+      console.log("[auth:login:mx] opening Samsung Account sign-in");
+      await startLogin(page);
+    }
+    const accountPage = existingAccountPage || await waitForSamsungAccountPage(context, page);
 
     if (accountPage && !manualLogin) {
-      const credentials = resolveRuntimeCredentials();
-      await fillSamsungAccount(accountPage, credentials);
+      await fillSamsungAccount(accountPage, resolveRuntimeCredentials);
     } else if (accountPage) {
       try { await prepareMxWindow(accountPage, true); }
       catch (error) { if (!hasMxAccountReturned(accountPage, HOSTNAME)) throw error; }
@@ -266,7 +210,7 @@ async function exportState(context, page) {
     await exportState(context, page);
   } catch (error) {
     console.error(`[auth:login:mx] ${redactMxAuthError(error)}`);
-    process.exitCode = 1;
+    process.exitCode = error.exitCode || 1;
   } finally {
     await browser?.close().catch(() => {});
   }
