@@ -11,7 +11,7 @@ pipeline {
   }
 
   parameters {
-    choice(name: 'MARKET', choices: ['MX', 'PE', 'CL', 'CO'], description: 'SMB market / storefront target. MX/PE/CL/CO have official QST lanes.')
+    choice(name: 'MARKET', choices: env.JOB_BASE_NAME ==~ /Samsung-SMB-(MX|PE|CO|CL)/ ? [env.JOB_BASE_NAME.tokenize('-').last()] : ['MX', 'PE', 'CL', 'CO'], description: 'SMB market / storefront target. Sibling market jobs are pinned to their own market; the original job keeps all four choices.')
     choice(name: 'ENVIRONMENT', choices: ['S1', 'S2'], description: 'Target staging environment. S1 = stg, S2 = stg2.')
     choice(name: 'TEST_SUITE', choices: ['fast-guest', 'authenticated-safe', 'official-p1', 'backoffice-safe', 'allure-smoke'], description: 'Execution profile. Functional suites use the shared Executive Dashboard + Playwright + Allure reporting standard.')
     choice(name: 'EXECUTION_MODE', choices: ['safe', 'authorized-destructive'], description: 'Safety mode. Full official-p1 payment/order execution requires authorized-destructive.')
