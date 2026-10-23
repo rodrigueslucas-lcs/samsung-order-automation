@@ -117,72 +117,59 @@ function enrichAllure() {
   const evidenceRoot = path.join(artifactDir, 'evidence');
   const evidenceArg = market === 'PE' ? path.join(evidenceRoot, 'qst-evidence.json') : evidenceRoot;
   const args = [script, allureResultsDir, runtimeSummaryFile, evidenceArg];
-  const enriched = spawnSync(process.execPath, args, {
-    stdio: 'inherit',
-    env: process.env,
-  });
-  if (enriched.status !== 0) {
-    console.error(`[reporting] ${market} Allure enrichment failed; raw results were preserved.`);
-  }
+  const enriched = spawnSync(process.execPath, args, { stdio: 'inherit', env: process.env });
+  if (enriched.status !== 0) console.error(`[reporting] ${market} Allure enrichment failed; raw results were preserved.`);
 }
 
 function polishAllure(phase) {
   if (!fs.existsSync(allureResultsDir)) return;
   const script = path.resolve('scripts/polish-allure-final.cjs');
   if (!fs.existsSync(script)) return;
-  const polished = spawnSync(process.execPath, [script, allureResultsDir, phase], {
-    stdio: 'inherit',
-    env: process.env,
-  });
-  if (polished.status !== 0) {
-    console.error(`[reporting] Final Allure polish (${phase}) failed; processing will continue with preserved results.`);
-  }
+  const polished = spawnSync(process.execPath, [script, allureResultsDir, phase], { stdio: 'inherit', env: process.env });
+  if (polished.status !== 0) console.error(`[reporting] Final Allure polish (${phase}) failed; processing will continue with preserved results.`);
 }
 
 function normalizeAllureEvidence() {
   if (!fs.existsSync(allureResultsDir)) return;
   const script = path.resolve('scripts/dedupe-allure-evidence.cjs');
   if (!fs.existsSync(script)) return;
-  const normalized = spawnSync(process.execPath, [script, allureResultsDir], {
-    stdio: 'inherit',
-    env: process.env,
-  });
-  if (normalized.status !== 0) {
-    console.error('[reporting] Allure evidence normalization failed; raw results were preserved.');
-  }
+  const normalized = spawnSync(process.execPath, [script, allureResultsDir], { stdio: 'inherit', env: process.env });
+  if (normalized.status !== 0) console.error('[reporting] Allure evidence normalization failed; raw results were preserved.');
 }
 
 function prepareAllureCiMetadata(mode = 'prepare') {
   if (!fs.existsSync(allureResultsDir) && mode !== 'save') return;
   const script = path.resolve('scripts/prepare-allure-ci-metadata.cjs');
   if (!fs.existsSync(script)) return;
-  const prepared = spawnSync(process.execPath, [script, allureResultsDir, allureReportDir, mode], {
-    stdio: 'inherit',
-    env: process.env,
-  });
-  if (prepared.status !== 0) {
-    console.error(`[reporting] Allure Jenkins metadata/history ${mode} failed; report processing will continue.`);
-  }
+  const prepared = spawnSync(process.execPath, [script, allureResultsDir, allureReportDir, mode], { stdio: 'inherit', env: process.env });
+  if (prepared.status !== 0) console.error(`[reporting] Allure Jenkins metadata/history ${mode} failed; report processing will continue.`);
 }
 
 function annotateKnownDefects() {
   if (!fs.existsSync(runtimeSummaryFile) || !fs.existsSync(path.join(executiveDir, 'index.html'))) return;
   const script = path.resolve('scripts/annotate-known-defects-dashboard.cjs');
   if (!fs.existsSync(script)) return;
-  const annotated = spawnSync(process.execPath, [script, artifactDir], {
-    stdio: 'inherit',
-    env: process.env,
-  });
-  if (annotated.status !== 0) {
-    console.error('[reporting] Known-defect dashboard annotation failed; the original dashboard was preserved.');
+  const annotated = spawnSync(process.execPath, [script, artifactDir], { stdio: 'inherit', env: process.env });
+  if (annotated.status !== 0) console.error('[reporting] Known-defect dashboard annotation failed; the original dashboard was preserved.');
+}
+
+function polishGeneratedAllure() {
+  const script = path.resolve('scripts/polish-generated-allure-report.cjs');
+  if (!fs.existsSync(script)) {
+    console.error('[reporting] Generated Allure polish script is missing.');
+    return false;
   }
+  const polished = spawnSync(process.execPath, [script, allureResultsDir, allureReportDir], { stdio: 'inherit', env: process.env });
+  if (polished.status !== 0) {
+    console.error('[reporting] Generated Allure report did not satisfy the final rich-description contract.');
+    return false;
+  }
+  return true;
 }
 
 function generateAllure() {
   if (!fs.existsSync(allureResultsDir)) return false;
-  const allureCli = process.platform === 'win32'
-    ? path.resolve('node_modules/.bin/allure.cmd')
-    : path.resolve('node_modules/.bin/allure');
+  const allureCli = process.platform === 'win32' ? path.resolve('node_modules/.bin/allure.cmd') : path.resolve('node_modules/.bin/allure');
   if (!fs.existsSync(allureCli)) return false;
   const result = spawnSync(allureCli, ['generate', allureResultsDir, '--clean', '-o', allureReportDir], {
     stdio: 'inherit',
@@ -192,12 +179,10 @@ function generateAllure() {
     console.error('[reporting] Allure HTML generation failed; raw results were preserved.');
     return false;
   }
-  return true;
+  return polishGeneratedAllure();
 }
 
 fs.mkdirSync(artifactDir, { recursive: true });
-// Market-specific official runners may already have generated a richer dashboard/runtime summary
-// that includes the complete official denominator (including NOT_RUN gaps). Preserve it.
 if (!(fs.existsSync(runtimeSummaryFile) && fs.existsSync(path.join(executiveDir, 'index.html')))) {
   if (fs.existsSync(jsonFile)) {
     const report = JSON.parse(fs.readFileSync(jsonFile, 'utf8'));
@@ -208,10 +193,8 @@ if (!(fs.existsSync(runtimeSummaryFile) && fs.existsSync(path.join(executiveDir,
 }
 writeAllureEnvironment();
 enrichAllure();
-// First pass: preserve screenshots/trace/video from technical steps before the global cleanup removes those steps.
 polishAllure('evidence');
 normalizeAllureEvidence();
-// Second pass: enforce the final global PASS/FAIL/BLOCKED/KNOWN DEFECT presentation after market enrichment + defect mapping.
 polishAllure('final');
 prepareAllureCiMetadata('prepare');
 annotateKnownDefects();
