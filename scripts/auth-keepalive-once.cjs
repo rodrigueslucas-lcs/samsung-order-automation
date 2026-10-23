@@ -1,36 +1,39 @@
+const fs = require('node:fs'); const path = require('node:path');
 const { runKeepAliveCycle } = require('../utils/authKeepAliveRunner.cjs');
 const { publisherEnvironment } = require('../utils/jenkinsPublisherConfig.cjs');
-
-function parseArgs(argv) {
-  let publish = process.env.AUTH_KEEPALIVE_PUBLISH !== '0';
-  let environment = process.env.AUTH_KEEPALIVE_ENVIRONMENT || process.env.ENVIRONMENT || 'S2';
+const { jenkinsBuildsIdle } = require('../utils/authJenkinsActivity.cjs');
+function parseArgs(argv, env = process.env) {
+  let publish = env.AUTH_KEEPALIVE_PUBLISH !== '0';
+  let environment = env.AUTH_KEEPALIVE_ENVIRONMENT || env.ENVIRONMENT || 'S2';
+  let scheduled = false;
+  let markets = ['mx','pe','co','cl'];
   for (const arg of argv) {
     if (arg === '--no-publish') publish = false;
     else if (arg === '--publish') publish = true;
+    else if (arg === '--scheduled') scheduled = true;
+    else if (arg.startsWith('--markets=')) markets = [...new Set(arg.slice('--markets='.length).split(',').map(m => m.trim().toLowerCase()))];
     else if (arg.startsWith('--environment=')) environment = arg.slice('--environment='.length);
-    else throw new Error(`Unsupported keep-alive argument: ${arg}`);
+    else throw new Error('Unsupported keep-alive argument.');
   }
-  return { publish, environment: String(environment).trim().toUpperCase() };
+  environment = String(environment).trim().toUpperCase();
+  if (!['S1','S2'].includes(environment)) throw new Error('Keep-alive requires S1 or S2.');
+  if (!markets.length || markets.some(m => !['mx','pe','co','cl'].includes(m))) throw new Error('Invalid keep-alive market scope.');
+  return { publish, environment, scheduled, markets };
 }
-
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  let runtimeEnv = { ...process.env };
-  if (args.publish) runtimeEnv = publisherEnvironment(runtimeEnv);
-  const summary = await runKeepAliveCycle({
-    environment: args.environment,
-    publish: args.publish,
-    env: runtimeEnv,
-  });
-  if (!summary.ok) {
-    const human = summary.blocking.filter(result => result.status === 'HUMAN_REQUIRED');
-    process.exitCode = human.length ? 2 : 1;
+async function main({ argv = process.argv.slice(2), env = process.env, cycle = runKeepAliveCycle, activity = jenkinsBuildsIdle, configure = publisherEnvironment, log = console.log, save = true } = {}) {
+  const args = parseArgs(argv, env);
+  const runtimeEnv = configure(env);
+  const activityResult = await activity(runtimeEnv, { markets: args.markets });
+  if (!activityResult.idle) { log('[auth:keepalive] BUSY: Samsung builds are running/queued; no auth operation was started.'); return 3; }
+  const summary = await cycle({ environment: args.environment, markets: args.markets, publish: args.publish, env: runtimeEnv });
+  if (save) {
+    const output = path.resolve('test-results/auth-keepalive', `last-cycle-${args.environment.toLowerCase()}${args.markets.length === 4 ? '' : '-' + [...args.markets].sort().join('-')}.json`);
+    fs.mkdirSync(path.dirname(output), { recursive: true });
+    fs.writeFileSync(output, JSON.stringify({ generatedAt: new Date().toISOString(), ...summary }, null, 2));
   }
+  if (summary.ok) return 0;
+  if (summary.blocking?.some(r => r.status === 'HUMAN_REQUIRED')) return 2;
+  return summary.busy?.length && !summary.blocking?.length ? 3 : 1;
 }
-
-main().catch(error => {
-  console.error(`[auth:keepalive] FAILED · ${String(error.message || error).split('\n')[0]}`);
-  process.exitCode = 1;
-});
-
-module.exports = { parseArgs };
+if (require.main === module) main().then(code => { process.exitCode = code; }).catch(() => { console.error('[auth:keepalive] FAILED: no READY was emitted; inspect the safe phase/status summary.'); process.exitCode = 1; });
+module.exports = { parseArgs, main };

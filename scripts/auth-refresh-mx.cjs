@@ -11,5 +11,5 @@ refreshAuth({ market: "mx", environment, slot: accountSlot, env: baseEnv,
   publishScript: "scripts/auth-publish-jenkins.cjs",
 }).catch(error => {
   console.error("[auth:refresh:mx] " + (error.code === "AUTH_HUMAN_REQUIRED" ? "WAITING HUMAN · " : "FAILED · ") + String(error.message).split("\n", 1)[0]);
-  process.exitCode = error.code === "AUTH_HUMAN_REQUIRED" ? 2 : 1;
+  process.exitCode = error.code === "AUTH_HUMAN_REQUIRED" ? 2 : error.code === "AUTH_BUSY" ? 3 : 1;
 });

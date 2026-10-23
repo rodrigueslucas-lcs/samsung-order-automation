@@ -1,3 +1,13 @@
+// Keep each authenticated shell command exclusive with local auth maintenance.
+def authShell(String command, boolean unix) {
+  def commandFile = ".auth-lease-" + env.BUILD_TAG.replaceAll(/[^A-Za-z0-9_-]/, '_') + (unix ? '.sh' : '.cmd')
+  writeFile file: commandFile, text: command
+  def protectedCommand = "node scripts/auth-with-market-lease.cjs --market=" + params.MARKET.toLowerCase() + " --environment=" + params.ENVIRONMENT + " --shell=" + (unix ? 'sh' : 'cmd') + " --file=" + commandFile
+  if (unix) { sh protectedCommand } else { bat protectedCommand }
+}
+def authSh(String command) { authShell(command, true) }
+def authBat(String command) { authShell(command, false) }
+
 pipeline {
   agent any
 
@@ -224,8 +234,8 @@ pipeline {
             env.MX_FAST_ARTIFACT_DIR = env.JENKINS_ARTIFACT_DIR
             env.TEST_SUITE = 'FAST/GUEST'
             env.TEST_STORE = 'BASE_STORE'
-            if (isUnix()) sh 'npx -y node@22 scripts/run-mx-qst-fast-guest.cjs'
-            else bat '@call npx -y node@22 scripts/run-mx-qst-fast-guest.cjs'
+            if (isUnix()) authSh 'npx -y node@22 scripts/run-mx-qst-fast-guest.cjs'
+            else authBat '@call npx -y node@22 scripts/run-mx-qst-fast-guest.cjs'
           }
         }
       }
@@ -252,7 +262,7 @@ pipeline {
           ]) {
             script {
               if (isUnix()) {
-                sh '''
+                authSh '''
                   set -eu
                   mkdir -p playwright/.auth
                   cp "$MX_AUTH_STATE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-user.json
@@ -263,7 +273,7 @@ pipeline {
                   npx playwright test tests/markets/mx/qst/base-store/authenticated-safe.spec.js --project=chromium --workers=1 --retries=0 --output "$JENKINS_ARTIFACT_DIR/playwright" $EXTRA
                 '''
               } else {
-                bat '''@echo off
+                authBat '''@echo off
                   if not exist playwright\\.auth mkdir playwright\\.auth
                   copy /Y "%MX_AUTH_STATE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-user.json" >nul || exit /b 2
                   copy /Y "%MX_SESSION_STORAGE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-session-storage.json" >nul || exit /b 2
@@ -298,7 +308,7 @@ pipeline {
                 file(credentialsId: 'samsung-mx-s2-backoffice-admin', variable: 'MX_BACKOFFICE_ADMIN_SECRET')
               ]) {
                 if (isUnix()) {
-                  sh '''
+                  authSh '''
                     set -eu
                     mkdir -p playwright/.auth
                     cp "$MX_BACKOFFICE_ADMIN_SECRET" playwright/.auth/backoffice-admin-s2.json
@@ -306,7 +316,7 @@ pipeline {
                     npx playwright test tests/markets/shared/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "$JENKINS_ARTIFACT_DIR/playwright"
                   '''
                 } else {
-                  bat '''@echo off
+                  authBat '''@echo off
                     if not exist playwright\\.auth mkdir playwright\\.auth
                     copy /Y "%MX_BACKOFFICE_ADMIN_SECRET%" "playwright\\.auth\\backoffice-admin-s2.json" >nul || exit /b 2
                     call npx playwright test tests/markets/shared/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "%JENKINS_ARTIFACT_DIR%\\playwright"
@@ -314,8 +324,8 @@ pipeline {
                 }
               }
             } else {
-              if (isUnix()) sh 'npx playwright test tests/markets/shared/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "$JENKINS_ARTIFACT_DIR/playwright"'
-              else bat '@call npx playwright test tests/markets/shared/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "%JENKINS_ARTIFACT_DIR%\\playwright"'
+              if (isUnix()) authSh 'npx playwright test tests/markets/shared/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "$JENKINS_ARTIFACT_DIR/playwright"'
+              else authBat '@call npx playwright test tests/markets/shared/qst/backoffice --project=chromium --workers=1 --retries=0 --grep-invert @destructive --output "%JENKINS_ARTIFACT_DIR%\\playwright"'
             }
           }
         }
@@ -358,7 +368,7 @@ pipeline {
               ]
               withCredentials(clCredentials) {
                 if (isUnix()) {
-                  sh '''
+                  authSh '''
                     set -eu
                     npm run auth:install:cl
                     mkdir -p playwright/.auth
@@ -369,7 +379,7 @@ pipeline {
                     npx -y node@22 scripts/run-cl-qst-p1.cjs
                   '''
                 } else {
-                  bat '''@echo off
+                  authBat '''@echo off
                     call npm run auth:install:cl || exit /b 2
                     if not exist playwright\\.auth mkdir playwright\\.auth
                     copy /Y "%CL_BACKOFFICE_ADMIN_SECRET%" "playwright\\.auth\\backoffice-admin-%BACKOFFICE_ENV%.json" >nul || exit /b 2
@@ -392,7 +402,7 @@ pipeline {
               ]
               withCredentials(coCredentials) {
                 if (isUnix()) {
-                  sh '''
+                  authSh '''
                     set -eu
                     npm run auth:install:co
                     mkdir -p playwright/.auth
@@ -403,7 +413,7 @@ pipeline {
                     npx -y node@22 scripts/run-co-qst-p1.cjs
                   '''
                 } else {
-                  bat '''@echo off
+                  authBat '''@echo off
                     call npm run auth:install:co || exit /b 2
                     if not exist playwright\\.auth mkdir playwright\\.auth
                     copy /Y "%CO_BACKOFFICE_ADMIN_SECRET%" "playwright\\.auth\\backoffice-admin-%BACKOFFICE_ENV%.json" >nul || exit /b 2
@@ -423,7 +433,7 @@ pipeline {
               ]
               withCredentials(peCredentials) {
                 if (isUnix()) {
-                  sh '''
+                  authSh '''
                     set -eu
                     npm run auth:install:pe
                     mkdir -p playwright/.auth
@@ -433,7 +443,7 @@ pipeline {
                     npx -y node@22 scripts/run-pe-qst-p1.cjs
                   '''
                 } else {
-                  bat '''@echo off
+                  authBat '''@echo off
                     call npm run auth:install:pe || exit /b 2
                     if not exist playwright\\.auth mkdir playwright\\.auth
                     copy /Y "%PE_BACKOFFICE_ADMIN_SECRET%" "playwright\\.auth\\backoffice-admin-%BACKOFFICE_ENV%.json" >nul || exit /b 2
@@ -456,7 +466,7 @@ pipeline {
                   file(credentialsId: env.MX_BACKOFFICE_ADMIN_CREDENTIAL, variable: 'MX_BACKOFFICE_ADMIN_SECRET')
                 ]) {
                   if (isUnix()) {
-                    sh '''
+                    authSh '''
                       set -eu
                       mkdir -p playwright/.auth
                       cp "$MX_SESSION_BUNDLE_SECRET" /tmp/samsung-mx-session-bundle.json
@@ -471,7 +481,7 @@ pipeline {
                       npx -y node@22 scripts/run-mx-qst-safe.cjs
                     '''
                   } else {
-                    bat '''@echo off
+                    authBat '''@echo off
                       if not exist playwright\\.auth mkdir playwright\\.auth
                       copy /Y "%MX_SESSION_BUNDLE_SECRET%" "%TEMP%\\samsung-mx-session-bundle.json" >nul || exit /b 2
                       set "MX_SESSION_BUNDLE=%TEMP%\\samsung-mx-session-bundle.json"
@@ -495,7 +505,7 @@ pipeline {
                   file(credentialsId: env.MX_BACKOFFICE_ADMIN_CREDENTIAL, variable: 'MX_BACKOFFICE_ADMIN_SECRET')
                 ]) {
                   if (isUnix()) {
-                    sh '''
+                    authSh '''
                       set -eu
                       mkdir -p playwright/.auth
                       cp "$MX_SESSION_BUNDLE_SECRET" /tmp/samsung-mx-session-bundle.json
@@ -510,7 +520,7 @@ pipeline {
                       npx -y node@22 scripts/run-mx-qst-safe.cjs
                     '''
                   } else {
-                    bat '''@echo off
+                    authBat '''@echo off
                       if not exist playwright\\.auth mkdir playwright\\.auth
                       copy /Y "%MX_SESSION_BUNDLE_SECRET%" "%TEMP%\\samsung-mx-session-bundle.json" >nul || exit /b 2
                       set "MX_SESSION_BUNDLE=%TEMP%\\samsung-mx-session-bundle.json"
@@ -537,7 +547,7 @@ pipeline {
                   file(credentialsId: env.MX_BACKOFFICE_ADMIN_CREDENTIAL, variable: 'MX_BACKOFFICE_ADMIN_SECRET')
                 ]) {
                   if (isUnix()) {
-                    sh '''
+                    authSh '''
                       set -eu
                       mkdir -p playwright/.auth
                       cp "$MX_AUTH_STATE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-user.json
@@ -550,7 +560,7 @@ pipeline {
                       npx -y node@22 scripts/run-mx-qst-safe.cjs
                     '''
                   } else {
-                    bat '''@echo off
+                    authBat '''@echo off
                       if not exist playwright\\.auth mkdir playwright\\.auth
                       copy /Y "%MX_AUTH_STATE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-user.json" >nul || exit /b 2
                       copy /Y "%MX_SESSION_STORAGE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-session-storage.json" >nul || exit /b 2
@@ -570,7 +580,7 @@ pipeline {
                   file(credentialsId: env.MX_BACKOFFICE_ADMIN_CREDENTIAL, variable: 'MX_BACKOFFICE_ADMIN_SECRET')
                 ]) {
                   if (isUnix()) {
-                    sh '''
+                    authSh '''
                       set -eu
                       mkdir -p playwright/.auth
                       cp "$MX_AUTH_STATE_SECRET" playwright/.auth/mx-${MX_AUTH_SUFFIX}-user.json
@@ -581,7 +591,7 @@ pipeline {
                       npx -y node@22 scripts/run-mx-qst-safe.cjs
                     '''
                   } else {
-                    bat '''@echo off
+                    authBat '''@echo off
                       if not exist playwright\\.auth mkdir playwright\\.auth
                       copy /Y "%MX_AUTH_STATE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-user.json" >nul || exit /b 2
                       copy /Y "%MX_SESSION_STORAGE_SECRET%" "playwright\\.auth\\mx-%MX_AUTH_SUFFIX%-session-storage.json" >nul || exit /b 2

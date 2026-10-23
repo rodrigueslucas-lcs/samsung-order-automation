@@ -16,7 +16,7 @@ function scenario({ flicker = false, signedOut = false, logoutVisible = true, at
     },
     isVisible: async () => true,
   });
-  const menu = locator({ getByText: () => logout, locator: () => login });
+  const menu = locator({ getByText: () => logout, locator: selector => selector === '[data-an-la="login"]' ? login : locator({ isVisible:async()=>false,count:async()=>0 }) });
   const profile = locator({ waitFor: async () => {}, hover: async () => { openings++; }, click: async () => { throw new Error('must not toggle an open menu'); } });
   const page = {
     url: () => `https://stg.shop.samsung.com/${market.toLowerCase()}/`,
@@ -47,7 +47,7 @@ test('other callers keep the default single-opening behavior', async () => {
 
 test('signed-out profile fails immediately without retrying or accepting menu visibility as identity', async () => {
   const state = scenario({ signedOut: true });
-  await assert.rejects(state.validate(), /session is signed out/);
+  await assert.rejects(state.validate(), { code: "AUTH_SIGNED_OUT" });
   assert.equal(state.counts().openings, 1);
   assert.equal(state.counts().logoutChecks, 0);
 });

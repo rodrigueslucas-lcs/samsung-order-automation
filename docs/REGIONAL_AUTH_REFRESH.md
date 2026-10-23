@@ -120,3 +120,24 @@ All commands default to S2; set `AUTH_REFRESH_ENVIRONMENT=S1` for S1. The SECOND
 Publishing requires all three `JENKINS_URL`, `JENKINS_USER` and `JENKINS_API_TOKEN` environment variables together, or the existing ignored `playwright/.auth/jenkins-publisher.local.json` with `url`, `user`, and `apiToken`. The orchestrator checks this configuration before opening browsers. Explicit environment configuration is never mixed with saved credentials.
 
 Visible email/password fields are populated once when automatic login is configured, even if a CAPTCHA is visible alongside them. No credentials are entered into MFA forms. Each dedicated native browser closes only after verification, packaging and requested publication succeed. A failed or human-gated flow preserves its window for recovery. Shared PreQA2 Chrome is never closed by this cleanup.
+
+## Regional keep-alive (S2 by default)
+
+Run `node scripts/auth-keepalive-once.cjs`. It checks MX PRIMARY/SECOND, PE PRIMARY, CO PRIMARY/SECOND and CL PRIMARY in parallel. Two positively signed-out checks are required before interactive renewal. Network failures and inconclusive UI checks never trigger login. Healthy checks do not open Samsung Account; they persist verified browser and session state before packaging.
+
+`--environment=S1` selects S1. `--markets=cl,pe` explicitly limits both Jenkins activity checking and all auth work to those markets. PE/CL have no SECOND keep-alive lane. CO never inherits MX_AUTH_SLOT. `--no-publish` disables publication, without acknowledging unsent changes.
+
+Each market holds a coordination lease through verification, renewal, package and publication. Jenkins auth batches participate in the same lease; an active/queued Samsung build also makes the one-shot exit BUSY before authentication begins. Different markets remain independent. Unknown lock ownership fails closed.
+
+Publication compares session content with the last successfully acknowledged publication. Bookkeeping timestamps alone do not rewrite bundles. Failed publications remain pending for a later cycle. With no publication checkpoint, the first successful cycle publishes once to establish that baseline. Checkpoints contain hashes/status only and are ignored local artifacts.
+
+Exit codes: 0 all READY, 2 HUMAN_REQUIRED, 3 BUSY, 1 failed or unproven. HUMAN_REQUIRED preserves the native browser and suppresses repeated automatic login attempts. After completing a preserved flow, run the corresponding market refresh to export/verify/package it, then repeat the one-shot. A healthy subsequent verification clears the human gate.
+
+For Windows, use Task Scheduler rather than a permanent Node loop or a Jenkins service login session. `node scripts/auth-keepalive-task.cjs --print` previews the definition; `--install` registers the 20-minute one-shot only after a recent successful real six-identity cycle. `--remove` disables it by removing the task. Installation and removal refuse active/queued Samsung builds.
+
+The task uses the logged-in operator (InteractiveToken), no stored Windows password, IgnoreNew, and an 18-minute execution limit. It needs that user logged in and network access. CAPTCHA/MFA remains manual. Scheduling does not guarantee indefinite session validity and never bypasses Samsung verification. Local evidence is in ignored `test-results/auth-keepalive/last-cycle-s2.json`; partial runs cannot authorize scheduler installation.
+`Health checks use up to three parallel Chromium contexts; interactive renewals use up to two simultaneous windows to avoid exhausting desktop memory when multiple identities expire together. All six identities remain covered; healthy sessions are never refreshed to fill a lane.`
+
+The login helper submits each credential step once. It fills email, attempts the normal CAPTCHA checkbox once when present, and waits for any real challenge/MFA. It fills password and submits only after the challenge has been completed. It never solves a challenge or resubmits failed credentials. MX/CO SECOND can also auto-fill when dedicated SECOND credentials are configured; without them it stays manual and never falls back to PRIMARY credentials. Keep SECOND credentials only in the existing ignored local credential files or dedicated environment variables.
+
+Visible renewal phases are FIRST before SECOND, with an explicit phase message. A pending FIRST human gate defers new SECOND login windows. Health checks remain parallel (up to three Chromium contexts); renewal is limited to two concurrent windows to bound desktop resource usage. Successful refresh closes its dedicated native browser; a human/failed flow preserves it for recovery.

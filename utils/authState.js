@@ -31,9 +31,9 @@ function createAuthState({
       !fs.existsSync(AUTH_STATE_PATH) ||
       !fs.existsSync(AUTH_SESSION_STORAGE_PATH)
     ) {
-      throw new Error(
+      throw Object.assign(new Error(
         `Authenticated ${label} state was not found. ${AUTH_REFRESH_INSTRUCTION}`
-      );
+      ), { code: "AUTH_STATE_MISSING" });
     }
 
     return AUTH_STATE_PATH;
@@ -238,9 +238,9 @@ function createAuthState({
       }
     }
 
-    if (menuRoot && await menuRoot.locator('a[data-an-la="login"]')
-      .filter({ visible: true }).isVisible().catch(() => false)) {
-      throw new Error(`The saved ${label} storefront session is signed out. ${AUTH_REFRESH_INSTRUCTION}`);
+    if (menuRoot && await menuRoot.locator('[data-an-la="login"]')
+      .filter({ visible: true }).first().isVisible().catch(() => false)) {
+      throw Object.assign(new Error(`The saved ${label} storefront session is signed out. ${AUTH_REFRESH_INSTRUCTION}`), { code: "AUTH_SIGNED_OUT" });
     }
 
     const authenticated = await logout
@@ -249,16 +249,16 @@ function createAuthState({
       .catch(() => false);
     if (!authenticated) {
       const signedOut = menuRoot
-        ? await menuRoot.locator('a[data-an-la="login"]').filter({ visible: true }).count().catch(() => 0)
+        ? await menuRoot.locator('[data-an-la="login"]').filter({ visible: true }).count().catch(() => 0)
         : 0;
       if (!signedOut && menuAttempt + 1 < Math.min(3, profileMenuOpenAttempts)) {
         return validateProfileMenu(page, menuAttempt + 1);
       }
-      throw new Error(
+      throw Object.assign(new Error(
         signedOut
           ? `The saved ${label} storefront session is signed out. ${AUTH_REFRESH_INSTRUCTION}`
           : `The saved ${label} profile menu opened but authenticated logout control was not rendered. Authentication could not be proven. ${AUTH_REFRESH_INSTRUCTION}`
-      );
+      ), { code: signedOut ? "AUTH_SIGNED_OUT" : "AUTH_NOT_PROVEN" });
     }
   }
 

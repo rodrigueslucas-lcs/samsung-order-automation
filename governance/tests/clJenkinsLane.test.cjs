@@ -25,8 +25,8 @@ test('CL Jenkins consumes the selected environment bundle and existing shared Ba
 });
 
 test('CL Jenkins installs and verifies auth before runtime on both shell paths', () => {
-  const unix = cl.slice(cl.indexOf("sh '''"), cl.indexOf('} else {'));
-  const windows = cl.slice(cl.indexOf("bat '''"));
+  const unix = cl.slice(cl.indexOf("authSh '''"), cl.indexOf('} else {'));
+  const windows = cl.slice(cl.indexOf("authBat '''"));
   for (const script of [unix, windows]) {
     const install = script.indexOf('npm run auth:install:cl');
     const verify = script.indexOf('node scripts/verify-jenkins-storefront-auth.cjs cl');

@@ -1,3 +1,4 @@
+const { recordPublication } = require('../utils/authKeepAlivePublication.cjs');
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -16,6 +17,8 @@ if (parsed.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(parsed.
 const suffix = environment.toLowerCase();
 const bundlePath = path.resolve("playwright/.session-packages", `co-${suffix}-session-bundle.json`);
 if (!fs.existsSync(bundlePath)) throw new Error("CO session bundle missing. Run auth:refresh:co first.");
+
+const bundleBytes = fs.readFileSync(bundlePath);
 
 const credentialId = process.env.JENKINS_CO_SESSION_BUNDLE_CREDENTIAL || `samsung-co-${suffix}-session-bundle`;
 const fileName = path.basename(bundlePath);
@@ -42,7 +45,7 @@ function xmlEscape(value) {
   return String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 function credentialXml() {
-  const encodedFile = fs.readFileSync(bundlePath).toString("base64");
+  const encodedFile = bundleBytes.toString("base64");
   return [
     "<org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl>",
     "  <scope>GLOBAL</scope>",
@@ -64,6 +67,7 @@ async function main() {
   if (exists) await submitCredential(`${credentialBase}/config.xml`, crumbHeader, "update");
   else await submitCredential(`${domainBase}/createCredentials`, crumbHeader, "create");
   if (!(await credentialExists())) throw new Error(`Jenkins accepted the request but credential '${credentialId}' is still absent.`);
+  recordPublication("co", environment, bundleBytes);
   console.log(`[auth:publish:jenkins:co] READY · CO ${environment} session bundle ${exists ? "updated" : "created"} in Jenkins credential '${credentialId}'.`);
   console.log("[auth:publish:jenkins:co] No session contents were logged.");
 }

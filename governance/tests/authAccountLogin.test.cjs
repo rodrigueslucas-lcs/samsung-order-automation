@@ -6,7 +6,7 @@ function scenario({ initial = 'email', captcha = false, remainCaptcha = false, m
   let state = initial, clock = 0, url = warm ? `https://${hostname}/${market}/` : 'https://account.samsung.com/accounts/fixture';
   const calls = [], logs = [];
   const locator = visible => ({ filter() { return this; }, first() { return this; }, last() { return this; },
-    isVisible: async () => visible(), count: async () => Number(visible()), fill: async () => calls.push('fill-' + state),
+    evaluateAll: async () => false, isVisible: async () => visible(), count: async () => Number(visible()), fill: async () => calls.push('fill-' + state),
     click: async () => { calls.push('click-' + state); if (state === 'email') state = captcha ? 'captcha' : 'password'; else url = `https://${hostname}/${market}/`; } });
   const page = { isClosed: () => false, url: () => url,
     locator: selector => selector.includes('iframe') ? locator(() => state === 'captcha') : locator(() => state === (selector.includes('password') ? 'password' : 'email')),
@@ -40,10 +40,10 @@ test('unresolved human verification is typed and never resubmits credentials', a
   assert.deepEqual(s.calls, []);
 });
 
-test('visible CAPTCHA permits filling both credentials once but never submits them', async () => {
+test('visible CAPTCHA fills only email and leaves password/submission for after human completion', async () => {
   let fills = 0, clock = 0;
   const locator = visible => ({ filter() { return this; }, first() { return this; }, last() { return this; },
-    count: async () => Number(visible), isVisible: async () => visible, fill: async () => { fills++; } });
+    evaluateAll: async () => false, count: async () => Number(visible), isVisible: async () => visible, fill: async () => { fills++; } });
   const page = { isClosed: () => false, url: () => 'https://account.samsung.com/accounts/fixture',
     locator: selector => locator(selector.includes('iframe') ? selector.includes('[title="reCAPTCHA" i]') : true),
     getByText: () => locator(false),
@@ -51,7 +51,7 @@ test('visible CAPTCHA permits filling both credentials once but never submits th
   await assert.rejects(completeAccountLogin(page, { market: 'cl', hostname: 'stg2.shop.samsung.com',
     credentials: { email: 'fixture@example.test', password: 'fixture-only' }, timeout: 1000, now: () => clock, pause: async ms => { clock += ms; }, log() {},
   }), error => error.exitCode === 79);
-  assert.equal(fills, 2);
+  assert.equal(fills, 1);
 });
 
 test('provider blank transition waits without filling credentials on the blank document', async () => {
@@ -94,3 +94,4 @@ test('combined login form fills email before password and submits only once', as
   });
   assert.deepEqual(actions, ['email', 'password', 'submit']);
 });
+test('checkbox is clicked once, password waits for manual completion even when the frame remains visible',async()=>{let clock=0,returned=false,completed=false;const actions=[];const loc=name=>({filter(){return this;},first(){return this;},last(){return this;},isVisible:async()=>true,count:async()=>1,evaluateAll:async()=>completed,fill:async()=>actions.push(name),click:async()=>{actions.push('submit');returned=true;}});const page={isClosed:()=>false,url:()=>returned?'https://stg2.shop.samsung.com/cl/':'https://account.samsung.com/accounts/fixture',locator:s=>loc(s.includes('password')?'password':'email'),getByText:()=>({first(){return this;},isVisible:async()=>false}),getByRole:()=>loc('button'),frameLocator:()=>({first(){return this;},getByRole:()=>({isVisible:async()=>true,click:async()=>actions.push('checkbox')})})};await completeAccountLogin(page,{market:'cl',hostname:'stg2.shop.samsung.com',credentials:{email:'fixture@example.test',password:'fixture'},timeout:2000,now:()=>clock,pause:async ms=>{clock+=ms;if(clock>=500)completed=true;},log(){}});assert.deepEqual(actions,['email','checkbox','password','submit']);});

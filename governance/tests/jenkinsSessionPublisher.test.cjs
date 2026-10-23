@@ -4,7 +4,7 @@ for(const market of ['mx','pe','co','cl']) test(`${market} publisher sends valid
  const bodies=[],output=[];const runtime={env:{ENVIRONMENT:'S2',JENKINS_URL:'http://localhost:8080',JENKINS_USER:'fixture',JENKINS_API_TOKEN:'fixture-token'},exitCode:0};
  const fakeFs={existsSync:()=>true,readFileSync:()=>Buffer.from(JSON.stringify({schemaVersion:1,market:market.toUpperCase(),environment:'S2',primary:{storageState:{},sessionStorage:{}}}))};
  const fetch=async(url,options={})=>{assert.ok(options.signal,'network wait must be bounded');if(options.body)bodies.push(options.body);return {ok:true,status:200,json:async()=>({crumbRequestField:'Jenkins-Crumb',crumb:'fixture-crumb'})};};
- vm.runInNewContext(fs.readFileSync(file,'utf8'),{process:runtime,require:name=>name==='node:fs'?fakeFs:require(name),URL,Buffer,AbortSignal,fetch,console:{log:line=>output.push(line),error:line=>output.push(line)}});
+ vm.runInNewContext(fs.readFileSync(file,'utf8'),{process:runtime,require:name=>name==='node:fs'?fakeFs:name==='../utils/authKeepAlivePublication.cjs'?{recordPublication(){}}:require(name),URL,Buffer,AbortSignal,fetch,console:{log:line=>output.push(line),error:line=>output.push(line)}});
  for(let i=0;i<20;i++)await new Promise(r=>setImmediate(r));
  assert.equal(runtime.exitCode,0);assert.equal(bodies.length,1);assert.ok(bodies[0].includes('\n  <scope>'));assert.ok(!bodies[0].includes('\\n'));assert.ok(output.every(line=>!line.includes('fixture-token')));
 });

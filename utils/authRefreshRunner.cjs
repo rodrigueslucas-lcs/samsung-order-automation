@@ -30,7 +30,8 @@ function acquireRefreshLock(market, environment, slot, directory = path.resolve(
 function runAuthChild(script, env, { label, log, timeoutMs, heartbeatMs = 15000, interactive = false }) {
   return new Promise((resolve, reject) => {
     const started = Date.now();
-    const child = spawn(process.execPath, [script], { env, stdio: 'inherit' });
+    const args = env.AUTH_MARKET_LEASE ? ['scripts/auth-leased-child.cjs', script] : [script];
+    const child = spawn(process.execPath, args, { env, stdio: 'inherit' });
     const heartbeat = setInterval(() => log(`${label} active (${Math.round((Date.now() - started) / 1000)}s). ${interactive ? 'Keep its Chrome open; complete any requested login/CAPTCHA/MFA there.' : 'Waiting for this phase; no interactive login is started here.'}`), heartbeatMs);
     let timedOut = false;
     let cancelled;
@@ -57,15 +58,19 @@ function runAuthChild(script, env, { label, log, timeoutMs, heartbeatMs = 15000,
 async function refreshAuth({ market, environment, slot = 'primary', env, publishScript }, {
   runChild = runAuthChild, acquire = acquireRefreshLock, log = console.log,
   captureBrowser = require('./authBrowserLifecycle.cjs').captureAuthBrowser,
+  acquireMarket = require('./authMarketLease.cjs').acquireMarketLease,
 } = {}) {
   if (!['mx', 'pe', 'co', 'cl'].includes(market) || !['S1', 'S2'].includes(environment) || !['primary', 'second'].includes(slot)) {
     throw new Error('Refresh requires a supported market, S1/S2 environment and primary/second slot.');
   }
   const prefix = `[auth:refresh:${market}]`;
   const report = text => log(`${prefix} ${text}`);
-  const release = acquire(market, environment, slot);
+  const releaseMarket = acquireMarket(market, environment, { env });
+  let release;
   let ownedBrowser;
   try {
+    env = { ...env, ...releaseMarket.env };
+    release = acquire(market, environment, slot);
     const interactiveMs = Number(env[`${market.toUpperCase()}_AUTH_INTERACTIVE_TIMEOUT_MS`] || 600000);
     if (!Number.isFinite(interactiveMs) || interactiveMs < 1000) throw new Error('Auth interactive timeout must be at least 1000ms.');
     const manual = env[`${market.toUpperCase()}_AUTH_MANUAL`] === '1';
@@ -106,7 +111,7 @@ async function refreshAuth({ market, environment, slot = 'primary', env, publish
     }
     report(`READY · ${market.toUpperCase()} ${environment} ${slot} authenticated session refreshed, verified and packaged.`);
     report('CAPTCHA/MFA remains a human security gate when Samsung Account requests it.');
-  } finally { try { await ownedBrowser?.dispose(); } finally { release(); } }
+  } finally { try { await ownedBrowser?.dispose(); } finally { try { release?.(); } finally { releaseMarket(); } } }
 }
 
 module.exports = { refreshAuth, runAuthChild, acquireRefreshLock };

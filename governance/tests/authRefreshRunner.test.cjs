@@ -10,7 +10,7 @@ async function scenario({ market = 'mx', environment = 'S2', slot = 'primary', s
   const calls = [], output = []; let released = 0;
   const env = { [`${market.toUpperCase()}_AUTH_MANUAL`]: manual ? '1' : '0', JENKINS_AUTH_PUBLISH: publish ? '1' : '0' };
   const result = refreshAuth({ market, environment, slot, env, publishScript: `publish-${market}` }, {
-    log: line => output.push(line), acquire: () => () => released++,
+    log: line => output.push(line), acquireMarket: () => () => {}, acquire: () => () => released++,
     captureBrowser: async () => null,
     runChild: async (script, actualEnv, options) => { calls.push({ script, env: actualEnv, options }); return statuses.shift() ?? 0; },
   });
@@ -66,7 +66,7 @@ for (const market of ['mx', 'pe', 'co', 'cl']) for (const environment of ['S1', 
       process: runtime, console: { log() {}, error() {} }, require: name => {
         assert.equal(name, '../utils/authRefreshRunner.cjs');
         return { refreshAuth: options => { const work = refreshAuth(options, {
-          acquire: () => () => {}, log() {}, captureBrowser: async () => null, runChild: async (script, env) => { calls.push({ script, env }); return 0; },
+          acquireMarket: () => () => {}, acquire: () => () => {}, log() {}, captureBrowser: async () => null, runChild: async (script, env) => { calls.push({ script, env }); return 0; },
         }); pending.push(work); return work; } };
       },
     });

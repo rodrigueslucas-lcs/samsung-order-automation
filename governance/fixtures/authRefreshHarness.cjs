@@ -13,7 +13,8 @@ async function runRefreshFixture(market, env, statuses = [0, 0, 0]) {
       if (name !== '../utils/authRefreshRunner.cjs') throw new Error('Unexpected operator dependency.');
       return { refreshAuth: options => {
         const result = refreshAuth(options, {
-          acquire: () => () => {}, log: line => output.push(line),
+          acquireMarket: () => { const release = () => {}; release.env = {}; return release; },
+          captureBrowser: async () => null, acquire: () => () => {}, log: line => output.push(line),
           runChild: async (script, env) => { calls.push({ script, env }); return statuses.shift() ?? 0; },
         });
         pending.push(result); return result;

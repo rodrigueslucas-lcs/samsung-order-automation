@@ -3,263 +3,170 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { acquireRefreshLock } = require('./authRefreshRunner.cjs');
+const { acquireMarketLease } = require('./authMarketLease.cjs');
 const { normalizeEnvironment } = require('./authRefreshAllRunner.cjs');
-
-const MARKET_SLOTS = Object.freeze({
-  mx: Object.freeze(['primary', 'second']),
-  pe: Object.freeze(['primary']),
-  co: Object.freeze(['primary', 'second']),
-  cl: Object.freeze(['primary']),
-});
-
-const PACKAGE_SCRIPTS = Object.freeze({
-  mx: 'scripts/auth-package-mx.cjs',
-  pe: 'scripts/auth-package-pe.cjs',
-  co: 'scripts/auth-package-co.cjs',
-  cl: 'scripts/auth-package-cl.cjs',
-});
-
-const PUBLISH_SCRIPTS = Object.freeze({
-  mx: 'scripts/auth-publish-jenkins.cjs',
-  pe: 'scripts/auth-publish-jenkins-pe.cjs',
-  co: 'scripts/auth-publish-jenkins-co.cjs',
-  cl: 'scripts/auth-publish-jenkins-cl.cjs',
-});
-
-function sessionBundlePath(market, environment) {
-  return path.resolve('playwright/.session-packages', `${market}-${environment.toLowerCase()}-session-bundle.json`);
+const { sessionContentHash } = require('./authBundleContent.cjs');
+const { writeJsonAtomically } = require('./atomicJson');
+const MARKET_SLOTS = Object.freeze({ mx: Object.freeze(['primary','second']), pe: Object.freeze(['primary']), co: Object.freeze(['primary','second']), cl: Object.freeze(['primary']) });
+const PACKAGE_SCRIPTS = Object.fromEntries(Object.keys(MARKET_SLOTS).map(m => [m, `scripts/auth-package-${m}.cjs`]));
+const PUBLISH_SCRIPTS = { mx: 'scripts/auth-publish-jenkins.cjs', pe: 'scripts/auth-publish-jenkins-pe.cjs', co: 'scripts/auth-publish-jenkins-co.cjs', cl: 'scripts/auth-publish-jenkins-cl.cjs' };
+const sessionBundlePath = (market, environment) => path.resolve('playwright/.session-packages', `${market}-${environment.toLowerCase()}-session-bundle.json`);
+function fileHash(file, { exists = fs.existsSync, read = fs.readFileSync } = {}) { return exists(file) ? crypto.createHash('sha256').update(read(file)).digest('hex') : null; }
+function readCheckpoint(market, environment) {
+  const file = path.resolve('playwright/.auth', `.keepalive-${market}-${environment.toLowerCase()}.json`);
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { if (e.code === 'ENOENT') return {}; throw new Error('Keep-alive checkpoint is unreadable; refusing to lose pending publication.'); }
 }
-
-function fileHash(file, { exists = fs.existsSync, read = fs.readFileSync } = {}) {
-  if (!exists(file)) return null;
-  return crypto.createHash('sha256').update(read(file)).digest('hex');
+function saveCheckpoint(market, environment, state) {
+  writeJsonAtomically(path.resolve('playwright/.auth', `.keepalive-${market}-${environment.toLowerCase()}.json`), state);
 }
-
 function identityEnv(market, environment, slot, baseEnv = process.env) {
+  if (!MARKET_SLOTS[market]?.includes(slot)) throw new Error('Unsupported keep-alive identity.');
   const upper = market.toUpperCase();
-  const env = {
-    ...baseEnv,
-    ENVIRONMENT: environment,
-    [`${upper}_QST_ENVIRONMENT`]: environment,
-    [`${upper}_AUTH_SLOT`]: slot,
-    AUTH_REFRESH_SLOT: slot,
-    AUTH_KEEPALIVE: '1',
-  };
+  const env = { ...baseEnv, ENVIRONMENT: environment, [`${upper}_QST_ENVIRONMENT`]: environment, [`${upper}_AUTH_SLOT`]: slot, AUTH_REFRESH_SLOT: slot, AUTH_KEEPALIVE: '1', [`${upper}_AUTH_AUTO_RENEW`]: '0', REGISTERED_AUTH_REHYDRATE: '0', JENKINS_AUTH_PUBLISH: '0' };
   if (market !== 'mx') delete env.MX_AUTH_SLOT;
   if (slot === 'second') env[`${upper}_AUTH_MANUAL`] = '1';
   return env;
 }
-
-function runNodeScript(script, env, {
-  spawnChild = spawn,
-  timeoutMs = 240000,
-  stdout = () => {},
-  stderr = () => {},
-} = {}) {
+function runNodeScript(script, env, { spawnChild = spawn, timeoutMs = 240000, stdout = () => {}, stderr = () => {} } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawnChild(process.execPath, [script], { env, stdio: ['ignore', 'pipe', 'pipe'] });
-    let out = '';
-    let err = '';
-    child.stdout?.setEncoding?.('utf8');
-    child.stderr?.setEncoding?.('utf8');
-    child.stdout?.on('data', chunk => { out += String(chunk); stdout(String(chunk)); });
-    child.stderr?.on('data', chunk => { err += String(chunk); stderr(String(chunk)); });
+    const args = env.AUTH_MARKET_LEASE ? ['scripts/auth-leased-child.cjs', script] : [script];
+    const child = spawnChild(process.execPath, args, { env, stdio: ['ignore','pipe','pipe'] });
+    let audit, lineBuffer = '', diagnostic = null;
     let timedOut = false;
     const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); }, timeoutMs);
-    child.once('error', error => { clearTimeout(timer); reject(error); });
-    child.once('close', (code, signal) => {
-      clearTimeout(timer);
-      resolve({ code: code ?? 1, signal: signal || null, timedOut, stdout: out, stderr: err });
-    });
-  });
-}
-
-async function verifyIdentity({ market, environment, slot, env = process.env, attempts = 2 }, {
-  acquire = acquireRefreshLock,
-  runScript = runNodeScript,
-  log = console.log,
-} = {}) {
-  let release;
-  try {
-    release = acquire(market, environment, slot);
-  } catch (error) {
-    if (/already active/i.test(String(error.message || error))) {
-      return { market, environment, slot, status: 'BUSY', attempts: 0, code: null };
-    }
-    throw error;
-  }
-
-  try {
-    const script = `scripts/auth-verify-${market}.cjs`;
-    const runtimeEnv = identityEnv(market, environment, slot, env);
-    let last;
-    for (let attempt = 1; attempt <= attempts; attempt++) {
-      log(`[keepalive:${market}] ${environment} ${slot} · verify ${attempt}/${attempts}`);
-      last = await runScript(script, runtimeEnv, { timeoutMs: 240000 });
-      if (last.code === 0) {
-        return { market, environment, slot, status: 'HEALTHY', attempts: attempt, code: 0 };
+    // Output is consumed but never retained in returned results/checkpoints.
+    child.stdout?.on('data', chunk => {
+      const lines = (lineBuffer + String(chunk)).split(/\r?\n/); lineBuffer = lines.pop().slice(-2048);
+      for (const line of lines) if (line.startsWith('AUTH_HEALTH_AUDIT ')) {
+        try { const value = JSON.parse(line.slice('AUTH_HEALTH_AUDIT '.length)); if (Number.isInteger(value.accountPages) && value.accountPages >= 0 && typeof value.statePersisted === 'boolean') audit = {accountPages:value.accountPages,statePersisted:value.statePersisted}; } catch {}
       }
-      if (attempt < attempts) await new Promise(resolve => setTimeout(resolve, 1500));
-    }
-    return {
-      market,
-      environment,
-      slot,
-      status: 'NEEDS_REFRESH',
-      attempts,
-      code: last?.code ?? 1,
-      error: String(last?.stderr || last?.stdout || '').split(/\r?\n/).filter(Boolean).slice(-1)[0] || null,
-    };
-  } finally {
-    release?.();
-  }
-}
-
-async function recoverIdentity({ market, environment, slot, env = process.env }, {
-  runScript = runNodeScript,
-  log = console.log,
-} = {}) {
-  const runtimeEnv = identityEnv(market, environment, slot, {
-    ...env,
-    JENKINS_AUTH_PUBLISH: '0',
+      stdout(String(chunk));
+    });
+    child.stderr?.on('data', chunk => {
+      const text = String(chunk);
+      if (text.includes('[auth:lease]')) diagnostic = 'CHILD_LEASE_ENTRY';
+      else if (/AUTH RECOVERY REQUIRED/.test(text)) diagnostic = 'AUTH_RECOVERY_REQUIRED';
+      else if (/profile menu did not open|authenticated logout control was not rendered/.test(text)) diagnostic = 'AUTH_NOT_PROVEN';
+      else if (/net::ERR_|ECONNRESET|ECONNREFUSED|ENOTFOUND/.test(text)) diagnostic = 'NETWORK_ERROR';
+      else { const kind = /\b(SyntaxError|ReferenceError|TypeError|TimeoutError)\b/.exec(text); if (kind) diagnostic = kind[1]; }
+      stderr(text);
+    });
+    const stop = signal => child.kill(signal);
+    const interrupt = () => stop('SIGINT'), terminate = () => stop('SIGTERM');
+    process.once('SIGINT', interrupt); process.once('SIGTERM', terminate);
+    const cleanup = () => { clearTimeout(timer); process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', terminate); };
+    child.once('error', () => { cleanup(); reject(new Error('Keep-alive child could not start.')); });
+    child.once('close', (code, signal) => { cleanup(); resolve({ code: code ?? 1, signal: signal || null, timedOut, audit, diagnostic }); });
   });
-  log(`[keepalive:${market}] ${environment} ${slot} · persistent verify failure; starting guarded refresh`);
-  const result = await runScript(`scripts/auth-refresh-${market}.cjs`, runtimeEnv, { timeoutMs: 900000 });
-  if (result.code === 0) return { market, environment, slot, status: 'RECOVERED', code: 0 };
-  if (result.code === 2) return { market, environment, slot, status: 'HUMAN_REQUIRED', code: 2 };
-  return {
-    market,
-    environment,
-    slot,
-    status: 'FAILED',
-    code: result.code,
-    error: String(result.stderr || result.stdout || '').split(/\r?\n/).filter(Boolean).slice(-1)[0] || null,
-  };
 }
-
-async function packageAndPublishMarket({ market, environment, publish, env = process.env }, {
-  runScript = runNodeScript,
-  hash = fileHash,
-  log = console.log,
-} = {}) {
+async function verifyIdentity({ market, environment, slot, env = process.env, attempts = 2 }, { acquire = acquireRefreshLock, runScript = runNodeScript, log = console.log, pause = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
+  let release;
+  try { release = acquire(market, environment, slot); }
+  catch (e) { if (e.code === 'AUTH_BUSY' || /already active/i.test(e.message)) return { market, environment, slot, status: 'BUSY', attempts: 0 }; throw e; }
+  try {
+    const outcomes = [], diagnostics = [], audits = [];
+    for (let attempt = 1; attempt <= Math.min(2, attempts); attempt++) {
+      log(`[keepalive:${market}] ${environment} ${slot} verify ${attempt}/2`);
+      const result = await runScript(`scripts/auth-verify-${market}.cjs`, identityEnv(market, environment, slot, env), { timeoutMs: 240000 });
+      if (result.code === 0 && !result.timedOut && !result.signal && result.audit?.statePersisted && result.audit?.accountPages === 0) return { market, environment, slot, status: 'HEALTHY', attempts: attempt, code: 0, audit: result.audit };
+      diagnostics.push(result.diagnostic || null); audits.push(result.audit || null);
+      outcomes.push(result.timedOut || result.signal ? 21 : result.code === 0 ? 22 : result.code);
+      if (attempt < Math.min(2, attempts)) await pause(1500);
+    }
+    // A mixed network/invalid result cannot establish persistent expiration.
+    const status = outcomes.length === 2 && outcomes.every(code => code === 20) ? 'NEEDS_REFRESH' : outcomes.every(code => code === 21) ? 'TRANSIENT_ERROR' : 'UNPROVEN';
+    return { market, environment, slot, status, attempts: outcomes.length, code: outcomes.at(-1), verifyCodes: outcomes, diagnostics, audits };
+  } finally { release(); }
+}
+async function recoverIdentity({ market, environment, slot, env = process.env }, { runScript = runNodeScript, log = console.log } = {}) {
+  const runtimeEnv = identityEnv(market, environment, slot, env);
+  delete runtimeEnv.AUTH_KEEPALIVE; // Refresh has its own fresh verify and normal interactive contract.
+  runtimeEnv[`${market.toUpperCase()}_AUTH_INTERACTIVE_TIMEOUT_MS`] = String(Math.min(600000, Number(env.AUTH_KEEPALIVE_INTERACTIVE_TIMEOUT_MS || 120000)));
+  log(`[keepalive:${market}] ${environment} ${slot} REFRESH (two positively invalid checks)`);
+  let informed = false;
+  const onOutput = chunk => { if (!informed && /CAPTCHA\/MFA|manual mode|Complete login\/CAPTCHA/.test(chunk)) { informed = true; log(`[keepalive:${market}] ${slot}: complete human verification in the dedicated Chrome window.`); } };
+  const result = await runScript(`scripts/auth-refresh-${market}.cjs`, runtimeEnv, { timeoutMs: 900000, stdout: onOutput, stderr: onOutput });
+  const status = result.code === 0 && !result.timedOut && !result.signal ? 'RECOVERED' : result.code === 2 ? 'HUMAN_REQUIRED' : result.code === 3 ? 'BUSY' : 'FAILED';
+  return { market, environment, slot, status, code: result.code };
+}
+async function packageAndPublishMarket({ market, environment, publish, env = process.env, state = {}, beforeHash = null }, { runScript = runNodeScript, hash = fileHash, contentHash = file => sessionContentHash(JSON.parse(fs.readFileSync(file, 'utf8'))), save = saveCheckpoint, log = console.log } = {}) {
   const bundle = sessionBundlePath(market, environment);
-  const before = hash(bundle);
-  const packageResult = await runScript(PACKAGE_SCRIPTS[market], {
-    ...env,
-    ENVIRONMENT: environment,
-    [`${market.toUpperCase()}_QST_ENVIRONMENT`]: environment,
-  }, { timeoutMs: 60000 });
-  if (packageResult.code !== 0) {
-    return { market, status: 'PACKAGE_FAILED', changed: false, published: false, code: packageResult.code };
-  }
-
+  const phaseEnv = identityEnv(market, environment, 'primary', env);
+  const packaged = await runScript(PACKAGE_SCRIPTS[market], phaseEnv, { timeoutMs: 60000 });
+  if (packaged.code !== 0 || packaged.timedOut || packaged.signal) return { market, status: 'PACKAGE_FAILED', changed: false, published: false };
   const after = hash(bundle);
-  const changed = before !== after;
-  if (!publish || !changed) {
-    log(`[keepalive:${market}] bundle ${changed ? 'changed' : 'unchanged'} · Jenkins publish ${publish ? 'not needed' : 'disabled'}`);
-    return { market, status: 'READY', changed, published: false, code: 0 };
-  }
-
-  const publishResult = await runScript(PUBLISH_SCRIPTS[market], {
-    ...env,
-    ENVIRONMENT: environment,
-    [`${market.toUpperCase()}_QST_ENVIRONMENT`]: environment,
-    JENKINS_AUTH_PUBLISH: '1',
-  }, { timeoutMs: 120000 });
-  return {
-    market,
-    status: publishResult.code === 0 ? 'READY' : 'PUBLISH_FAILED',
-    changed,
-    published: publishResult.code === 0,
-    code: publishResult.code,
+  if (!after) return { market, status: 'PACKAGE_FAILED', changed: false, published: false };
+  const semantic = contentHash(bundle);
+  const changed = beforeHash !== after;
+  const needsPublish = state.publishedContentHash !== semantic;
+  if (!publish || !needsPublish) { log(`[keepalive:${market}] bundle=${changed ? 'changed' : 'same'} publish=${publish ? 'unchanged' : 'disabled'}`); return { market, status: 'READY', changed, published: false, contentHash: semantic, fileHash: after }; }
+  const result = await runScript(PUBLISH_SCRIPTS[market], { ...phaseEnv, JENKINS_AUTH_PUBLISH: '1' }, { timeoutMs: 120000 });
+  if (result.code !== 0 || result.timedOut || result.signal) return { market, status: 'PUBLISH_FAILED', changed, published: false };
+  save(market, environment, { ...state, publishedContentHash: semantic, publishedFileHash: after });
+  return { market, status: 'READY', changed, published: true, contentHash: semantic, fileHash: after };
+}
+function limitConcurrency(maximum) {
+  let active = 0; const pending = [];
+  return async action => {
+    if (active >= maximum) await new Promise(resolve => pending.push(resolve));
+    else active++;
+    try { return await action(); }
+    finally { const next = pending.shift(); if (next) next(); else active--; }
   };
 }
-
-async function runKeepAliveCycle({ environment = 'S2', publish = true, env = process.env } = {}, {
-  verify = verifyIdentity,
-  recover = recoverIdentity,
-  finalize = packageAndPublishMarket,
-  log = console.log,
-} = {}) {
-  const targetEnvironment = normalizeEnvironment(environment);
-  const identities = Object.entries(MARKET_SLOTS).flatMap(([market, slots]) =>
-    slots.map(slot => ({ market, environment: targetEnvironment, slot }))
-  );
-  const startedAt = Date.now();
-
-  log('============================================================');
-  log(` SAMSUNG SMB · AUTH KEEP-ALIVE · ${targetEnvironment}`);
-  log('============================================================');
-  log(' Identities : MX PRIMARY/SECOND · PE PRIMARY · CO PRIMARY/SECOND · CL PRIMARY');
-  log(' Strategy   : verify twice → guarded refresh only if persistently invalid');
-  log(` Jenkins    : ${publish ? 'publish only when bundle hash changes' : 'disabled'}`);
-  log('============================================================');
-
-  const checks = await Promise.all(identities.map(identity => verify({ ...identity, env })));
-  const byMarket = new Map(Object.keys(MARKET_SLOTS).map(market => [market, []]));
-  for (const result of checks) byMarket.get(result.market).push(result);
-
-  const recoveries = [];
-  await Promise.all([...byMarket.entries()].map(async ([market, results]) => {
-    for (const result of results.filter(item => item.status === 'NEEDS_REFRESH')) {
-      const recovered = await recover({ market, environment: targetEnvironment, slot: result.slot, env });
-      recoveries.push(recovered);
+async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MARKET_SLOTS), publish = true, env = process.env } = {}, { verify = verifyIdentity, recover = recoverIdentity, finalize = packageAndPublishMarket, acquireMarket = acquireMarketLease, readState = readCheckpoint, saveState = saveCheckpoint, hash = fileHash, log = console.log } = {}) {
+  const target = normalizeEnvironment(environment);
+  if (!Array.isArray(markets) || !markets.length || markets.some(m => !MARKET_SLOTS[m])) throw new Error('Unsupported keep-alive market scope.');
+  const selected = [...new Set(markets)], verifyLane = limitConcurrency(3), refreshLane = limitConcurrency(2);
+  log('[auth:keepalive] ' + target + ': ' + selected.join(',').toUpperCase() + '; two strict checks; FIRST recovery before SECOND.');
+  const records = selected.map(market => ({market, checked:MARKET_SLOTS[market].map(slot=>({market,environment:target,slot}))}));
+  const fail = (record,status='FAILED') => {record.checked=record.checked.map(({market,environment,slot})=>({market,environment,slot,status}));record.failed=true;};
+  try {
+    for (const record of records) {
+      try {
+        record.release=acquireMarket(record.market,target,{env});
+        record.env={...env,...record.release.env};
+        record.beforeHash=hash(sessionBundlePath(record.market,target));
+        record.state=readState(record.market,target);
+      } catch(error) {fail(record,error.code==='AUTH_BUSY'?'BUSY':'FAILED');}
     }
-  }));
-
-  const finalStatus = new Map(checks.map(result => [`${result.market}:${result.slot}`, result]));
-  for (const result of recoveries) finalStatus.set(`${result.market}:${result.slot}`, result);
-
-  const finalized = [];
-  await Promise.all(Object.keys(MARKET_SLOTS).map(async market => {
-    const statuses = MARKET_SLOTS[market].map(slot => finalStatus.get(`${market}:${slot}`)?.status);
-    if (statuses.some(status => ['BUSY', 'HUMAN_REQUIRED', 'FAILED', undefined].includes(status))) {
-      finalized.push({ market, status: 'SKIPPED', changed: false, published: false, code: null });
-      return;
-    }
-    finalized.push(await finalize({ market, environment: targetEnvironment, publish, env }));
-  }));
-
-  log('');
-  log('============================================================');
-  log(` AUTH KEEP-ALIVE SUMMARY · ${targetEnvironment}`);
-  log('============================================================');
-  for (const identity of identities) {
-    const result = finalStatus.get(`${identity.market}:${identity.slot}`);
-    log(` ${identity.market.toUpperCase()} ${identity.slot.padEnd(7)} ${String(result?.status || 'UNKNOWN').padEnd(14)}`);
+    await Promise.all(records.filter(r=>!r.failed).flatMap(record=>record.checked.map(async(identity,index)=>{
+      try {record.checked[index]=await verifyLane(()=>verify({...identity,env:record.env}));}
+      catch {record.checked[index]={...identity,status:'FAILED'};}
+    })));
+    const recoverSlot=async(slot)=>{
+      const waiting=records.filter(r=>!r.failed).flatMap(record=>record.checked.map((identity,index)=>({record,identity,index}))).filter(({identity})=>identity.slot===slot&&identity.status==='NEEDS_REFRESH');
+      if(!waiting.length)return;
+      if(slot==='second') log('[auth:keepalive] FIRST phase finished. Starting SECOND renewal only.');
+      else log('[auth:keepalive] Starting FIRST renewal only; SECOND login windows are deferred.');
+      await Promise.all(waiting.map(({record,identity,index})=>refreshLane(async()=>{
+        const {market,environment,slot}=identity;
+        if(record.state.human?.[slot]) {record.checked[index]={market,environment,slot,status:'HUMAN_REQUIRED'};return;}
+        if(slot==='second' && records.some(r=>r.checked.some(i=>i.slot==='primary'&&i.status==='HUMAN_REQUIRED'))) {record.checked[index]={market,environment,slot,status:'WAITING_PRIMARY'};return;}
+        try {record.checked[index]=await recover({market,environment,slot,env:record.env});}
+        catch {record.checked[index]={market,environment,slot,status:'FAILED'};}
+      })));
+    };
+    await recoverSlot('primary');
+    await recoverSlot('second');
+    await Promise.all(records.map(async record=>{
+      record.final={market:record.market,status:'SKIPPED',published:false};
+      if(record.failed)return;
+      try {
+        const human={...record.state.human};
+        for(const result of record.checked){if(result.status==='HUMAN_REQUIRED')human[result.slot]=true;else if(['HEALTHY','RECOVERED'].includes(result.status))delete human[result.slot];}
+        record.state={...record.state,human};saveState(record.market,target,record.state);
+        if(record.checked.every(r=>['HEALTHY','RECOVERED'].includes(r.status))) record.final=await finalize({market:record.market,environment:target,publish,env:record.env,state:record.state,beforeHash:record.beforeHash});
+      } catch {fail(record);}
+    }));
+  } finally {
+    for(const record of records)try{record.release?.();}catch{fail(record);record.final={market:record.market,status:'SKIPPED',published:false};}
   }
-  for (const result of finalized.sort((a, b) => a.market.localeCompare(b.market))) {
-    const suffix = result.status === 'READY'
-      ? `bundle=${result.changed ? 'changed' : 'same'} · Jenkins=${result.published ? 'updated' : 'unchanged'}`
-      : 'finalization skipped/failed';
-    log(` ${result.market.toUpperCase()} FINAL      ${result.status.padEnd(14)} · ${suffix}`);
-  }
-  log(` total ${Math.round((Date.now() - startedAt) / 1000)}s`);
-  log('============================================================');
-
-  const blocking = [...finalStatus.values()].filter(result => ['HUMAN_REQUIRED', 'FAILED'].includes(result.status));
-  const busy = [...finalStatus.values()].filter(result => result.status === 'BUSY');
-  const finalizeFailures = finalized.filter(result => !['READY', 'SKIPPED'].includes(result.status));
-  return {
-    environment: targetEnvironment,
-    identities: [...finalStatus.values()],
-    finalized,
-    blocking,
-    busy,
-    ok: blocking.length === 0 && finalizeFailures.length === 0,
-  };
+  const identities=records.flatMap(r=>r.checked),finalized=records.map(r=>r.final||{market:r.market,status:'SKIPPED',published:false});
+  for(const r of identities)log('[auth:keepalive] '+r.market.toUpperCase()+' '+r.slot+': '+r.status);
+  for(const r of finalized)log('[auth:keepalive] '+r.market.toUpperCase()+' bundle: '+r.status+', publish='+(r.published?'updated':'unchanged'));
+  const busy=identities.filter(r=>r.status==='BUSY'),blocking=identities.filter(r=>!['HEALTHY','RECOVERED','BUSY'].includes(r.status));
+  return {environment:target,identities,finalized,blocking,busy,ok:blocking.length===0&&busy.length===0&&finalized.every(r=>r.status==='READY')};
 }
 
-module.exports = {
-  MARKET_SLOTS,
-  PACKAGE_SCRIPTS,
-  PUBLISH_SCRIPTS,
-  fileHash,
-  identityEnv,
-  packageAndPublishMarket,
-  recoverIdentity,
-  runKeepAliveCycle,
-  runNodeScript,
-  sessionBundlePath,
-  verifyIdentity,
-};
+module.exports = { MARKET_SLOTS, PACKAGE_SCRIPTS, PUBLISH_SCRIPTS, sessionBundlePath, fileHash, identityEnv, runNodeScript, verifyIdentity, recoverIdentity, packageAndPublishMarket, runKeepAliveCycle, readCheckpoint, saveCheckpoint, limitConcurrency };

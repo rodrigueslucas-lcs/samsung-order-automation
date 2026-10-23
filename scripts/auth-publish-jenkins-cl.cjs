@@ -1,3 +1,4 @@
+const { recordPublication } = require('../utils/authKeepAlivePublication.cjs');
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -72,6 +73,7 @@ async function main() {
   if (submitted.status === 403) throw new Error("Jenkins credential publish failed (HTTP 403). Jenkins API user cannot manage credentials through the Credentials REST API.");
   if (!submitted.ok) throw new Error(`Jenkins CL credential publish failed (HTTP ${submitted.status}).`);
   if (!(await credentialExists())) throw new Error("Jenkins accepted the request but the CL credential is still absent.");
+  recordPublication("cl", environment, bundleBytes);
   console.log(`[auth:publish:jenkins:cl] READY · CL ${environment} session bundle ${exists ? "updated" : "created"} in Jenkins.`);
   console.log("[auth:publish:jenkins:cl] No session contents were logged.");
 }

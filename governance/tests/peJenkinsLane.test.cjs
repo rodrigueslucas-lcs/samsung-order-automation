@@ -24,8 +24,8 @@ test('PE provisions the existing shared MX BackOffice credential for S1 and S2',
 });
 
 test('both PE shell paths install buyer and BackOffice prerequisites before verification and execution', () => {
-  const unix = pe.slice(pe.indexOf("sh '''"), pe.indexOf('} else {'));
-  const windows = pe.slice(pe.indexOf("bat '''"));
+  const unix = pe.slice(pe.indexOf("authSh '''"), pe.indexOf('} else {'));
+  const windows = pe.slice(pe.indexOf("authBat '''"));
   for (const script of [unix, windows]) {
     const install = script.indexOf('npm run auth:install:pe');
     const credential = script.indexOf('backoffice-admin-');

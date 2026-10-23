@@ -1,3 +1,5 @@
+const { observeAuthHealthContext } = require('../utils/authHealthAudit.cjs');
+const { verificationExitCode } = require('../utils/authVerificationResult.cjs');
 const { chromium } = require("@playwright/test");
 const { prepareAuthBrowserWindow } = require("../utils/authBrowserWindow.cjs");
 const { writeJsonAtomically } = require("../utils/atomicJson");
@@ -35,29 +37,32 @@ async function verifyCoAuthentication() {
   const config = getCoQstConfig();
   const auth = getCoAuthState();
   const ci = ["1", "true"].includes(String(process.env.CI || "").toLowerCase());
+  const headless = ci || process.env.AUTH_KEEPALIVE === "1";
   const browser = await chromium.launch({
     channel: "chrome",
-    headless: ci,
-    args: ci ? [] : ["--start-maximized"],
+    headless,
+    args: headless ? [] : ["--start-maximized"],
   });
 
+  let healthAudit;
   try {
     const context = await browser.newContext({
       storageState: auth.requireAuthState(),
-      viewport: ci ? { width: 1440, height: 900 } : null,
+      viewport: headless ? { width: 1440, height: 900 } : null,
     });
     await auth.applyAuthSessionStorage(context, { guardFuturePages: false });
+    healthAudit = observeAuthHealthContext(context);
     const page = await context.newPage();
-    if (!ci) await prepareAuthBrowserWindow(page);
+    if (!headless) await prepareAuthBrowserWindow(page);
     page.setDefaultNavigationTimeout(ci ? 120000 : 60000);
     page.setDefaultTimeout(ci ? 90000 : 60000);
 
     console.log(`[auth:verify:co] fresh ${config.environment} CO browser context created`);
     console.log(`[auth:verify:co] target: ${config.environment} | CO | ${config.baseUrl.hostname}`);
-    console.log(`[auth:verify:co] runtime: ${ci ? "CI Chrome | headless" : "local Chrome | headed"}`);
+    console.log(`[auth:verify:co] runtime: ${ci ? "CI Chrome" : "local Chrome"} | ${headless ? "headless" : "headed"}`);
 
     let lastError;
-    const attempts = ci ? 3 : 1;
+    const attempts = process.env.AUTH_KEEPALIVE === "1" ? 1 : ci ? 3 : 1;
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       try {
         await auth.validateAuthenticatedSession(page);
@@ -106,8 +111,10 @@ async function verifyCoAuthentication() {
     );
     writeJsonAtomically(CO_AUTH_SESSION_STORAGE_PATH, sessionStorage);
     markCoAuthStateVerified();
+    healthAudit.persisted();
     console.log(`[auth:verify:co] refreshed ${config.environment} CO session state preserved and marked as verified for the test fixture`);
   } finally {
+    healthAudit?.report();
     await browser.close();
   }
 }
@@ -117,5 +124,5 @@ verifyCoAuthentication().catch((error) => {
     .split("\n", 1)[0]
     .replace(/([?&][^=\s]+)=([^&\s]+)/g, "$1=<redacted>");
   console.error(`[auth:verify:co] ${error.name}: ${summary}`);
-  process.exitCode = 1;
+  process.exitCode = verificationExitCode(error);
 });

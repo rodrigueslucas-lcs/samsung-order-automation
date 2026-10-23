@@ -23,7 +23,7 @@ for (const failurePhase of [null, 'verify', 'package', 'publish']) {
   test(`browser closes only after every phase succeeds (${failurePhase || 'success'})`, async () => {
     const events = [];
     const pending = refreshAuth({ market: 'pe', environment: 'S2', env: { JENKINS_AUTH_PUBLISH: '1' }, publishScript: 'scripts/publish.cjs' }, {
-      acquire: () => () => events.push('release'), log() {},
+      acquireMarket: () => () => {}, acquire: () => () => events.push('release'), log() {},
       async runChild(script) { const phase = script.match(/auth-(login|verify|package)/)?.[1] || 'publish'; events.push(phase); return phase === failurePhase ? 1 : 0; },
       async captureBrowser() { events.push('capture'); return { async closeVerified() { events.push('close'); }, async dispose() { events.push('disconnect'); } }; },
     });
@@ -36,7 +36,7 @@ for (const failurePhase of [null, 'verify', 'package', 'publish']) {
 
 test('shared PreQA2 login does not capture or close any native browser', async () => {
   await refreshAuth({ market: 'co', environment: 'S2', env: { CO_STOREFRONT_URL: 'https://p6-pre-qa2.samsung.com/co/' } }, {
-    acquire: () => () => {}, log() {}, runChild: async () => 0,
+    acquireMarket: () => () => {}, acquire: () => () => {}, log() {}, runChild: async () => 0,
     captureBrowser() { throw new Error('must preserve shared Chrome'); },
   });
 });

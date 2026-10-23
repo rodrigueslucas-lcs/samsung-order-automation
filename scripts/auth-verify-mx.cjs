@@ -1,3 +1,5 @@
+const { observeAuthHealthContext } = require('../utils/authHealthAudit.cjs');
+const { verificationExitCode } = require('../utils/authVerificationResult.cjs');
 const { chromium } = require("@playwright/test");
 const { prepareAuthBrowserWindow } = require("../utils/authBrowserWindow.cjs");
 const fs = require("node:fs");
@@ -18,7 +20,7 @@ function writeJsonSecurely(destination, value) {
 
 async function verifyMxAuthentication() {
   const ci = ["1", "true"].includes(String(process.env.CI || "").toLowerCase());
-  const headless = ci || process.env.MX_QST_HEADLESS === "1";
+  const headless = ci || process.env.AUTH_KEEPALIVE === "1" || process.env.MX_QST_HEADLESS === "1";
   const launchOptions = {
     headless,
     args: headless ? [] : ["--start-maximized"],
@@ -33,12 +35,14 @@ async function verifyMxAuthentication() {
 
   const browser = await chromium.launch(launchOptions);
 
+  let healthAudit;
   try {
     const context = await browser.newContext({
       storageState: requireAuthState(),
       viewport: headless ? { width: 1440, height: 900 } : null,
     });
     await applyAuthSessionStorage(context, { guardFuturePages: false });
+    healthAudit = observeAuthHealthContext(context);
     const page = await context.newPage();
     if (!headless) await prepareAuthBrowserWindow(page);
     page.setDefaultNavigationTimeout(navigationTimeout);
@@ -98,8 +102,10 @@ async function verifyMxAuthentication() {
     );
     writeJsonSecurely(AUTH_SESSION_STORAGE_PATH, sessionStorage);
     markAuthStateVerified();
+    healthAudit.persisted();
     console.log("[auth:verify:mx] refreshed MX session state preserved and marked as verified for the target environment");
   } finally {
+    healthAudit?.report();
     await browser.close();
   }
 }
@@ -109,5 +115,5 @@ verifyMxAuthentication().catch((error) => {
     .split("\n", 1)[0]
     .replace(/([?&][^=\s]+)=([^&\s]+)/g, "$1=<redacted>");
   console.error(`[auth:verify:mx] ${error.name}: ${summary}`);
-  process.exitCode = 1;
+  process.exitCode = verificationExitCode(error);
 });

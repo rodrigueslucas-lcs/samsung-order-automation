@@ -46,13 +46,20 @@ function readLocalCredentials() {
   };
 }
 
+function useAutomaticLogin() {
+  if (!manualLogin) return true;
+  if (accountSlot !== 'second') return false;
+  const local = readLocalCredentials();
+  return Boolean((process.env.MX_SECOND_SAMSUNG_EMAIL?.trim() || local.email) && (process.env.MX_SECOND_SAMSUNG_PASSWORD || local.password));
+}
+
 function resolveRuntimeCredentials() {
   const local = readLocalCredentials();
   const email = accountSlot === "second"
-    ? process.env.MX_SECOND_SAMSUNG_EMAIL?.trim() || process.env.MX_SAMSUNG_EMAIL?.trim() || local.email
+    ? process.env.MX_SECOND_SAMSUNG_EMAIL?.trim() || local.email
     : process.env.SAMSUNG_ACCOUNT_EMAIL?.trim() || process.env.MX_SAMSUNG_EMAIL?.trim() || local.email;
   const password = accountSlot === "second"
-    ? process.env.MX_SECOND_SAMSUNG_PASSWORD || process.env.MX_SAMSUNG_PASSWORD || local.password
+    ? process.env.MX_SECOND_SAMSUNG_PASSWORD || local.password
     : process.env.SAMSUNG_ACCOUNT_PASSWORD || process.env.MX_SAMSUNG_PASSWORD || local.password;
   if (!email || !password) {
     throw new Error(
@@ -198,7 +205,7 @@ async function exportState(context, page) {
     }
     const accountPage = existingAccountPage || await waitForSamsungAccountPage(context, page);
 
-    if (accountPage && !manualLogin) {
+    if (accountPage && useAutomaticLogin()) {
       await fillSamsungAccount(accountPage, resolveRuntimeCredentials);
     } else if (accountPage) {
       try { await prepareMxWindow(accountPage, true); }

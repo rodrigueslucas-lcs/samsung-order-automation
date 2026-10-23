@@ -46,6 +46,13 @@ function readLocalCredentials() {
   };
 }
 
+function useAutomaticLogin() {
+  if (!manualLogin) return true;
+  if (accountSlot !== 'second') return false;
+  const local = readLocalCredentials();
+  return Boolean((process.env.CO_SECOND_SAMSUNG_EMAIL?.trim() || local.email) && (process.env.CO_SECOND_SAMSUNG_PASSWORD || local.password));
+}
+
 function resolveRuntimeCredentials() {
   const local = readLocalCredentials();
   const email = accountSlot === "second"
@@ -339,7 +346,7 @@ async function loginCoSamsungAccount() {
         assertAllowedHost(page, [ACCOUNT_HOSTNAME], "Samsung Account login");
       }
 
-      if (menuState === "signed-out" && manualLogin) {
+      if (menuState === "signed-out" && !useAutomaticLogin()) {
         console.log(`[auth:login:co] Samsung Account login is ready in the visible Chrome. Complete login/CAPTCHA/MFA manually; automation will resume after the authenticated CO ${ENV_NAME} return.`);
         page = await waitForManualStorefront(context, page, {
           hostname: HOSTNAME, market: "co", timeout: interactiveTimeout,

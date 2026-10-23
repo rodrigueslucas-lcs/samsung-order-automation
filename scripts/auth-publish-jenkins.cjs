@@ -1,3 +1,4 @@
+const { recordPublication } = require('../utils/authKeepAlivePublication.cjs');
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -18,6 +19,8 @@ if (parsed.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(parsed.
 const suffix = environment.toLowerCase();
 const bundlePath = path.resolve("playwright/.session-packages", `mx-${suffix}-session-bundle.json`);
 if (!fs.existsSync(bundlePath)) throw new Error("Session bundle missing. Run auth:refresh:mx first.");
+
+const bundleBytes = fs.readFileSync(bundlePath);
 
 const credentialId = process.env.JENKINS_MX_SESSION_BUNDLE_CREDENTIAL || `samsung-mx-${suffix}-session-bundle`;
 const fileName = path.basename(bundlePath);
@@ -56,7 +59,7 @@ function xmlEscape(value) {
 }
 
 function credentialXml() {
-  const encodedFile = fs.readFileSync(bundlePath).toString("base64");
+  const encodedFile = bundleBytes.toString("base64");
   return [
     "<org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl>",
     "  <scope>GLOBAL</scope>",
@@ -97,6 +100,7 @@ async function main() {
     throw new Error(`Jenkins accepted the ${exists ? "update" : "create"} request but credential '${credentialId}' is still absent. No legacy credential was changed.`);
   }
 
+  recordPublication("mx", environment, bundleBytes);
   console.log(`[auth:publish:jenkins] READY · MX ${environment} session bundle ${exists ? "updated" : "created"} in Jenkins credential '${credentialId}'.`);
   console.log("[auth:publish:jenkins] Used the Jenkins Credentials REST XML API; Script Console access is not required.");
   console.log("[auth:publish:jenkins] No session contents were logged.");

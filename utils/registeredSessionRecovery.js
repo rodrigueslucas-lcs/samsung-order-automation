@@ -37,6 +37,9 @@ function withRegisteredSessionRecovery(authState, {
     throw new Error("A valid auth state is required for registered-session recovery.");
   }
 
+  // A keep-alive health check must never initiate login or hide its first result.
+  if (process.env.AUTH_KEEPALIVE === "1") return authState;
+
   const strictValidate = authState.validateAuthenticatedSession.bind(authState);
   const installState = authState.installPersistedBrowserState.bind(authState);
   const refreshState = authState.refreshAuthenticatedState.bind(authState);

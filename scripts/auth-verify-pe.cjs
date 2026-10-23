@@ -1,3 +1,5 @@
+const { observeAuthHealthContext } = require('../utils/authHealthAudit.cjs');
+const { verificationExitCode } = require('../utils/authVerificationResult.cjs');
 const { chromium } = require("@playwright/test");
 const { prepareAuthBrowserWindow } = require("../utils/authBrowserWindow.cjs");
 const { writeJsonAtomically } = require("../utils/atomicJson");
@@ -45,29 +47,32 @@ async function verifyPeAuthentication() {
   const config = getPeQstConfig();
   const auth = getPeAuthState();
   const ci = ["1", "true"].includes(String(process.env.CI || "").toLowerCase());
+  const headless = ci || process.env.AUTH_KEEPALIVE === "1";
   const browser = await chromium.launch({
     channel: "chrome",
-    headless: ci,
-    args: ci ? [] : ["--start-maximized"],
+    headless,
+    args: headless ? [] : ["--start-maximized"],
   });
 
+  let healthAudit;
   try {
     const context = await browser.newContext({
       storageState: auth.requireAuthState(),
-      viewport: ci ? { width: 1440, height: 900 } : null,
+      viewport: headless ? { width: 1440, height: 900 } : null,
     });
     await auth.applyAuthSessionStorage(context, { guardFuturePages: false });
+    healthAudit = observeAuthHealthContext(context);
     const page = await context.newPage();
-    if (!ci) await prepareAuthBrowserWindow(page);
+    if (!headless) await prepareAuthBrowserWindow(page);
     page.setDefaultNavigationTimeout(ci ? 120000 : 60000);
     page.setDefaultTimeout(ci ? 90000 : 60000);
 
     console.log(`[auth:verify:pe] fresh ${config.environment} PE browser context created`);
     console.log(`[auth:verify:pe] target: ${config.environment} | PE | ${config.baseUrl.hostname}`);
-    console.log(`[auth:verify:pe] runtime: ${ci ? "CI Chrome | headless" : "local Chrome | headed"}`);
+    console.log(`[auth:verify:pe] runtime: ${ci ? "CI Chrome" : "local Chrome"} | ${headless ? "headless" : "headed"}`);
 
     let lastError;
-    const attempts = 3;
+    const attempts = process.env.AUTH_KEEPALIVE === "1" ? 1 : 3;
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       try {
         await auth.validateAuthenticatedSession(page);
@@ -120,8 +125,10 @@ async function verifyPeAuthentication() {
     );
     writeJsonSecurely(PE_AUTH_SESSION_STORAGE_PATH, sessionStorage);
     markPeAuthStateVerified();
+    healthAudit.persisted();
     console.log(`[auth:verify:pe] refreshed ${config.environment} PE session state preserved and marked as verified for the test fixture`);
   } finally {
+    healthAudit?.report();
     await browser.close();
   }
 }
@@ -131,5 +138,5 @@ verifyPeAuthentication().catch((error) => {
     .split("\n", 1)[0]
     .replace(/([?&][^=\s]+)=([^&\s]+)/g, "$1=<redacted>");
   console.error(`[auth:verify:pe] ${error.name}: ${summary}`);
-  process.exitCode = 1;
+  process.exitCode = verificationExitCode(error);
 });
