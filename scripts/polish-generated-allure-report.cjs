@@ -4,6 +4,7 @@ const path = require('node:path');
 const resultsDir = path.resolve(process.argv[2] || process.env.ALLURE_RESULTS_DIR || 'allure-results');
 const reportDir = path.resolve(process.argv[3] || process.env.ALLURE_REPORT_DIR || 'allure-report');
 const testCasesDir = path.join(reportDir, 'data', 'test-cases');
+const widgetsDir = path.join(reportDir, 'widgets');
 
 function clean(value) {
   return String(value || '')
@@ -46,6 +47,28 @@ function decorateBusinessLinks(html) {
       `<a href="$1" style="${pillStyle}">📎 Evidências</a>`);
 }
 
+function suppressNoisyOverviewTrend() {
+  const trendFile = path.join(widgetsDir, 'history-trend.json');
+  if (!fs.existsSync(trendFile)) return false;
+
+  const raw = fs.readFileSync(trendFile, 'utf8');
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return false;
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0) return false;
+
+  // Preserve the complete generated trend data for diagnostics/audit, but feed
+  // an empty series to Allure's Overview. The stock stacked-area widget is hard
+  // to read for a fixed 29-TC campaign and duplicates the clearer Executive
+  // Dashboard. Per-TC History and the underlying report/history files remain intact.
+  fs.writeFileSync(path.join(widgetsDir, 'history-trend-full.json'), JSON.stringify(parsed));
+  fs.writeFileSync(trendFile, '[]');
+  return true;
+}
+
 if (!fs.existsSync(resultsDir) || !fs.existsSync(testCasesDir)) {
   console.log('[allure-generated-polish] Results/report data missing; nothing to polish.');
   process.exit(0);
@@ -77,9 +100,6 @@ for (const name of fs.readdirSync(testCasesDir).filter((file) => file.endsWith('
   if (richHtml) {
     testCase.descriptionHtml = decorateBusinessLinks(source.descriptionHtml);
     delete testCase.description;
-    // The rich Description already exposes Official TC / Known Defect /
-    // Jenkins / artifacts as clickable links. Hide Allure's native duplicate
-    // Links block in the published test-case view.
     duplicateLinksRemoved += Array.isArray(testCase.links) ? testCase.links.length : 0;
     testCase.links = [];
   } else {
@@ -94,5 +114,7 @@ for (const name of fs.readdirSync(testCasesDir).filter((file) => file.endsWith('
   polished += 1;
 }
 
-console.log(`[allure-generated-polish] READY · ${polished} TC(s) polished in generated report · console-noise-removed=${consoleNoiseRemoved} · duplicate-links-removed=${duplicateLinksRemoved} · missing-rich-html=${missingHtml}.`);
+const overviewTrendSuppressed = suppressNoisyOverviewTrend();
+
+console.log(`[allure-generated-polish] READY · ${polished} TC(s) polished in generated report · console-noise-removed=${consoleNoiseRemoved} · duplicate-links-removed=${duplicateLinksRemoved} · overview-trend=${overviewTrendSuppressed ? 'suppressed' : 'unchanged'} · missing-rich-html=${missingHtml}.`);
 if (missingHtml > 0) process.exitCode = 2;
