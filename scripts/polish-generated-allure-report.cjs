@@ -48,6 +48,7 @@ for (const name of fs.readdirSync(resultsDir).filter((file) => file.endsWith('-r
 
 let polished = 0;
 let consoleNoiseRemoved = 0;
+let duplicateLinksRemoved = 0;
 let missingHtml = 0;
 
 for (const name of fs.readdirSync(testCasesDir).filter((file) => file.endsWith('.json'))) {
@@ -61,15 +62,15 @@ for (const name of fs.readdirSync(testCasesDir).filter((file) => file.endsWith('
 
   const richHtml = clean(source.descriptionHtml);
   if (richHtml) {
-    // This is the actual object consumed by the Allure UI. Force the rich
-    // business description here so adapter/generator fallback choices cannot
-    // regress the published Jenkins report to a plain text wall.
     testCase.descriptionHtml = source.descriptionHtml;
     delete testCase.description;
+    // The rich Description already exposes Official TC / Known Defect /
+    // Jenkins / artifacts as clickable links. Hide Allure's native duplicate
+    // Links block in the published test-case view.
+    duplicateLinksRemoved += Array.isArray(testCase.links) ? testCase.links.length : 0;
+    testCase.links = [];
   } else {
     missingHtml += 1;
-    // Keep the curated Markdown fallback if a future upstream change ever
-    // stops producing rich HTML. Never restore an older/plain description.
     testCase.description = source.description || testCase.description || '';
   }
 
@@ -80,5 +81,5 @@ for (const name of fs.readdirSync(testCasesDir).filter((file) => file.endsWith('
   polished += 1;
 }
 
-console.log(`[allure-generated-polish] READY · ${polished} TC(s) polished in generated report · console-noise-removed=${consoleNoiseRemoved} · missing-rich-html=${missingHtml}.`);
+console.log(`[allure-generated-polish] READY · ${polished} TC(s) polished in generated report · console-noise-removed=${consoleNoiseRemoved} · duplicate-links-removed=${duplicateLinksRemoved} · missing-rich-html=${missingHtml}.`);
 if (missingHtml > 0) process.exitCode = 2;
