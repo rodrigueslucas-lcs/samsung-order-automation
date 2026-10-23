@@ -25,6 +25,23 @@ function polish(phase) {
   }
 }
 
+function polishGeneratedReport() {
+  const script = path.resolve("scripts/polish-generated-allure-report.cjs");
+  if (!fs.existsSync(script)) {
+    console.error("[allure] Generated-report polish script is missing.");
+    return false;
+  }
+  const polished = spawnSync(process.execPath, [script, resultsDir, reportDir], {
+    stdio: "inherit",
+    env: process.env,
+  });
+  if (polished.status !== 0) {
+    console.error("[allure] Generated report did not satisfy the final rich-description contract.");
+    return false;
+  }
+  return true;
+}
+
 const enrich = spawnSync(process.execPath, [
   path.resolve("scripts/enrich-allure-mx-qst.cjs"),
   resultsDir,
@@ -98,14 +115,18 @@ if (generated.status !== 0) {
   process.exit(generated.status || 1);
 }
 
-const savedHistory = spawnSync(process.execPath, [
-  path.resolve("scripts/prepare-allure-ci-metadata.cjs"),
-  resultsDir,
-  reportDir,
-  "save",
-], { stdio: "inherit", env: process.env });
-if (savedHistory.status !== 0) {
-  console.error("[allure] Trend history persistence failed; generated report was preserved.");
+if (!polishGeneratedReport()) {
+  process.exitCode = 1;
+} else {
+  const savedHistory = spawnSync(process.execPath, [
+    path.resolve("scripts/prepare-allure-ci-metadata.cjs"),
+    resultsDir,
+    reportDir,
+    "save",
+  ], { stdio: "inherit", env: process.env });
+  if (savedHistory.status !== 0) {
+    console.error("[allure] Trend history persistence failed; generated report was preserved.");
+  }
 }
 
 console.log(`[allure] Final Samsung MX QST report generated: ${reportDir}`);
