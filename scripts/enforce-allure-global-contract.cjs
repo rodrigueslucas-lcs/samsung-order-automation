@@ -15,6 +15,15 @@ function clean(value) {
     .trim();
 }
 
+function esc(value) {
+  return clean(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 function parameter(result, name) {
   return clean((result.parameters || []).find((item) => item?.name === name)?.value || '');
 }
@@ -42,11 +51,8 @@ function marketOf(result) {
 
 function environmentOf(result) {
   const raw = parameter(result, 'Environment') || clean(
-    process.env.MX_QST_ENVIRONMENT ||
-    process.env.PE_QST_ENVIRONMENT ||
-    process.env.CO_QST_ENVIRONMENT ||
-    process.env.CL_QST_ENVIRONMENT ||
-    process.env.ENVIRONMENT
+    process.env.MX_QST_ENVIRONMENT || process.env.PE_QST_ENVIRONMENT ||
+    process.env.CO_QST_ENVIRONMENT || process.env.CL_QST_ENVIRONMENT || process.env.ENVIRONMENT
   );
   if (/S2|STG2/i.test(raw)) return 'S2 / STG2';
   if (/S1|(?:^|\W)STG(?:$|\W)/i.test(raw)) return 'S1 / STG';
@@ -73,12 +79,10 @@ function runtimeStatus(result) {
   if (/BLOCKED|SKIPPED/.test(explicit)) return 'BLOCKED';
   if (/PASS/.test(explicit)) return 'PASS';
   if (/FAIL|TIMEDOUT|INTERRUPTED|UNEXPECTED/.test(explicit)) return 'FAIL';
-
   const technical = parameter(result, 'Technical Result').toUpperCase();
   if (/BLOCKED|SKIPPED/.test(technical)) return 'BLOCKED';
   if (/PASS/.test(technical)) return 'PASS';
   if (/FAIL|TIMEDOUT|INTERRUPTED|UNEXPECTED/.test(technical)) return 'FAIL';
-
   const status = clean(result.status).toLowerCase();
   if (status === 'passed') return 'PASS';
   if (status === 'skipped' || status === 'broken') return 'BLOCKED';
@@ -86,13 +90,34 @@ function runtimeStatus(result) {
   return 'NOT RUN';
 }
 
-function statusMessage(result, status, defect) {
+function humanizeTechnical(raw) {
+  const text = clean(raw).replace(/^(?:FAIL|BLOCKED)\s*[·:-]?\s*/i, '');
+  if (!text) return '';
+  if (/bounded wait\/recovery|exceeded.*wait|expected storefront state/i.test(text)) {
+    return 'O cenário excedeu a janela controlada de espera antes de atingir o estado funcional esperado.';
+  }
+  if (/cart readback is unresolved|product absence was not proven/i.test(text)) {
+    return 'O estado do carrinho não pôde ser confirmado com segurança dentro da janela de recuperação controlada.';
+  }
+  if (/authentication|session|credentials|unauthenticated|login/i.test(text)) {
+    return 'A execução não pôde continuar porque o pré-requisito de autenticação/sessão não estava disponível.';
+  }
+  if (/HTTP\s*500/i.test(text)) {
+    return 'O backend retornou HTTP 500 durante o fluxo e impediu a conclusão esperada do cenário.';
+  }
+  if (/timeout|timed out/i.test(text)) {
+    return 'O cenário excedeu a janela controlada de espera antes de atingir o estado esperado.';
+  }
+  return text;
+}
+
+function statusMessage(result, status, defect, originalMessage) {
   const title = parameter(result, 'Known Defect Title');
   if (defect) return `KNOWN DEFECT · ${defect}${title ? ` · ${title}` : ''}`;
   if (status === 'PASS') return 'PASS · Critérios automatizados do cenário atendidos.';
-  if (status === 'BLOCKED') return clean(result.statusDetails?.message || '').replace(/^BLOCKED\s*[·:-]?\s*/i, '') || 'Pré-requisito necessário indisponível.';
-  if (status === 'FAIL') return clean(result.statusDetails?.message || '').replace(/^FAIL\s*[·:-]?\s*/i, '') || 'O comportamento observado não atendeu ao resultado esperado.';
-  return clean(result.statusDetails?.message || '');
+  if (status === 'BLOCKED') return `BLOCKED · ${humanizeTechnical(originalMessage) || 'Pré-requisito necessário indisponível.'}`;
+  if (status === 'FAIL') return `FAIL · ${humanizeTechnical(originalMessage) || 'O comportamento observado não atendeu ao resultado esperado.'}`;
+  return clean(originalMessage);
 }
 
 function samId(result) {
@@ -127,7 +152,7 @@ function markdownDescription(result, status, defect, market, environment, store)
   const visual = statusVisual(status, defect);
   const objective = stepValue(result, '01 · ') || `Validar o cenário oficial ${id}: ${title}.`;
   const expected = stepValue(result, '02 · ') || `O comportamento funcional “${title}” deve atender aos critérios de aceite definidos para o TC sem divergências.`;
-  const observed = stepValue(result, '03 · ') || statusMessage(result, status, defect);
+  const observed = stepValue(result, '03 · ') || statusMessage(result, status, defect, result.statusDetails?.message || '');
   const prerequisiteStep = (result.steps || []).find((item) => /Pré-requisito|desbloqueio/i.test(clean(item?.name)));
   const prerequisite = clean(prerequisiteStep?.steps?.[0]?.name || '');
   const defectTitle = parameter(result, 'Known Defect Title');
@@ -137,27 +162,26 @@ function markdownDescription(result, status, defect, market, environment, store)
   if (!context.some(([label]) => label === 'Store')) context.splice(2, 0, ['Store', store]);
 
   const lines = [
-    `## ${visual.icon} **${visual.label}** · **${id}**`,
-    `### ${title}`,
-    '',
-    '---',
-    '',
-    '### **O que foi validado**',
-    objective,
-    '',
-    '### **Resultado esperado**',
-    expected,
-    '',
-    '### **Resultado observado**',
-    `**${visual.icon} ${observed}**`,
+    `## ${visual.icon} **${visual.label}** · **${id}**`, `### ${title}`, '', '---', '',
+    '### **O que foi validado**', objective, '',
+    '### **Resultado esperado**', expected, '',
+    '### **Resultado observado**', `**${visual.icon} ${observed}**`,
   ];
-
   if (defect) lines.push('', '### **Known Defect**', `🟣 **${defect}**${defectTitle ? ` — ${defectTitle}` : ''}`, 'O runtime técnico original permanece preservado nas evidências para diagnóstico.');
   if (status === 'BLOCKED' && prerequisite) lines.push('', '### **Pré-requisito / desbloqueio**', `🟡 ${prerequisite}`);
-
   lines.push('', '### **Contexto da execução**', '', '| Campo | Valor |', '|---|---|');
   for (const [label, value] of context) lines.push(`| **${label}** | ${value} |`);
   return lines.join('\n');
+}
+
+function replaceTechnicalTextInHtml(html, originalMessage, replacement) {
+  if (!html || !originalMessage || !replacement) return html;
+  const candidates = [clean(originalMessage), clean(originalMessage).replace(/^(?:FAIL|BLOCKED)\s*[·:-]?\s*/i, '')];
+  let output = String(html);
+  for (const candidate of candidates.filter(Boolean)) {
+    output = output.split(esc(candidate)).join(esc(replacement));
+  }
+  return output;
 }
 
 function removeConsoleNoiseFromSteps(steps) {
@@ -191,48 +215,43 @@ for (const fileName of fs.readdirSync(resultsDir).filter((name) => name.endsWith
   const status = runtimeStatus(result);
   const id = samId(result);
   const title = scenarioTitle(result, id);
+  const originalStatusMessage = clean(result.statusDetails?.message || result.statusDetails?.trace || '');
 
   upsertLabel(result, 'parentSuite', `${market} · ${environment}`);
   upsertLabel(result, 'suite', `${store} · P1/QST`);
   upsertLabel(result, 'subSuite', `${market} QST · ${store} Official P1`);
   suiteNormalized += 1;
 
-  // Behaviors/Overview must represent the complete official campaign, not only
-  // the subset of specs that happened to declare feature/story annotations.
   upsertLabel(result, 'epic', 'Samsung SMB QST');
   upsertLabel(result, 'feature', `${market} · ${store} · P1/QST`);
   upsertLabel(result, 'story', `${id} · ${title}`);
   behaviorNormalized += 1;
 
   if (defect) {
-    result.status = 'unknown';
-    addTag(result, 'known-defect');
-    counts.defect += 1;
+    result.status = 'unknown'; addTag(result, 'known-defect'); counts.defect += 1;
   } else if (status === 'PASS') {
-    result.status = 'passed';
-    counts.passed += 1;
+    result.status = 'passed'; counts.passed += 1;
   } else if (status === 'BLOCKED') {
-    result.status = 'broken';
-    addTag(result, 'blocked');
-    counts.blocked += 1;
+    result.status = 'broken'; addTag(result, 'blocked'); counts.blocked += 1;
   } else if (status === 'FAIL') {
-    result.status = 'failed';
-    counts.failed += 1;
-  } else {
-    counts.other += 1;
-  }
+    result.status = 'failed'; counts.failed += 1;
+  } else counts.other += 1;
 
   result.stage = 'finished';
   result.statusDetails ||= {};
-  result.statusDetails.message = statusMessage(result, status, defect);
+  const finalMessage = statusMessage(result, status, defect, originalStatusMessage);
+  result.statusDetails.message = finalMessage;
   if (defect || status === 'PASS') result.statusDetails.trace = '';
 
-  // Keep both representations until generation: rich HTML is the source of
-  // truth for the published report; Markdown is only a readable fallback.
-  result.description = markdownDescription(result, status, defect, market, environment, store);
-  if (!clean(result.descriptionHtml)) {
-    console.error(`[allure-global-contract] Missing rich HTML description for ${id}.`);
+  const conciseObserved = defect
+    ? `O comportamento conhecido está mapeado em ${defect}${parameter(result, 'Known Defect Title') ? ` — ${parameter(result, 'Known Defect Title')}` : ''}.`
+    : humanizeTechnical(originalStatusMessage);
+  if (clean(result.descriptionHtml) && conciseObserved) {
+    result.descriptionHtml = replaceTechnicalTextInHtml(result.descriptionHtml, originalStatusMessage, conciseObserved);
   }
+
+  result.description = markdownDescription(result, status, defect, market, environment, store);
+  if (!clean(result.descriptionHtml)) console.error(`[allure-global-contract] Missing rich HTML description for ${id}.`);
 
   if (Array.isArray(result.attachments)) {
     const before = result.attachments.length;
