@@ -12,7 +12,7 @@ test('P1 clears only the validated current output lane before auth can abort exe
   assert.ok(request.indexOf('env.JENKINS_ARTIFACT_DIR != expectedDir') < request.indexOf('deleteDir()'));
   assert.match(request, /dir\(expectedDir\) \{ deleteDir\(\) \}/);
   assert.doesNotMatch(request, /dir\(['"](?:\.|test-results|playwright\/\.auth)['"]\)/);
-  assert.ok(source.indexOf("stage('03 · Validate Request')") < source.indexOf('CI=1 npm run auth:verify:cl'));
+  assert.ok(source.indexOf("stage('03 · Validate Request')") < source.indexOf('CI=1 node scripts/verify-jenkins-storefront-auth.cjs cl'));
 });
 
 test('absent current runtime JSON cannot trigger finalization or a successful build', () => {
@@ -38,7 +38,7 @@ test('preflight failure cannot publish stale reports as current TC evidence', ()
 test('session rejection stays gating and no interactive renewal is enabled in CI', () => {
   assert.match(source, /catchError\(buildResult: 'FAILURE', stageResult: 'FAILURE'\)/);
   for (const market of ['cl', 'co', 'pe']) {
-    assert.ok(source.includes(`call npm run auth:verify:${market} || exit /b 20`));
+    assert.ok(source.includes(`call node scripts/verify-jenkins-storefront-auth.cjs ${market} || exit /b 20`));
   }
   assert.match(source, /CL_AUTH_AUTO_RENEW = '0'/);
 });

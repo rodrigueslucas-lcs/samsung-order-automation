@@ -29,7 +29,7 @@ test('CL Jenkins installs and verifies auth before runtime on both shell paths',
   const windows = cl.slice(cl.indexOf("bat '''"));
   for (const script of [unix, windows]) {
     const install = script.indexOf('npm run auth:install:cl');
-    const verify = script.indexOf('npm run auth:verify:cl');
+    const verify = script.indexOf('node scripts/verify-jenkins-storefront-auth.cjs cl');
     const run = script.indexOf('npx -y node@22 scripts/run-cl-qst-p1.cjs');
     assert.ok(install >= 0 && verify > install && run > verify);
   }

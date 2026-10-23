@@ -365,7 +365,7 @@ pipeline {
                     cp "$CL_BACKOFFICE_ADMIN_SECRET" "playwright/.auth/backoffice-admin-${BACKOFFICE_ENV}.json"
                     cp "$CL_TEST_CARD_SECRET" playwright/.auth/mx-test-card.json
                     chmod 600 playwright/.auth/*.json || true
-                    CI=1 npm run auth:verify:cl
+                    CI=1 node scripts/verify-jenkins-storefront-auth.cjs cl
                     npx -y node@22 scripts/run-cl-qst-p1.cjs
                   '''
                 } else {
@@ -375,7 +375,7 @@ pipeline {
                     copy /Y "%CL_BACKOFFICE_ADMIN_SECRET%" "playwright\\.auth\\backoffice-admin-%BACKOFFICE_ENV%.json" >nul || exit /b 2
                     copy /Y "%CL_TEST_CARD_SECRET%" "playwright\\.auth\\mx-test-card.json" >nul || exit /b 2
                     set CI=1
-                    call npm run auth:verify:cl || exit /b 20
+                    call node scripts/verify-jenkins-storefront-auth.cjs cl || exit /b 20
                     call npx -y node@22 scripts/run-cl-qst-p1.cjs
                   '''
                 }
@@ -399,7 +399,7 @@ pipeline {
                     cp "$CO_BACKOFFICE_ADMIN_SECRET" playwright/.auth/backoffice-admin-${BACKOFFICE_ENV}.json
                     cp "$CO_TEST_CARD_SECRET" "playwright/.auth/${CO_TEST_CARD_RUNTIME_FILE}"
                     chmod 600 playwright/.auth/*.json || true
-                    CI=1 npm run auth:verify:co
+                    CI=1 node scripts/verify-jenkins-storefront-auth.cjs co
                     npx -y node@22 scripts/run-co-qst-p1.cjs
                   '''
                 } else {
@@ -409,7 +409,7 @@ pipeline {
                     copy /Y "%CO_BACKOFFICE_ADMIN_SECRET%" "playwright\\.auth\\backoffice-admin-%BACKOFFICE_ENV%.json" >nul || exit /b 2
                     copy /Y "%CO_TEST_CARD_SECRET%" "playwright\\.auth\\%CO_TEST_CARD_RUNTIME_FILE%" >nul || exit /b 2
                     set CI=1
-                    call npm run auth:verify:co || exit /b 20
+                    call node scripts/verify-jenkins-storefront-auth.cjs co || exit /b 20
                     call npx -y node@22 scripts/run-co-qst-p1.cjs
                   '''
                 }
@@ -429,7 +429,7 @@ pipeline {
                     mkdir -p playwright/.auth
                     cp "$PE_BACKOFFICE_ADMIN_SECRET" playwright/.auth/backoffice-admin-${BACKOFFICE_ENV}.json
                     chmod 600 playwright/.auth/*.json || true
-                    CI=1 npm run auth:verify:pe
+                    CI=1 node scripts/verify-jenkins-storefront-auth.cjs pe
                     npx -y node@22 scripts/run-pe-qst-p1.cjs
                   '''
                 } else {
@@ -438,7 +438,7 @@ pipeline {
                     if not exist playwright\\.auth mkdir playwright\\.auth
                     copy /Y "%PE_BACKOFFICE_ADMIN_SECRET%" "playwright\\.auth\\backoffice-admin-%BACKOFFICE_ENV%.json" >nul || exit /b 2
                     set CI=1
-                    call npm run auth:verify:pe || exit /b 20
+                    call node scripts/verify-jenkins-storefront-auth.cjs pe || exit /b 20
                     call npx -y node@22 scripts/run-pe-qst-p1.cjs
                   '''
                 }

@@ -29,7 +29,7 @@ test('both PE shell paths install buyer and BackOffice prerequisites before veri
   for (const script of [unix, windows]) {
     const install = script.indexOf('npm run auth:install:pe');
     const credential = script.indexOf('backoffice-admin-');
-    const verify = script.indexOf('npm run auth:verify:pe');
+    const verify = script.indexOf('node scripts/verify-jenkins-storefront-auth.cjs pe');
     const run = script.indexOf('npx -y node@22 scripts/run-pe-qst-p1.cjs');
     assert.ok(install >= 0 && credential > install && verify > credential && run > verify);
   }
