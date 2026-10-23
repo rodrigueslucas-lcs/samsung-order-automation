@@ -14,7 +14,7 @@ function runtime(status = 'SKIPPED-BLOCKED') {
     suite: 'P1/QST',
     summary: { official: 29, executed: 28, passed: 25, failed: 3, blocked: 1, notRun: 0 },
     tests: [
-      { samId: 'SAM-25010', title: 'Track Order with email and Order ID', status, failureType: 'TEST_DATA_BLOCKED' },
+      { samId: 'SAM-25010', title: 'Track Order with email and Order ID', status, failureType: 'TEST_DATA_BLOCKED', blockedReason: 'KNOWN DEFECT RT-738525 · MX Guest Track Order accepts OTP but cannot resolve MX-QA in the current BaseSite.' },
     ],
   };
 }

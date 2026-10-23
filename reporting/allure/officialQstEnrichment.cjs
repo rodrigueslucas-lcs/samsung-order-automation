@@ -1,3 +1,4 @@
+const { matchesKnownDefectEvidence } = require('../knownDefectEvidence.cjs');
 const fs = require("node:fs");
 const path = require("node:path");
 const { sanitize } = require("../evidence/sanitizer");
@@ -354,7 +355,7 @@ function enrichOfficialQst({
     details.paymentMode ||= inferPaymentMode(entry.title);
     const runtimeStatus = prettyStatus(runtimeTest?.status || evidence.result || result.status);
     const mappedDefect = activeDefect(registry, market, environment, store, samId);
-    const defect = ["FAIL", "BLOCKED"].includes(runtimeStatus) ? mappedDefect : null;
+    const defect = ["FAIL", "BLOCKED"].includes(runtimeStatus) && mappedDefect && matchesKnownDefectEvidence(mappedDefect, { ...result, ...runtimeTest, statusDetails: result.statusDetails }) ? mappedDefect : null;
     const context = dynamicContext({ market, environment, store, samId, entry, details, runtimeTest: { ...runtimeTest, status: runtimeStatus }, evidence, defect, defaults });
 
     result.name = `${samId} · ${entry.title}`;

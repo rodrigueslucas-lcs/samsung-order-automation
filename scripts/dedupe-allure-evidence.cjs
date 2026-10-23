@@ -1,3 +1,4 @@
+const { matchesKnownDefectEvidence } = require('../reporting/knownDefectEvidence.cjs');
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -143,7 +144,7 @@ function mappedDefect(result) {
     normalizeEnvironment(defect.environment) === environment &&
     (!defect.store || !store || normalizeStore(defect.store) === store) &&
     String(defect.samId || "").toUpperCase() === samId &&
-    String(defect.status || "OPEN").toUpperCase() !== "CLOSED"
+    String(defect.status || "OPEN").toUpperCase() !== "CLOSED" && matchesKnownDefectEvidence(defect, result)
   ) || null;
 }
 

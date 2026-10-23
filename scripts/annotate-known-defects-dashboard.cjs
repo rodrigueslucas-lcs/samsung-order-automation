@@ -1,3 +1,4 @@
+const { matchesKnownDefectEvidence } = require('../reporting/knownDefectEvidence.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -42,7 +43,7 @@ function activeKnownDefects(runtime, registry) {
     if (!matchesScope || String(defect.status || 'OPEN').toUpperCase() === 'CLOSED') return [];
 
     const test = runtime.tests.find(item => runtimeSamId(item) === String(defect.samId || '').toUpperCase());
-    if (!test || !actionableStatuses.has(String(test.status || '').toUpperCase())) return [];
+    if (!test || !actionableStatuses.has(String(test.status || '').toUpperCase()) || !matchesKnownDefectEvidence(defect, test)) return [];
     return [{ defect, test }];
   });
 }
