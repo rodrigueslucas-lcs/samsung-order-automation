@@ -28,6 +28,7 @@ const credentialBase = `${domainBase}/credential/${encodeURIComponent(credential
 async function request(relative, options = {}) {
   return fetch(`${baseUrl}${relative}`, {
     redirect: "manual",
+    signal: AbortSignal.timeout(30000),
     ...options,
     headers: { Authorization: auth, ...(options.headers || {}) },
   });
@@ -64,7 +65,7 @@ function credentialXml() {
     `  <fileName>${xmlEscape(fileName)}</fileName>`,
     `  <secretBytes>${encodedFile}</secretBytes>`,
     "</org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl>",
-  ].join("\\n");
+  ].join("\n");
 }
 
 async function submitCredential(relative, crumbHeader, mode) {

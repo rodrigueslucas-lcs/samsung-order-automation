@@ -22,11 +22,13 @@ const requestedMarkets = args.markets.length
   : (process.env.AUTH_REFRESH_MARKETS || process.env.MARKETS || '');
 const markets = normalizeMarkets(requestedMarkets, args.slot);
 const environment = process.env.AUTH_REFRESH_ENVIRONMENT || process.env.ENVIRONMENT || 'S2';
-const runtimeEnv = {
+let runtimeEnv = {
   ...process.env,
   AUTH_REFRESH_SLOT: args.slot,
   JENKINS_AUTH_PUBLISH: args.publish ? '1' : '0',
 };
+// Fail before opening four browsers if publishing cannot be configured.
+if (args.publish) runtimeEnv = require('../utils/jenkinsPublisherConfig.cjs').publisherEnvironment(runtimeEnv);
 
 function writeSummary(summary) {
   const publishSuffix = args.publish ? '-jenkins' : '';

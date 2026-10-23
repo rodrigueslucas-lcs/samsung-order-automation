@@ -73,6 +73,8 @@ function runMarketRefresh(market, environment, slot = 'primary', baseEnv = proce
     AUTH_REFRESH_SLOT: selectedSlot,
     AUTH_REFRESH_ALL: '1',
   };
+  // CO supports a legacy MX_AUTH_SLOT alias; a regional selection is explicit.
+  if (market !== 'mx') delete env.MX_AUTH_SLOT;
   if (selectedSlot === 'second') env[`${upper}_AUTH_MANUAL`] = '1';
 
   return new Promise((resolve, reject) => {

@@ -24,7 +24,7 @@ const domainBase = "/manage/credentials/store/system/domain/_";
 const credentialBase = `${domainBase}/credential/${encodeURIComponent(credentialId)}`;
 
 async function request(relative, options = {}) {
-  return fetch(`${baseUrl}${relative}`, { redirect: "manual", ...options, headers: { Authorization: auth, ...(options.headers || {}) } });
+  return fetch(`${baseUrl}${relative}`, { redirect: "manual", signal: AbortSignal.timeout(30000), ...options, headers: { Authorization: auth, ...(options.headers || {}) } });
 }
 async function getCrumb() {
   const response = await request("/crumbIssuer/api/json");
@@ -51,7 +51,7 @@ function credentialXml() {
     `  <fileName>${xmlEscape(fileName)}</fileName>`,
     `  <secretBytes>${encodedFile}</secretBytes>`,
     "</org.jenkinsci.plugins.plaincredentials.impl.FileCredentialsImpl>",
-  ].join("\\n");
+  ].join("\n");
 }
 async function submitCredential(relative, crumbHeader, mode) {
   const response = await request(relative, { method: "POST", headers: { ...crumbHeader, "Content-Type": "application/xml" }, body: credentialXml() });

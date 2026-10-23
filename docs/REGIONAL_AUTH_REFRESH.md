@@ -107,3 +107,16 @@ First runtime validation should run S2 for all four markets and confirm:
 - each market reaches its own verify/package stage independently;
 - a CAPTCHA/MFA in one market does not terminate the others;
 - READY is printed only for markets that completed the full individual pipeline.
+
+## Combined Jenkins and SECOND shortcuts
+
+- `node scripts/auth-refresh-all.cjs`: PRIMARY for MX, PE, CO and CL.
+- `node scripts/auth-refresh-all-jenkins.cjs`: the same refresh followed by each market's Jenkins publication.
+- `node scripts/auth-refresh-second.cjs`: SECOND for MX and CO only.
+- `node scripts/auth-refresh-second-jenkins.cjs`: SECOND refresh followed by Jenkins publication.
+
+All commands default to S2; set `AUTH_REFRESH_ENVIRONMENT=S1` for S1. The SECOND shortcuts keep manual identity selection and never reuse PRIMARY credentials. CAPTCHA/MFA remains manual.
+
+Publishing requires all three `JENKINS_URL`, `JENKINS_USER` and `JENKINS_API_TOKEN` environment variables together, or the existing ignored `playwright/.auth/jenkins-publisher.local.json` with `url`, `user`, and `apiToken`. The orchestrator checks this configuration before opening browsers. Explicit environment configuration is never mixed with saved credentials.
+
+Visible email/password fields are populated once when automatic login is configured, even if a CAPTCHA is visible alongside them. No credentials are entered into MFA forms. Each dedicated native browser closes only after verification, packaging and requested publication succeed. A failed or human-gated flow preserves its window for recovery. Shared PreQA2 Chrome is never closed by this cleanup.

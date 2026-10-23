@@ -74,3 +74,10 @@ test('a thrown market startup error is isolated into that market result', async 
   assert.equal(summary.failed, 1);
   assert.match(summary.results.find((result) => result.market === 'mx').error, /fixture startup error/);
 });
+
+for (const environment of ['S1','S2']) for (const slot of ['primary','second']) test(`CO ${environment} ${slot} ignores inherited MX slot alias`, async () => {
+ const {runMarketRefresh}=require('../../utils/authRefreshAllRunner.cjs'); const {EventEmitter}=require('node:events');
+ let actual;
+ const result=await runMarketRefresh('co',environment,slot,{MX_AUTH_SLOT:slot==='primary'?'second':'primary'},{spawnChild(exe,args,options){actual=options.env;const child=new EventEmitter();setImmediate(()=>child.emit('close',0,null));return child;},stdout(){},stderr(){}});
+ assert.equal(actual.CO_AUTH_SLOT,slot);assert.equal(actual.MX_AUTH_SLOT,undefined);assert.equal(result.status,'READY');
+});
