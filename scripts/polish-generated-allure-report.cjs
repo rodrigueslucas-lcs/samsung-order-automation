@@ -71,10 +71,6 @@ function backupAndEmptyWidget(fileName, backupName = fileName.replace(/\.json$/i
 
 function simplifyStockGraphs() {
   const suppressed = [];
-
-  // The stock Allure trend widgets are useful for raw diagnostics but noisy for
-  // this fixed-size SMB campaign. Keep full backups for audit while presenting
-  // only Status, Duration and Duration trend on the Graphs page.
   const widgetsToSuppress = [
     ['history-trend.json', 'history-trend-full.json'],
     ['retries-trend.json', 'retries-trend-full.json'],
@@ -87,6 +83,40 @@ function simplifyStockGraphs() {
   }
 
   return suppressed;
+}
+
+function hideTimelineNavigation() {
+  const indexFile = path.join(reportDir, 'index.html');
+  if (!fs.existsSync(indexFile)) return false;
+
+  const marker = 'data-samsung-hide-timeline';
+  const html = fs.readFileSync(indexFile, 'utf8');
+  if (html.includes(marker)) return true;
+
+  const script = `
+<script ${marker}="true">
+(() => {
+  const hideTimeline = () => {
+    for (const node of document.querySelectorAll('a,button,[role="link"],[role="button"]')) {
+      const text = (node.textContent || '').trim().toLowerCase();
+      const href = (node.getAttribute?.('href') || '').toLowerCase();
+      if (text === 'timeline' || /(?:#|\/)timeline(?:$|[/?#])/.test(href)) {
+        const item = node.closest('li') || node.closest('[class*="menu"]') || node;
+        item.style.display = 'none';
+      }
+    }
+  };
+  hideTimeline();
+  const observer = new MutationObserver(hideTimeline);
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+})();
+</script>`;
+
+  const updated = html.includes('</body>')
+    ? html.replace('</body>', `${script}\n</body>`)
+    : `${html}\n${script}`;
+  fs.writeFileSync(indexFile, updated);
+  return true;
 }
 
 if (!fs.existsSync(resultsDir) || !fs.existsSync(testCasesDir)) {
@@ -135,6 +165,7 @@ for (const name of fs.readdirSync(testCasesDir).filter((file) => file.endsWith('
 }
 
 const suppressedGraphWidgets = simplifyStockGraphs();
+const timelineHidden = hideTimelineNavigation();
 
-console.log(`[allure-generated-polish] READY · ${polished} TC(s) polished in generated report · console-noise-removed=${consoleNoiseRemoved} · duplicate-links-removed=${duplicateLinksRemoved} · graph-widgets-suppressed=${suppressedGraphWidgets.join(',') || 'none'} · missing-rich-html=${missingHtml}.`);
+console.log(`[allure-generated-polish] READY · ${polished} TC(s) polished in generated report · console-noise-removed=${consoleNoiseRemoved} · duplicate-links-removed=${duplicateLinksRemoved} · graph-widgets-suppressed=${suppressedGraphWidgets.join(',') || 'none'} · timeline-nav=${timelineHidden ? 'hidden' : 'unchanged'} · missing-rich-html=${missingHtml}.`);
 if (missingHtml > 0) process.exitCode = 2;
