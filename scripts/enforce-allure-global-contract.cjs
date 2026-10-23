@@ -87,17 +87,107 @@ function runtimeStatus(result) {
 }
 
 function statusMessage(result, status, defect) {
-  const title = clean((result.parameters || []).find((item) => item?.name === 'Known Defect Title')?.value || '');
+  const title = parameter(result, 'Known Defect Title');
   if (defect) return `KNOWN DEFECT · ${defect}${title ? ` · ${title}` : ''}`;
   if (status === 'PASS') return 'PASS · Critérios automatizados do cenário atendidos.';
-  if (status === 'BLOCKED') return clean(result.statusDetails?.message || '').replace(/^BLOCKED\s*[·:-]?\s*/i, '') || 'BLOCKED · Pré-requisito necessário indisponível.';
-  if (status === 'FAIL') return clean(result.statusDetails?.message || '').replace(/^FAIL\s*[·:-]?\s*/i, '') || 'FAIL · O comportamento observado não atendeu ao resultado esperado.';
+  if (status === 'BLOCKED') return clean(result.statusDetails?.message || '').replace(/^BLOCKED\s*[·:-]?\s*/i, '') || 'Pré-requisito necessário indisponível.';
+  if (status === 'FAIL') return clean(result.statusDetails?.message || '').replace(/^FAIL\s*[·:-]?\s*/i, '') || 'O comportamento observado não atendeu ao resultado esperado.';
   return clean(result.statusDetails?.message || '');
 }
 
+function samId(result) {
+  return `${result.name || ''} ${result.fullName || ''}`.match(/SAM-\d+/)?.[0] || '';
+}
+
+function scenarioTitle(result, id) {
+  return clean(result.name || result.fullName || id).replace(new RegExp(`^${id}\\s*[·:\\-]?\\s*`, 'i'), '').trim();
+}
+
+function stepValue(result, prefix) {
+  const step = (result.steps || []).find((item) => clean(item?.name).startsWith(prefix));
+  return clean(step?.steps?.[0]?.name || '');
+}
+
+function contextMap(result) {
+  const labels = ['Market', 'Environment', 'Store', 'User Type', 'SKU', 'Payment', 'Order ID', 'Runtime Status', 'Technical Result'];
+  return labels
+    .map((label) => [label, parameter(result, label)])
+    .filter(([, value]) => value);
+}
+
+function statusVisual(status, defect) {
+  if (defect) return { icon: '🟣', label: 'KNOWN DEFECT' };
+  if (status === 'PASS') return { icon: '🟢', label: 'PASS' };
+  if (status === 'BLOCKED') return { icon: '🟡', label: 'BLOCKED' };
+  if (status === 'FAIL') return { icon: '🔴', label: 'FAIL' };
+  return { icon: '⚪', label: 'NOT RUN' };
+}
+
+function markdownDescription(result, status, defect, market, environment, store) {
+  const id = samId(result);
+  const title = scenarioTitle(result, id);
+  const visual = statusVisual(status, defect);
+  const objective = stepValue(result, '01 · ') || `Validate the official ${id} business scenario.`;
+  const expected = stepValue(result, '02 · ') || 'The expected business acceptance criteria should be satisfied.';
+  const observed = stepValue(result, '03 · ') || statusMessage(result, status, defect);
+  const prerequisiteStep = (result.steps || []).find((item) => /Pré-requisito|desbloqueio/i.test(clean(item?.name)));
+  const prerequisite = clean(prerequisiteStep?.steps?.[0]?.name || '');
+  const defectTitle = parameter(result, 'Known Defect Title');
+  const context = contextMap(result);
+  if (!context.some(([label]) => label === 'Market')) context.unshift(['Market', market]);
+  if (!context.some(([label]) => label === 'Environment')) context.splice(1, 0, ['Environment', environment]);
+  if (!context.some(([label]) => label === 'Store')) context.splice(2, 0, ['Store', store]);
+
+  const lines = [
+    `## ${visual.icon} **${visual.label}** · **${id}**`,
+    `### ${title}`,
+    '',
+    '---',
+    '',
+    '### **O que foi validado**',
+    objective,
+    '',
+    '### **Resultado esperado**',
+    expected,
+    '',
+    '### **Resultado observado**',
+    `**${visual.icon} ${observed}**`,
+  ];
+
+  if (defect) {
+    lines.push('', '### **Known Defect**', `🟣 **${defect}**${defectTitle ? ` — ${defectTitle}` : ''}`, 'O runtime técnico original permanece preservado nas evidências para diagnóstico.');
+  }
+  if (status === 'BLOCKED' && prerequisite) {
+    lines.push('', '### **Pré-requisito / desbloqueio**', `🟡 ${prerequisite}`);
+  }
+
+  lines.push('', '### **Contexto da execução**', '', '| Campo | Valor |', '|---|---|');
+  for (const [label, value] of context) lines.push(`| **${label}** | ${value} |`);
+
+  if ((result.links || []).length) {
+    lines.push('', '### **Links e evidências**');
+    for (const link of result.links) lines.push(`- [${clean(link.name)}](${link.url})`);
+  }
+
+  return lines.join('\n');
+}
+
+function removeConsoleNoiseFromSteps(steps) {
+  let removed = 0;
+  for (const step of steps || []) {
+    if (Array.isArray(step.attachments)) {
+      const before = step.attachments.length;
+      step.attachments = step.attachments.filter((attachment) => !/^(stdout|stderr)$/i.test(clean(attachment?.name)));
+      removed += before - step.attachments.length;
+    }
+    removed += removeConsoleNoiseFromSteps(step.steps || []);
+  }
+  return removed;
+}
+
 let processed = 0;
-let htmlOnly = 0;
 let suiteNormalized = 0;
+let consoleNoiseRemoved = 0;
 const counts = { passed: 0, failed: 0, blocked: 0, defect: 0, other: 0 };
 
 for (const fileName of fs.readdirSync(resultsDir).filter((name) => name.endsWith('-result.json'))) {
@@ -139,16 +229,23 @@ for (const fileName of fs.readdirSync(resultsDir).filter((name) => name.endsWith
   result.statusDetails.message = statusMessage(result, status, defect);
   if (defect || status === 'PASS') result.statusDetails.trace = '';
 
-  if (clean(result.descriptionHtml)) {
-    delete result.description;
-    htmlOnly += 1;
+  // Allure 2 reliably renders Markdown in `description`. Keep one authoritative
+  // representation so the UI cannot fall back to the old cramped plain text.
+  result.description = markdownDescription(result, status, defect, market, environment, store);
+  delete result.descriptionHtml;
+
+  if (Array.isArray(result.attachments)) {
+    const before = result.attachments.length;
+    result.attachments = result.attachments.filter((attachment) => !/^(stdout|stderr)$/i.test(clean(attachment?.name)));
+    consoleNoiseRemoved += before - result.attachments.length;
   }
+  consoleNoiseRemoved += removeConsoleNoiseFromSteps(result.steps || []);
 
   fs.writeFileSync(file, JSON.stringify(result, null, 2));
   processed += 1;
 }
 
 console.log(
-  `[allure-global-contract] READY · ${processed} official TC(s) · suites=${suiteNormalized} · html-only=${htmlOnly} · ` +
+  `[allure-global-contract] READY · ${processed} official TC(s) · suites=${suiteNormalized} · console-noise-removed=${consoleNoiseRemoved} · ` +
   `PASS=${counts.passed} FAIL=${counts.failed} BLOCKED=${counts.blocked} KNOWN_DEFECT=${counts.defect} OTHER=${counts.other}.`
 );
