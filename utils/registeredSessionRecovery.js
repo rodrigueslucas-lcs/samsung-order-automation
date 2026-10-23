@@ -133,9 +133,9 @@ function withRegisteredSessionRecovery(authState, {
     }
   }
 
-  async function applyAuthSessionStorage(context) {
+  async function applyAuthSessionStorage(context, { guardFuturePages: guardPages = guardFuturePages } = {}) {
     await applySessionStorage(context);
-    if (!guardFuturePages || context[GUARDED_CONTEXT]) return;
+    if (!guardPages || context[GUARDED_CONTEXT]) return;
 
     const originalNewPage = context.newPage.bind(context);
     Object.defineProperty(context, GUARDED_CONTEXT, {

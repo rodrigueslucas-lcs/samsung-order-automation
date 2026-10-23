@@ -1,4 +1,5 @@
 const { chromium } = require("@playwright/test");
+const { prepareAuthBrowserWindow } = require("../utils/authBrowserWindow.cjs");
 const fs = require("node:fs");
 const { writeJsonAtomically } = require("../utils/atomicJson");
 const { resolveMxEnvironment } = require("../utils/mxConfig");
@@ -37,8 +38,9 @@ async function verifyMxAuthentication() {
       storageState: requireAuthState(),
       viewport: headless ? { width: 1440, height: 900 } : null,
     });
-    await applyAuthSessionStorage(context);
+    await applyAuthSessionStorage(context, { guardFuturePages: false });
     const page = await context.newPage();
+    if (!headless) await prepareAuthBrowserWindow(page);
     page.setDefaultNavigationTimeout(navigationTimeout);
     page.setDefaultTimeout(ci ? 90000 : 60000);
 

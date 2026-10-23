@@ -1,4 +1,5 @@
 const { chromium } = require("@playwright/test");
+const { prepareAuthBrowserWindow } = require("../utils/authBrowserWindow.cjs");
 const { writeJsonAtomically } = require("../utils/atomicJson");
 const {
   CO_AUTH_SESSION_STORAGE_PATH,
@@ -45,8 +46,9 @@ async function verifyCoAuthentication() {
       storageState: auth.requireAuthState(),
       viewport: ci ? { width: 1440, height: 900 } : null,
     });
-    await auth.applyAuthSessionStorage(context);
+    await auth.applyAuthSessionStorage(context, { guardFuturePages: false });
     const page = await context.newPage();
+    if (!ci) await prepareAuthBrowserWindow(page);
     page.setDefaultNavigationTimeout(ci ? 120000 : 60000);
     page.setDefaultTimeout(ci ? 90000 : 60000);
 
