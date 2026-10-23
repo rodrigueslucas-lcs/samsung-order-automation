@@ -28,7 +28,7 @@ function resultFor({ market, environment, state, index }) {
       message: state === 'BLOCKED'
         ? 'BLOCKED · required authentication prerequisite unavailable.'
         : state === 'FAIL' || state === 'KNOWN_DEFECT'
-          ? 'FAIL · Expected business state was not reached.'
+          ? 'FAIL · The scenario exceeded its bounded wait/recovery window before the expected storefront state became available.'
           : 'PASS · Criteria satisfied.',
     },
     parameters: [
@@ -78,10 +78,7 @@ test('global Allure contract is identical for MX/PE/CO/CL in S1/S2 and all busin
       }
     }
 
-    const structured = spawnSync(process.execPath, [structureScript, dir], {
-      encoding: 'utf8',
-      env: { ...process.env, BUILD_NUMBER: '999' },
-    });
+    const structured = spawnSync(process.execPath, [structureScript, dir], { encoding: 'utf8', env: { ...process.env, BUILD_NUMBER: '999' } });
     assert.equal(structured.status, 0, structured.stderr || structured.stdout);
 
     const enforced = spawnSync(process.execPath, [contractScript, dir], { encoding: 'utf8' });
@@ -91,24 +88,25 @@ test('global Allure contract is identical for MX/PE/CO/CL in S1/S2 and all busin
       for (const environment of environments) {
         for (const state of states) {
           const result = JSON.parse(fs.readFileSync(path.join(dir, `${market}-${environment}-${state}-result.json`), 'utf8'));
-          const labels = Object.fromEntries((result.labels || []).filter((item) => ['parentSuite', 'suite', 'subSuite'].includes(item.name)).map((item) => [item.name, item.value]));
+          const labels = Object.fromEntries((result.labels || []).map((item) => [item.name, item.value]));
 
           assert.equal(labels.parentSuite, `${market} · ${environment === 'S2' ? 'S2 / STG2' : 'S1 / STG'}`);
           assert.equal(labels.suite, 'Base Store · P1/QST');
           assert.equal(labels.subSuite, `${market} QST · Base Store Official P1`);
+          assert.equal(labels.epic, 'Samsung SMB QST');
+          assert.equal(labels.feature, `${market} · Base Store · P1/QST`);
+          assert.match(labels.story, /^SAM-\d+ · Contract scenario/i);
 
           assert.match(result.descriptionHtml, /font-weight:800/i);
           assert.match(result.descriptionHtml, /O que foi validado/i);
           assert.match(result.descriptionHtml, /Resultado esperado/i);
           assert.match(result.descriptionHtml, /Resultado observado/i);
           assert.match(result.descriptionHtml, /Contexto da execução/i);
-          assert.match(result.descriptionHtml, new RegExp(`Contract scenario`, 'i'));
+          assert.match(result.descriptionHtml, /Contract scenario/i);
           assert.doesNotMatch(result.descriptionHtml, /Validate the official SAM-\d+ business scenario/i);
           assert.doesNotMatch(result.descriptionHtml, /expected business acceptance criteria should be satisfied/i);
 
           assert.match(result.description, /^## [🟢🔴🟡🟣⚪]/u);
-          assert.match(result.description, /### \*\*O que foi validado\*\*/i);
-          assert.match(result.description, /### \*\*Contexto da execução\*\*/i);
           assert.equal((result.attachments || []).some((item) => /^(stdout|stderr)$/i.test(item.name || '')), false);
           assert.equal((result.attachments || []).some((item) => /Screenshot · Estado final/i.test(item.name || '')), true);
 
@@ -117,10 +115,11 @@ test('global Allure contract is identical for MX/PE/CO/CL in S1/S2 and all busin
             assert.match(result.description, /🟢 \*\*PASS\*\*/u);
           } else if (state === 'FAIL') {
             assert.equal(result.status, 'failed');
-            assert.match(result.description, /🔴 \*\*FAIL\*\*/u);
+            assert.match(result.statusDetails.message, /janela controlada de espera/i);
+            assert.doesNotMatch(result.statusDetails.message, /bounded wait\/recovery/i);
           } else if (state === 'BLOCKED') {
             assert.equal(result.status, 'broken');
-            assert.match(result.description, /🟡 \*\*BLOCKED\*\*/u);
+            assert.match(result.statusDetails.message, /autenticação\/sessão/i);
           } else {
             assert.equal(result.status, 'unknown');
             assert.match(result.description, /🟣 \*\*KNOWN DEFECT\*\*/u);
