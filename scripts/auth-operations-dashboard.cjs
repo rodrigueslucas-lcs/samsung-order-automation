@@ -43,15 +43,17 @@ async function main({argv=process.argv.slice(2),env=process.env,read=readCycles,
     keepalive:stored.cycles.length?null:readMetadata(path.join(root,'auth-keepalive',`last-cycle-${suffix}.json`)),
     regional:['primary','second'].map(slot=>readMetadata(path.join(root,'auth-refresh',`regional-${suffix}-${slot}-jenkins-summary.json`))),
   });
-  let buildActivity={known:false,active:[],queued:[]};
+  let buildActivity={known:false,active:[],queued:[]},refreshOrigin='';
   try {
     const configured=publisherEnvironment(env,{readFile:()=>fs.readFileSync(path.resolve(args.sourceRoot,'playwright/.auth/jenkins-publisher.local.json'),'utf8')});
+    if(configured.JENKINS_URL)refreshOrigin=new URL(configured.JENKINS_URL).origin;
     buildActivity=safeActivity(await activity(configured));
   } catch { /* Unavailable metadata is displayed as unknown, never as idle. */ }
   const model=buildModel({cycles:[...stored.cycles,...legacy],scheduler:scheduler(args.environment,{env,now:now()}),activity:buildActivity,corrupt:stored.corrupt,environment:args.environment,now:now()});
-  const html=render(model,{refreshUrl:args.refreshUrl});
+  const html=render(model,{refreshUrl:args.refreshUrl,refreshOrigin});
   fs.mkdirSync(args.output,{recursive:true});
   await atomicText(path.join(args.output,'styles.css'),fs.readFileSync(path.resolve(__dirname,'../reporting/auth-operations/styles.css'),'utf8'));
+  await atomicText(path.join(args.output,'countdown.js'),fs.readFileSync(path.resolve(__dirname,'../reporting/auth-operations/countdown.js'),'utf8'));
   writeJsonAtomically(path.join(args.output,'state.json'),model);
   writeJsonAtomically(path.join(args.output,'metrics.json'),{environment:model.environment,generatedAt:model.generatedAt,metrics:model.metrics});
   writeJsonAtomically(path.join(args.output,'events.json'),{environment:model.environment,generatedAt:model.generatedAt,events:model.timeline});
