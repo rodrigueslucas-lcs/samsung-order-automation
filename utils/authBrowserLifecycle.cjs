@@ -18,8 +18,11 @@ async function captureAuthBrowser({ market, environment, slot }, {
     if (error.code === 'ENOENT') return null;
     throw error;
   }
-  const browser = await chromium.connectOverCDP(endpoint, { timeout: 5000 });
+  let browser;
+  try { browser = await chromium.connectOverCDP(endpoint, { timeout: 5000 }); }
+  catch(error) { if(error.code==='ECONNREFUSED'||/ECONNREFUSED/.test(String(error.message)))return null;throw error; }
   return {
+    fingerprint: require('node:crypto').createHash('sha256').update(endpoint).digest('hex'),
     async closeVerified() {
       if (!browser.isConnected()) return;
       const session = await browser.newBrowserCDPSession();
@@ -30,4 +33,18 @@ async function captureAuthBrowser({ market, environment, slot }, {
   };
 }
 
-module.exports = { captureAuthBrowser };
+function authBrowserClosed({market,environment,slot}, {platform=process.platform,profilesRoot=path.resolve('playwright/profiles'),run=require('node:child_process').execFileSync,canonical=fs.realpathSync.native,env=process.env}={}) {
+  if(!['mx','pe','co','cl'].includes(market)||!['S1','S2'].includes(environment)||!['primary','second'].includes(slot))throw new Error('Invalid auth browser identity.');
+  if(platform!=='win32')return false;
+  try {
+    const shell=path.join(env.SystemRoot||'C:/Windows','System32/WindowsPowerShell/v1.0/powershell.exe');
+    const raw=run(shell,['-NoProfile','-NonInteractive','-File',path.resolve(__dirname,'../scripts/auth-probe-browser.ps1')],{encoding:'utf8',windowsHide:true,timeout:20000,maxBuffer:131072});
+    const snapshot=JSON.parse(raw);
+    if(snapshot.known!==true||!Array.isArray(snapshot.profiles))return false;
+    const folder=path.join(profilesRoot,`${environment.toLowerCase()}-${market}-${slot==='second'?'second':'qa'}`);
+    const normalize=value=>canonical(value).toLowerCase();
+    let target;try{target=normalize(folder);}catch(error){if(error.code!=='ENOENT')return false;target=path.resolve(folder).toLowerCase();}
+    return snapshot.profiles.every(profile=>typeof profile==='string'&&normalize(profile)!==target);
+  } catch {return false;}
+}
+module.exports = { captureAuthBrowser, authBrowserClosed };

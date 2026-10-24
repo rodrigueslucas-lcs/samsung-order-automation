@@ -1,6 +1,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { captureAuthBrowser } = require('../../utils/authBrowserLifecycle.cjs');
+const { authBrowserClosed } = require('../../utils/authBrowserLifecycle.cjs');
+for(const [name,snapshot,expected] of [['absent',{known:true,profiles:[]},true],['live exact profile',{known:true,profiles:['/fixture/s2-mx-qa']},false],['unknown',{known:false,profiles:[]},false]])test(`OS browser probe fails closed: ${name}`,()=>{assert.equal(authBrowserClosed({market:'mx',environment:'S2',slot:'primary'},{platform:'win32',profilesRoot:'/fixture',canonical:value=>value.replaceAll('\\','/'),run:()=>JSON.stringify(snapshot)}),expected);});
 const { refreshAuth } = require('../../utils/authRefreshRunner.cjs');
 
 for (const market of ['mx', 'pe', 'co', 'cl']) for (const environment of ['S1', 'S2']) {

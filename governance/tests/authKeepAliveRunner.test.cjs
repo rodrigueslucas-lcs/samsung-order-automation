@@ -10,6 +10,8 @@ function cycleFixture(status = 'HEALTHY') {
     hash: () => 'before', readState: market => saved.get(market) || {}, saveState: (market, env, state) => saved.set(market, state), log: quiet,
     verify: async identity => { calls.push(`verify:${identity.market}:${identity.slot}`); return { ...identity, env: undefined, status }; },
     recover: async identity => { calls.push(`refresh:${identity.market}:${identity.slot}`); return { ...identity, env: undefined, status: 'RECOVERED' }; },
+    resume: async identity => { calls.push(`resume:${identity.market}:${identity.slot}`); return {market:identity.market,environment:identity.environment,slot:identity.slot,status:'HUMAN_REQUIRED'}; },
+    captureBrowser: async()=>null,
     finalize: async ({ market }) => { calls.push('finalize:' + market); return { market, status: 'READY', published: false }; },
   };
   return { calls, deps, saved };
@@ -51,7 +53,9 @@ for (const status of ['HUMAN_REQUIRED','FAILED','BUSY']) test(`${status} recover
 test('pending human verification is not restarted by the next scheduled cycle', async () => {
   const s = cycleFixture('NEEDS_REFRESH'); s.deps.readState = () => ({ human: { primary: true, second: true } });
   const result = await runKeepAliveCycle({}, s.deps);
-  assert.ok(result.identities.every(r => r.status === 'HUMAN_REQUIRED')); assert.ok(!s.calls.some(c => c.startsWith('refresh:')));
+  assert.ok(result.identities.filter(r=>r.slot==='primary').every(r => r.status === 'HUMAN_REQUIRED'));
+  assert.ok(result.identities.filter(r=>r.slot==='second').every(r => r.status === 'WAITING_PRIMARY'));
+  assert.ok(!s.calls.some(c => c.startsWith('refresh:')));assert.ok(!s.calls.some(c=>c.includes('resume:')&&c.endsWith(':second')));
 });
 test('healthy verification clears a previous human gate without login', async () => {
   const s = cycleFixture(); s.deps.readState = () => ({ human: { primary: true, second: true } }); await runKeepAliveCycle({}, s.deps);
