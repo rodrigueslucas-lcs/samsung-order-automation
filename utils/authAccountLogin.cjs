@@ -29,13 +29,16 @@ async function completeAccountLogin(page, { market, hostname, credentials, timeo
       if (url.hostname !== hostname && !url.hostname.endsWith('.ecom-stg.samsung.com')) throw new Error('Samsung Account reached an unexpected host; no credentials were submitted there.');
       await pause(250); continue;
     }
+    const visualChallenge = await page.locator('iframe[title*="challenge" i], iframe[title*="desaf" i], iframe[src*="bframe"]').filter({ visible: true }).count();
     let challenge = await page.locator('iframe[title="reCAPTCHA" i], iframe[title*="challenge" i], iframe[title*="desaf" i], iframe[src*="bframe"]').filter({ visible: true }).count();
-    if (challenge) {
-      // Read only whether the user completed the provider challenge; never
-      // generate, alter or log its response token. Checkbox frames can remain
-      // visible after successful manual verification.
-      const completed = await page.locator('textarea[name="g-recaptcha-response"], input[name="g-recaptcha-response"]').evaluateAll(elements => elements.some(element => Boolean(element.value))).catch(() => false);
-      if (completed) challenge = 0;
+    if (challenge && !visualChallenge) {
+      // Only the visible widget can release this gate. Providers can retain
+      // hidden widgets and stale response values from an earlier challenge.
+      try {
+        const completed = await page.frameLocator('iframe[title="reCAPTCHA" i]:visible').first().getByRole('checkbox')
+          .getAttribute('aria-checked', { timeout: 1000 }).then(value => value === 'true').catch(() => false);
+        if (completed) challenge = 0;
+      } catch { /* A detached or not-yet-rendered widget remains a human gate. */ }
     }
     const mfa = await page.getByText(/Two-step verification|Verification code|c[oó]digo de verificaci[oó]n|Verificaci[oó]n en dos pasos/i).first().isVisible();
     if (mfa) {
@@ -50,9 +53,9 @@ async function completeAccountLogin(page, { market, hostname, credentials, timeo
       if (!configured().email) throw new Error('Configured Samsung Account email is unavailable.');
       await email.fill(configured().email); emailFilled = true;
     }
-    if (challenge && !captchaActivated) {
+    if (challenge && !captchaActivated && !visualChallenge) {
       try {
-        const checkbox = page.frameLocator('iframe[title="reCAPTCHA" i]').first().getByRole('checkbox');
+        const checkbox = page.frameLocator('iframe[title="reCAPTCHA" i]:visible').first().getByRole('checkbox');
         if (await checkbox.isVisible()) {
           captchaActivated = true; // one click after the widget has rendered
           await checkbox.click({ timeout: 5000 });
@@ -78,7 +81,16 @@ async function completeAccountLogin(page, { market, hostname, credentials, timeo
       await page.getByRole('button', { name: /^(?:Siguiente|Next|Continuar|Sign in)$/i }).filter({ visible: true }).first().click({ timeout: 10000 });
       emailSubmitted = true;
     }
-    } catch (error) { if (returned()) return; throw error; }
+    } catch (error) {
+      if (returned()) return;
+      // A provider challenge can appear between observing the form and clicking
+      // Next. Preserve the human gate rather than retrying an ambiguous submit.
+      if (await page.locator('iframe[title*="challenge" i], iframe[title*="desaf" i], iframe[src*="bframe"]').filter({ visible: true }).count().catch(() => 0)) {
+        const gate = new Error('Samsung Account is awaiting human CAPTCHA/MFA. No credentials were retried.');
+        gate.exitCode = 79; throw gate;
+      }
+      throw error;
+    }
     await pause(250);
   }
   const error = new Error(human
