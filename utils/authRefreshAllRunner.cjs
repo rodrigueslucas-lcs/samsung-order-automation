@@ -80,6 +80,7 @@ function runMarketRefresh(market, environment, slot = 'primary', baseEnv = proce
   return new Promise((resolve, reject) => {
     const startedAt = Date.now();
     const child = spawnChild(process.execPath, [script], {
+      windowsHide: true,
       env,
       stdio: ['inherit', 'pipe', 'pipe'],
     });

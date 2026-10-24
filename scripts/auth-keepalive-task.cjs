@@ -1,10 +1,11 @@
 const fs = require('node:fs'); const path = require('node:path'); const { spawnSync } = require('node:child_process');
-const { buildTaskXml, buildDashboardTaskXml, taskName, assertHomologated, assertExistingInstallation } = require('../utils/authKeepAliveTask.cjs');
+const { buildTaskXml, buildDashboardTaskXml, taskAction, taskName, assertHomologated, assertExistingInstallation } = require('../utils/authKeepAliveTask.cjs');
 const { jenkinsBuildsIdle } = require('../utils/authJenkinsActivity.cjs');
 const { leaseDirectory } = require('../utils/authMarketLease.cjs');
 async function main() {
-  const args = process.argv.slice(2); let environment = 'S2', mode = 'print', dashboardOutput;
-  for (const arg of args) { if (arg === '--install') mode = 'install'; else if (arg === '--update-schedule') mode = 'update'; else if (arg === '--remove') mode = 'remove'; else if (arg === '--print') mode = 'print'; else if (arg.startsWith('--dashboard-output=')) dashboardOutput = path.resolve(arg.slice('--dashboard-output='.length)); else if (arg.startsWith('--environment=')) environment = arg.slice('--environment='.length).toUpperCase(); else throw new Error('Unsupported task configuration argument.'); }
+  const args = process.argv.slice(2); let environment = 'S2', mode = 'print', dashboardOutput, dashboardOnly=false;
+  for (const arg of args) { if (arg === '--install') mode = 'install'; else if (arg === '--update-schedule') mode = 'update'; else if(arg==='--hide-consoles') mode='hide'; else if(arg==='--dashboard-only') dashboardOnly=true; else if (arg === '--remove') mode = 'remove'; else if (arg === '--print') mode = 'print'; else if (arg.startsWith('--dashboard-output=')) dashboardOutput = path.resolve(arg.slice('--dashboard-output='.length)); else if (arg.startsWith('--environment=')) environment = arg.slice('--environment='.length).toUpperCase(); else throw new Error('Unsupported task configuration argument.'); }
+  if(dashboardOnly&&(mode!=='hide'||!dashboardOutput))throw new Error('Dashboard-only requires --hide-consoles and its existing output.');
   const name = taskName(environment);
   if(dashboardOutput&&!dashboardOutput.toLowerCase().endsWith(path.sep+path.join('userContent','samsung-smb-auth',environment.toLowerCase()).toLowerCase()))throw new Error('Dashboard output must be its dedicated Jenkins userContent directory.');
   if (process.platform !== 'win32') throw new Error('This task installer requires Windows.');
@@ -21,14 +22,28 @@ async function main() {
   const activity = await jenkinsBuildsIdle(process.env);
   if (!activity.idle) throw new Error('Samsung builds are active/queued; task configuration was not changed.');
   if (mode === 'remove') { run('Unregister-ScheduledTask -TaskName $env:SMB_AUTH_TASK_NAME -Confirm:$false -ErrorAction Stop', { SMB_AUTH_TASK_NAME:name }); console.log('[auth:task] Removed ' + name); return; }
+  if(mode==='hide') {
+    if(!fs.existsSync(taskAction({script:'auth-keepalive-once.cjs'}).command)||!fs.existsSync(path.resolve('scripts/auth-task-launcher.vbs')))throw new Error('Hidden launcher unavailable; task actions were not changed.');
+    const targets=dashboardOnly?[]:[{name,script:'auth-keepalive-once.cjs',args:['--environment='+environment,'--scheduled']}];
+    if(dashboardOutput)targets.push({name:'SamsungSMB-AuthOperations-'+environment,script:'auth-operations-dashboard.cjs',args:['--environment='+environment,'--source-root='+process.cwd(),'--output='+dashboardOutput,'--refresh-url=/userContent/samsung-smb-auth/'+environment.toLowerCase()+'/index.html']});
+    for(const target of targets){
+      const actual=JSON.parse(run('$ErrorActionPreference="Stop";$task=Get-ScheduledTask -TaskName $env:SMB_AUTH_TASK_NAME;$owner=$task.Principal.UserId;if($owner -notmatch "^S-1-"){$owner=([System.Security.Principal.NTAccount]$owner).Translate([System.Security.Principal.SecurityIdentifier]).Value};[pscustomobject]@{enabled=[bool]$task.Settings.Enabled;interactiveOnly=([string]$task.Principal.LogonType -eq "Interactive");ignoreNew=([string]$task.Settings.MultipleInstances -eq "IgnoreNew");ownerMatches=($owner -eq $env:SMB_AUTH_OPERATOR_SID);notRunning=($task.State -ne "Running");count=$task.Actions.Count;action=@{command=$task.Actions[0].Execute;arguments=$task.Actions[0].Arguments;workingDirectory=$task.Actions[0].WorkingDirectory}}|ConvertTo-Json -Depth 4 -Compress',{SMB_AUTH_TASK_NAME:target.name,SMB_AUTH_OPERATOR_SID:sid}));
+      const expected=taskAction(target),matches=actual.count===1&&require('../utils/authTaskMigration.cjs').knownTaskAction(actual.action,target);
+      assertExistingInstallation({...actual,commandMatches:matches,argumentsMatch:matches,workingDirectoryMatches:matches});
+      target.action=expected;
+    }
+    for(const target of targets)run('$ErrorActionPreference="Stop";$action=New-ScheduledTaskAction -Execute $env:SMB_AUTH_COMMAND -Argument $env:SMB_AUTH_ARGS -WorkingDirectory $env:SMB_AUTH_DIRECTORY;Set-ScheduledTask -TaskName $env:SMB_AUTH_TASK_NAME -Action $action -ErrorAction Stop|Out-Null',{SMB_AUTH_TASK_NAME:target.name,SMB_AUTH_COMMAND:target.action.command,SMB_AUTH_ARGS:target.action.arguments,SMB_AUTH_DIRECTORY:target.action.workingDirectory});
+    console.log('[auth:task] Hidden launch configured; existing triggers, intervals, owner and overlap policy preserved. No auth was started.');return;
+  }
   if(mode==='update') {
     const candidate=path.resolve('test-results/auth-keepalive',`task-candidate-${environment.toLowerCase()}.xml`);
     fs.mkdirSync(path.dirname(candidate),{recursive:true});fs.writeFileSync(candidate,content,'utf16le');
     const quote=value=>"'"+String(value).replaceAll("'","''")+"'";
     const legacyAction='& '+quote(process.execPath)+' '+quote(path.resolve('scripts/auth-keepalive-once.cjs'))+' --environment='+environment+' --scheduled; exit $LASTEXITCODE';
     const legacyArgs='-NoProfile -NonInteractive -WindowStyle Hidden -Command "'+legacyAction+'"';
-    const descriptor=run('$ErrorActionPreference="Stop"; $task=Get-ScheduledTask -TaskName $env:SMB_AUTH_TASK_NAME; [xml]$expected=Get-Content -Encoding Unicode -Raw -LiteralPath $env:SMB_AUTH_TASK_XML; $owner=$task.Principal.UserId; if($owner -notmatch "^S-1-"){$owner=([System.Security.Principal.NTAccount]$owner).Translate([System.Security.Principal.SecurityIdentifier]).Value}; [pscustomobject]@{enabled=[bool]$task.Settings.Enabled;interactiveOnly=([string]$task.Principal.LogonType -eq "Interactive");ignoreNew=([string]$task.Settings.MultipleInstances -eq "IgnoreNew");ownerMatches=($owner -eq $env:SMB_AUTH_OPERATOR_SID);notRunning=($task.State -ne "Running");commandMatches=($task.Actions.Count -eq 1 -and $task.Actions[0].Execute -eq $expected.Task.Actions.Exec.Command);argumentsMatch=($task.Actions[0].Arguments -eq $expected.Task.Actions.Exec.Arguments -or $task.Actions[0].Arguments -eq $env:SMB_AUTH_LEGACY_ARGS);workingDirectoryMatches=($task.Actions[0].WorkingDirectory -eq $expected.Task.Actions.Exec.WorkingDirectory)}|ConvertTo-Json -Compress',{SMB_AUTH_TASK_NAME:name,SMB_AUTH_TASK_XML:candidate,SMB_AUTH_OPERATOR_SID:sid,SMB_AUTH_LEGACY_ARGS:legacyArgs});
-    assertExistingInstallation(JSON.parse(descriptor));
+    const descriptor=run('$ErrorActionPreference="Stop"; $task=Get-ScheduledTask -TaskName $env:SMB_AUTH_TASK_NAME; [xml]$expected=Get-Content -Encoding Unicode -Raw -LiteralPath $env:SMB_AUTH_TASK_XML; $owner=$task.Principal.UserId; if($owner -notmatch "^S-1-"){$owner=([System.Security.Principal.NTAccount]$owner).Translate([System.Security.Principal.SecurityIdentifier]).Value}; [pscustomobject]@{enabled=[bool]$task.Settings.Enabled;interactiveOnly=([string]$task.Principal.LogonType -eq "Interactive");ignoreNew=([string]$task.Settings.MultipleInstances -eq "IgnoreNew");ownerMatches=($owner -eq $env:SMB_AUTH_OPERATOR_SID);notRunning=($task.State -ne "Running");commandMatches=($task.Actions.Count -eq 1 -and $task.Actions[0].Execute -eq $expected.Task.Actions.Exec.Command);argumentsMatch=($task.Actions[0].Arguments -eq $expected.Task.Actions.Exec.Arguments -or $task.Actions[0].Arguments -eq $env:SMB_AUTH_LEGACY_ARGS);workingDirectoryMatches=($task.Actions[0].WorkingDirectory -eq $expected.Task.Actions.Exec.WorkingDirectory);action=@{command=$task.Actions[0].Execute;arguments=$task.Actions[0].Arguments;workingDirectory=$task.Actions[0].WorkingDirectory}}|ConvertTo-Json -Depth 4 -Compress',{SMB_AUTH_TASK_NAME:name,SMB_AUTH_TASK_XML:candidate,SMB_AUTH_OPERATOR_SID:sid,SMB_AUTH_LEGACY_ARGS:legacyArgs});
+    const proof=JSON.parse(descriptor),matches=require('../utils/authTaskMigration.cjs').knownTaskAction(proof.action,{script:'auth-keepalive-once.cjs',args:['--environment='+environment,'--scheduled']});
+    assertExistingInstallation({...proof,commandMatches:matches,argumentsMatch:matches});
     console.log('[auth:task] Updating this operator existing enabled managed installation; auth validity is not inferred from task configuration.');
   } else {
     assertHomologated(JSON.parse(fs.readFileSync(`test-results/auth-keepalive/last-cycle-${environment.toLowerCase()}.json`, 'utf8')), environment);

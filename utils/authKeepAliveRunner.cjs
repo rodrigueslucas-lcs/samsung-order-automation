@@ -30,7 +30,7 @@ function identityEnv(market, environment, slot, baseEnv = process.env) {
 function runNodeScript(script, env, { spawnChild = spawn, timeoutMs = 240000, stdout = () => {}, stderr = () => {} } = {}) {
   return new Promise((resolve, reject) => {
     const args = env.AUTH_MARKET_LEASE ? ['scripts/auth-leased-child.cjs', script] : [script];
-    const child = spawnChild(process.execPath, args, { env, stdio: ['ignore','pipe','pipe'] });
+    const child = spawnChild(process.execPath, args, { env, stdio: ['ignore','pipe','pipe'], windowsHide: true });
     let audit, handoff, lineBuffer = '', diagnostic = null;
     let timedOut = false;
     const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); }, timeoutMs);
@@ -84,7 +84,7 @@ async function verifyIdentity({ market, environment, slot, env = process.env, at
 async function recoverIdentity({ market, environment, slot, env = process.env }, { runScript = runNodeScript, log = console.log, onEvent = () => {} } = {}) {
   const runtimeEnv = identityEnv(market, environment, slot, env);
   delete runtimeEnv.AUTH_KEEPALIVE; // Refresh has its own fresh verify and normal interactive contract.
-  runtimeEnv[`${market.toUpperCase()}_AUTH_INTERACTIVE_TIMEOUT_MS`] = String(Math.min(600000, Number(env.AUTH_KEEPALIVE_INTERACTIVE_TIMEOUT_MS || 120000)));
+  runtimeEnv[`${market.toUpperCase()}_AUTH_INTERACTIVE_TIMEOUT_MS`] = String(Math.min(600000, Number(env.AUTH_KEEPALIVE_INTERACTIVE_TIMEOUT_MS || 600000)));
   log(`[keepalive:${market}] ${environment} ${slot} REFRESH (two positively invalid checks)`);
   let informed = false;
   const onOutput = chunk => { if (!informed && /CAPTCHA\/MFA requires human completion|manual mode|Complete login\/CAPTCHA|Complete Samsung Account login\/CAPTCHA/.test(chunk)) { informed = true; log(`[keepalive:${market}] ${slot}: complete human verification in the dedicated Chrome window.`); try { onEvent({ market, slot, status:'HUMAN_REQUIRED' }); } catch {} } };
@@ -198,7 +198,10 @@ async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MAR
           }
           notify(event);
         };
-        try {notify({market,slot,status:'REFRESHING'});const started=now();record.checked[index]={...await recover({market,environment,slot,env:record.env},{onEvent:recoveryEvent}),verifyDurationMs:identity.verifyDurationMs,refreshDurationMs:Math.max(0,now()-started)};notify(record.checked[index]);}
+        try {notify({market,slot,status:'REFRESHING'});const started=now();record.checked[index]={...await recover({market,environment,slot,env:record.env},{onEvent:recoveryEvent}),verifyDurationMs:identity.verifyDurationMs,refreshDurationMs:Math.max(0,now()-started)};notify(record.checked[index]);
+        if(['FAILED','HUMAN_REQUIRED','UNPROVEN'].includes(record.checked[index].status)){
+          try{const handle=await captureBrowser({market,environment,slot});if(handle){record.resumeHandles||={};record.resumeHandles[slot]=handle;record.state.pendingClose={...record.state.pendingClose,[slot]:handle.fingerprint};saveState(market,target,record.state);}}catch{record.cleanupUnproven=true;}
+        }}
         catch {record.checked[index]={market,environment,slot,status:'FAILED'};}
       })));
     };

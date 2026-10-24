@@ -31,7 +31,7 @@ function runAuthChild(script, env, { label, log, timeoutMs, heartbeatMs = 15000,
   return new Promise((resolve, reject) => {
     const started = Date.now();
     const args = env.AUTH_MARKET_LEASE ? ['scripts/auth-leased-child.cjs', script] : [script];
-    const child = spawn(process.execPath, args, { env, stdio: 'inherit' });
+    const child = spawn(process.execPath, args, { env, stdio: 'inherit', windowsHide: true });
     const heartbeat = setInterval(() => log(`${label} active (${Math.round((Date.now() - started) / 1000)}s). ${interactive ? 'Keep its Chrome open; complete any requested login/CAPTCHA/MFA there.' : 'Waiting for this phase; no interactive login is started here.'}`), heartbeatMs);
     let timedOut = false;
     let cancelled;
