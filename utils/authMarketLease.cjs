@@ -35,9 +35,28 @@ function acquireMarketLease(market, environment, { env = process.env, directory 
   const owner = { pid, hostname: os.hostname(), token: crypto.randomUUID() };
   try { fs.writeFileSync(file, JSON.stringify(owner), { flag: 'wx', mode: 0o600 }); } catch (e) { fs.rmdirSync(path.join(folder, 'members')); fs.rmdirSync(folder); throw e; }
   const release = () => {
-    try { const latest = JSON.parse(fs.readFileSync(file, 'utf8')); if (latest.token === owner.token) { if (fs.readdirSync(path.join(folder, 'members')).length) throw busy(); fs.rmdirSync(path.join(folder, 'members')); fs.unlinkSync(file); fs.rmdirSync(folder); } }
-    catch (e) { if (e.code !== 'ENOENT') throw e; }
+    try {
+      const latest = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (latest.token !== owner.token) return;
+      const members = path.join(folder, 'members');
+      for (const name of fs.readdirSync(members)) {
+        const memberFile = path.join(members, name);
+        let member;
+        try { member = JSON.parse(fs.readFileSync(memberFile, 'utf8')); }
+        catch { throw busy(); }
+        // Fatal process exits can skip JS exit listeners. Only proven-dead
+        // children of this exact lease can be removed during release.
+        if (member.token !== owner.token || !Number.isInteger(member.pid) || alive(member.pid)) throw busy();
+        fs.unlinkSync(memberFile);
+      }
+      fs.rmdirSync(members);
+      fs.unlinkSync(file);
+      fs.rmdirSync(folder);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
   };
+
   release.env = { AUTH_MARKET_LEASE: owner.token, AUTH_COORDINATION_DIR: directory, AUTH_MARKET_LEASE_MARKET: market, AUTH_MARKET_LEASE_ENVIRONMENT: environment }; return release;
 }
 function registerLeaseProcess(env = process.env, pid = process.pid) {

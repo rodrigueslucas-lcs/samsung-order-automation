@@ -115,11 +115,11 @@ First runtime validation should run S2 for all four markets and confirm:
 - `node scripts/auth-refresh-second.cjs`: SECOND for MX and CO only.
 - `node scripts/auth-refresh-second-jenkins.cjs`: SECOND refresh followed by Jenkins publication.
 
-All commands default to S2; set `AUTH_REFRESH_ENVIRONMENT=S1` for S1. The SECOND shortcuts keep manual identity selection and never reuse PRIMARY credentials. CAPTCHA/MFA remains manual.
+All commands default to S2; set `AUTH_REFRESH_ENVIRONMENT=S1` for S1. The SECOND shortcuts use dedicated SECOND credentials when configured, otherwise keep manual identity selection; they never reuse PRIMARY credentials. CAPTCHA/MFA remains manual.
 
 Publishing requires all three `JENKINS_URL`, `JENKINS_USER` and `JENKINS_API_TOKEN` environment variables together, or the existing ignored `playwright/.auth/jenkins-publisher.local.json` with `url`, `user`, and `apiToken`. The orchestrator checks this configuration before opening browsers. Explicit environment configuration is never mixed with saved credentials.
 
-Visible email/password fields are populated once when automatic login is configured, even if a CAPTCHA is visible alongside them. No credentials are entered into MFA forms. Each dedicated native browser closes only after verification, packaging and requested publication succeed. A failed or human-gated flow preserves its window for recovery. Shared PreQA2 Chrome is never closed by this cleanup.
+Visible email fields are populated once when automatic login is configured. Password and submission wait for any CAPTCHA challenge to be completed. No credentials are entered into MFA forms. Each dedicated native browser closes only after verification, packaging and requested publication succeed. A failed or human-gated flow preserves its window for recovery. Shared PreQA2 Chrome is never closed by this cleanup.
 
 ## Regional keep-alive (S2 by default)
 
@@ -136,7 +136,7 @@ Exit codes: 0 all READY, 2 HUMAN_REQUIRED, 3 BUSY, 1 failed or unproven. HUMAN_R
 For Windows, use Task Scheduler rather than a permanent Node loop or a Jenkins service login session. `node scripts/auth-keepalive-task.cjs --print` previews the definition; `--install` registers the 20-minute one-shot only after a recent successful real six-identity cycle. `--remove` disables it by removing the task. Installation and removal refuse active/queued Samsung builds.
 
 The task uses the logged-in operator (InteractiveToken), no stored Windows password, IgnoreNew, and an 18-minute execution limit. It needs that user logged in and network access. CAPTCHA/MFA remains manual. Scheduling does not guarantee indefinite session validity and never bypasses Samsung verification. Local evidence is in ignored `test-results/auth-keepalive/last-cycle-s2.json`; partial runs cannot authorize scheduler installation.
-`Health checks use up to three parallel Chromium contexts; interactive renewals use up to two simultaneous windows to avoid exhausting desktop memory when multiple identities expire together. All six identities remain covered; healthy sessions are never refreshed to fill a lane.`
+Health checks use up to three parallel Chromium contexts; interactive renewals use up to two simultaneous windows to avoid exhausting desktop memory when multiple identities expire together. All six identities remain covered; healthy sessions are never refreshed to fill a lane.
 
 The login helper submits each credential step once. It fills email, attempts the normal CAPTCHA checkbox once when present, and waits for any real challenge/MFA. It fills password and submits only after the challenge has been completed. It never solves a challenge or resubmits failed credentials. MX/CO SECOND can also auto-fill when dedicated SECOND credentials are configured; without them it stays manual and never falls back to PRIMARY credentials. Keep SECOND credentials only in the existing ignored local credential files or dedicated environment variables.
 

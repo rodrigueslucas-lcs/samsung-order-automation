@@ -19,3 +19,5 @@ test('proven dead owner is reclaimed without age based takeover',()=>{
 test('wrong inherited token cannot adopt an active market lease',()=>{
  const f=fixture();const release=acquireMarketLease('mx','S2',{directory:f.directory,env:{}});try{assert.throws(()=>acquireMarketLease('mx','S2',{directory:f.directory,env:{...release.env,AUTH_MARKET_LEASE:'wrong'}}),e=>e.code==='AUTH_BUSY');}finally{release();f.cleanup();}
 });
+
+test('release prunes only a proven dead child registration',()=>{const directory=fs.mkdtempSync(path.join(os.tmpdir(),'smb-dead-member-'));const release=acquireMarketLease('co','S2',{directory,env:{},alive:pid=>pid===process.pid});try{const leave=registerLeaseProcess(release.env,999999999);release();leave();assert.deepEqual(fs.readdirSync(directory),[]);}finally{if(!fs.readdirSync(directory).length)fs.rmdirSync(directory);}});
