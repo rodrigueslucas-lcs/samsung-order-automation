@@ -62,15 +62,17 @@ async function completeAccountLogin(page, { market, hostname, credentials, timeo
       humanReported=true;
       human = true; await pause(250); continue;
     }
+    let formAction='';
     try {
     // A reCAPTCHA can be visible alongside the normal credentials form.
     // Populate the email once, but leave the password and submission until
     // the human completes the challenge. Never populate an MFA form.
     if (!resumeOnly && !passwordSubmitted && await email.isVisible() &&
-        ((!emailSubmitted&&!emailFilled)||((emailChallengePending||human)&&!emailRestored&&await email.inputValue()===''))) {
+        ((!emailSubmitted&&!emailFilled)||((emailChallengePending||human)&&!emailRestored&&(formAction='email-read',await email.inputValue({timeout:1500}))===''))) {
       if (!configured().email) throw new Error('Configured Samsung Account email is unavailable.');
       if(emailFilled)emailRestored=true;
-      await email.fill(configured().email); emailFilled = true;
+      formAction='email-fill';
+      await email.fill(configured().email,{timeout:2000}); emailFilled = true;formAction='';
       report('configured email populated');
     }
     if (challenge && !captchaActivated && !visualChallenge && !resumeOnly) {
@@ -91,8 +93,8 @@ async function completeAccountLogin(page, { market, hostname, credentials, timeo
     }
     human = false; humanReported=false;
     if(resumeOnly&&resumeEmailPhase!=='NONE'&&await email.isVisible()&&!await password.isVisible()) {
-      const value=(await email.inputValue()).trim();
-      if(!value&&!emailRestored){await email.fill(configured().email);emailRestored=true;report('configured email restored after provider reset');}
+      formAction='email-read';const value=(await email.inputValue({timeout:1500})).trim();formAction='';
+      if(!value&&!emailRestored){formAction='email-fill';await email.fill(configured().email,{timeout:2000});formAction='';emailRestored=true;report('configured email restored after provider reset');}
       else if(value.toLowerCase()!==String(configured().email||'').trim().toLowerCase()) {
         const mismatch=new Error('Retained email does not match its configured identity; manual intervention required.');mismatch.exitCode=79;throw mismatch;
       }
@@ -117,7 +119,7 @@ async function completeAccountLogin(page, { market, hostname, credentials, timeo
     }
     if (!passwordSubmitted && !passwordFilled && await password.isVisible()) {
       if (!configured().password) throw new Error('Configured Samsung Account password is unavailable.');
-      await password.fill(configured().password); passwordFilled = true;
+      await password.fill(configured().password,{timeout:2000}); passwordFilled = true;
       report('configured password populated');
     }
     if (!passwordSubmitted && await password.isVisible()) {
@@ -131,6 +133,13 @@ async function completeAccountLogin(page, { market, hostname, credentials, timeo
     }
     } catch (error) {
       if (returned()) return;
+      // Samsung can replace the email form between visibility and inputValue/
+      // fill. Move forward only when the password step positively appeared;
+      // this never repeats Next, a password submission or an unknown timeout.
+      if(error.name==='TimeoutError'&&formAction.startsWith('email-')&&!passwordSubmitted&&await password.isVisible()) {
+        report('email form replaced by password step; continuing without another email submit');
+        await pause(250);continue;
+      }
       // A provider challenge can appear between observing the form and clicking
       // Next. Preserve the human gate rather than retrying an ambiguous submit.
       if ((await captchaGate().catch(()=>({pending:0}))).pending) {

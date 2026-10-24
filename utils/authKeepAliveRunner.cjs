@@ -199,6 +199,14 @@ async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MAR
           notify(event);
         };
         try {notify({market,slot,status:'REFRESHING'});const started=now();record.checked[index]={...await recover({market,environment,slot,env:record.env},{onEvent:recoveryEvent}),verifyDurationMs:identity.verifyDurationMs,refreshDurationMs:Math.max(0,now()-started)};notify(record.checked[index]);
+        const recovered=record.checked[index];
+        if(recovered.status==='HUMAN_REQUIRED'||recovered.humanPending){
+          record.state.human={...record.state.human,[slot]:true};
+          record.state.handoff={...record.state.handoff,[slot]:{passwordAttempted:recovered.passwordAttempted??record.state.handoff?.[slot]?.passwordAttempted??true,emailPhase:['READY','CHALLENGE'].includes(recovered.emailPhase)?recovered.emailPhase:'NONE'}};
+          // Persist the final child audit immediately, before waiting for other
+          // markets. A later scheduler interruption must not lose safe resume.
+          saveState(market,target,record.state);
+        }
         if(['FAILED','HUMAN_REQUIRED','UNPROVEN'].includes(record.checked[index].status)){
           try{const handle=await captureBrowser({market,environment,slot});if(handle){record.resumeHandles||={};record.resumeHandles[slot]=handle;record.state.pendingClose={...record.state.pendingClose,[slot]:handle.fingerprint};saveState(market,target,record.state);}}catch{record.cleanupUnproven=true;}
         }}
