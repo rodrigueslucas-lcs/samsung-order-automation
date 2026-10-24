@@ -43,10 +43,13 @@ async function main({argv=process.argv.slice(2),env=process.env,read=readCycles,
     keepalive:stored.cycles.length?null:readMetadata(path.join(root,'auth-keepalive',`last-cycle-${suffix}.json`)),
     regional:['primary','second'].map(slot=>readMetadata(path.join(root,'auth-refresh',`regional-${suffix}-${slot}-jenkins-summary.json`))),
   });
-  let buildActivity={known:false,active:[],queued:[]},refreshOrigin='';
+  // Display navigation is independent of the credential-bearing API origin.
+  // A LAN dashboard must not weaken the publisher's HTTPS/loopback policy.
+  const localDisplay=readMetadata(path.resolve(args.sourceRoot,'playwright/.auth/jenkins-publisher.local.json'));
+  let buildActivity={known:false,active:[],queued:[]},refreshOrigin=env.AUTH_OPERATIONS_REFRESH_ORIGIN||localDisplay?.dashboardOrigin||'';
   try {
     const configured=publisherEnvironment(env,{readFile:()=>fs.readFileSync(path.resolve(args.sourceRoot,'playwright/.auth/jenkins-publisher.local.json'),'utf8')});
-    if(configured.JENKINS_URL)refreshOrigin=new URL(configured.JENKINS_URL).origin;
+    if(!refreshOrigin&&configured.JENKINS_URL)refreshOrigin=new URL(configured.JENKINS_URL).origin;
     buildActivity=safeActivity(await activity(configured));
   } catch { /* Unavailable metadata is displayed as unknown, never as idle. */ }
   const model=buildModel({cycles:[...stored.cycles,...legacy],scheduler:scheduler(args.environment,{env,now:now()}),activity:buildActivity,corrupt:stored.corrupt,environment:args.environment,now:now()});
