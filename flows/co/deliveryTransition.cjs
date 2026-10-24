@@ -2,7 +2,7 @@ async function coPaymentPanelReady(page) {
   const url = new URL(page.url());
   if (!['stg.shop.samsung.com','stg2.shop.samsung.com'].includes(url.hostname) || url.pathname !== '/co/checkout/one') return false;
   const payment = page.getByRole('region', { name: /^3\.\s*Pago$/i });
-  return await payment.isVisible().catch(() => false) && await payment.getByRole('button', { name: /^Tarjeta de Cr[eé]dito\s*\/\s*D[eé]bito/i }).first().isVisible().catch(() => false);
+  return await payment.isVisible().catch(() => false) && await payment.getByRole('button', { name: /^(?:Tarjeta de Cr[eé]dito\s*\/\s*D[eé]bito|Pagar con (?:Bre-B|Bancolombia|PSE)|Nequi\/Daviplata\/RappiPay|Pay by Line Of Credit)\b/i }).first().isVisible().catch(() => false);
 }
 async function advanceCoDeliveryToPayment(page, delivery, continueButton, { click, timeout = 30000, now = Date.now, pause = ms => new Promise(resolve => setTimeout(resolve, ms)) }) {
   const target = new URL(page.url());
