@@ -51,10 +51,10 @@ async function completeAccountLogin(page, { market, hostname, credentials, timeo
       await email.fill(configured().email); emailFilled = true;
     }
     if (challenge && !captchaActivated) {
-      captchaActivated = true; // one normal checkbox attempt, never solve/retry a challenge
       try {
         const checkbox = page.frameLocator('iframe[title="reCAPTCHA" i]').first().getByRole('checkbox');
         if (await checkbox.isVisible()) {
+          captchaActivated = true; // one click after the widget has rendered
           await checkbox.click({ timeout: 5000 });
           report('CAPTCHA checkbox activated once; any challenge requires human completion.');
         }
