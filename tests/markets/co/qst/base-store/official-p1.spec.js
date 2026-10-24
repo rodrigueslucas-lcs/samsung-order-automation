@@ -23,6 +23,7 @@ import { addProductFromPreQaBc } from "../../../../../flows/smb/preQaBcCart";
 import coLogoutCart from "../../../../../flows/co/logoutCart.cjs";
 import coNotificationReminder from "../../../../../flows/co/notificationReminder.cjs";
 import coShippingReadiness from "../../../../../flows/co/shippingReadiness.cjs";
+import coDeliveryTransition from "../../../../../flows/co/deliveryTransition.cjs";
 
 const test = base.extend({
   qstBusinessScenario: [async ({}, use, testInfo) => {
@@ -198,13 +199,7 @@ async function coRegisteredDelivery(browser){
   }catch(error){await context.close();throw error;}
 }
 async function coDismissReminder(page){
-  const dialog=page.locator('[role="dialog"][aria-modal="true"]:visible');
-  for(let n=0;n<4 && await dialog.isVisible().catch(()=>false);n++){
-    await dialog.getByText(/¡Listo!/i).filter({visible:true}).last().click({timeout:3000}).catch(async()=>{
-      await page.locator('#ins-frameless-overlay[close-on-click="true"]').click({position:{x:1,y:1},timeout:3000});
-    });
-  }
-  await expect(dialog).toBeHidden({timeout:5000});
+  await coNotificationReminder.dismissCoNotificationReminder(page);
 }
 async function coClick(page,locator){
   await expect(locator).toBeEnabled({timeout:30000});
@@ -258,24 +253,7 @@ async function coFillNewBilling(page,delivery,secondaryNumber="113-43"){
   await delivery.locator('input[name="line1"]').fill(`Carrera 7 #${secondaryNumber}, Oficina 607, Usaquen`);
 }
 async function coAdvanceDeliveryToPayment(page,delivery,continueButton){
-  const ecoRenueva=delivery.getByRole("listitem").filter({hasText:/Eco Renueva/i}).first();
-  const paymentReady=async()=>/CHECKOUT_STEP_PAYMENT/i.test(page.url()) &&
-    !(await ecoRenueva.isVisible().catch(()=>false));
-  for(let attempt=1;attempt<=3;attempt++){
-    if(await paymentReady())return;
-    await expect(ecoRenueva).toBeVisible({timeout:30000});
-    try{await coClick(page,ecoRenueva);}
-    catch(error){
-      if(await paymentReady())return;
-      throw error;
-    }
-    await expect(continueButton).toBeEnabled({timeout:30000});
-    await coClick(page,continueButton);
-    await page.waitForTimeout(3000);
-    if(await paymentReady())return;
-    console.log(`[co-qst] Delivery returned after Eco Renueva selection (${attempt}/3): ${page.url()}`);
-  }
-  throw new Error(`CO checkout stayed on Delivery after selecting Eco Renueva and continuing three times: ${page.url()}`);
+  await coDeliveryTransition.advanceCoDeliveryToPayment(page,delivery,continueButton,{click:coClick});
 }
 async function coContinueToPayment(page,delivery){
   for(const field of ["termsAndCondition","termsAndCondition2"]){

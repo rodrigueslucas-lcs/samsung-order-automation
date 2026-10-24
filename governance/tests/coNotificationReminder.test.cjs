@@ -27,3 +27,5 @@ for (const withButton of [true, false]) {
     } finally { await browser.close(); }
   });
 }
+
+for(const gone of [true,false])test('reminder dismiss race keeps the original failure only if still visible: '+gone,async()=>{const {dismissCoNotificationReminder}=require('../../flows/co/notificationReminder.cjs');let visible=true,overlayChecks=0;const button={last(){return this;},isVisible:async()=>true,click:async()=>{visible=!gone;throw Error('dismiss raced');}};const dialog={filter(){return this;},isVisible:async()=>visible,getByText:()=>button,waitFor:async()=>{}};const page={locator:selector=>selector.includes('#ins-frameless')?{isVisible:async()=>{overlayChecks++;return false;}}:selector.includes('ins-web-opt-in')?{}:dialog};if(gone){await dismissCoNotificationReminder(page);assert.equal(overlayChecks,0);}else await assert.rejects(dismissCoNotificationReminder(page),/dismiss raced/);});

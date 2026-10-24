@@ -35,6 +35,8 @@ const peProjectUse = { ...chromiumUse };
 
 export default defineConfig({
   testDir: './tests',
+  // A confirmed CO order must retain enough teardown budget to finalize video/trace.
+  timeout: coOfficialP1 ? 120000 : 30000,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

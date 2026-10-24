@@ -15,12 +15,14 @@ for (const video of ['0', '1']) {
   test(`CO P1 keeps Chrome and the requested video setting (${video})`, () => {
     const result = config({ TEST_MARKET: 'CO', TEST_SUITE: 'P1/QST', PW_VIDEO: video });
     assert.equal(result.use.channel, 'chrome');
+    assert.equal(result.timeout,120000);
     assert.equal(result.use.video === 'off', video === '0');
   });
 }
 test('other market browser selection is preserved', () => {
   for (const market of ['MX', 'PE', 'CL']) {
     assert.equal(config({ TEST_MARKET: market, PW_VIDEO: '1' }).use.channel, undefined);
+    assert.equal(config({ TEST_MARKET: market, PW_VIDEO: '1' }).timeout,30000);
     assert.equal(config({ TEST_MARKET: market, PW_VIDEO: '0' }).use.channel, 'chrome');
   }
 });
