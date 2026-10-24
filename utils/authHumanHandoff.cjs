@@ -15,7 +15,7 @@ function credentialsForHandoff({market,slot}, {env=process.env,authRoot=path.res
   const password=slot==='second'?env[`${upper}_SECOND_SAMSUNG_PASSWORD`]||local.password:env.SAMSUNG_ACCOUNT_PASSWORD||env[`${upper}_SAMSUNG_PASSWORD`]||local.password;
   return typeof email==='string'&&email.trim()&&typeof password==='string'&&password?{email:email.trim(),password}:null;
 }
-async function resumeHumanHandoff({market,environment,slot,passwordAttempted=true}, {
+async function resumeHumanHandoff({market,environment,slot,passwordAttempted=true,emailPhase='NONE'}, {
   chromium=require('@playwright/test').chromium,profilesRoot=path.resolve('playwright/profiles'),authRoot=path.resolve('playwright/.auth'),
   read=fs.readFileSync,write=writeJsonAtomically,readProfile=openAuthProfile,complete=completeAccountLogin,
   credentials=credentialsForHandoff,env=process.env,log=console.log,
@@ -23,6 +23,7 @@ async function resumeHumanHandoff({market,environment,slot,passwordAttempted=tru
   if(!Object.hasOwn(SLOTS,market)||!SLOTS[market].includes(slot)||!['S1','S2'].includes(environment))throw new Error('Invalid retained auth identity.');
   const host=environment==='S2'?'stg2.shop.samsung.com':'stg.shop.samsung.com';
   let browser,attempted=passwordAttempted;
+  let phase=['READY','CHALLENGE'].includes(emailPhase)?emailPhase:'NONE';
   try {
     // Never launch a browser, create a page, navigate to login, or restart a
     // profile. A retained human handoff may only use its existing CDP browser.
@@ -34,15 +35,17 @@ async function resumeHumanHandoff({market,environment,slot,passwordAttempted=tru
     const context=browser.contexts()[0];if(!context)return{status:'UNPROVEN',passwordAttempted:attempted};
     const account=context.pages().find(page=>{try{return new URL(page.url()).hostname==='account.samsung.com';}catch{return false;}});
     if(account) {
-      if(attempted||!await account.locator('input[type="password"], #iptLgnPlnPD').filter({visible:true}).first().isVisible())return{status:'HUMAN_REQUIRED',passwordAttempted:attempted};
+      const passwordVisible=await account.locator('input[type="password"], #iptLgnPlnPD').filter({visible:true}).first().isVisible();
+      const retainedEmail=phase!=='NONE'&&await account.locator('input#account, input[type="email"], input[name="email"], #iptLgnPlnID').filter({visible:true}).first().isVisible();
+      if(attempted||(!passwordVisible&&!retainedEmail))return{status:'HUMAN_REQUIRED',passwordAttempted:attempted,emailPhase:phase};
       const configured=credentials({market,slot},{env,authRoot,read});
-      if(!configured)return{status:'HUMAN_REQUIRED',passwordAttempted:attempted};
+      if(!configured)return{status:'HUMAN_REQUIRED',passwordAttempted:attempted,emailPhase:phase};
       try {
-        await complete(account,{market,hostname:host,credentials:configured,resumeOnly:true,timeout:20000,log:line=>{
-          if(String(line).startsWith('AUTH_HANDOFF_AUDIT ')) {try{attempted=JSON.parse(String(line).slice(19)).passwordAttempted===true;}catch{attempted=true;}}
+        await complete(account,{market,hostname:host,credentials:configured,resumeOnly:true,resumeEmailPhase:phase,timeout:20000,log:line=>{
+          if(String(line).startsWith('AUTH_HANDOFF_AUDIT ')) {try{const audit=JSON.parse(String(line).slice(19));attempted=audit.passwordAttempted===true;phase=['READY','CHALLENGE'].includes(audit.emailPhase)?audit.emailPhase:'NONE';}catch{attempted=true;phase='NONE';}}
           else log(line);
         }});
-      } catch(error) {return{status:error.exitCode===79?'HUMAN_REQUIRED':'UNPROVEN',passwordAttempted:attempted};}
+      } catch(error) {return{status:error.exitCode===79?'HUMAN_REQUIRED':'UNPROVEN',passwordAttempted:attempted,emailPhase:phase};}
     }
     const pages=context.pages().filter(page=>{try{const url=new URL(page.url());return url.protocol==='https:'&&url.hostname===host&&(url.pathname===`/${market}`||url.pathname.startsWith(`/${market}/`));}catch{return false;}}).reverse();
     let unproven=false;

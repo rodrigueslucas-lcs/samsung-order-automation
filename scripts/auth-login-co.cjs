@@ -347,6 +347,7 @@ async function loginCoSamsungAccount() {
       }
 
       if (menuState === "signed-out" && !useAutomaticLogin()) {
+        await require('../utils/authAccountQr.cjs').openSecondAccountQr(page,{slot:accountSlot});
         console.log(`[auth:login:co] Samsung Account login is ready in the visible Chrome. Complete login/CAPTCHA/MFA manually; automation will resume after the authenticated CO ${ENV_NAME} return.`);
         page = await waitForManualStorefront(context, page, {
           hostname: HOSTNAME, market: "co", timeout: interactiveTimeout,

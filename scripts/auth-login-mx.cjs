@@ -208,6 +208,7 @@ async function exportState(context, page) {
     if (accountPage && useAutomaticLogin()) {
       await fillSamsungAccount(accountPage, resolveRuntimeCredentials);
     } else if (accountPage) {
+      await require('../utils/authAccountQr.cjs').openSecondAccountQr(accountPage,{slot:accountSlot});
       try { await prepareMxWindow(accountPage, true); }
       catch (error) { if (!hasMxAccountReturned(accountPage, HOSTNAME)) throw error; }
       console.log(`[auth:login:mx] manual mode for ${ENV_NAME} ${accountSlot}; complete this account's Samsung Account login/CAPTCHA/MFA in the maximized Chrome.`);

@@ -41,7 +41,7 @@ function runNodeScript(script, env, { spawnChild = spawn, timeoutMs = 240000, st
         try { const value = JSON.parse(line.slice('AUTH_HEALTH_AUDIT '.length)); if (Number.isInteger(value.accountPages) && value.accountPages >= 0 && typeof value.statePersisted === 'boolean') audit = {accountPages:value.accountPages,statePersisted:value.statePersisted}; } catch {}
       }
       else if(line.startsWith('AUTH_HANDOFF_AUDIT ')) {
-        try { const value=JSON.parse(line.slice('AUTH_HANDOFF_AUDIT '.length)); if(typeof value.passwordAttempted==='boolean')handoff={passwordAttempted:value.passwordAttempted}; } catch {}
+        try { const value=JSON.parse(line.slice('AUTH_HANDOFF_AUDIT '.length)); if(typeof value.passwordAttempted==='boolean')handoff={passwordAttempted:value.passwordAttempted,...(['NONE','READY','CHALLENGE'].includes(value.emailPhase)?{emailPhase:value.emailPhase}:{})}; } catch {}
       }
       stdout(String(chunk));
     });
@@ -90,25 +90,26 @@ async function recoverIdentity({ market, environment, slot, env = process.env },
   const onOutput = chunk => { if (!informed && /CAPTCHA\/MFA requires human completion|manual mode|Complete login\/CAPTCHA|Complete Samsung Account login\/CAPTCHA/.test(chunk)) { informed = true; log(`[keepalive:${market}] ${slot}: complete human verification in the dedicated Chrome window.`); try { onEvent({ market, slot, status:'HUMAN_REQUIRED' }); } catch {} } };
   const result = await runScript(`scripts/auth-refresh-${market}.cjs`, runtimeEnv, { timeoutMs: 900000, stdout: onOutput, stderr: onOutput });
   const status = result.code === 0 && !result.timedOut && !result.signal ? 'RECOVERED' : result.code === 2 ? 'HUMAN_REQUIRED' : result.code === 3 ? 'BUSY' : 'FAILED';
-  return { market, environment, slot, status, code: result.code, ...(status==='HUMAN_REQUIRED'||(informed&&status!=='RECOVERED')?{humanPending:true,passwordAttempted:result.handoff?.passwordAttempted??true}:{}) };
+  return { market, environment, slot, status, code: result.code, ...(status==='HUMAN_REQUIRED'||(informed&&status!=='RECOVERED')?{humanPending:true,passwordAttempted:result.handoff?.passwordAttempted??true,emailPhase:result.handoff?.emailPhase||'NONE'}:{}) };
 }
-async function resumeIdentity({market,environment,slot,env=process.env,passwordAttempted=true},{runScript=runNodeScript,verify=verifyIdentity,captureBrowser=require('./authBrowserLifecycle.cjs').captureAuthBrowser,browserClosed=require('./authBrowserLifecycle.cjs').authBrowserClosed,acquire=acquireRefreshLock}={}) {
-  let release,owned,keep=false;
+async function resumeIdentity({market,environment,slot,env=process.env,passwordAttempted=true,emailPhase='NONE'},{runScript=runNodeScript,verify=verifyIdentity,captureBrowser=require('./authBrowserLifecycle.cjs').captureAuthBrowser,browserClosed=require('./authBrowserLifecycle.cjs').authBrowserClosed,acquire=acquireRefreshLock}={}) {
+  let release,owned,keep=false,childInvoked=false;
   const base={market,environment,slot};
   try {
     try {release=acquire(market,environment,slot);}catch{return{...base,status:'BUSY'};}
     owned=await captureBrowser(base);
     if(!owned)return{...base,status:await browserClosed(base)?'HANDOFF_CLOSED':'HUMAN_REQUIRED',passwordAttempted};
-    const runtime={...identityEnv(market,environment,slot,env),AUTH_HANDOFF_PASSWORD_ATTEMPTED:passwordAttempted?'1':'0'};
+    const runtime={...identityEnv(market,environment,slot,env),AUTH_HANDOFF_PASSWORD_ATTEMPTED:passwordAttempted?'1':'0',AUTH_HANDOFF_EMAIL_PHASE:['READY','CHALLENGE'].includes(emailPhase)?emailPhase:'NONE'};
+    childInvoked=true;
     const result=await runScript('scripts/auth-resume-human.cjs',runtime,{timeoutMs:90000});
     release();release=null;
-    if(result.code!==0||result.timedOut||result.signal)return{...base,status:result.code===2?'HUMAN_REQUIRED':'UNPROVEN',passwordAttempted:result.handoff?.passwordAttempted??true};
+    if(result.code!==0||result.timedOut||result.signal)return{...base,status:result.code===2?'HUMAN_REQUIRED':'UNPROVEN',passwordAttempted:result.handoff?.passwordAttempted??true,emailPhase:result.handoff?.emailPhase||'NONE'};
     const proof=await verify({...base,env});
     if(proof.status!=='HEALTHY'||!proof.audit?.statePersisted||proof.audit.accountPages!==0)return{...base,status:'UNPROVEN',passwordAttempted:result.handoff?.passwordAttempted??true};
     const resumed={...proof,status:'RECOVERED'};
     Object.defineProperty(resumed,'_browser',{value:owned});keep=true;
     return resumed;
-  } catch{return{...base,status:'UNPROVEN',passwordAttempted};}
+  } catch{return{...base,status:'UNPROVEN',passwordAttempted:childInvoked?true:passwordAttempted,emailPhase:childInvoked?'NONE':emailPhase};}
   finally {release?.();if(!keep)await owned?.dispose();}
 }
 async function packageAndPublishMarket({ market, environment, publish, env = process.env, state = {}, beforeHash = null }, { runScript = runNodeScript, hash = fileHash, contentHash = file => sessionContentHash(JSON.parse(fs.readFileSync(file, 'utf8'))), save = saveCheckpoint, log = console.log } = {}) {
@@ -175,11 +176,12 @@ async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MAR
           const started=now();
           let ended=false;
           try {
-            const result=await resume({market,environment,slot,env:record.env,passwordAttempted:record.state.handoff?.[slot]?.passwordAttempted??true});
+            const result=await resume({market,environment,slot,env:record.env,passwordAttempted:record.state.handoff?.[slot]?.passwordAttempted??true,emailPhase:record.state.handoff?.[slot]?.emailPhase||'NONE'});
             if(result.status==='HANDOFF_CLOSED') {
               ended=true;record.state.human={...record.state.human};delete record.state.human[slot];record.state.handoff={...record.state.handoff};delete record.state.handoff[slot];
               notify({market,slot,status:'HANDOFF_ENDED'});
             } else {
+            if(typeof result.passwordAttempted==='boolean')record.state.handoff={...record.state.handoff,[slot]:{passwordAttempted:result.passwordAttempted,emailPhase:['READY','CHALLENGE'].includes(result.emailPhase)?result.emailPhase:'NONE'}};
             if(result._browser){record.resumeHandles||={};record.resumeHandles[slot]=result._browser;record.state.pendingClose={...record.state.pendingClose,[slot]:result._browser.fingerprint};}
             record.checked[index]={...result,verifyDurationMs:identity.verifyDurationMs,refreshDurationMs:Math.max(0,now()-started)};
             }
@@ -217,7 +219,7 @@ async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MAR
           catch {record.cleanupUnproven=true;}
           if(handle){record.resumeHandles||={};record.resumeHandles[result.slot]=handle;record.state.pendingClose={...record.state.pendingClose,[result.slot]:handle.fingerprint};}
         }
-        for(const result of record.checked){if(result.status==='HUMAN_REQUIRED'||result.humanPending){human[result.slot]=true;handoff[result.slot]={passwordAttempted:result.passwordAttempted??handoff[result.slot]?.passwordAttempted??true};}else if(['HEALTHY','RECOVERED'].includes(result.status)){delete human[result.slot];delete handoff[result.slot];}}
+        for(const result of record.checked){if(result.status==='HUMAN_REQUIRED'||result.humanPending){human[result.slot]=true;handoff[result.slot]={passwordAttempted:result.passwordAttempted??handoff[result.slot]?.passwordAttempted??true,emailPhase:['READY','CHALLENGE'].includes(result.emailPhase)?result.emailPhase:'NONE'};}else if(['HEALTHY','RECOVERED'].includes(result.status)){delete human[result.slot];delete handoff[result.slot];}}
         record.state={...record.state,human,handoff};saveState(record.market,target,record.state);
         if(record.checked.every(r=>['HEALTHY','RECOVERED'].includes(r.status))) record.final=await finalize({market:record.market,environment:target,publish,env:record.env,state:record.state,beforeHash:record.beforeHash});
         if(record.final.status==='READY'&&record.cleanupUnproven)record.final={...record.final,status:'BROWSER_CLOSE_FAILED'};
