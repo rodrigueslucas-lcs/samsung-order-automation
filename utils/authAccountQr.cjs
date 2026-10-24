@@ -5,11 +5,15 @@ async function openSecondAccountQr(page,{slot,log=console.log}={}) {
   try {
     const url=new URL(page.url());
     if(url.protocol!=='https:'||url.hostname!=='account.samsung.com')return false;
+    if(url.pathname==='/iam/sign-in/credentials/qr-code')return true;
     const scan=page.getByText(/Escanea.*(?:QR|c[oó]digo)|Scan.*QR|Escanear.*QR/i).filter({visible:true}).first();
     if(await scan.isVisible())return true;
     const name=/(?:c[oó]digo\s*QR|QR\s*code|con\s*QR|with\s*QR)/i;
     for(const role of ['button','link']) {
       const option=page.getByRole(role,{name}).filter({visible:true}).first();
+      // The provider renders this control after its initial document. Wait
+      // for readiness, never retry the click or regenerate an existing QR.
+      await option.waitFor({state:'visible',timeout:5000}).catch(()=>{});
       if(!await option.isVisible())continue;
       if(role==='link') {
         const href=await option.getAttribute('href');
