@@ -36,6 +36,11 @@ test('CL Jenkins installs and verifies auth before runtime on both shell paths',
   assert.match(source, /CL_AUTH_AUTO_RENEW = '0'/);
 });
 
+test('CL checkout login receives legitimate PRIMARY credentials through Jenkins masking rather than committed files', () => {
+  assert.ok(cl.includes("usernamePassword(credentialsId: 'samsung-storefront-primary-user', usernameVariable: 'SAMSUNG_ACCOUNT_EMAIL', passwordVariable: 'SAMSUNG_ACCOUNT_PASSWORD')"));
+  assert.doesNotMatch(cl,/SAMSUNG_ACCOUNT_PASSWORD\s*=|samsung-storefront-user\.json/);
+});
+
 test('CL Jenkins derives mutation opt-ins from the explicit execution mode', () => {
   assert.ok(cl.includes("env.ALLOW_PAYMENT_SUBMIT = params.EXECUTION_MODE == 'authorized-destructive' ? '1' : '0'"));
   assert.ok(cl.includes("env.ALLOW_PROFILE_WRITE = params.EXECUTION_MODE == 'authorized-destructive' ? '1' : '0'"));

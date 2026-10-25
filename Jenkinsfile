@@ -362,6 +362,7 @@ pipeline {
               env.CL_SESSION_BUNDLE_CREDENTIAL = "samsung-cl-${params.ENVIRONMENT.toLowerCase()}-session-bundle"
               env.CL_BACKOFFICE_ADMIN_CREDENTIAL = params.ENVIRONMENT == 'S1' ? 'samsung-mx-s1-backoffice-admin' : 'samsung-mx-s2-backoffice-admin'
               def clCredentials = [
+                usernamePassword(credentialsId: 'samsung-storefront-primary-user', usernameVariable: 'SAMSUNG_ACCOUNT_EMAIL', passwordVariable: 'SAMSUNG_ACCOUNT_PASSWORD'),
                 file(credentialsId: env.CL_SESSION_BUNDLE_CREDENTIAL, variable: 'CL_SESSION_BUNDLE'),
                 file(credentialsId: env.CL_BACKOFFICE_ADMIN_CREDENTIAL, variable: 'CL_BACKOFFICE_ADMIN_SECRET'),
                 file(credentialsId: 'samsung-mx-test-card', variable: 'CL_TEST_CARD_SECRET')
