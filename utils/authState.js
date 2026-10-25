@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { writeJsonAtomically } = require("./atomicJson");
 const { bypassStagingHttpCache } = require("./authNavigation.cjs");
+const { assertAuthDocumentHealth } = require('./authStorefrontHealth.cjs');
 
 function createAuthState({
   authStatePath,
@@ -270,6 +271,7 @@ function createAuthState({
     if (setupUrl) {
       for (let attempt = 0; attempt < 2; attempt += 1) {
         const response = await gotoWithNetworkRetry(page, setupUrl, { waitUntil: "domcontentloaded" });
+        await assertAuthDocumentHealth(page, { label });
         if (enforceHostname && new URL(page.url()).hostname !== hostname) {
           throw new Error(`Unexpected ${label} setup host.`);
         }
@@ -290,6 +292,7 @@ function createAuthState({
     }
 
     await gotoWithNetworkRetry(page, validationUrl, { waitUntil: "domcontentloaded" });
+    await assertAuthDocumentHealth(page, { label });
 
     const maintenanceMessage = page.getByText(
       /SystemParking|Page Under Maintenance/i

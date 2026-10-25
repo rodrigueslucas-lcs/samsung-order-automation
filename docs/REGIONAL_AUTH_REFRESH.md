@@ -148,6 +148,8 @@ The login helper submits each credential step once. It fills email, attempts the
 
 Visible renewal phases are FIRST before SECOND, with an explicit phase message. A pending FIRST human gate defers new SECOND login windows. Health checks remain parallel (up to three Chromium contexts); renewal is limited to two concurrent windows to bound desktop resource usage. Successful refresh closes its dedicated native browser; a human/failed flow preserves it for recovery.
 
+A staging bootstrap or home can return HTTP 200 with an exact maintenance document title (`Error: Page Under Maintenance`, `System Maintenance`, or `SAP Commerce Cloud - Maintenance`). This is an availability failure, not evidence of session expiration. Health checks return the transient outcome (21); refresh stops before credentials instead of waiting for a profile/CAPTCHA control that cannot render. The guard applies to all four markets in S1/S2 and does not turn other errors into maintenance.
+
 ## Read-only auth operations dashboard
 
 `node scripts/auth-operations-dashboard.cjs` renders six identity cards from allowlisted metadata, actual Task Scheduler configuration and Jenkins GET activity. It never verifies, refreshes, publishes credentials, starts builds or opens browsers. Reports are atomic and failures do not change authentication outcomes. History is bounded to 30 days / 3,000 cycle records; malformed records are counted and skipped. No email, UID, password, cookie, token or bundle contents are collected.

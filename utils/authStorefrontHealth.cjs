@@ -1,3 +1,18 @@
+const MAINTENANCE_TITLE = /^\s*(?:Error:\s*)?(?:Page Under Maintenance|System Maintenance|SAP Commerce Cloud\s*-\s*Maintenance)\s*$/i;
+function maintenanceError(label) {
+  return Object.assign(new Error(`${label} storefront is serving a maintenance document. Authentication cannot be evaluated; no login should be submitted until staging is available.`), { code: 'AUTH_STOREFRONT_UNAVAILABLE' });
+}
+async function assertAuthDocumentHealth(page, { label = 'Staging' } = {}) {
+  if (MAINTENANCE_TITLE.test(await page.title())) throw maintenanceError(label);
+}
+async function waitForAuthControl(page, control, { label = 'Staging', timeout } = {}) {
+  // Maintenance documents can return HTTP 200. Observe their exact title in
+  // parallel with the expected control, instead of spending a full UI timeout.
+  await Promise.race([
+    control.waitFor({ state: 'visible', timeout }),
+    page.waitForFunction(pattern => new RegExp(pattern, 'i').test(document.title), MAINTENANCE_TITLE.source, { timeout }).then(() => { throw maintenanceError(label); }),
+  ]);
+}
 async function assertAuthStorefrontHealth(request, { market, environment }) {
   const code = String(market || '').toLowerCase();
   const target = String(environment || '').toUpperCase();
@@ -25,4 +40,4 @@ async function assertAuthStorefrontHealth(request, { market, environment }) {
   }
 }
 
-module.exports = { assertAuthStorefrontHealth };
+module.exports = { assertAuthStorefrontHealth, assertAuthDocumentHealth, waitForAuthControl };

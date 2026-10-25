@@ -12,15 +12,15 @@ function homeHtml({ signedIn = false, clickOnly = false } = {}) {
     <nav hidden>${signedIn ? '<button>Cerrar sesión</button>' : '<div>Iniciar sesión/Registrarse</div><a class="loginBtn" data-an-la="login" href="https://account.samsung.com/accounts/fixture">Beneficios exclusivos con una Samsung Account</a>'}</nav><main>Storefront</main></body></html>`;
 }
 
-async function fixture(market = 'mx', environment = 'S2', { blankFirst = false, broken = false, http = 200, signedIn = false, clickOnly = false } = {}) {
+async function fixture(market = 'mx', environment = 'S2', { blankFirst = false, broken = false, http = 200, signedIn = false, clickOnly = false, setupMaintenance = false, homeMaintenance = false } = {}) {
   const context = await browser.newContext(); const page = await context.newPage();
   const origin = environment === 'S2' ? 'https://stg2.shop.samsung.com' : 'https://stg.shop.samsung.com';
   let homes = 0, setups = 0;
   await context.route(`${origin}/**`, route => {
     const url = new URL(route.request().url());
-    if (url.pathname === '/getcookie.html') { setups++; return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: '<html><body>You can access pages now!</body></html>' }); }
+    if (url.pathname === '/getcookie.html') { setups++; return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: setupMaintenance ? '<html><head><title>Error: Page Under Maintenance</title></head><body>Unavailable</body></html>' : '<html><body>You can access pages now!</body></html>' }); }
     homes++;
-    const body = broken ? '<html><body>System Check: staging unavailable</body></html>' : blankFirst && homes === 1 ? '<html><body><main></main></body></html>' : homeHtml({ signedIn, clickOnly });
+    const body = homeMaintenance ? '<html><head><title>System Maintenance</title></head><body>Unavailable</body></html>' : broken ? '<html><body>System Check: staging unavailable</body></html>' : blankFirst && homes === 1 ? '<html><body><main></main></body></html>' : homeHtml({ signedIn, clickOnly });
     return route.fulfill({ status: http, contentType: 'text/html; charset=utf-8', body });
   });
   await context.route('https://account.samsung.com/**', route => route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: '<html><body>Human verification fixture</body></html>' }));
@@ -30,6 +30,18 @@ async function fixture(market = 'mx', environment = 'S2', { blankFirst = false, 
 }
 
 for (const market of ['mx', 'pe', 'co', 'cl']) for (const environment of ['S1', 'S2']) {
+  test(`${market} ${environment} HTTP 200 maintenance is an environment failure, with no login or blank-page retry`, async () => {
+    for (const setupMaintenance of [true, false]) {
+      const s = await fixture(market, environment, { setupMaintenance, homeMaintenance: !setupMaintenance });
+      try {
+        await assert.rejects(prepareAuthStorefront(s.page, s.options), { code: 'AUTH_STOREFRONT_UNAVAILABLE' });
+        assert.deepEqual(s.counts(), { setups: 1, homes: setupMaintenance ? 0 : 1 });
+        const { createAuthState } = require('../../utils/authState');
+        const auth = createAuthState({ authStatePath: 'test-results/unused-auth.json', sessionStoragePath: 'test-results/unused-session.json', hostname: new URL(s.options.homeUrl).hostname, setupUrl: setupMaintenance ? s.options.setupUrl : null, validationUrl: s.options.homeUrl, label: `${environment} ${market}`, refreshInstruction: 'No interactive login in a health check.' });
+        await assert.rejects(auth.validateAuthenticatedSession(s.page), { code: 'AUTH_STOREFRONT_UNAVAILABLE' });
+      } finally { await s.close(); }
+    }
+  });
   test(`${market} ${environment} native profile fallback reaches Account on first login handoff`, async () => {
     const s = await fixture(market, environment, { clickOnly: market === 'co' });
     try {

@@ -1,5 +1,5 @@
 const { prepareAuthBrowserWindow } = require('./authBrowserWindow.cjs');
-const { assertAuthStorefrontHealth } = require('./authStorefrontHealth.cjs');
+const { assertAuthStorefrontHealth, waitForAuthControl } = require('./authStorefrontHealth.cjs');
 
 function authProfileControl(page) {
   return page.getByRole('button', { name: 'My Profile', exact: true })
@@ -101,9 +101,10 @@ async function prepareAuthStorefront(page, {
       if (current().origin !== home.origin) throw new Error(`${market.toUpperCase()} ${label} left the expected staging origin.`);
       if (response && !response.ok()) throw new Error(`${market.toUpperCase()} ${label} returned HTTP ${response.status()}; login was not submitted.`);
       try {
-        await marker().waitFor({ state: 'visible', timeout: controlTimeoutMs });
+        await waitForAuthControl(page, marker(), { label: market.toUpperCase(), timeout: controlTimeoutMs });
         return;
       } catch (error) {
+        if (error.code === 'AUTH_STOREFRONT_UNAVAILABLE') throw error;
         if (page.isClosed() || /Target page, context or browser has been closed|Browser has been closed|browser.*disconnected/i.test(String(error.message))) {
           const closed = new Error(`${market.toUpperCase()} dedicated browser/page closed while ${label}; profile readiness could not be checked.`, { cause: error });
           closed.exitCode = 75;

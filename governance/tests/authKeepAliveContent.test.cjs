@@ -7,3 +7,7 @@ test('stable package leaves bytes untouched on metadata-only updates',()=>{const
 test('malformed bundle fails closed instead of silently publishing null hash',()=>assert.throws(()=>sessionContentHash({})));
 for(const [error,code] of [[{code:'AUTH_SIGNED_OUT'},20],[{code:'AUTH_STATE_MISSING'},20],[{name:'TimeoutError'},21],[{message:'net::ERR_NAME_NOT_RESOLVED'},21],[{message:'profile menu did not open'},22],[{code:'AUTH_NOT_PROVEN'},22]])test(`verification classification ${JSON.stringify(error)} is ${code}`,()=>{assert.equal(verificationExitCode(error,{AUTH_KEEPALIVE:'1'}),code);assert.equal(verificationExitCode(error,{}),1);});
 test('all four health verifiers remain noninteractive and persist refreshed browser/session state',()=>{for(const market of ['mx','pe','co','cl']){const s=fs.readFileSync(`scripts/auth-verify-${market}.cjs`,'utf8');assert.match(s,/AUTH_KEEPALIVE/);assert.match(s,/storageState\(\{ indexedDB: true \}\)/);assert.match(s,/verificationExitCode\(error\)/);assert.match(s,/mark.*AuthStateVerified/);}});
+test('proven staging maintenance/unreachable is transient, never proof of expired identity',()=>{
+ for(const code of ['AUTH_STOREFRONT_UNAVAILABLE','AUTH_STOREFRONT_UNREACHABLE'])assert.equal(verificationExitCode({code},{AUTH_KEEPALIVE:'1'}),21);
+ assert.equal(verificationExitCode({code:'AUTH_SIGNED_OUT'},{AUTH_KEEPALIVE:'1'}),20);
+});
