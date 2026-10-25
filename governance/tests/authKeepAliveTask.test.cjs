@@ -1,7 +1,17 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const {buildTaskXml,buildDashboardTaskXml,assertHomologated}=require('../../utils/authKeepAliveTask.cjs');
 test('Windows task runs immediately on user logon and every 15 minutes, without overlap or stored password',()=>{
  const xml=buildTaskXml({root:'C:/QA & Test',executable:'C:/Node/node.exe',userSid:'S-1-5-21-123',start:new Date('2026-10-23T20:00:00Z')});
- assert.match(xml,/<Interval>PT15M<\/Interval>/);assert.match(xml,/<LogonTrigger><Enabled>true<\/Enabled><UserId>S-1-5-21-123<\/UserId><\/LogonTrigger>/);assert.match(xml,/<MultipleInstancesPolicy>IgnoreNew<\/MultipleInstancesPolicy>/);assert.match(xml,/<LogonType>InteractiveToken<\/LogonType>/);assert.match(xml,/--scheduled/);assert.match(xml,/&amp;/);assert.doesNotMatch(xml,/Password|apiToken|JENKINS_API_TOKEN/);assert.match(xml,/<ExecutionTimeLimit>PT18M/);
+ assert.match(xml,/<Interval>PT15M<\/Interval>/);assert.match(xml,/<LogonTrigger><Enabled>true<\/Enabled><UserId>S-1-5-21-123<\/UserId><\/LogonTrigger>/);assert.match(xml,/<MultipleInstancesPolicy>IgnoreNew<\/MultipleInstancesPolicy>/);assert.match(xml,/<LogonType>InteractiveToken<\/LogonType>/);assert.match(xml,/--scheduled/);assert.match(xml,/&amp;/);assert.doesNotMatch(xml,/Password|apiToken|JENKINS_API_TOKEN/);assert.match(xml,/<ExecutionTimeLimit>PT75M/);
+});
+test('task ceiling covers six invalid identities without cutting off the SECOND recovery wave',()=>{
+ const xml=buildTaskXml({userSid:'S-1-5-21-123'});
+ const ceiling=Number(/<ExecutionTimeLimit>PT(\d+)M/.exec(xml)[1]);
+ const verifyMinutes=Math.ceil(6/3)*2*4;
+ const recoveryMinutes=(Math.ceil(4/2)+Math.ceil(2/2))*15;
+ const finalizeMinutes=1+2;
+ assert.ok(ceiling>verifyMinutes+recoveryMinutes+finalizeMinutes);
+ assert.ok(ceiling<=90,'task remains bounded');
+ assert.match(xml,/<MultipleInstancesPolicy>IgnoreNew<\/MultipleInstancesPolicy>/);
 });
 test('scheduler cannot be enabled using only unit tests or partial CL/PE evidence',()=>{
  assert.throws(()=>assertHomologated({environment:'S2',ok:true,identities:[{market:'cl',slot:'primary',status:'HEALTHY'}]},'S2'));
