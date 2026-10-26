@@ -158,6 +158,18 @@ For the local Jenkins installation, add `--dashboard-output=C:\ProgramData\Jenki
 
 The dashboard distinguishes missing/stale evidence, BUSY, HUMAN_REQUIRED, verification failures, package/publication failures and scheduler degradation. An unresolved human gate stays highlighted through later BUSY cycles. The success percentage describes observed check outcomes, not measured uptime. Session age is shown only when a refresh timestamp is known; identity independence is not inferred from successful login. Logon trigger configuration is separate from evidence of an actual Windows logon execution.
 
+### Real Windows logon trigger qualification — 2026-10-25
+
+The installed `SamsungSMB-AuthKeepAlive-S2` **At log on trigger is runtime-qualified**. All times below are America/Sao_Paulo. No manual task start, keep-alive, refresh or verification was executed for this qualification.
+
+- Windows TerminalServices event 23: session 1 logged off at 21:01:30.873; event 21: session 2 logged on at 21:01:48.512.
+- TaskScheduler event **119** recorded user-logon activation at 21:01:51.998; event 100 started instance `386c9bf0-f8c4-4554-b025-161a41042e6c` at 21:01:52.017. The cause was logon, not time-trigger event 107 or manual-request event 110.
+- The previous instance finished at 21:00:14.112. Exactly one instance ran during this logon cycle, with `IgnoreNew` preserved; event 102 recorded its completion at 21:08:59.022.
+- Application cycle: 21:01:58.119–21:08:43.879. `LastTaskResult=1`: MX PRIMARY, PE PRIMARY, CO PRIMARY/SECOND and CL PRIMARY were `TRANSIENT_ERROR`; MX SECOND was `UNPROVEN`, after two checks each. All four publications were `SKIPPED`. This qualifies startup execution, **not six healthy sessions or successful session renewal**.
+- The independent dashboard reporter updated its files after logon. The enabled recurring trigger remains `PT15M`; the next scheduled time at cycle completion was 21:10:31.
+
+Event correlation and safe runtime metadata are preserved locally in ignored `.agent/tmp/at-logon-runtime-proof.json` and the AuthOperations cycle store. No session material belongs in this evidence.
+
 The dashboard presentation uses local SVG country marks, separate FIRST/SECOND badges, text-labelled health meters and a reduced-motion responsive layout. `countdown.js` updates only display text from the recorded next-run timestamp: no requests, storage, auth actions or schedule changes. If scripting is restricted by Jenkins CSP, the absolute scheduled time remains visible. Jenkins resource-domain page refresh uses the configured canonical Jenkins origin and the fixed read-only dashboard path, without changing CSP or Jenkins security. Market execution displays only the market names present in the existing metadata; build numbers are not inferred. HTML Publisher retains its safe intermediate access page because Jenkins serves reports on an isolated resource domain.
 
 The UI labels current healthy identities separately from historical identity-check outcomes; the percentage is not platform uptime or the fraction of fully healthy cycles. Current status and the last recorded action are displayed separately. SECOND waiting labels name their corresponding FIRST market. Activity filters operate only on the 60 events already rendered, with categories derived from those events; no scheduler event is invented. A generation-age indicator updates locally alongside the existing countdown, without adding requests or changing the 45-second refresh. If Jenkins CSP blocks scripts, all events and the absolute generation time remain available.
