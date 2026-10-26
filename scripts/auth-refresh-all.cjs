@@ -45,6 +45,7 @@ function writeSummary(summary) {
     markets: summary.markets,
     ready: summary.ready,
     human: summary.human,
+    busy: summary.busy,
     failed: summary.failed,
     ok: summary.ok,
     results: summary.results.map((result) => ({
@@ -67,7 +68,7 @@ console.log(`[auth:refresh:all] Jenkins publish: ${args.publish ? 'enabled' : 'd
 refreshAll({ markets, environment, slot: args.slot, env: runtimeEnv })
   .then((summary) => {
     writeSummary(summary);
-    if (!summary.ok) process.exitCode = summary.human > 0 && summary.failed === 0 ? 2 : 1;
+    if (!summary.ok) process.exitCode = summary.failed > 0 ? 1 : summary.human > 0 ? 2 : summary.busy > 0 ? 3 : 1;
   })
   .catch((error) => {
     console.error(`[auth:refresh:all] FAILED · ${String(error.message || error).split('\n')[0]}`);

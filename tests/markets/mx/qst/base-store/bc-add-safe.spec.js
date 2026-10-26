@@ -4,6 +4,7 @@ import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
 import { test, expect } from "./mxQst.fixture";
 import preQaCustomerState from "../../../../../utils/preQaCustomerState.js";
 import bcCareChoice from "../../../../../utils/mxBcCareChoice.cjs";
+import bcCatalog from "../../../../../utils/mxBcCatalog.cjs";
 
 const { recordBusinessEvidence } = evidenceContext;
 const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
@@ -160,13 +161,11 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
     });
 
     await test.step("Open the configured Galaxy Z Flip7 PDP from the BC catalog", async () => {
-      const productCard = page.locator("[role='listitem'].pd21-product-card__item")
-        .filter({ has: page.locator(`a.pd21-product-card__name[data-modelcode='${PRE_QA_MODEL_CODE}']`) })
-        .first();
+      const productCard = await bcCatalog.waitForMxBcProductCard(page, PRE_QA_MODEL_CODE);
       // The filter label includes its active count (for example "Filtros (1)").
       // Readiness is the exact product card rather than incidental filter copy.
       await expect(productCard, "The PreQA BC catalog must render the configured Galaxy Z Flip7 product card.")
-        .toBeVisible({ timeout: 60000 });
+        .toBeVisible();
       await productCard.scrollIntoViewIfNeeded();
       const productLink = productCard.locator(`a.pd21-product-card__name[data-modelcode='${PRE_QA_MODEL_CODE}']`);
       const detailsUrl = new URL(await productLink.getAttribute("href"), PRE_QA_ORIGIN);

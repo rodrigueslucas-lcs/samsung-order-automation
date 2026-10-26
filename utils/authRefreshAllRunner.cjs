@@ -96,7 +96,7 @@ function runMarketRefresh(market, environment, slot = 'primary', baseEnv = proce
         code: code ?? 1,
         signal: signal || null,
         elapsedMs,
-        status: code === 0 ? 'READY' : code === 2 ? 'HUMAN_REQUIRED' : signal ? 'INTERRUPTED' : 'FAILED',
+        status: signal ? 'INTERRUPTED' : code === 0 ? 'READY' : code === 2 ? 'HUMAN_REQUIRED' : code === 3 ? 'BUSY' : 'FAILED',
       });
     });
   });
@@ -144,15 +144,16 @@ async function refreshAll({ markets, environment, slot, env = process.env } = {}
   log(` REGIONAL AUTH REFRESH SUMMARY · ${selectedEnvironment} · ${selectedSlot.toUpperCase()}`);
   log('============================================================');
   for (const result of settled) {
-    const icon = result.status === 'READY' ? 'READY' : result.status === 'HUMAN_REQUIRED' ? 'HUMAN' : 'FAIL';
+    const icon = result.status === 'READY' ? 'READY' : result.status === 'HUMAN_REQUIRED' ? 'HUMAN' : result.status === 'BUSY' ? 'BUSY' : 'FAIL';
     const seconds = Math.max(0, Math.round(result.elapsedMs / 1000));
     log(` ${result.market.toUpperCase().padEnd(2)}  ${icon.padEnd(5)} · ${seconds}s${result.error ? ` · ${result.error}` : ''}`);
   }
   const ready = settled.filter((result) => result.status === 'READY').length;
   const human = settled.filter((result) => result.status === 'HUMAN_REQUIRED').length;
-  const failed = settled.length - ready - human;
+  const busy = settled.filter((result) => result.status === 'BUSY').length;
+  const failed = settled.length - ready - human - busy;
   log('------------------------------------------------------------');
-  log(` READY ${ready}/${settled.length} · HUMAN ${human} · FAILED ${failed} · total ${Math.round((Date.now() - startedAt) / 1000)}s`);
+  log(` READY ${ready}/${settled.length} · HUMAN ${human} · BUSY ${busy} · FAILED ${failed} · total ${Math.round((Date.now() - startedAt) / 1000)}s`);
   log('============================================================');
 
   return {
@@ -162,6 +163,7 @@ async function refreshAll({ markets, environment, slot, env = process.env } = {}
     results: settled,
     ready,
     human,
+    busy,
     failed,
     ok: ready === settled.length,
   };

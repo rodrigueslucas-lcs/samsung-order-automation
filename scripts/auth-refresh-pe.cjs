@@ -10,6 +10,6 @@ const baseEnv = {
 refreshAuth({ market: "pe", environment, slot: accountSlot, env: baseEnv,
   publishScript: "scripts/auth-publish-jenkins-pe.cjs",
 }).catch(error => {
-  console.error("[auth:refresh:pe] " + (error.code === "AUTH_HUMAN_REQUIRED" ? "WAITING HUMAN · " : "FAILED · ") + String(error.message).split("\n", 1)[0]);
+  console.error("[auth:refresh:pe] " + (error.code === "AUTH_HUMAN_REQUIRED" ? "WAITING HUMAN · " : error.code === "AUTH_BUSY" ? "BUSY · " : "FAILED · ") + String(error.message).split("\n", 1)[0]);
   process.exitCode = error.code === "AUTH_HUMAN_REQUIRED" ? 2 : error.code === "AUTH_BUSY" ? 3 : 1;
 });

@@ -81,3 +81,19 @@ for (const environment of ['S1','S2']) for (const slot of ['primary','second']) 
  const result=await runMarketRefresh('co',environment,slot,{MX_AUTH_SLOT:slot==='primary'?'second':'primary'},{spawnChild(exe,args,options){actual=options.env;const child=new EventEmitter();setImmediate(()=>child.emit('close',0,null));return child;},stdout(){},stderr(){}});
  assert.equal(actual.CO_AUTH_SLOT,slot);assert.equal(actual.MX_AUTH_SLOT,undefined);assert.equal(result.status,'READY');
 });
+
+test('occupied market exits as BUSY rather than FAILED and never counts as READY', async () => {
+  const {runMarketRefresh}=require('../../utils/authRefreshAllRunner.cjs');
+  const {EventEmitter}=require('node:events');
+  const result=await runMarketRefresh('mx','S2','primary',{}, {spawnChild(){const child=new EventEmitter();setImmediate(()=>child.emit('close',3,null));return child;},stdout(){},stderr(){}});
+  assert.equal(result.status,'BUSY');
+  const logs=[];
+  const summary=await refreshAll({markets:['mx','pe'],environment:'S2',env:{}},{runMarket:async market=>({...result,market}),log:s=>logs.push(s),error(){}});
+  assert.equal(summary.busy,2);assert.equal(summary.failed,0);assert.equal(summary.ready,0);assert.equal(summary.ok,false);
+  assert.ok(logs.some(s=>s.includes('BUSY 2')));
+});
+
+test('one busy market preserves successful siblings and true failure counts', async () => {
+  const summary=await refreshAll({markets:['mx','pe','co'],env:{}},{runMarket:async market=>({market,status:market==='mx'?'BUSY':market==='pe'?'READY':'FAILED',elapsedMs:1}),log(){},error(){}});
+  assert.equal(summary.busy,1);assert.equal(summary.ready,1);assert.equal(summary.failed,1);
+});
