@@ -12,16 +12,16 @@ function homeHtml({ signedIn = false, clickOnly = false } = {}) {
     <nav hidden>${signedIn ? '<button>Cerrar sesión</button>' : '<div>Iniciar sesión/Registrarse</div><a class="loginBtn" data-an-la="login" href="https://account.samsung.com/accounts/fixture">Beneficios exclusivos con una Samsung Account</a>'}</nav><main>Storefront</main></body></html>`;
 }
 
-async function fixture(market = 'mx', environment = 'S2', { blankFirst = false, broken = false, http = 200, signedIn = false, clickOnly = false, setupMaintenance = false, homeMaintenance = false } = {}) {
+async function fixture(market = 'mx', environment = 'S2', { blankFirst = false, broken = false, http = 200, signedIn = false, clickOnly = false, setupMaintenance = false, homeMaintenance = false, legacyTitles = false } = {}) {
   const context = await browser.newContext(); const page = await context.newPage();
   const origin = environment === 'S2' ? 'https://stg2.shop.samsung.com' : 'https://stg.shop.samsung.com';
   let homes = 0, setups = 0;
   await context.route(`${origin}/**`, route => {
     const url = new URL(route.request().url());
-    if (url.pathname === '/getcookie.html') { setups++; return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: setupMaintenance ? '<html><head><title>Error: Page Under Maintenance</title></head><body>Unavailable</body></html>' : '<html><body>You can access pages now!</body></html>' }); }
+    if (url.pathname === '/getcookie.html') { setups++; return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: setupMaintenance ? '<html><head><title>Error: Page Under Maintenance</title></head><body><h1>Page Under Maintenance</h1></body></html>' : `<html><head><title>${legacyTitles ? 'Error: Page Under Maintenance' : 'Staging access'}</title></head><body>You can access pages now!</body></html>` }); }
     homes++;
-    const body = homeMaintenance ? '<html><head><title>System Maintenance</title></head><body>Unavailable</body></html>' : broken ? '<html><body>System Check: staging unavailable</body></html>' : blankFirst && homes === 1 ? '<html><body><main></main></body></html>' : homeHtml({ signedIn, clickOnly });
-    return route.fulfill({ status: http, contentType: 'text/html; charset=utf-8', body });
+    const body = homeMaintenance ? '<html><head><title>System Maintenance</title></head><body><h1>System Maintenance</h1></body></html>' : broken ? '<html><body>System Check: staging unavailable</body></html>' : blankFirst && homes === 1 ? '<html><body><main></main></body></html>' : homeHtml({ signedIn, clickOnly });
+    return route.fulfill({ status: http, contentType: 'text/html; charset=utf-8', body: legacyTitles && !homeMaintenance ? body.replace('<html>', '<html><head><title>System Maintenance</title></head>') : body });
   });
   await context.route('https://account.samsung.com/**', route => route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: '<html><body>Human verification fixture</body></html>' }));
   const options = { market, setupUrl: `${origin}/getcookie.html`, homeUrl: `${origin}/${market}/`,
@@ -59,6 +59,17 @@ test('blank document recovery repeats only a safe storefront GET once', async ()
   const s = await fixture('mx', 'S2', { blankFirst: true });
   try { await prepareAuthStorefront(s.page, s.options); assert.deepEqual(s.counts(), { homes: 2, setups: 1 }); }
   finally { await s.close(); }
+});
+
+for (const signedIn of [true, false]) test(`legacy maintenance titles with valid access and rendered home preserve real identity proof (signedIn=${signedIn})`, async () => {
+  const s = await fixture('mx', 'S2', { signedIn, legacyTitles: true });
+  try {
+    await prepareAuthStorefront(s.page, s.options);
+    const { createAuthState } = require('../../utils/authState');
+    const auth = createAuthState({ authStatePath: 'test-results/unused-auth.json', sessionStoragePath: 'test-results/unused-session.json', hostname: new URL(s.options.homeUrl).hostname, setupUrl: s.options.setupUrl, validationUrl: s.options.homeUrl, label: 'S2 MX', refreshInstruction: 'Refresh only if signed out.', profileMenuTrigger: 'hover', profileButtonSelector: 'button[data-an-la="L0_13_login"]', authenticatedMenuSelector: 'nav', profileMenuReadySelector: 'nav', logoutTextName: /Cerrar sesi[oó]n/i });
+    if (signedIn) await auth.validateAuthenticatedSession(s.page);
+    else await assert.rejects(auth.validateAuthenticatedSession(s.page), { code: 'AUTH_SIGNED_OUT' });
+  } finally { await s.close(); }
 });
 
 test('a closed storefront tab is classified as browser loss instead of a missing profile timeout', async () => {

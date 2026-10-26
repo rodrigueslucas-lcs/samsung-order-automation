@@ -1,5 +1,5 @@
 const { observeAuthHealthContext } = require('../utils/authHealthAudit.cjs');
-const { verificationExitCode } = require('../utils/authVerificationResult.cjs');
+const { verificationExitCode, reportVerificationIssue } = require('../utils/authVerificationResult.cjs');
 const { chromium } = require("@playwright/test");
 const { prepareAuthBrowserWindow } = require("../utils/authBrowserWindow.cjs");
 const fs = require("node:fs");
@@ -115,5 +115,6 @@ verifyMxAuthentication().catch((error) => {
     .split("\n", 1)[0]
     .replace(/([?&][^=\s]+)=([^&\s]+)/g, "$1=<redacted>");
   console.error(`[auth:verify:mx] ${error.name}: ${summary}`);
+  reportVerificationIssue(error);
   process.exitCode = verificationExitCode(error);
 });

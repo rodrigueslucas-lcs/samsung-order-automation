@@ -2,6 +2,16 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { verifyIdentity, recoverIdentity, packageAndPublishMarket, runKeepAliveCycle, identityEnv } = require('../../utils/authKeepAliveRunner.cjs');
 const quiet = () => {};
+test('a failed FIRST with a retained browser defers visible SECOND recovery', async () => {
+  const s = cycleFixture('NEEDS_REFRESH');
+  s.deps.recover = async identity => { s.calls.push(`refresh:${identity.market}:${identity.slot}`); return {...identity, status: identity.market === 'mx' ? 'FAILED' : 'RECOVERED'}; };
+  s.deps.captureBrowser = async ({market,slot}) => market === 'mx' && slot === 'primary' ? {fingerprint:'fixture-owned-first'} : null;
+  const result = await runKeepAliveCycle({}, s.deps);
+  assert.equal(result.identities.filter(i => i.slot === 'second' && i.status === 'WAITING_PRIMARY').length, 2);
+  assert.ok(!s.calls.some(c => c.startsWith('refresh:') && c.endsWith(':second')));
+  assert.equal(s.saved.get('mx').pendingClose.primary, 'fixture-owned-first');
+  assert.equal(result.finalized.filter(r => r.status === 'READY').length, 2);
+});
 const id = { market: 'mx', environment: 'S2', slot: 'primary', env: {} };
 function cycleFixture(status = 'HEALTHY') {
   const calls = [], saved = new Map();

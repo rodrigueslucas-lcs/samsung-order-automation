@@ -39,6 +39,7 @@ function buildModel({ cycles = [], scheduler, activity, corrupt = 0, environment
     return {
       market,slot,status:unresolvedHuman?'HUMAN_REQUIRED':stale?'STALE':latest?.status||'NO_DATA',at:unresolvedHuman?human.at:latest?.at||null,lastOutcome:latest?.status||'NO_DATA',
       lastVerify:verified?.at||null,lastRefresh:refreshed?.at||null,lastHuman:human?.at||null,
+      reason:latest?.reason||null,
       verifyDurationMs:[...own].reverse().find(e=>e.verifyDurationMs!==undefined)?.verifyDurationMs??null,
       refreshDurationMs:[...own].reverse().find(e=>e.refreshDurationMs!==undefined)?.refreshDurationMs??null,
       retries:own.filter(e=>VERIFY_OUTCOMES.has(e.status)&&(e.attempts||0)>1).length,bundle:typeof bundle?.changed==='boolean'?(bundle.changed?'CHANGED':'SAME'):'UNKNOWN',

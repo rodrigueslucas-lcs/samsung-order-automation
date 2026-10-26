@@ -7,6 +7,7 @@ const { acquireMarketLease } = require('./authMarketLease.cjs');
 const { normalizeEnvironment } = require('./authRefreshAllRunner.cjs');
 const { sessionContentHash } = require('./authBundleContent.cjs');
 const { writeJsonAtomically } = require('./atomicJson');
+const { VERIFICATION_ISSUES } = require('./authVerificationResult.cjs');
 const MARKET_SLOTS = Object.freeze({ mx: Object.freeze(['primary','second']), pe: Object.freeze(['primary']), co: Object.freeze(['primary','second']), cl: Object.freeze(['primary']) });
 const PACKAGE_SCRIPTS = Object.fromEntries(Object.keys(MARKET_SLOTS).map(m => [m, `scripts/auth-package-${m}.cjs`]));
 const PUBLISH_SCRIPTS = { mx: 'scripts/auth-publish-jenkins.cjs', pe: 'scripts/auth-publish-jenkins-pe.cjs', co: 'scripts/auth-publish-jenkins-co.cjs', cl: 'scripts/auth-publish-jenkins-cl.cjs' };
@@ -31,7 +32,7 @@ function runNodeScript(script, env, { spawnChild = spawn, timeoutMs = 240000, st
   return new Promise((resolve, reject) => {
     const args = env.AUTH_MARKET_LEASE ? ['scripts/auth-leased-child.cjs', script] : [script];
     const child = spawnChild(process.execPath, args, { env, stdio: ['ignore','pipe','pipe'], windowsHide: true });
-    let audit, handoff, lineBuffer = '', diagnostic = null;
+    let audit, handoff, lineBuffer = '', diagnostic = null, structuredIssue = false;
     let timedOut = false;
     const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); }, timeoutMs);
     // Output is consumed but never retained in returned results/checkpoints.
@@ -40,6 +41,9 @@ function runNodeScript(script, env, { spawnChild = spawn, timeoutMs = 240000, st
       for (const line of lines) if (line.startsWith('AUTH_HEALTH_AUDIT ')) {
         try { const value = JSON.parse(line.slice('AUTH_HEALTH_AUDIT '.length)); if (Number.isInteger(value.accountPages) && value.accountPages >= 0 && typeof value.statePersisted === 'boolean') audit = {accountPages:value.accountPages,statePersisted:value.statePersisted}; } catch {}
       }
+      else if(line.startsWith('AUTH_HEALTH_ISSUE ')) {
+        try { const value = JSON.parse(line.slice('AUTH_HEALTH_ISSUE '.length)); if (VERIFICATION_ISSUES.includes(value.reason)) { diagnostic = value.reason; structuredIssue = true; } } catch {}
+      }
       else if(line.startsWith('AUTH_HANDOFF_AUDIT ')) {
         try { const value=JSON.parse(line.slice('AUTH_HANDOFF_AUDIT '.length)); if(typeof value.passwordAttempted==='boolean')handoff={passwordAttempted:value.passwordAttempted,...(['NONE','READY','CHALLENGE'].includes(value.emailPhase)?{emailPhase:value.emailPhase}:{})}; } catch {}
       }
@@ -47,6 +51,7 @@ function runNodeScript(script, env, { spawnChild = spawn, timeoutMs = 240000, st
     });
     child.stderr?.on('data', chunk => {
       const text = String(chunk);
+      if (structuredIssue) { stderr(text); return; }
       if (text.includes('[auth:lease]')) diagnostic = 'CHILD_LEASE_ENTRY';
       else if (/AUTH RECOVERY REQUIRED/.test(text)) diagnostic = 'AUTH_RECOVERY_REQUIRED';
       else if (/profile menu did not open|authenticated logout control was not rendered/.test(text)) diagnostic = 'AUTH_NOT_PROVEN';
@@ -78,7 +83,8 @@ async function verifyIdentity({ market, environment, slot, env = process.env, at
     }
     // A mixed network/invalid result cannot establish persistent expiration.
     const status = outcomes.length === 2 && outcomes.every(code => code === 20) ? 'NEEDS_REFRESH' : outcomes.every(code => code === 21) ? 'TRANSIENT_ERROR' : 'UNPROVEN';
-    return { market, environment, slot, status, attempts: outcomes.length, code: outcomes.at(-1), verifyCodes: outcomes, diagnostics, audits };
+    const reason = diagnostics.length && diagnostics.every(value => value === diagnostics[0]) && VERIFICATION_ISSUES.includes(diagnostics[0]) ? diagnostics[0] : null;
+    return { market, environment, slot, status, attempts: outcomes.length, code: outcomes.at(-1), verifyCodes: outcomes, diagnostics, audits, ...(reason ? { reason } : {}) };
   } finally { release(); }
 }
 async function recoverIdentity({ market, environment, slot, env = process.env }, { runScript = runNodeScript, log = console.log, onEvent = () => {} } = {}) {
@@ -162,7 +168,7 @@ async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MAR
     const recoverSlot=async(slot)=>{
       const waiting=records.filter(r=>!r.failed).flatMap(record=>record.checked.map((identity,index)=>({record,identity,index}))).filter(({identity})=>identity.slot===slot&&identity.status==='NEEDS_REFRESH');
       if(!waiting.length)return;
-      if(slot==='second'&&records.some(r=>r.checked.some(i=>i.slot==='primary'&&(i.status==='HUMAN_REQUIRED'||i.humanPending||(r.state?.human?.primary&&!['HEALTHY','RECOVERED'].includes(i.status)))))) {
+      if(slot==='second'&&records.some(r=>r.checked.some(i=>i.slot==='primary'&&(i.status==='HUMAN_REQUIRED'||i.humanPending||((r.state?.human?.primary||r.state?.pendingClose?.primary)&&!['HEALTHY','RECOVERED'].includes(i.status)))))) {
         log('[auth:keepalive] FIRST requires human verification; SECOND renewal remains deferred.');
         for(const {record,identity,index} of waiting){record.checked[index]={...identity,status:'WAITING_PRIMARY'};notify(record.checked[index]);}
         return;
@@ -171,7 +177,7 @@ async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MAR
       else log('[auth:keepalive] Starting FIRST renewal only; SECOND login windows are deferred.');
       await Promise.all(waiting.map(({record,identity,index})=>refreshLane(async()=>{
         const {market,environment,slot}=identity;
-        if(slot==='second' && records.some(r=>r.checked.some(i=>i.slot==='primary'&&(i.status==='HUMAN_REQUIRED'||i.humanPending||(r.state?.human?.primary&&!['HEALTHY','RECOVERED'].includes(i.status)))))) {record.checked[index]={market,environment,slot,status:'WAITING_PRIMARY'};notify(record.checked[index]);return;}
+        if(slot==='second' && records.some(r=>r.checked.some(i=>i.slot==='primary'&&(i.status==='HUMAN_REQUIRED'||i.humanPending||((r.state?.human?.primary||r.state?.pendingClose?.primary)&&!['HEALTHY','RECOVERED'].includes(i.status)))))) {record.checked[index]={market,environment,slot,status:'WAITING_PRIMARY'};notify(record.checked[index]);return;}
         if(record.state.human?.[slot]) {
           const started=now();
           let ended=false;

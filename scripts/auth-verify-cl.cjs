@@ -1,5 +1,5 @@
 const { observeAuthHealthContext } = require('../utils/authHealthAudit.cjs');
-const { verificationExitCode } = require('../utils/authVerificationResult.cjs');
+const { verificationExitCode, reportVerificationIssue } = require('../utils/authVerificationResult.cjs');
 const { chromium } = require("@playwright/test");
 const { prepareAuthBrowserWindow } = require("../utils/authBrowserWindow.cjs");
 const { writeJsonAtomically } = require("../utils/atomicJson");
@@ -53,5 +53,6 @@ async function verifyClAuthentication() {
 
 verifyClAuthentication().catch((error) => {
   console.error(`[auth:verify:cl] ${error.name}: ${String(error.message || error).split("\n", 1)[0]}`);
+  reportVerificationIssue(error);
   process.exitCode = verificationExitCode(error);
 });

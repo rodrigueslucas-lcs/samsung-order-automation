@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { writeJsonAtomically } = require('./atomicJson');
+const { VERIFICATION_ISSUES } = require('./authVerificationResult.cjs');
 
 const SLOTS = Object.freeze({ mx: ['primary', 'second'], pe: ['primary'], co: ['primary', 'second'], cl: ['primary'] });
 const STATUSES = new Set(['VERIFYING', 'HEALTHY', 'NEEDS_REFRESH', 'REFRESHING', 'RECOVERED', 'REFRESHED', 'HUMAN_REQUIRED', 'HANDOFF_ENDED', 'WAITING_PRIMARY', 'BUSY', 'FAILED', 'TRANSIENT_ERROR', 'UNPROVEN']);
@@ -15,6 +16,7 @@ function duration(value) { return Number.isFinite(value) && value >= 0 && value 
 function identity(value) {
   if (!Object.hasOwn(SLOTS,value?.market) || !SLOTS[value.market].includes(value.slot) || !STATUSES.has(value.status)) return null;
   const safe = { market: value.market, slot: value.slot, status: value.status };
+  if (VERIFICATION_ISSUES.includes(value.reason)) safe.reason = value.reason;
   if (Number.isInteger(value.attempts) && value.attempts >= 0 && value.attempts <= 2) safe.attempts = value.attempts;
   for (const key of ['verifyDurationMs', 'refreshDurationMs']) if (duration(value[key]) !== null) safe[key] = duration(value[key]);
   return safe;
