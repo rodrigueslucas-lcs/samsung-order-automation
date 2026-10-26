@@ -79,6 +79,8 @@
     "preqa2:reconcile": "node scripts/print-preqa2-reconciliation.cjs",
     "preqa2:record": "node scripts/record-preqa2-result.cjs",
     "preqa2:bootstrap": "node scripts/preqa2-bootstrap.cjs",
+    "preqa2:lanes": "node scripts/preqa2-market-lanes.cjs",
+    "preqa2:health": "node scripts/preqa2-lanes-health.cjs",
     "preqa2:gate": "node scripts/preqa2-gate.cjs && npm run preqa2:validation:test && npm run reporting:preqa2:test",
     "reporting:evidence:test": "node --test reporting/tests/evidence.test.cjs && playwright test --config=reporting/tests/playwright.evidence.config.cjs",
     "reporting:executive": "node reporting/executive/generateExecutiveReport.cjs",

@@ -20,18 +20,22 @@ The four sibling jobs default to `ENVIRONMENT=S2`, `TEST_SUITE=official-p1`, `EX
 Configure the Windows Jenkins node with at least 4 executors. Jenkins will allocate independent workspaces to the four jobs, so `playwright/.auth`, `test-results`, Playwright output, Allure results/report, local Allure history/cache and Executive Dashboard files remain isolated by job workspace.
 
 ## Operator flow
-1. Keep one visible Chrome running with CDP on `127.0.0.1:9223` and an authenticated WMC / AD SSO session.
+1. Run `npm run preqa2:bootstrap`. It reuses the dedicated Chrome on `127.0.0.1:9223`, or opens it maximized with the ignored `playwright/profiles/preqa2-smb` profile. Complete corporate MFA if requested. Once READY, the command returns to the terminal while Chrome remains open. A failed or human-gated bootstrap also preserves that browser for inspection/resume; it never deletes the profile. An unavailable custom CDP endpoint is reported without launching an alternate profile.
 2. Prepare persistent PreQA2 market tabs with:
 
    ```bash
    PREQA2_CDP_URL="http://127.0.0.1:9223" PREQA2_MARKETS="mx,pe,co,cl" node scripts/preqa2-market-lanes.cjs
    ```
 
+   With the defaults, the equivalent command is `npm run preqa2:lanes`.
+
 3. Verify the four tabs without navigating or reloading them:
 
    ```bash
    PREQA2_CDP_URL="http://127.0.0.1:9223" PREQA2_MARKETS="mx,pe,co,cl" node scripts/preqa2-lanes-health.cjs
    ```
+
+   With the defaults, use `npm run preqa2:health`. The script filename is `preqa2-lanes-health.cjs`.
 
    Expected result: `PASS` for MX, PE, CO and CL followed by `READY · 4/4 market lanes healthy`.
 

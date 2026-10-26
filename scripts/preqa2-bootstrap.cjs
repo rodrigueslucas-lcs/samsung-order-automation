@@ -3,7 +3,9 @@ const path = require("node:path");
 const { chromium } = require("playwright");
 const { bootstrapPreqa2Market } = require("../utils/preqa2Bootstrap");
 const { normalizePreqa2Market } = require("../utils/preqa2Config");
-const { PREQA2_HOST, classifyWmcUrl, safePageIdentity } = require("../utils/wmcSessionState");
+const { classifyWmcUrl, safePageIdentity } = require("../utils/wmcSessionState");
+const { connectPreqa2Browser, DEFAULT_ENDPOINT } = require('../utils/preqa2Browser.cjs');
+const { findPreqa2Control, isExpectedWmcTransition } = require('../utils/preqa2WmcControls.cjs');
 
 const WMC_URL = "https://wds.samsung.com";
 
@@ -47,27 +49,6 @@ function loadLocalRuntimeCredentials() {
   return values;
 }
 
-async function findPreqa2Control(page) {
-  const controls = [];
-  for (const frame of page.frames()) {
-    const candidates = frame
-      .getByRole("link", { name: /Preqa2/i })
-      .or(frame.getByRole("button", { name: /Preqa2/i }))
-      .or(frame.getByText(/^Preqa2$/i))
-      .filter({ visible: true });
-    for (const candidate of await candidates.all()) {
-      controls.push({ candidate, href: (await candidate.getAttribute("href").catch(() => "")) || "" });
-    }
-  }
-  const exactTarget = controls.find(({ href }) => href.includes(PREQA2_HOST));
-  if (exactTarget) return exactTarget.candidate;
-  if (controls.length === 1) return controls[0].candidate;
-  if (controls.length > 1) {
-    throw new Error("Multiple Preqa2 controls were visible and none identified the approved PreQA2 host.");
-  }
-  return null;
-}
-
 async function findEmployeeLoginControl(page) {
   for (const frame of page.frames()) {
     const marker = frame.getByText(/AD SSO Login/i).filter({ visible: true }).first();
@@ -93,6 +74,7 @@ async function waitForAuthenticatedPreqa2(context, timeoutMs, credentials = {}, 
   const foregroundedMfaPages = new WeakSet();
   let nextDiagnosticAt = 0;
   while (Date.now() < deadline) {
+    if (!context.browser()?.isConnected()) throw new Error('Dedicated PreQA2 Chrome was closed; no authentication was retried.');
     if ((runtime.handshakeFailures || 0) > handledHandshakeFailures) {
       handledHandshakeFailures = runtime.handshakeFailures;
       if (handledHandshakeFailures > 1) {
@@ -124,6 +106,8 @@ async function waitForAuthenticatedPreqa2(context, timeoutMs, credentials = {}, 
       nextDiagnosticAt = Date.now() + 5000;
     }
     for (const page of context.pages()) {
+      if (page.isClosed()) continue;
+      try {
       const state = classifyWmcUrl(page.url());
       if (state === "preqa2" || state === "preqa2-gate") {
         const text = await page.locator("body").innerText().catch(() => "");
@@ -193,6 +177,12 @@ async function waitForAuthenticatedPreqa2(context, timeoutMs, credentials = {}, 
           await preqa2.click();
         }
       }
+      } catch (error) {
+        // SSO can close its original popup after the authenticated tab opens.
+        // Continue only while this same native browser has a surviving page.
+        // Submission flags are retained; credentials are never sent again.
+        if (!isExpectedWmcTransition(error, context)) throw error;
+      }
     }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
@@ -215,22 +205,13 @@ async function main() {
   delete localRuntime.WMC_SSO_EMAIL;
   delete localRuntime.WMC_SSO_PASSWORD;
   let context;
-  let ownsContext = false;
+  let browser;
   try {
-    if (process.env.PREQA2_CDP_URL) {
-      const browser = await chromium.connectOverCDP(process.env.PREQA2_CDP_URL);
-      context = browser.contexts()[0];
-      if (!context) throw new Error("The visible Chrome CDP session has no browser context.");
-      console.log("[preqa2] Attached to the user-visible Chrome through local CDP.");
-    } else {
-      context = await chromium.launchPersistentContext(profileDir, {
-        channel: "chrome",
-        headless: false,
-        viewport: null,
-        args: ["--start-maximized", "--disable-background-mode"],
-      });
-      ownsContext = true;
-    }
+    browser = await connectPreqa2Browser({ chromium, profileDir,
+      endpoint: process.env.PREQA2_CDP_URL || DEFAULT_ENDPOINT,
+    });
+    context = browser.contexts()[0];
+    console.log('[preqa2] Dedicated visible Chrome connected through CDP; it remains open after this command exits.');
   } catch (error) {
     releaseBootstrap();
     if (/ProcessSingleton|profile.*(?:in use|locked)|user data directory is already in use/i.test(error.message)) {
@@ -271,7 +252,7 @@ async function main() {
       } catch (error) {
         // WMC can leave its initial navigation pending even after Chrome is usable.
         if (!/Timeout.*exceeded/i.test(error.message) || wmc.isClosed()) throw error;
-        console.warn(`[preqa2] WMC navigation is still pending (${wmc.url()}); continue in the visible Chrome.`);
+        console.warn(`[preqa2] WMC navigation is still pending (${safePageIdentity(wmc.url())}); continue in the visible Chrome.`);
       }
       console.log("[preqa2] Complete WMC -> Samsung Employees -> AD SSO Login -> QA / Preqa2.");
       console.log("[preqa2] Waiting for the authenticated Preqa2 tab; Chrome must remain open.");
@@ -303,15 +284,18 @@ async function main() {
     fs.mkdirSync(path.dirname(output), { recursive: true });
     fs.writeFileSync(output, `${JSON.stringify({ generatedAt: new Date().toISOString(), results }, null, 2)}\n`);
     console.log(`[preqa2] Discovery written to ${output}`);
-    console.log("[preqa2] Press Ctrl+C after reviewing the storefront; the profile remains Git-ignored.");
-    await new Promise((resolve) => context.on("close", resolve));
+    console.log('[preqa2] READY · authenticated bootstrap complete. Chrome remains available for market-lanes and Jenkins on CDP.');
   } finally {
-    if (ownsContext) await context.close().catch(() => {});
+    // Disconnect only. Preserve the native browser on success and on a human
+    // gate/error so MFA and an authenticated WMC session are never discarded.
+    await browser.close().catch(() => {});
     releaseBootstrap();
   }
 }
 
-main().catch((error) => {
-  console.error(`[preqa2] ${error.message}`);
+if (require.main === module) main().catch((error) => {
+  const message = String(error.message).split('\n', 1)[0].replace(/https?:\/\/[^\s)]+/g, safePageIdentity);
+  console.error(`[preqa2] ${message}`);
   process.exitCode = 1;
 });
+module.exports = { main, findPreqa2Control, waitForAuthenticatedPreqa2 };
