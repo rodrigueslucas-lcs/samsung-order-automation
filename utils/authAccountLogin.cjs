@@ -55,6 +55,12 @@ async function completeAccountLogin(page, { market, hostname, credentials, timeo
       if (url.hostname !== hostname && !url.hostname.endsWith('.ecom-stg.samsung.com')) throw new Error('Samsung Account reached an unexpected host; no credentials were submitted there.');
       await pause(250); continue;
     }
+    if (/^\/iam\/error(?:\/|$)/i.test(url.pathname)) {
+      const error = new Error('Samsung Account rejected the current authorization. No credential step will be repeated on this error page; start a fresh authorized refresh.');
+      error.code = 'AUTH_PROVIDER_ERROR';
+      error.exitCode = 78;
+      throw error;
+    }
     let {visual:visualChallenge,pending:challenge,checkbox:captchaCheckbox}=await captchaGate();
     const mfa = await page.getByText(/Two-step verification|Verification code|c[oó]digo de verificaci[oó]n|Verificaci[oó]n en dos pasos/i).first().isVisible();
     if (mfa) {
@@ -122,11 +128,13 @@ async function completeAccountLogin(page, { market, hostname, credentials, timeo
       await password.fill(configured().password,{timeout:2000}); passwordFilled = true;
       report('configured password populated');
     }
-    if (!passwordSubmitted && await password.isVisible()) {
+    // Visibility can change between awaits while Samsung hydrates the form.
+    // A newly visible field must return through its fill branch before submit.
+    if (!passwordSubmitted && passwordFilled && await password.isVisible()) {
       report('completing the visible password step once');
       passwordSubmitted = true; // An ambiguous click is never submitted again on resume.
       await page.getByRole('button', { name: /^(?:Iniciar sesi[oó]n|Sign in|Continuar)$/i }).filter({ visible: true }).last().click({ timeout: 10000 });
-    } else if ((!resumeOnly||resumeEmailPhase==='READY') && !emailSubmitted && !passwordSubmitted && await email.isVisible()) {
+    } else if ((!resumeOnly||resumeEmailPhase==='READY') && !emailSubmitted && !passwordSubmitted && emailFilled && await email.isVisible()) {
       report('completing the visible email step once');
       emailSubmitted = true;
       await page.getByRole('button', { name: /^(?:Siguiente|Next|Continuar|Sign in)$/i }).filter({ visible: true }).first().click({ timeout: 10000 });
@@ -161,4 +169,20 @@ async function completeAccountLogin(page, { market, hostname, credentials, timeo
     try { log('AUTH_HANDOFF_AUDIT ' + JSON.stringify({ passwordAttempted: passwordSubmitted,emailPhase:passwordSubmitted?'NONE':emailChallengePending&&!emailChallengeContinued?'CHALLENGE':emailFilled&&!emailSubmitted?'READY':'NONE' })); } catch {}
   }
 }
-module.exports = { completeAccountLogin };
+async function discardRejectedAccountPages(context) {
+  const rejected = context.pages().filter(page => {
+    if (page.isClosed()) return false;
+    try {
+      const url = new URL(page.url());
+      return url.protocol === 'https:' && url.hostname === 'account.samsung.com' && /^\/iam\/error(?:\/|$)/i.test(url.pathname);
+    } catch { return false; }
+  });
+  for (const page of rejected) {
+    // A new refresh must obtain a new authorization from the storefront.
+    // Keep Chrome alive; never discard a live CAPTCHA, MFA or login form.
+    if (context.pages().filter(candidate => !candidate.isClosed()).length === 1) await context.newPage();
+    await page.close();
+  }
+  return rejected.length;
+}
+module.exports = { completeAccountLogin, discardRejectedAccountPages };

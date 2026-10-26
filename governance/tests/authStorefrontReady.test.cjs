@@ -166,3 +166,18 @@ test('a newly restored CDP tab with an empty URL initializes through the trusted
   try { await prepareAuthStorefront(s.page, s.options); assert.deepEqual(s.counts(), { homes: 1, setups: 1 }); }
   finally { s.page.url = original; await s.close(); }
 });
+
+for (const signedIn of [false, true]) test(`header menu trigger sharing login analytics is never a sign-in action (signedIn=${signedIn})`, async () => {
+  const s = await fixture('pe', 'S2');
+  try {
+    await s.page.goto(s.options.homeUrl);
+    await s.page.setContent(`<button aria-label="My Profile" class="profile-header-menu__trigger nv00-gnb-v4__utility-user" data-an-la="login" onmouseover="document.querySelector('nav').hidden=false" onclick="document.querySelector('nav').hidden=false"></button><nav hidden>${signedIn ? '<button>Cerrar sesión</button>' : '<button data-an-la="login" class="profile-header-menu__sign-in-action" onclick="location.href=\'https://account.samsung.com/accounts/fixture\'">Iniciar sesión</button>'}</nav>`);
+    const result = await openAuthProfile(s.page, s.options);
+    assert.equal(result.state, signedIn ? 'authenticated' : 'signed-out');
+    if (!signedIn) {
+      assert.equal(await result.login.getAttribute('class'), 'profile-header-menu__sign-in-action');
+      await result.login.click();
+      await s.page.waitForURL('https://account.samsung.com/accounts/fixture');
+    }
+  } finally { await s.close(); }
+});

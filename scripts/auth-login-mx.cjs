@@ -8,7 +8,7 @@ const { writeJsonAtomically } = require("../utils/atomicJson");
 const path = require("node:path");
 const { resolveMxEnvironment } = require("../utils/mxConfig");
 const { hasMxAccountReturned, redactMxAuthError } = require("../utils/mxAuthLoginStep.cjs");
-const { completeAccountLogin } = require("../utils/authAccountLogin.cjs");
+const { completeAccountLogin, discardRejectedAccountPages } = require("../utils/authAccountLogin.cjs");
 
 const TARGET = resolveMxEnvironment();
 const HOSTNAME = TARGET.hostname;
@@ -182,6 +182,7 @@ async function exportState(context, page) {
     const context = contexts[0];
     if (!context) throw new Error("Dedicated MX Chrome has no browser context.");
 
+    await discardRejectedAccountPages(context);
     const existingAccountPage = context.pages().find(candidate => {
       try { return new URL(candidate.url()).hostname === ACCOUNT_HOSTNAME; } catch { return false; }
     });

@@ -1,6 +1,6 @@
 const { chromium } = require("@playwright/test");
 const { connectAuthBrowser } = require("../utils/authDedicatedBrowser.cjs");
-const { completeAccountLogin } = require("../utils/authAccountLogin.cjs");
+const { completeAccountLogin, discardRejectedAccountPages } = require("../utils/authAccountLogin.cjs");
 const { openAuthProfile, prepareAuthStorefront } = require("../utils/authStorefrontReady.cjs");
 const { createAuthNavigation } = require("../utils/authNavigation.cjs");
 const gotoWithTransientRetry = createAuthNavigation("cl");
@@ -121,6 +121,7 @@ async function exportState(context, page) {
   const browser = await connectAuthBrowser({ chromium, profileDir, market: "cl", environment: config.environment, slot });
   const context = browser.contexts()[0];
   if (!context) throw new Error("Dedicated CL Chrome has no browser context.");
+  await discardRejectedAccountPages(context);
   const existingAccountPage = context.pages().find(candidate => { try { return new URL(candidate.url()).hostname === accountHostname; } catch { return false; } });
   let page = existingAccountPage || context.pages().slice().reverse().find(candidate => {
     try { const url = new URL(candidate.url()); return url.origin === config.baseUrl.origin && url.pathname.replace(/\/$/, "") === "/cl"; } catch { return false; }

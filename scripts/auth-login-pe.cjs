@@ -1,7 +1,7 @@
 const { waitForManualStorefront } = require("../utils/authManualReturn.cjs");
 const { chromium } = require("@playwright/test");
 const { connectAuthBrowser } = require("../utils/authDedicatedBrowser.cjs");
-const { completeAccountLogin } = require("../utils/authAccountLogin.cjs");
+const { completeAccountLogin, discardRejectedAccountPages } = require("../utils/authAccountLogin.cjs");
 const { authProfileControl, openAuthProfile, prepareAuthStorefront } = require("../utils/authStorefrontReady.cjs");
 const fs = require("node:fs");
 const { writeJsonAtomically } = require("../utils/atomicJson");
@@ -143,6 +143,7 @@ async function loginPeSamsungAccount() {
   const browser = await connectDedicatedChrome();
   const context = browser.contexts()[0];
   if (!context) throw new Error("Dedicated PE Chrome did not expose a browser context.");
+  await discardRejectedAccountPages(context);
   const existingAccountPage = context.pages().find((candidate) => {
     try { return new URL(candidate.url()).hostname === ACCOUNT_HOSTNAME; } catch { return false; }
   });

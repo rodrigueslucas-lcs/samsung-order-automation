@@ -9,7 +9,7 @@ function authProfileControl(page) {
 
 function authActions(page) {
   return {
-    login: page.locator('[data-an-la="login"], a.loginBtn')
+    login: page.locator('[data-an-la="login"]:not(.profile-header-menu__trigger), a.loginBtn')
       .or(page.getByRole('button', { name: /^Iniciar sesi[oó]n(?:\/Registrarse)?$|^Sign in$/i }))
       .or(page.getByRole('link', { name: /^Iniciar sesi[oó]n(?:\/Registrarse)?$|^Sign in$/i }))
       .or(page.getByText(/^Iniciar sesi[oó]n(?:\/Registrarse)?$|^Sign in$/i))
@@ -30,7 +30,7 @@ async function openAuthProfile(page, { market, prepareWindow = prepareAuthBrowse
     // AEM also renders a non-interactive "Iniciar sesión/Registrarse" title.
     // Locator.or() uses DOM order, not selector preference: prefer the actual
     // login action over that earlier title after the menu has become visible.
-    const actions = [page.locator('[data-an-la="login"]').filter({ visible: true }).first(),
+    const actions = [page.locator('[data-an-la="login"]:not(.profile-header-menu__trigger)').filter({ visible: true }).first(),
       page.locator('a.loginBtn').filter({ visible: true }).first(),
       page.getByRole('button', { name: /^Iniciar sesi[oó]n(?:\/Registrarse)?$|^Sign in$/i }).filter({ visible: true }).first(),
       page.getByRole('link', { name: /^Iniciar sesi[oó]n(?:\/Registrarse)?$|^Sign in$/i }).filter({ visible: true }).first()];
