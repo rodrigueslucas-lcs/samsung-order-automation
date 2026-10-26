@@ -125,6 +125,7 @@ export default class MailinatorPage extends BasePage {
     intervalMs = Number(process.env.MAILINATOR_POLL_INTERVAL_MS || 3000),
   } = {}) {
     const startedAt = Date.now();
+    let emptyInboxRecovery = false;
     const baseline = new Set(baselineMessageIds);
     const priorOtpCodes = new Set(baselineOtpCodes);
     const baselineOtpCount = Number(
@@ -136,6 +137,13 @@ export default class MailinatorPage extends BasePage {
       observed = await this.snapshotInbox();
       const otpRows = await this.inboxRows();
       const otpCount = await otpRows.count();
+      if (!otpCount && !emptyInboxRecovery && Date.now() - startedAt >= 30000) {
+        // One explicit inbox re-subscription recovers a silent websocket.
+        // Preserve the original baseline so historical OTPs remain ineligible.
+        emptyInboxRecovery = true;
+        await this.refreshInbox();
+        continue;
+      }
       const candidateCount = baselineOtpCodes.length > 0
         ? otpCount
         : Math.max(0, otpCount - baselineOtpCount);

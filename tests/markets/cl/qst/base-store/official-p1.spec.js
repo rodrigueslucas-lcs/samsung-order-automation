@@ -214,7 +214,12 @@ test.describe("CL QST - Base Store Official P1", () => {
               return /reCAPTCHA/i.test(frame.title) && /desaf[ií]o|challenge|expira|expires/i.test(frame.title) && bounds.width > 0 && bounds.height > 0;
             }));
             if (!captchaVisible) throw new Error("Samsung Account did not advance from email to password; no visible CAPTCHA challenge was detected.");
-            if (process.env.CI) throw new Error("Samsung Account requires an interactive CAPTCHA during checkout login; CI cannot complete this human verification.");
+            if (["1", "true"].includes(String(process.env.CI).toLowerCase())) {
+              await testInfo.attach("CL checkout login requires human CAPTCHA", {
+                body: await page.screenshot({ animations: "disabled", mask: [email, page.locator('input[type="password"]')] }), contentType: "image/png",
+              });
+              blocked("Samsung Account displayed an interactive CAPTCHA during checkout login; headless CI requires human verification. No CAPTCHA bypass or authenticated PASS was attempted.");
+            }
             await page.bringToFront();
             console.log("[cl-checkout-login] CAPTCHA visible: complete it manually in the maximized Chrome and click Siguiente; the test will resume automatically.");
             passwordStep = await waitForStep(password, 120000);
@@ -514,8 +519,8 @@ test.describe("CL QST - Base Store Official P1", () => {
       await selectClNewAddress(page);
       const shipping = page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
       const select = async (name, option) => {
-        await shipping.locator(`mat-select[name="${name}"]:not([aria-disabled="true"])`).first().click();
-        await page.getByRole("option", { name: option, exact: typeof option === "string" }).first().click();
+        await selectClCheckoutOption(page,
+          shipping.locator(`mat-select[name="${name}"]:visible`).first(), option);
       };
       await select("regionIso", /Metropolitana/i);
       await select("town", cfg.checkoutCommune);

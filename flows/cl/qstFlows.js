@@ -11,12 +11,25 @@ const { CL_AUTH_STATE_PATH, getClAuthState, hasClAuthState } = clAuthStateModule
 const { recordBusinessEvidence } = evidenceContext;
 
 export async function selectClCheckoutOption(page, control, name) {
-  await control.click();
-  const option = page.locator(".cdk-overlay-pane:visible")
-    .getByRole("option", { name }).filter({ visible: true }).first();
-  await option.waitFor({ state: "visible", timeout: 30000 });
-  await option.press("Enter");
-  await expect(control).toContainText(name);
+  await expect(control).toBeEnabled({ timeout: 30000 });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await control.click();
+    const option = page.locator(".cdk-overlay-pane:visible")
+      .getByRole("option", { name, exact: typeof name === "string" }).filter({ visible: true }).first();
+    try {
+      await option.waitFor({ state: "visible", timeout: 15000 });
+    } catch (error) {
+      if (attempt) throw error;
+      // Dependent town options can hydrate after an empty panel was opened.
+      // Reopen only this reversible selector; never select a different town.
+      await page.keyboard.press("Escape");
+      await expect(control).toBeEnabled({ timeout: 30000 });
+      continue;
+    }
+    await option.press("Enter");
+    await expect(control).toContainText(name);
+    return;
+  }
 }
 
 export async function bootstrapClStorefront(page, config) {
