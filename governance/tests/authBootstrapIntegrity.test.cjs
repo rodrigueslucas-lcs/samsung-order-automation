@@ -16,7 +16,7 @@ function scenario({ failures = 1, blank = true, truncated = true, status = 200, 
       if (target.endsWith('getcookie.html')) setupCalls++;
       return { ok: () => status === 200, text: async () => truncated ? '<html><body>' : '<html><body></body></html>' };
     },
-    url: () => url, keyboard: { press: async () => {} },
+    url: () => url, title: async () => 'Storefront fixture', keyboard: { press: async () => {} },
     locator: () => ({ innerText: async () => blank ? '' : 'Page Under Maintenance' }),
     getByRole: () => ({ waitFor: async () => {}, click: async () => {} }),
     getByText: name => /You can access/.test(String(name)) ? marker
