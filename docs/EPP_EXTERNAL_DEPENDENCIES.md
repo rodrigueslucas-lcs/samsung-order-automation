@@ -68,6 +68,9 @@ Direct Playwright execution uses the same lease fixture; discovery acquires none
 Verified business responses can preserve rotated EPP state between cases, without
 ever exporting anonymous/rejected sessions. API proof is bound to the selected
 environment and EPP site. No EPP session is published to existing Jenkins bundles.
+Server-proof response bodies have a 15-second read deadline. An unfinished body
+is classified as unavailable proof, never as expired authentication; it cannot
+hold fixture teardown indefinitely.
 
 ### Runtime findings (2026-10-26)
 

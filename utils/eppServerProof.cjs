@@ -5,7 +5,8 @@ function isRegisteredUser(user, expectedEmail) {
   return [user.uid, user.email].some(value => typeof value === "string" && value.trim().toLowerCase() === expected);
 }
 
-function watchEppServerProof(context, config, { expectedEmail } = {}) {
+function watchEppServerProof(context, config, { expectedEmail, bodyTimeoutMs = 15000 } = {}) {
+  if (!Number.isFinite(bodyTimeoutMs) || bodyTimeoutMs <= 0) throw new Error('EPP proof read deadline must be positive.');
   const sites = new Set(config.rootUrl.pathname.split("/").filter(Boolean).slice(2, 4).map(site => site.toLowerCase()));
   const apiHost = config.environment === 'S1' ? 's1-smb-api-cdn.ecom-stg.samsung.com' : 's2-smb-api-cdn.ecom-stg.samsung.com';
   const state = { user: false, access: false };
@@ -31,11 +32,16 @@ function watchEppServerProof(context, config, { expectedEmail } = {}) {
       else if (status >= 500) reason = "SERVER_UNAVAILABLE";
       else if (status !== 200) reason = "SERVER_PROOF_UNEXPECTED_STATUS";
       else {
+        let timer;
         try {
-          const payload = await response.json();
+          const payload = await Promise.race([
+            response.json(),
+            new Promise((_, reject) => { timer = setTimeout(() => reject(Object.assign(new Error('EPP proof body did not finish.'), { code: 'EPP_PROOF_BODY_TIMEOUT' })), bodyTimeoutMs); }),
+          ]);
           accepted = kind === "user" ? isRegisteredUser(payload, expectedEmail) : payload?.canAccess === true;
           reason = accepted ? "SERVER_ACCEPTED" : kind === "user" ? "SERVER_IDENTITY_NOT_PROVEN" : "EPP_ENTITLEMENT_NOT_PROVEN";
-        } catch { reason = "SERVER_PROOF_INVALID_PAYLOAD"; }
+        } catch (error) { reason = error.code === 'EPP_PROOF_BODY_TIMEOUT' ? 'SERVER_PROOF_BODY_TIMEOUT' : 'SERVER_PROOF_INVALID_PAYLOAD'; }
+        finally { clearTimeout(timer); }
       }
       if (latest[kind] === sequence) { state[kind] = accepted; reasons[kind] = reason; }
     })().catch(() => { if (latest[kind] === sequence) { state[kind] = false; reasons[kind] = "SERVER_PROOF_UNAVAILABLE"; } });

@@ -3,6 +3,21 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const markets = ['MX','CO','PE','CL'];
 
+function prerequisiteReason(description = '') {
+  const rules = [
+    [/BLOCKED_NOT_IMPLEMENTED/i,'PAYMENT_ADAPTER_NOT_IMPLEMENTED'],
+    [/VERIFICATION_CODE_REJECTED/i,'VERIFICATION_CODE_REJECTED'],
+    [/CORPORATE_ACTIVATION|corporate.*activation/i,'CORPORATE_ACTIVATION_REQUIRED'],
+    [/contact QA data|contact fixture/i,'MISSING_EPP_CONTACT_DATA'],
+    [/PLP/i,'MISSING_OR_UNPROVEN_EPP_PLP'],
+    [/PDP|SKU|product\/cart/i,'MISSING_OR_UNPROVEN_EPP_PRODUCT'],
+    [/COMMERCE_CONTENT_NOT_RENDERED/i,'EPP_COMMERCE_NOT_RENDERED'],
+    [/HUMAN_REQUIRED|identity|authentication/i,'AUTH_OR_ENTITLEMENT_REQUIRED'],
+    [/payment|provider|order|confirmation/i,'PAYMENT_FLOW_NOT_PROVEN'],
+  ];
+  return rules.find(([pattern])=>pattern.test(description))?.[1] || 'PREREQUISITE_NOT_MET';
+}
+
 function inventory() {
   return markets.flatMap(market => {
     const directory = path.join(root, 'tests/markets', market.toLowerCase(), 'qst/epp');
@@ -25,7 +40,7 @@ function extractResults(document) {
           const skipped = last.status === 'skipped';
           results.push({ tc, runtime: skipped ? 'PREREQUISITE_CHECK' : 'TARGETED_RUNTIME',
             result: last.status === 'passed' ? 'PASS' : skipped ? 'BLOCKED' : last.status === 'interrupted' ? 'NOT_RUN' : 'FAIL',
-            notes: skipped ? (/HUMAN_REQUIRED|identity|authentication/i.test(annotation?.description || '') ? 'AUTH_OR_ENTITLEMENT_REQUIRED' : 'PREREQUISITE_NOT_MET') : last.status === 'passed' ? 'EXPECTED_BEHAVIOR_PROVEN' : 'INSPECT_IGNORED_PLAYWRIGHT_REPORT' });
+            notes: skipped ? prerequisiteReason(annotation?.description) : last.status === 'passed' ? 'EXPECTED_BEHAVIOR_PROVEN' : 'INSPECT_IGNORED_PLAYWRIGHT_REPORT' });
         }
       }
       visit(suite.suites);
@@ -62,5 +77,8 @@ function report() {
   console.log(`[epp-homologation] ${path.relative(root,path.join(output,'matrix.md'))}`);
   return rows;
 }
-if (require.main === module) report();
-module.exports = { inventory, extractResults, buildRows, report };
+if (require.main === module) {
+  try { report(); }
+  catch { console.error('[epp-homologation] Unable to read/write a complete report; no raw report, identity or provider data printed.'); process.exitCode = 1; }
+}
+module.exports = { inventory, extractResults, buildRows, prerequisiteReason, report };

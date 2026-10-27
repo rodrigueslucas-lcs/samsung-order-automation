@@ -30,6 +30,15 @@ test('another environment API cannot prove EPP S2 authentication', async () => {
   assert.equal(proof.snapshot().userAccepted,false);
   proof.stop();
 });
+test('unfinished proof response is bounded and never mislabeled as expired auth', async () => {
+  const context = new EventEmitter(), proof = watchEppServerProof(context,getEppConfig('MX',{}),{bodyTimeoutMs:5});
+  const pending = response(); pending.json = () => new Promise(()=>{});
+  context.emit('response',pending);
+  await proof.settle();
+  assert.equal(proof.snapshot().reason,'SERVER_PROOF_BODY_TIMEOUT');
+  assert.equal(proof.accepted(),false);
+  proof.stop();
+});
 for (const [status, reason] of [[401, "SERVER_AUTH_REJECTED"], [503, "SERVER_UNAVAILABLE"]]) {
   test(`HTTP ${status} has a distinct causal classification`, async () => {
     const context = new EventEmitter(), proof = watchEppServerProof(context, getEppConfig("MX", {}));

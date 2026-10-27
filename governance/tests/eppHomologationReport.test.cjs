@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { inventory, extractResults, buildRows } = require('../../scripts/report-epp-homologation.cjs');
+const { inventory, extractResults, buildRows, prerequisiteReason } = require('../../scripts/report-epp-homologation.cjs');
 test('EPP matrix represents 26 unique official cases and 52 environment rows without inventing runtime PASS', () => {
   const scope = inventory();
   assert.equal(scope.length,26);
@@ -20,4 +20,9 @@ test('EPP report uses actual result and omits raw failure, account or provider d
   assert.deepEqual(results.map(r=>r.result),['FAIL','BLOCKED']);
   assert.ok(!JSON.stringify(results).includes('sensitive fixture data'));
   assert.equal(buildRows([{market:'MX',tc:'SAM-25022',implementation:'IMPLEMENTED'}],new Map([['MX:S2:SAM-25022',results[0]]]))[0].result,'NOT_RUN');
+});
+test('matrix preserves actionable blocker categories without copying sensitive descriptions', () => {
+  assert.equal(prerequisiteReason('BLOCKED: contact QA data is missing'),'MISSING_EPP_CONTACT_DATA');
+  assert.equal(prerequisiteReason('BLOCKED_NOT_IMPLEMENTED: card flow'),'PAYMENT_ADAPTER_NOT_IMPLEMENTED');
+  assert.equal(prerequisiteReason('unrecognized sensitive fixture data'),'PREREQUISITE_NOT_MET');
 });
