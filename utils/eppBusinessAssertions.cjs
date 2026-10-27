@@ -1,5 +1,15 @@
 const { expect } = require('@playwright/test');
 
+function getEppCartTextPatterns(market) {
+  return market==='CL' ? {
+    cartPageTitlePattern:/Tienes\s+\d+\s+productos?\s+en\s+tu\s+carro/i,
+    orderSummaryPattern:/^Resumen$/i,
+  } : {
+    cartPageTitlePattern:/Tienes \d+ productos? en tu carrito|Tu carrito|Carrito de compra|Shopping cart/i,
+    orderSummaryPattern:/Resumen de (?:la orden|tu pedido)|Order summary/i,
+  };
+}
+
 function assertStoreRoute(value, config, route) {
   const url = new URL(value);
   if (url.origin !== config.rootUrl.origin || !url.pathname.startsWith(config.rootUrl.pathname) ||
@@ -35,6 +45,28 @@ async function proveFilterEffect(page, config) {
   await expect.poll(signature, { timeout: 30000 }).not.toBe(before);
   await expect(cards.first()).toBeVisible();
   assertStoreRoute(page.url(), config);
+}
+
+async function provePdpVariantSelection(page, config, {timeout=30000}={}) {
+  const before=assertStoreRoute(page.url(),config,/^p\//);
+  const beforeSku=decodeURIComponent(before.pathname.split('/').filter(Boolean).at(-1));
+  await expect(page.getByRole('main').getByText(beforeSku,{exact:true}).first()).toBeVisible();
+  const controls=page.locator('main button.bttn, main [role="radio"]').filter({visible:true});
+  let choice;
+  for(let i=0;i<await controls.count();i++) {
+    const item=controls.nth(i), classes=await item.getAttribute('class')||'';
+    const selected=/\bselected\b/.test(classes)||await item.getAttribute('aria-checked')==='true';
+    if(!selected&&await item.isEnabled()){choice=item;break;}
+  }
+  if(!choice) throw Object.assign(new Error('PDP lacks an alternate selectable variant.'),{eppReason:'MISSING_OR_UNPROVEN_EPP_PRODUCT'});
+  const label=(await choice.innerText()).trim();
+  await choice.click();
+  await expect.poll(()=>new URL(page.url()).pathname,{timeout}).not.toBe(before.pathname);
+  const after=assertStoreRoute(page.url(),config,/^p\//), sku=decodeURIComponent(after.pathname.split('/').filter(Boolean).at(-1));
+  if(sku===beforeSku)throw new Error('PDP variant did not change its product identity.');
+  await expect(page.getByRole('main').getByText(sku,{exact:true}).first()).toBeVisible({timeout});
+  await expect.poll(()=>page.locator('main button.bttn.selected, main [role="radio"][aria-checked="true"]').evaluateAll(es=>es.map(e=>e.textContent.trim())),{timeout}).toContain(label);
+  return {beforeSku,sku,label};
 }
 
 async function chooseConfiguredPdpFromPlp(page, config) {
@@ -133,4 +165,4 @@ async function completeContact(page, config, customer) {
   assertStoreRoute(page.url(), config, /^checkout\//);
 }
 
-module.exports = { assertStoreRoute, proveCheckout, proveFilterEffect, chooseConfiguredPdpFromPlp, proveTooltipAboveBackToTop, completeContact };
+module.exports = { getEppCartTextPatterns, assertStoreRoute, proveCheckout, proveFilterEffect, provePdpVariantSelection, chooseConfiguredPdpFromPlp, proveTooltipAboveBackToTop, completeContact };

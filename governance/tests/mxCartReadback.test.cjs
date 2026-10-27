@@ -11,7 +11,7 @@ function state({ failures = 1, empty = false, unresolved = false, httpError = fa
   let clock = 0;
   const module = { exports: {} };
   vm.runInNewContext(fs.readFileSync('utils/mxCartReadback.cjs', 'utf8'), {
-    module, URL, Date: { now: () => clock },
+    module, URL, Date: { now: () => clock }, require: name=>{assert.equal(name,'./mxStorefrontScope.cjs');return require('../../utils/mxStorefrontScope.cjs');},
   });
   const { readMxCartSku: readback } = module.exports;
   const blank = () => alwaysBlank || ((blankFirst || clock < readyDelayMs) && gets.length === 1);

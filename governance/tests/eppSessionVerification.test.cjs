@@ -15,6 +15,7 @@ function verifierFixture(blocked=null) {
     './eppAccessState.cjs':{proveEppAccess:async()=>{throw new Error('Must not claim access after navigation failure');}},
     './eppServerProof.cjs':{watchEppServerProof:()=>({stop:()=>calls.push('stop')})},
     './authStorefrontReady.cjs':{openAuthProfile:async()=>{throw new Error('Must not claim logout after navigation failure');}},
+    './eppStorefrontOverlays.cjs':{installEppOverlayDismissal:async()=>{},dismissEppNotificationTutorial:async()=>{}},
     './eppNavigationGuard.cjs':{installEppNavigationGuard:async()=>({protectPage:async()=>{},lastBlocked:()=>blocked,dispose:async()=>calls.push('dispose')})},
   };
   const module={exports:{}};

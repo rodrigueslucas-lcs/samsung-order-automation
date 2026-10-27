@@ -1,6 +1,7 @@
 import { test, expect } from "../../../../../utils/eppTestFixtures";
 import eppConfigModule from "../../../../../config/markets/epp";
-import { addConfiguredEppProduct, validateEppLogin, validateEppFilter, validateEppCheckout, validateEppContact, openEppStore, validateBackToTop, validateEppCartUi } from "../../../../../flows/eppStorefront";
+import {runEppPaymentPrerequisiteCase} from '../../../../../flows/eppPaymentPrerequisites';
+import { addConfiguredEppProduct, validateEppLogin, validateEppVariants, validateEppCheckout, validateEppContact, openEppStore, validateBackToTop, validateEppCartUi } from "../../../../../flows/eppStorefront";
 
 const { getEppConfig } = eppConfigModule;
 const cfg = () => getEppConfig("CO");
@@ -13,10 +14,10 @@ function requireProductConfig(current) {
 test.describe("CO QST - Official EPP", () => {
   test.describe.configure({ timeout: 420000 });
 
-  test("SAM-24929 @qst @co @epp @safe - Facets/Filter on PLP", async ({ page }, testInfo) => {
-    await test.step("Open the official CO EPP PLP and validate a filter entry point", async () => {
+  test("SAM-24929 @qst @co @epp @safe - Variants/selectors on PDP", async ({ page }, testInfo) => {
+    await test.step("Choose a PDP variant and prove selected option and changed product identity", async () => {
       const current = cfg();
-      await validateEppFilter(page, current);
+      await validateEppVariants(page, current);
     });
   });
 
@@ -24,7 +25,7 @@ test.describe("CO QST - Official EPP", () => {
     await test.step("Add the configured CO EPP product from PDP", async () => {
       const current = cfg();
       requireProductConfig(current);
-      const cart = await addConfiguredEppProduct(page, current, { fromPlp: true, currencyPattern: /\$\s*[\d.,]+/ });
+      const cart = await addConfiguredEppProduct(page, current, { currencyPattern: /\$\s*[\d.,]+/ });
       await cart.validateProductInCart();
     });
   });
@@ -59,9 +60,9 @@ test.describe("CO QST - Official EPP", () => {
     });
   });
 
-  test("SAM-24953 @blocked @destructive @qst @co @epp @registered - Payment using credit card with reg user", async ({}, testInfo) => {
-    await test.step("Keep the official CO EPP card-payment case represented without unauthorized order placement", async () => {
-      test.skip(true, "BLOCKED_NOT_IMPLEMENTED: EPP activation/registered checkout and card provider contract are not runtime-proven; no payment is submitted.");
+  test("SAM-24953 @preflight @destructive @qst @co @epp @registered - Payment using credit card with reg user", async ({page}, testInfo) => {
+    await test.step("Inspect authenticated EPP cart, checkout and payment prerequisites", async () => {
+      await runEppPaymentPrerequisiteCase(page,cfg(),{kind:'card'});
     });
   });
 });

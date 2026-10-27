@@ -3,7 +3,7 @@
 function blockedEppRequest(config, {url: value, method='GET', document=false, top=false}) {
   const url = new URL(value);
   const api = `https://${config.environment === 'S1' ? 's1' : 's2'}-smb-api-cdn.ecom-stg.samsung.com`;
-  const production = ['www.samsung.com','shop.samsung.com'].includes(url.hostname) ||
+  const production = ['samsung.com','www.samsung.com','shop.samsung.com'].includes(url.hostname) ||
     (url.hostname.endsWith('.shop.samsung.com') && !['stg.shop.samsung.com','stg2.shop.samsung.com'].includes(url.hostname));
   const commerceWrite = url.pathname.startsWith('/tokocommercewebservices/') && !['GET','HEAD','OPTIONS'].includes(method);
   const allowed = url.origin === config.rootUrl.origin || url.origin === 'https://account.samsung.com' ||
@@ -23,7 +23,10 @@ async function installEppNavigationGuard(context, config) {
       session.on('Fetch.requestPaused', async event => {
         const blocked = blockedEppRequest(config,{...event.request,document:event.resourceType==='Document',top:event.frameId===frameTree.frame.id});
         try {
-          if (blocked) { last=blocked; await session.send('Fetch.failRequest',{requestId:event.requestId,errorReason:'BlockedByClient'}); }
+          if (blocked) {
+            last={...blocked,path:safeNavigationPath(event.request.url)};
+            await session.send('Fetch.failRequest',{requestId:event.requestId,errorReason:'BlockedByClient'});
+          }
           else await session.send('Fetch.continueRequest',{requestId:event.requestId});
         } catch { /* Target may close during interception; never retry its request. */ }
       });
@@ -44,4 +47,7 @@ async function installEppNavigationGuard(context, config) {
     }
   }};
 }
-module.exports={installEppNavigationGuard,blockedEppRequest};
+function safeNavigationPath(value) {
+  return new URL(value).pathname.replace(/[^/]*(?:@|%40)[^/]*/gi,'[identity]').replace(/[A-Za-z0-9_%.-]{48,}/g,'[opaque]');
+}
+module.exports={installEppNavigationGuard,blockedEppRequest,safeNavigationPath};

@@ -4,21 +4,25 @@ import CartPage from "../pages/CartPage";
 import accessState from "../utils/eppAccessState.cjs";
 import business from "../utils/eppBusinessAssertions.cjs";
 import serverProof from "../utils/eppServerProof.cjs";
+import mxReadback from '../utils/mxCartReadback.cjs';
+import eppOverlays from '../utils/eppStorefrontOverlays.cjs';
 
 const CODE_INPUT = /verification|verify|access code|c[oó]digo|clave de acceso/i;
 const CODE_BUTTON = /verify|continue|enter|submit|access|ingresar|continuar|validar|acceder/i;
 
 export async function openEppStore(page, cfg) {
+  await eppOverlays.installEppOverlayDismissal(page,cfg);
   const entry = new URL(cfg.entryUrl);
   if (entry.origin !== cfg.rootUrl.origin || !entry.pathname.startsWith(cfg.rootUrl.pathname) || entry.username || entry.password) {
     throw new Error("EPP entry must remain inside the configured staging multistore.");
   }
-  await page.goto(new URL("/getcookie.html", cfg.rootUrl).href, { waitUntil: "domcontentloaded", timeout: 30000 });
+  await page.goto(new URL("/getcookie.html", cfg.rootUrl).href, { waitUntil: "commit", timeout: 30000 });
   await expect(page.getByText(/You can access pages now/i).first()).toBeVisible({ timeout: 15000 });
-  await page.goto(cfg.entryUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
+  await page.goto(cfg.entryUrl.href, { waitUntil: "commit", timeout: 60000 });
 
   // Hydration, not DOMContentLoaded, determines whether the gate/content exists.
   await expect.poll(async () => {
+    await eppOverlays.dismissEppNotificationTutorial(page,cfg);
     const state = await inspectEppAccess(page, cfg);
     return ["READY", "CODE_REQUIRED", "HUMAN_REQUIRED"].includes(state.status) || ['OUTSIDE_EPP_STORE','VERIFICATION_CODE_REJECTED'].includes(state.reason);
   }, { timeout: 45000 }).toBeTruthy().catch(() => {});
@@ -78,10 +82,12 @@ export async function validateEppLogin(page, cfg) {
   } finally { proof.stop(); }
 }
 
-export async function validateEppFilter(page, cfg) {
-  test.skip(!cfg.plpUrl, `BLOCKED: ${cfg.market} ${cfg.environment} EPP PLP data is missing.`);
-  await openEppStore(page, { ...cfg, entryUrl: cfg.plpUrl });
-  await business.proveFilterEffect(page, cfg);
+export async function validateEppVariants(page, cfg) {
+  test.skip(!cfg.pdpUrl||!cfg.sku, 'BLOCKED: MISSING_OR_UNPROVEN_EPP_PRODUCT for PDP variants.');
+  await openEppStore(page, { ...cfg, entryUrl: cfg.pdpUrl });
+  try { await business.provePdpVariantSelection(page,cfg); }
+  catch(error){if(error.eppReason==='MISSING_OR_UNPROVEN_EPP_PRODUCT')test.skip(true,error.eppReason);throw error;}
+  await businessScreenshot(page,'epp-pdp-selected-variant');
 }
 
 export async function validateEppCheckout(page, cfg) {
@@ -103,9 +109,15 @@ export async function inspectEppAccess(page, cfg) {
   return accessState.proveEppAccess(page, cfg);
 }
 
-export async function addConfiguredEppProduct(page, cfg, { currencyPattern = /[$S/]\s*[\d.,]+/, fromPlp = false } = {}) {
+export async function addConfiguredEppProduct(page, cfg, { currencyPattern = /[$S/]\s*[\d.,]+/, fromPlp = false, resetMxCart = false } = {}) {
   if (!cfg.pdpUrl || !cfg.sku) {
     throw new Error(`${cfg.market} ${cfg.environment} EPP needs ${cfg.market}_EPP_QST_PDP_URL and ${cfg.market}_EPP_QST_SKU for product/cart scenarios.`);
+  }
+  if(resetMxCart){
+    if(cfg.market!=='MX')throw new Error('The controlled MX cart setup cannot target another market.');
+    await openEppStore(page,{...cfg,entryUrl:cfg.pdpUrl||cfg.rootUrl});
+    const cart=new CartPage(page,{cartUrl:cfg.cartUrl.href,storefront:cfg});cart.screenshot=name=>businessScreenshot(page,name);
+    await cart.clearMxCartAndConfirmEmpty();
   }
   if (fromPlp) {
     test.skip(!cfg.plpUrl, `BLOCKED: ${cfg.market} ${cfg.environment} EPP PLP is required for the official PLP-to-PDP step.`);
@@ -118,17 +130,18 @@ export async function addConfiguredEppProduct(page, cfg, { currencyPattern = /[$
     pdpUrl: cfg.pdpUrl.href,
     cartUrl: cfg.cartUrl.href,
     reuseLoadedPdp: true,
+    ...(cfg.market==='MX'?{cartReadback:(target,options)=>mxReadback.readMxCartSku(target,{...options,storefront:cfg})}:{}),
   });
   product.screenshot = name => businessScreenshot(page, name);
   await product.addConfiguredPdpToCart({ waitForCartMutation: true });
   business.assertStoreRoute(page.url(), cfg, /^cart\/?$/);
   const cart = new CartPage(page, {
     cartUrl: cfg.cartUrl.href,
+    storefront: cfg,
     sku: cfg.sku,
     productNamePattern: null,
     currencyPattern,
-    cartPageTitlePattern: /Tienes \d+ productos? en tu carrito|Tu carrito|Carrito de compra|Shopping cart/i,
-    orderSummaryPattern: /Resumen de (?:la orden|tu pedido)|Order summary/i,
+    ...business.getEppCartTextPatterns(cfg.market),
     totalPattern: /^Total(?: con IVA)?$/i,
     footerAccountPattern: /Cuenta|Account/i,
     checkoutButtonPattern: /^Continuar$|^Finalizar Compra$|^Checkout$/i,

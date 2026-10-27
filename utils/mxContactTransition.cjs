@@ -1,8 +1,5 @@
-async function continueMxContactToDelivery(page, button, { timeout = 120000, now = Date.now } = {}) {
-  const current = new URL(page.url());
-  if (current.protocol !== 'https:' || !['stg.shop.samsung.com', 'stg2.shop.samsung.com'].includes(current.hostname) || current.pathname !== '/mx/checkout/one') {
-    throw new Error('MX contact transition requires the configured staging MX checkout.');
-  }
+async function continueMxCheckoutUpdate(page, button, { timeout = 120000, now = Date.now, storefront = null } = {}, targetStep, region) {
+  const {url:current,site}=require('./mxStorefrontScope.cjs').resolveMxStorefrontScope(page.url(),storefront,'checkout/one');
   const apiHost = `${current.hostname.startsWith('stg2.') ? 's2' : 's1'}-smb-api-cdn.ecom-stg.samsung.com`;
   const deadline = now() + timeout;
   const remaining = () => Math.max(1, deadline - now());
@@ -11,7 +8,7 @@ async function continueMxContactToDelivery(page, button, { timeout = 120000, now
   const updated = page.waitForResponse(response => {
     const url = new URL(response.url());
     return url.protocol === 'https:' && url.hostname === apiHost &&
-      url.pathname === '/tokocommercewebservices/v2/mx/users/current/carts/current/checkout/update' &&
+      url.pathname === `/tokocommercewebservices/v2/${site}/users/current/carts/current/checkout/update` &&
       response.request().method() === 'POST';
   }, { timeout: remaining() });
   updated.catch(() => {});
@@ -28,11 +25,16 @@ async function continueMxContactToDelivery(page, button, { timeout = 120000, now
   } finally { clearTimeout(timer); }
   // Commit avoids waiting for unrelated analytics/load events. A visible
   // Delivery region is still required: URL alone is not business readiness.
-  await page.waitForURL(url => url.origin === current.origin && url.pathname === current.pathname && url.searchParams.get('step') === 'CHECKOUT_STEP_DELIVERY', {
+  await page.waitForURL(url => url.origin === current.origin && url.pathname === current.pathname && url.searchParams.get('step') === targetStep, {
     waitUntil: 'commit', timeout: remaining(),
   });
-  await page.getByRole('region', { name: /^2\. M[eé]todo de Entrega$/i })
+  await page.getByRole('region', { name: region })
     .waitFor({ state: 'visible', timeout: remaining() });
 }
 
-module.exports = { continueMxContactToDelivery };
+function continueMxContactToDelivery(page,button,options){return continueMxCheckoutUpdate(page,button,options,'CHECKOUT_STEP_DELIVERY',/^2\. M[eé]todo de Entrega$/i);}
+function continueMxDeliveryToPayment(page,button,options={}){
+  if(!options.storefront)throw new Error('EPP delivery transition requires an explicit programme scope.');
+  return continueMxCheckoutUpdate(page,button,options,'CHECKOUT_STEP_PAYMENT',/^3\. M[eé]todos de Pago$/i);
+}
+module.exports = { continueMxContactToDelivery, continueMxDeliveryToPayment };

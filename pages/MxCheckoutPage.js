@@ -1,11 +1,12 @@
 import BasePage from "./BasePage";
 import contactTransition from "../utils/mxContactTransition.cjs";
 
-const { continueMxContactToDelivery } = contactTransition;
+const { continueMxContactToDelivery, continueMxDeliveryToPayment } = contactTransition;
 
 export default class MxCheckoutPage extends BasePage {
-  constructor(page) {
+  constructor(page, { storefront = null } = {}) {
     super(page);
+    this.storefront = storefront;
     this.contactContinue = page.getByRole("button", {
       name: /Continuar al m[eé]todo de entrega/i,
     });
@@ -93,7 +94,7 @@ export default class MxCheckoutPage extends BasePage {
     if (!(await this.contactContinue.isEnabled())) {
       throw new Error("MX registered Contact continue remained disabled after required QA data.");
     }
-    await continueMxContactToDelivery(this.page, this.contactContinue);
+    await continueMxContactToDelivery(this.page, this.contactContinue, { storefront: this.storefront });
   }
 
   async waitForRegisteredAddressModes() {
@@ -131,6 +132,13 @@ export default class MxCheckoutPage extends BasePage {
       await postal.waitFor({ state: "visible", timeout: 60000 }).catch(() => {
         throw new Error("MX Delivery form remained an unrendered skeleton after one reload; check S1 dynamic-form errors.");
       });
+    }
+    // EPP restores the postcode and region but not necessarily its colonia
+    // options. Re-enter the same value through an empty field to request fresh
+    // options; a cached region alone is not sufficient delivery evidence.
+    if (this.storefront && await postal.inputValue() === postalCode) {
+      await postal.fill("");
+      await postal.press("Tab");
     }
     const addressResponse = this.page.waitForResponse(
       (response) =>
@@ -255,6 +263,13 @@ export default class MxCheckoutPage extends BasePage {
       }
 
       const standardDeliveryCard = legacyStandardDeliveryCards.first();
+      if(this.storefront){
+        // EPP stages this choice locally and commits it with checkout/update
+        // on Continue. It need not emit Base Store's deliverymodes/update POST.
+        await standardDeliveryCard.click();
+        const selected=await standardDeliveryCard.evaluate(card=>Boolean(card.control?.checked||card.querySelector('input[type="radio"]')?.checked));
+        if(!selected)throw new Error('EPP delivery card did not become selected.');
+      }else{
       const deliveryModeUpdate = this.page.waitForResponse(
         (response) =>
           response.request().method() === "POST" &&
@@ -278,6 +293,7 @@ export default class MxCheckoutPage extends BasePage {
         throw new Error(
           `MX Standard delivery update failed with HTTP ${deliveryModeResponse.status()}.`
         );
+      }
       }
       selectedDeliveryMode = "Entrega Estándar";
     } else {
@@ -305,6 +321,13 @@ export default class MxCheckoutPage extends BasePage {
       await summaryMode.first().waitFor({ state: "visible", timeout: 30000 });
     }
 
+    if(this.storefront){
+      const acknowledgement=this.page.getByRole('checkbox',{name:/Reconozco y acepto/i}).filter({visible:true});
+      if(await acknowledgement.count()&&!(await acknowledgement.first().isChecked()))await acknowledgement.first().check({force:true});
+      const save=this.page.locator('input[name="saveInAddressBook"]');
+      if(await save.count()&&await save.isChecked())await save.uncheck({force:true});
+      if(await save.count()&&await save.isChecked())throw new Error('EPP checkout must not persist the delivery address.');
+    }
     const resolveContinueButton = async () => {
       const buttons = this.page
         .getByRole("button", { name: /^Continuar$/i })
@@ -391,6 +414,10 @@ export default class MxCheckoutPage extends BasePage {
       });
 
     const firstContinue = await resolveContinueButton();
+    if(this.storefront){
+      await continueMxDeliveryToPayment(this.page,firstContinue,{storefront:this.storefront});
+      return;
+    }
     await firstContinue.click();
     const firstTransition = await observeTransition(15000);
 

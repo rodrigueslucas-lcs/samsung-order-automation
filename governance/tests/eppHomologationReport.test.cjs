@@ -8,7 +8,9 @@ test('EPP matrix represents 26 unique official cases and 52 environment rows wit
   const rows = buildRows(scope);
   assert.equal(rows.length,52);
   assert.ok(rows.every(r=>r.result==='NOT_RUN'));
-  assert.equal(scope.filter(r=>r.implementation==='BLOCKED_NOT_IMPLEMENTED').length,8);
+  assert.equal(scope.filter(r=>r.implementation==='PREREQUISITE_FLOW').length,7);
+  assert.equal(scope.filter(r=>r.implementation==='IMPLEMENTED').length,19);
+  assert.equal(scope.filter(r=>r.implementation==='BLOCKED_NOT_IMPLEMENTED').length,0);
   assert.equal(scope.filter(r=>r.implementation==='PARTIAL').length,0);
 });
 test('EPP report uses actual result and omits raw failure, account or provider data', () => {

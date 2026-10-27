@@ -4,6 +4,7 @@ const { proveEppAccess } = require("./eppAccessState.cjs");
 const { watchEppServerProof } = require("./eppServerProof.cjs");
 const { openAuthProfile } = require("./authStorefrontReady.cjs");
 const { installEppNavigationGuard } = require('./eppNavigationGuard.cjs');
+const {installEppOverlayDismissal,dismissEppNotificationTutorial}=require('./eppStorefrontOverlays.cjs');
 
 async function verifyEppSnapshot(config, snapshot, { expectedEmail, timeout = 60000, configureContext = async () => {} } = {}) {
   const browser = await chromium.launch({ channel: "chrome", headless: true });
@@ -16,10 +17,12 @@ async function verifyEppSnapshot(config, snapshot, { expectedEmail, timeout = 60
     proof = watchEppServerProof(context, config, { expectedEmail });
     const page = await context.newPage();
     await guard.protectPage(page);
-    await page.goto(config.rootUrl.href, { waitUntil: "domcontentloaded", timeout });
+    await installEppOverlayDismissal(page,config);
+    await page.goto(config.rootUrl.href, { waitUntil: "commit", timeout });
     const deadline = Date.now() + timeout;
     let ui;
     do {
+      await dismissEppNotificationTutorial(page,config);
       ui = await proveEppAccess(page, config);
       await proof.settle();
       if (ui.status === "READY" && proof.accepted()) break;

@@ -32,7 +32,7 @@
       {"id":"SAM-25006","title":"Rewards","reason":"Historical implementation is retained for traceability only. The copied Colombia PSE path is excluded from active MX scope until Samsung provides a valid MX-specific Rewards execution path."}
     ],
     "eppContext": [
-      {"id":"SAM-25020","title":"Facets/Filter","reason":"Dedicated MX EPP PLP facet automation now exists, but the official EPP PLP route still needs runtime data and target-environment proof."},
+      {"id":"SAM-25020","title":"Variants/selectors on PDP","reason":"Operator corrected the scope to PDP variants/selectors. MX S2 runtime is proven; S1 still requires eligible EPP product data."},
       {"id":"SAM-25021","title":"Able to add to Cart from PDP","reason":"Dedicated MX EPP PDP/cart automation now exists and needs runtime validation in the official EPP environment."},
       {"id":"SAM-25022","title":"Cart page UI","reason":"Dedicated MX EPP cart UI automation now exists; runtime proof and full official presentation validation are still pending."},
       {"id":"SAM-25034","title":"Step 1: Contact information","reason":"Dedicated MX EPP checkout contact-information automation now exists and still requires runtime proof in EPP context."},

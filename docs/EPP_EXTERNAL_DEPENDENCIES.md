@@ -26,10 +26,10 @@ are attached to the isolated report with input values masked; shared Page Object
 never write EPP evidence into their legacy global screenshot directory.
 
 Current implementation is **not fully homologated**. All 26 official IDs are
-represented: 18 safe-flow implementations and 8 explicit payment/confirmation
-prerequisite placeholders. The latter are **not implemented payments** and must
-not be advertised as executable order coverage. Filter assertions require changed
-product results, MX/CO Add follows the configured PLP into the exact SKU variant,
+represented: 18 safe-flow implementations, one MX S2 card adapter with causal
+runtime proof, and seven executable payment/confirmation prerequisite inspections.
+The seven inspections are not implemented payments and cannot pass from discovery alone. The operator corrected the filter/add scope to PDP. Variant assertions require
+changed SKU and selected control; MX/CO Add uses the exact eligible PDP variant,
 checkout rejects login/Account as completion, contact proves delivery transition,
 and Back to Top checks the official tooltip stacking requirement. DOM fixture
 tests prove assertion behavior, not live market compatibility.
@@ -156,6 +156,136 @@ ignored `test-results/epp/homologation/matrix.md` and `matrix.json`, using actua
 Playwright outcomes. The matrix separates implementation, prerequisite checks,
 functional runtime, PASS, FAIL, BLOCKED and NOT_RUN, and omits raw error bodies.
 
+## Latest discovery: 2026-10-27 (supersedes historical findings below)
+
+Safe implementations remain MX 5, CO 5, PE 4 and CL 4. Operator scope
+correction: SAM-25020 and SAM-24929 validate PDP variants/selectors;
+SAM-25021 and SAM-24930 add from PDP and do not require an artificial PLP.
+
+Real official PASS evidence: MX S2 SAM-25020, SAM-25021, SAM-25022,
+SAM-25034, SAM-25044, SAM-25045; CL S1 SAM-24836, SAM-24840 and SAM-24851. Auth probes alone are not TC PASS.
+The new MX variants assertion proves a different SKU and active variant.
+Add-to-cart proves an exact-SKU successful response and controlled EPP cart.
+
+MX S2 now reaches Payment through EPP-scoped reuse of CartPage and
+MxCheckoutPage. Only explicit EPP opt-in changes site/path binding; Base Store
+defaults remain intact. Delivery is committed once with checkout/update ACK,
+then a Payment route and real provider controls are required. Restored postcode
+forms require a fresh lookup and colonia selection, not cached region alone.
+Providers observed: Mercado Pago credit/debit, wallets and cash. Secure card
+fields use secure-fields.mercadopago.com, as in the existing MX helper.
+Seven remaining payment/confirmation cases inspect real prerequisites; their
+source implementation is PREREQUISITE_FLOW, not an implemented payment. MX S2 has an opt-in card
+adapter reusing PaymentPage and a persistent ambiguity marker before submit.
+Only a new causal order plus visible confirmation can archive that marker.
+Never replay a submit after timeout.
+
+Remaining access/data dependencies:
+
+| Market | Env | Current dependency | Impact |
+|---|---|---|---|
+| MX | S1 | Authenticated/entitled native proof exists; later fresh context returned to auth/multistore. No candidate PDP eligibility proven. | AUTH_OR_ENTITLEMENT_REQUIRED; MISSING_OR_UNPROVEN_EPP_PRODUCT |
+| CO | S1 | Earlier Account security denial and blocked callback; automatic approval rejected another authentication attempt. No repeat/indirect login attempted. | Provider/operator clearance; AUTH_OR_ENTITLEMENT_REQUIRED |
+| CO | S2 | Corporate registration gate; previously observed verification-success redirect to Production remains unresolved. No corporate activation replay. | CORPORATE_ACTIVATION_REQUIRED; ENVIRONMENT_DEFECT |
+| PE | S1 | Callback leaves staging for Production registration; guard prevents continuation. | ENVIRONMENT_DEFECT |
+| PE | S2 | Supplied code rejected previously. No repeated submission this round. | VERIFICATION_CODE_REJECTED; valid programme access data required |
+| CL | S1 | Independent EPP READY and eligible SM-S918BZKILTL PDP proven; SAM-24836/24840/24851 PASS. Footer is empty in cart; local contact/delivery fixture absent. | SAM-24841 FAIL (footer); MISSING_EPP_CONTACT_DATA for payment |
+| CL | S2 | checkAccess=true with anonymous user; homepage and explicit auth route lack functional registered entry. | AUTH_OR_ENTITLEMENT_REQUIRED; EPP_COMMERCE_NOT_RENDERED |
+
+Observed defects (no invented Jira):
+
+* MX S1 / CL S1: open entitled EPP home, use header Search and submit Galaxy.
+  Expected: programme staging search. Actual: link leaves for samsung.com
+  Production search; blocked before contacting Production. CL sanitized path:
+  /cl/multistore/alianzas/search/. Catalogue discovery cannot safely continue
+  through these links. Evidence: epp-final-mx-s1-search.log and
+  epp-final-cl-s1-search.log in local ignored discovery output.
+* PE S1: finish Account challenge and callback. Expected: staging EPP return;
+  actual: Production programme registration target. No Production form submitted.
+* CO S2: corporate verification-success staging route was previously observed
+  redirecting to Production /shop/. Current public root still renders the
+  corporate registration gate; internal redirect configuration cause unproven.
+* CL S2: open programme home/auth entry after bootstrap. Expected: a usable
+  registered entry or positive registered identity; actual: anonymous + access
+  flag and no functioning profile/login control. Access flag is insufficient.
+
+Evidence is isolated under test-results/epp/<market>/<env>/<run>/ and local
+ignored discovery logs. The generated 52-row matrix records implementation,
+actual runtime and current blockers separately. Historical PASS is preserved
+against prerequisite blocks; contradictory functional failure still fails.
+
+
+### Causal MX S2 card order and confirmation
+
+One authorized Mercado Pago card submit created public order **MX261026-78768209**.
+The exact internal order-detail GET returned HTTP 200 with that public number
+and SHIPPING_REQUESTED. Confirmation of the same attempt passed SAM-25045 in
+the official runner; no second submit was performed during recovery.
+The internal identifier has a timestamp suffix; UI displays the public number.
+The deployed component reads a matrix parameter (orderConfirmation;orderCode=...),
+not an orderCode query parameter. The initial recovery query route incorrectly
+requested orders/null. That automation error was corrected, not labelled an app bug.
+The duplicate guard records SUBMITTING before the click, preserves an observed
+internal ID, and archives only after exact order GET plus causal URL/UI proof.
+History/order-list/analytics responses cannot provide order identity.
+
+A proven notification tutorial could block profile actions. EPP now closes only
+#ins-web-opt-in-reminder-container .ins-web-opt-in-reminder-close-button.
+It never accepts notification permission or closes CAPTCHA/business dialogs.
+Native MX S2 refresh and independent verify returned READY and closed the owned
+browser after this fix; the late-overlay DOM regression also passed.
+
+A new card case requires an authenticated EPP session, approved payment.card
+in the ignored EPP runtime-data.json and explicit ALLOW_PAYMENT_SUBMIT=1:
+
+```sh
+MX_QST_ENVIRONMENT=S2 MX_QST_TARGET_IDS=SAM-25045 ALLOW_PAYMENT_SUBMIT=1 npm run qst:mx:epp
+```
+
+For an observed unresolved attempt only, reconciliation is read-only:
+
+```sh
+MX_QST_ENVIRONMENT=S2 MX_QST_TARGET_IDS=SAM-25045 EPP_RESUME_PENDING_ORDER=1 npm run qst:mx:epp
+```
+
+Without a pending marker, recovery cannot reset a cart or create another order.
+An unknown/ambiguous submit blocks fresh financial work until reconciled.
+Do not delete its marker to bypass the guard. Card saving is explicitly disabled
+before fixture entry; failure to disable it prevents submit.
+
+
+### Final validation and remaining limits
+
+Matrix: 26 official IDs, 52 market/environment rows; **9 proven PASS, 42 BLOCKED,
+1 FAIL and 0 NOT_RUN** after current MX cash, CO card and CL S1 revalidation.
+Source inventory: 18 safe implementations + 1 MX card implementation +
+7 executable prerequisite inspections. Authentication discovery is supporting
+evidence and never adds a TC PASS.
+
+| Market | Safe implementations | Real S1 PASS | Real S2 PASS | Payment/confirmation |
+|---|---:|---|---|---|
+| MX | 5 | none | 25020, 25021, 25022, 25034, 25044, 25045 | one causal Mercado Pago card order and confirmation |
+| CO | 5 | none | none | 24953 blocked by access/entitlement |
+| PE | 4 | none | none | 25138/25140 blocked by callback/access/code prerequisites |
+| CL | 4 | 24836, 24840, 24851 | none | CL S1 payment reaches Contact and lacks approved contact/delivery mass; CL S2 access still blocked |
+
+Cash SAM-25046: real discovery identified mx-mercadoCash, four bank/store options, an enabled Ir a Mercado Pago button and a configured provider test buyer. The programme-bound details request returned HTTP 200. Base Store MX implements selection/readiness for Pay in Cash; no completed cash/voucher flow was found to reuse. The EPP prerequisite inspector now expands the exact outer and inner cash panels, checks the current API contract and reports only safe booleans/counts. Checkout Pro test access, voucher and return/confirmation remain unproven; ignored EPP runtime data contains a card fixture but no cash-gateway access fixture. PAYMENT_FLOW_NOT_PROVEN is specific to EXTERNAL_GATEWAY, not a generic placeholder or a newly asserted app defect. No cash submit/order has been performed.
+
+Focused final release validation: **166/166 EPP and affected MX tests passed**; the last CL/runner/contact changes also passed their isolated 35/35 regression; 32/32
+Windows launcher/refresh tests passed in the isolated sequential recheck;
+Executive reporting 4/4 and MX reporting 33/33 passed. Architecture, official
+scope and business-step gates passed, and all eight EPP market/environment lists
+remained valid. The broad refactor composite was executed but was not green:
+915/919 passed and four Windows subprocess fixtures timed out. Their isolated
+32/32 rerun passed; do not describe the original composite as successful.
+
+The programme is still not fully homologated across S1/S2: external access,
+entitlement and eligible catalogue dependencies above remain. No Base Store
+state, keep-alive task, Jenkins credential or PreQA resource was modified by the
+EPP implementation. Only the existing CO S2 SECOND window's QR option was opened
+when the operator mistook it for an EPP FIRST email screen; no FIRST credentials
+were entered there.
+
 ## Historical DST dependencies (not the current QST result)
 
 | Dependency | Why it blocks automation | Exact information/access required | Related TCs | Priority | Current evidence | Status |
@@ -168,3 +298,19 @@ functional runtime, PASS, FAIL, BLOCKED and NOT_RUN, and omits raw error bodies.
 | EPP BackOffice mapping | Existing S1/S2/S3 access cannot be assumed to contain EPP orders | Exact environment/URL, order discriminator/type and runtime CS/Admin authorities | QST EPP 18-22; DST EPP TC47-TC57 | P1 | No EPP order or BackOffice mapping exists in repo evidence | Open |
 | Safe EPP cancellation and fulfillment mass | Cancellation/CronJobs are state-changing and require causal, disposable staging data | Disposable cancelable order; Waiting for Send Financial and Order Split orders; expected transition ownership | QST EPP 20-22; DST EPP TC50, TC53-TC57 | P2 | Existing S1 Base Store scan found only COMPLETED orders; not evidence for EPP | Open |
 | EPP job codes | Running Base Store Peru jobs against an unknown EPP flow is unsafe | Exact EPP financial-initial and warehouse-transfer CronJob codes/prefixes | QST EPP 20-21; DST EPP TC54, TC56 | P2 | Existing `pe-toko*` jobs are proven for other staging flows only | Open |
+
+### Revalidation after regional FIRST/SECOND renewal
+
+Regional Base Store READY is not EPP proof. Independent EPP readback first returned HTTP 400 UnknownIdentifierError with users/current anonymous and checkAccess=true. After renewing only EPP MX S2, the same exact internal order GET returned 200 and public code MX261026-78768209, status SHIPPING_REQUESTED. The matrix route and visible public number were revalidated with zero new submits. Evidence: local ignored epp-existing-order-revalidated.log and epp-existing-order-confirmed.png. The earlier orders/null was an automation query-vs-matrix parameter error, not a reproduced application defect.
+
+CO S2 was rechecked at the corporate registration route and still requires corporate activation; no activation link was replayed. PE S1 and S2 were observed anonymous at the programme auth gate; the rejected PE S2 code was not resubmitted. A new PE S1 legitimate Account login was completed by the operator; the callback again attempted www.samsung.com/pe/multistore/beneficios_empleados/ and was blocked before Production continuation. CL S1 was independently renewed READY again, preserving SAM-24836 PASS. CL S2 root and explicit auth route were rechecked: access flag true, user anonymous, no usable login/profile entry or code field. CO S1 is read-only revalidation only; another credential retry remains prohibited after the security denial.
+
+### Newly unlocked CL S1 commerce and remaining UI failure
+
+After independent FIRST renewal, /cl/multistore/alianzas/alianzas/p/SM-S918BZKILTL rendered the exact SKU, variants and buy action with users/current and checkAccess both accepted. Its proven product mass is stored only in ignored runtime-data.json under S1.CL.product. The canonical EPP runner loads optional product.sku/product.pdpUrl into validated same-programme overrides; explicit operator overrides win and --list does not read private data.
+
+SAM-24840 Add to Cart and SAM-24851 Checkout button now have real PASS. A CL title mismatch (carro, template whitespace) and use of guest instead of authenticated checkout were automation errors and are corrected. PE EPP checkout uses the same registered transition; Base Store defaults are unchanged.
+
+**Observed CL S1 cart footer issue, SAM-24841:** open the proven PDP, add to cart, inspect /cl/multistore/alianzas/alianzas/cart. Product image/name/SKU/price, summary and Continue are present. The contentinfo element is empty, with none of Shop/Tienda, Account/Cuenta or Soporte/Support required by the current cart-UI assertion. Final rerun fails specifically on the absent footer heading, not cart text or an invented environment timeout. Evidence: epp-current-cl-s1-cart-final.log, its ignored Playwright trace/screenshots and epp-current-cl-s1-cart-structure.log (footer empty). CMS/footer expectations need functional confirmation; no Jira ID is invented and the assertion is not quarantined or weakened.
+
+SAM-24864 reached registered Contact and reports MISSING_EPP_CONTACT_DATA. No CL payment or confirmation order is claimed. CO S2 SAM-24953 was executed again and remains CORPORATE_ACTIVATION_REQUIRED. MX S2 SAM-25046 was executed again and reports PAYMENT_FLOW_NOT_PROVEN: EXTERNAL_GATEWAY after mx-mercadoCash details and configured test-buyer proof; no cash order was submitted. Only one EPP financial order was created in this round: MX261026-78768209.

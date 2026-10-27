@@ -1,3 +1,4 @@
+const {installEppOverlayDismissal,dismissEppNotificationTutorial}=require('../utils/eppStorefrontOverlays.cjs');
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
@@ -61,19 +62,20 @@ async function refresh(market, environment) {
       stage = "STAGING_BOOTSTRAP";
       page = context.pages().find(candidate => isEppPage(candidate, config)) || context.pages()[0] || await context.newPage();
       await guard.protectPage(page);
+      await installEppOverlayDismissal(page,config);
       await prepareAuthBrowserWindow(page);
       // Resume an owned registration/verification dialog in place. Navigation
       // would discard its successful code confirmation and could repeat work.
       if (!isEppPage(page, config)) {
-        await page.goto(new URL("/getcookie.html", config.rootUrl).href, { waitUntil: "domcontentloaded", timeout: 30000 });
+        await page.goto(new URL("/getcookie.html", config.rootUrl).href, { waitUntil: "commit", timeout: 30000 });
         await page.getByText(/You can access pages now/i).first().waitFor({ timeout: 15000 });
-        await page.goto(config.rootUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
+        await page.goto(config.rootUrl.href, { waitUntil: "commit", timeout: 60000 });
       } else if (new URL(page.url()).pathname !== config.rootUrl.pathname && !/\/auth\/multistore\/?$|\/registration\/?$/.test(new URL(page.url()).pathname)) {
         // Auth is proven on the EPP home, independently of a particular SKU.
         // Resume verification dialogs in place; never lose their positive result.
-        await page.goto(config.rootUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
+        await page.goto(config.rootUrl.href, { waitUntil: "commit", timeout: 60000 });
       } else if (config.accessMode === "corporate-email-link" && readHandoff(files).corporateLinkRequestedAt) {
-        await page.goto(config.rootUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
+        await page.goto(config.rootUrl.href, { waitUntil: "commit", timeout: 60000 });
       }
       const login = eppAccountLoginAction(page);
       await Promise.any([login.waitFor({ timeout: 60000 }), page.locator('input[type="email"]:visible').first().waitFor({ timeout: 60000 }), page.getByRole("textbox", { name: /c[oó]digo|verification/i }).first().waitFor({ timeout: 60000 }), authProfileControl(page).waitFor({ state: "visible", timeout: 60000 })]).catch(() => {});
@@ -125,6 +127,7 @@ async function refresh(market, environment) {
     const deadline = Date.now() + 60000;
     let state, codeSubmitted = false, confirmationAttempted = false;
     do {
+      await installEppOverlayDismissal(page,config);
       const gate = await observe(page, config);
       if (gate.reason === 'VERIFICATION_CODE_REJECTED') throw Object.assign(new Error('Configured EPP code rejected; no repeat submit.'), { exitCode: 78, eppReason: gate.reason });
       const confirmation = confirmationAttempted ? null : await findEppVerifiedContinue(page);
@@ -134,6 +137,7 @@ async function refresh(market, environment) {
         report("EPP code accepted; continuing the verified-account dialog once");
         await confirmation.click();
       }
+      await dismissEppNotificationTutorial(page,config);
       state = await observe(page, config);
       if (state.status === "READY") break;
       if (state.reason === "CORPORATE_ACTIVATION_REQUIRED") {
@@ -158,6 +162,7 @@ async function refresh(market, environment) {
       await page.waitForTimeout(500);
     } while (Date.now() < deadline);
     if (state.status !== "READY") throw Object.assign(new Error(`EPP access not proven: ${state.reason}.`), { exitCode: state.status === "HUMAN_REQUIRED" ? 79 : 1, eppReason: state.reason });
+    await installEppOverlayDismissal(page,config);
     const identity = await openAuthProfile(page, { market: config.market.toLowerCase(), prepareWindow: async () => {} });
     if (identity.state !== "authenticated") throw Object.assign(new Error("EPP registered identity was not proven."), { exitCode: 79, eppReason: "EPP_IDENTITY_REQUIRED" });
     stage = "INDEPENDENT_VERIFY";
@@ -171,7 +176,11 @@ async function refresh(market, environment) {
     success = true;
     report("READY · independent EPP verify passed; state exported; closing owned browser");
   } catch (error) {
-    if (guard?.lastBlocked()) { error.eppReason = guard.lastBlocked().reason; error.exitCode = 78; }
+    if (guard?.lastBlocked()) {
+      const denied=guard.lastBlocked();
+      report(`navigation denied: ${denied.reason} ${denied.host}${denied.path}`);
+      error.eppReason = denied.reason; error.exitCode = 78;
+    }
     error.eppStage = stage;
     throw error;
   } finally {

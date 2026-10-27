@@ -7,6 +7,7 @@ export default class CartPage extends BasePage {
     super(page);
 
     this.cartUrl = options.cartUrl || 'https://stg2.shop.samsung.com/pe/cart';
+    this.storefront = options.storefront || null;
     this.sku = options.sku || 'RB45DG6300B1PE';
     this.allowPromotionalGifts = options.allowPromotionalGifts === true;
 
@@ -95,17 +96,13 @@ export default class CartPage extends BasePage {
   }
 
   async loadMxCartState() {
-    const cartUrl = new URL(this.cartUrl);
-    const allowedMxStagingHosts = new Set(['stg.shop.samsung.com', 'stg2.shop.samsung.com']);
-    if (!allowedMxStagingHosts.has(cartUrl.hostname) || cartUrl.pathname !== '/mx/cart') {
-      throw new Error('MX cart control is restricted to the MX S1/S2 staging cart.');
-    }
+    const {apiOrigin,cartPath}=require('../utils/mxStorefrontScope.cjs').resolveMxStorefrontScope(this.cartUrl,this.storefront,'cart');
 
     const currentCartResponse = this.page.waitForResponse(
       (response) => {
         const url = new URL(response.url());
         return response.request().method() === 'GET' &&
-          /\/v2\/mx\/users\/current\/carts\/current$/.test(url.pathname);
+          url.origin===apiOrigin && url.pathname===cartPath;
       },
       { timeout: 60000 }
     );
@@ -160,14 +157,11 @@ export default class CartPage extends BasePage {
     if (!Number.isInteger(entryNumber) || entryNumber < 0) {
       throw new Error('MX cart removal requires a valid observed entry number.');
     }
-    const target = new URL(this.cartUrl);
-    const apiOrigin = target.hostname === 'stg.shop.samsung.com'
-      ? 'https://s1-smb-api-cdn.ecom-stg.samsung.com'
-      : 'https://s2-smb-api-cdn.ecom-stg.samsung.com';
+    const {apiOrigin,cartPath}=require('../utils/mxStorefrontScope.cjs').resolveMxStorefrontScope(this.cartUrl,this.storefront,'cart');
     const removal = this.page.waitForResponse(response => {
       const url = new URL(response.url());
       return response.request().method() === 'DELETE' && url.origin === apiOrigin &&
-        url.pathname === `/tokocommercewebservices/v2/mx/users/current/carts/current/entries/${entryNumber}`;
+        url.pathname === `${cartPath}/entries/${entryNumber}`;
     }, { timeout: 120000 });
     const [response] = await Promise.all([removal, confirmButton.click()]);
     if (!response.ok()) throw new Error(`MX cart removal returned HTTP ${response.status()}; no mutation was retried.`);
@@ -181,7 +175,7 @@ export default class CartPage extends BasePage {
       const { productEntries } = await this.loadMxCartState();
       const main = this.page.getByRole('main');
       const removeButtons = main.getByRole('button', { name: /^Remove$|^Eliminar$/i });
-      const emptyCart = main.getByRole('heading', { name: /Su carrito esta vac[ií]o/i });
+      const emptyCart = main.getByRole('heading', { name: /(?:Su|Tu) carrito est[aá] vac[ií]o/i });
 
       if (!productEntries.length) {
         await emptyCart.waitFor({ state: 'visible', timeout: 30000 });
@@ -242,7 +236,7 @@ export default class CartPage extends BasePage {
     // The final removal may render the empty cart just after the last API
     // snapshot. Accept only the observed empty UI with no removable rows.
     const main = this.page.getByRole('main');
-    const emptyCart = main.getByRole('heading', { name: /Su carrito esta vac[ií]o/i });
+    const emptyCart = main.getByRole('heading', { name: /(?:Su|Tu) carrito est[aá] vac[ií]o/i });
     if (await emptyCart.waitFor({ state: 'visible', timeout: 10000 }).then(() => true, () => false)) {
       if (await main.getByRole('button', { name: /^Remove$|^Eliminar$/i }).count()) {
         throw new Error('MX cart rendered an empty state together with removable product rows.');

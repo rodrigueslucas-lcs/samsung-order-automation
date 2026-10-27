@@ -4,6 +4,8 @@ const root = path.resolve(__dirname, '..');
 const markets = ['MX','CO','PE','CL'];
 
 function prerequisiteReason(description = '') {
+  const exact=['MISSING_OR_UNPROVEN_EPP_PLP','MISSING_OR_UNPROVEN_EPP_PRODUCT','MISSING_EPP_CONTACT_DATA','VERIFICATION_CODE_REJECTED','CORPORATE_ACTIVATION_REQUIRED','AUTH_OR_ENTITLEMENT_REQUIRED','EPP_COMMERCE_NOT_RENDERED','PAYMENT_FLOW_NOT_PROVEN','PAYMENT_SUBMIT_NOT_AUTHORIZED','PROVIDER_NOT_AVAILABLE','PAYMENT_DATA_REJECTED','ENVIRONMENT_DEFECT'];
+  const classified=exact.find(reason=>description.includes(reason));if(classified)return classified;
   const rules = [
     [/BLOCKED_NOT_IMPLEMENTED/i,'PAYMENT_ADAPTER_NOT_IMPLEMENTED'],
     [/VERIFICATION_CODE_REJECTED/i,'VERIFICATION_CODE_REJECTED'],
@@ -23,7 +25,7 @@ function inventory() {
     const directory = path.join(root, 'tests/markets', market.toLowerCase(), 'qst/epp');
     return fs.readdirSync(directory).filter(name => name.endsWith('.spec.js')).flatMap(name =>
       [...fs.readFileSync(path.join(directory,name),'utf8').matchAll(/test\("(SAM-\d+)([^"\n]*)/g)].map(match => ({ market, tc:match[1],
-        implementation: /@blocked/.test(match[2]) ? 'BLOCKED_NOT_IMPLEMENTED' : 'IMPLEMENTED' })));
+        implementation: /@preflight/.test(match[2]) ? 'PREREQUISITE_FLOW' : /@blocked/.test(match[2]) ? 'BLOCKED_NOT_IMPLEMENTED' : 'IMPLEMENTED' })));
   });
 }
 function extractResults(document) {

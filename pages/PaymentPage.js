@@ -138,13 +138,19 @@ export default class PaymentPage extends BasePage {
     await this.screenshot("09-payment-modes");
   }
 
-  async selectPaymentMode(name, screenshotName) {
+  async selectPaymentMode(name, screenshotName, { within = this.page, option = null } = {}) {
     this.selectedPaymentAction = null;
-    const paymentMode = this.page.getByRole("button", {
+    let paymentMode = option || within.getByRole("button", {
       name,
     });
 
     await paymentMode.waitFor({ state: "visible", timeout: 90000 });
+    // Expanding a group may render a child with the same accessible label.
+    // Bind the already unique chosen header before that child is inserted.
+    const headerId = await paymentMode.getAttribute("id");
+    if (headerId && /^[A-Za-z0-9_-]+$/.test(headerId)) {
+      paymentMode = this.page.locator(`#${headerId}`);
+    }
     await paymentMode.scrollIntoViewIfNeeded();
     if ((await paymentMode.getAttribute("aria-expanded")) !== "true") await paymentMode.click();
     await expect(paymentMode, "Payment mode must finish expanding before its form is used")

@@ -1,8 +1,5 @@
-async function readMxCartSku(page, { cartUrl, sku, timeout = 20000 }) {
-  const target = new URL(cartUrl);
-  if (target.protocol !== 'https:' || !['stg.shop.samsung.com', 'stg2.shop.samsung.com'].includes(target.hostname) || target.pathname !== '/mx/cart') {
-    throw new Error('MX cart readback requires the configured staging cart.');
-  }
+async function readMxCartSku(page, { cartUrl, sku, timeout = 20000, storefront=null }) {
+  const {url:target}=require('./mxStorefrontScope.cjs').resolveMxStorefrontScope(cartUrl,storefront,'cart');
 
   const main = page.getByRole('main');
   const product = page.getByText(sku, { exact: true }).filter({ visible: true }).first();

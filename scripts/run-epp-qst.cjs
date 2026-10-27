@@ -4,8 +4,16 @@ const { spawnSync } = require("node:child_process");
 const { getEppConfig } = require("../config/markets/epp");
 const { acquireEppLease } = require("../utils/eppSession.cjs");
 
-function buildRun(market, args = [], sourceEnv = process.env) {
-  const config = getEppConfig(market, sourceEnv);
+function buildRun(market, args = [], sourceEnv = process.env, {readData = require('../utils/eppRuntimeData.cjs').getEppRuntimeData} = {}) {
+  let config = getEppConfig(market, sourceEnv);
+  // Optional proven product mass lives with the other ignored EPP fixtures.
+  // Explicit operator overrides still win; listing never depends on local data.
+  const product = args.includes('--list') ? null : readData(config)?.product;
+  if (product && !sourceEnv[`${config.market}_EPP_QST_PDP_URL`] && !sourceEnv[`${config.market}_EPP_QST_SKU`]) {
+    if (typeof product.pdpUrl !== 'string' || typeof product.sku !== 'string' || !product.sku.trim()) throw new Error('Ignored EPP product fixture is incomplete; contents suppressed.');
+    sourceEnv = {...sourceEnv, [`${config.market}_EPP_QST_PDP_URL`]:product.pdpUrl, [`${config.market}_EPP_QST_SKU`]:product.sku};
+    config = getEppConfig(market, sourceEnv);
+  }
   const code = config.market;
   const directory = path.resolve(__dirname, "..", "tests", "markets", code.toLowerCase(), "qst", "epp");
   const files = fs.readdirSync(directory).filter(name => name.endsWith(".spec.js"));

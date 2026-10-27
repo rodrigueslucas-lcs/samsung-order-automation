@@ -1,8 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { chromium } = require('@playwright/test');
-const { assertStoreRoute, proveCheckout, proveFilterEffect, chooseConfiguredPdpFromPlp, proveTooltipAboveBackToTop, completeContact } = require('../../utils/eppBusinessAssertions.cjs');
+const { assertStoreRoute, proveCheckout, proveFilterEffect, provePdpVariantSelection, chooseConfiguredPdpFromPlp, proveTooltipAboveBackToTop, completeContact } = require('../../utils/eppBusinessAssertions.cjs');
 const { getEppContact } = require('../../utils/eppRuntimeData.cjs');
+const { getEppCartTextPatterns } = require('../../utils/eppBusinessAssertions.cjs');
 const config = { market: 'MX', environment: 'S2', rootUrl: new URL('https://stg2.shop.samsung.com/mx/multistore/pymesmx/pymesmx/') };
 let browser;
 test.before(async () => { browser = await chromium.launch({ headless: true }); });
@@ -16,12 +17,39 @@ async function fixture(html, action, suffix = 'cart') {
     return await action(page);
   } finally { await context.close(); }
 }
+test('CL EPP cart text accepts actual template padding and nonbreaking spaces',async()=>{
+  await fixture('<p> Tienes&nbsp;4 productos en tu carro </p><h2>Resumen</h2>',async page=>{
+    const patterns=getEppCartTextPatterns('CL');
+    assert.equal(await page.getByText(patterns.cartPageTitlePattern).isVisible(),true);
+    assert.equal(await page.getByRole('heading',{name:patterns.orderSummaryPattern}).isVisible(),true);
+  });
+});
+test('CL cart labels do not change other EPP market contracts',()=>{
+  for(const market of ['MX','PE','CO']){
+    const patterns=getEppCartTextPatterns(market);
+    assert.equal(patterns.cartPageTitlePattern.test('Tienes 1 producto en tu carrito'),true);
+    assert.equal(patterns.orderSummaryPattern.test('Resumen de la orden'),true);
+    assert.equal(patterns.orderSummaryPattern.test('Resumen'),false);
+  }
+});
 test('EPP rejects Production, Base Store, other programme and account as checkout proof', () => {
   for (const url of ['https://www.samsung.com/shop/', 'https://stg2.shop.samsung.com/mx/checkout/one', 'https://stg2.shop.samsung.com/mx/multistore/other/other/checkout/one', 'https://account.samsung.com/']) assert.throws(() => assertStoreRoute(url, config, /^checkout\//));
   assert.doesNotThrow(() => assertStoreRoute(new URL('checkout/one', config.rootUrl), config, /^checkout\//));
 });
 test('PLP filter proves selection AND changed product results', async () => {
   await fixture(`<cx-facet><label><input type="checkbox" onchange="document.querySelectorAll('.product-card')[1].remove()">Phone</label></cx-facet><div class="product-card"><a href="p/A">A</a></div><div class="product-card"><a href="p/B">B</a></div>`, page => proveFilterEffect(page, config), 'c/phones');
+});
+
+test('PDP variant proves a changed SKU and selected control together',async()=>{
+ await fixture(`<main><p id="sku">QA-A</p><button class="bttn selected">Blue</button><button class="bttn" onclick="history.pushState({},'', 'QA-B');document.querySelector('#sku').textContent='QA-B';document.querySelector('.selected').classList.remove('selected');this.classList.add('selected')">Black</button></main>`,async page=>{
+  const result=await provePdpVariantSelection(page,config);assert.equal(result.beforeSku,'QA-A');assert.equal(result.sku,'QA-B');assert.equal(result.label,'Black');
+ },'p/QA-A');
+});
+test('cosmetic-only variant selection is not a PDP PASS',async()=>{
+ await fixture(`<main><p>QA-A</p><button class="bttn selected">Blue</button><button class="bttn" onclick="this.classList.add('selected')">Black</button></main>`,page=>assert.rejects(provePdpVariantSelection(page,config,{timeout:100})),'p/QA-A');
+});
+test('variant navigation cannot substitute a Base Store product for EPP proof',async()=>{
+ await fixture(`<main><p id="sku">QA-A</p><button class="bttn selected">Blue</button><button class="bttn" onclick="history.pushState({},'', '/mx/p/QA-B');document.querySelector('#sku').textContent='QA-B';this.classList.add('selected')">Black</button></main>`,page=>assert.rejects(provePdpVariantSelection(page,config,{timeout:100}),/staging multistore/),'p/QA-A');
 });
 test('checkout proof requires actual multistore checkout content', async () => {
   await fixture('<input name="firstName" aria-label="firstName">', page => proveCheckout(page, config), 'checkout/one?step=CHECKOUT_STEP_CONTACT_INFO');

@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { installEppNavigationGuard, blockedEppRequest } = require('../../utils/eppNavigationGuard.cjs');
+const { installEppNavigationGuard, blockedEppRequest, safeNavigationPath } = require('../../utils/eppNavigationGuard.cjs');
 const { getEppConfig } = require('../../config/markets/epp');
 async function request(url,{ method='GET',navigation=true,iframe=false }={}) {
   const blocked=blockedEppRequest(getEppConfig('MX',{}),{url,method,document:navigation,top:!iframe});
@@ -43,8 +43,14 @@ test('real Chromium blocks a Production redirect after multiple staging hops bef
     catch(e) { outcome={error:e.name}; }
     assert.equal(guard.lastBlocked()?.reason,'PRODUCTION_NAVIGATION_BLOCKED',JSON.stringify({outcome,hits}));
     assert.deepEqual(hits,['/start','/next']);
-    assert.deepEqual(guard.lastBlocked(),{reason:'PRODUCTION_NAVIGATION_BLOCKED',host:'shop.samsung.com'});
+    assert.deepEqual(guard.lastBlocked(),{reason:'PRODUCTION_NAVIGATION_BLOCKED',host:'shop.samsung.com',path:'/shop/'});
   } finally { await browser?.close(); await new Promise(resolve=>server.close(resolve)); }
+});
+test('blocked navigation diagnostics omit query, identity and opaque authorization material',()=>{
+  assert.equal(safeNavigationPath('https://stg.shop.samsung.com/callback?token=sensitive-fixture'),'/callback');
+  assert.equal(safeNavigationPath('https://stg.shop.samsung.com/users/fixture%40example.invalid/profile'),'/users/[identity]/profile');
+  assert.ok(!safeNavigationPath('https://stg.shop.samsung.com/callback/'+ 'a'.repeat(64)).includes('a'.repeat(64)));
+  assert.equal(blockedEppRequest(getEppConfig('MX',{}),{url:'https://samsung.com/mx/search',document:true,top:true}).reason,'PRODUCTION_NAVIGATION_BLOCKED');
 });
 test('same-environment staging and Samsung Account remain navigable',async()=>{
   for(const url of ['https://stg2.shop.samsung.com/getcookie.html','https://stg2.shop.samsung.com/mx/multistore/pymesmx/pymesmx/checkout/one','https://account.samsung.com/iam/oauth2/authorize']) assert.equal((await request(url)).action,'continue');

@@ -5,7 +5,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync('pages/CartPage.js', 'utf8')
   .replace(/^import .*;\r?\n/gm, '').replace('export default class CartPage', 'class CartPage');
-const Cart = vm.runInNewContext(`${source}\nCartPage;`, { BasePage: class {}, URL });
+const Cart = vm.runInNewContext(`${source}\nCartPage;`, { BasePage: class {}, URL, require:name=>{assert.equal(name,'../utils/mxStorefrontScope.cjs');return require('../../utils/mxStorefrontScope.cjs');} });
 
 function removal({ environment = 'S2', status = 200, interrupted = false, bodyGate } = {}) {
   const events = [];

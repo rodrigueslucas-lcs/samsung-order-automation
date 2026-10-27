@@ -48,3 +48,16 @@ test("access discovery never converts observed gates into functional TC PASS", (
   assert.equal(new Set(matrix.map(row => `${row.market}:${row.environment}:${row.tc}`)).size, 52);
   assert.ok(matrix.every(row => row.runtime === "NOT_RUN" && row.result === "NOT_RUN"));
 });
+test('proven ignored product mass reaches the child through validated market overrides',()=>{
+  const run=buildRun('CL',[],{ENVIRONMENT:'S1'},{readData:cfg=>{assert.equal(cfg.market,'CL');assert.equal(cfg.environment,'S1');return{product:{sku:'QA-SKU',pdpUrl:'https://stg.shop.samsung.com/cl/multistore/alianzas/alianzas/p/QA-SKU'}};}});
+  assert.equal(run.env.CL_EPP_QST_SKU,'QA-SKU');
+  assert.equal(run.env.CL_EPP_QST_PDP_URL,'https://stg.shop.samsung.com/cl/multistore/alianzas/alianzas/p/QA-SKU');
+  assert.throws(()=>buildRun('CL',[],{ENVIRONMENT:'S1'},{readData:()=>({product:{sku:'QA',pdpUrl:'https://www.samsung.com/cl/p/QA'}})}),/configured staging multistore/);
+});
+test('listing ignores private fixtures and explicit product overrides retain precedence',()=>{
+  const fixture={product:{sku:'ignored',pdpUrl:'invalid'}};
+  const list=buildRun('CL',['--list'],{ENVIRONMENT:'S1'},{readData:()=>{throw Error('listing must not read private fixtures');}});
+  assert.equal(list.env.CL_EPP_QST_SKU,undefined);
+  const run=buildRun('CL',[],{ENVIRONMENT:'S1',CL_EPP_QST_SKU:'explicit',CL_EPP_QST_PDP_URL:'https://stg.shop.samsung.com/cl/multistore/alianzas/alianzas/p/explicit'},{readData:()=>fixture});
+  assert.equal(run.env.CL_EPP_QST_SKU,'explicit');
+});
