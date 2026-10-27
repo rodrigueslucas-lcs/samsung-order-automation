@@ -1,6 +1,6 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../../../../../utils/eppTestFixtures";
 import eppConfigModule from "../../../../../config/markets/epp";
-import { addConfiguredEppProduct, openEppStore, validateBackToTop, validateEppCartUi } from "../../../../../flows/eppStorefront";
+import { addConfiguredEppProduct, validateEppLogin, validateEppFilter, validateEppCheckout, validateEppContact, openEppStore, validateBackToTop, validateEppCartUi } from "../../../../../flows/eppStorefront";
 
 const { getEppConfig } = eppConfigModule;
 const cfg = () => getEppConfig("MX");
@@ -15,13 +15,7 @@ test.describe("MX QST - Official EPP", () => {
   test("SAM-25020 @qst @mx @epp @safe - Facets/Filter on PLP", async ({ page }) => {
     await test.step("Open the official MX EPP storefront and validate PLP filtering entry point", async () => {
       const current = cfg();
-      const plp = String(process.env.MX_EPP_QST_PLP_URL || "").trim();
-      test.skip(!plp, "MX_EPP_QST_PLP_URL is required to prove the official EPP PLP facet scenario without guessing a category route.");
-      await openEppStore(page, { ...current, entryUrl: new URL(plp) });
-      const filter = page.getByRole("button", { name: /Filtrar|Filtro|Filter/i })
-        .or(page.getByText(/Filtrar|Filtro|Filter/i))
-        .filter({ visible: true }).first();
-      await expect(filter).toBeVisible({ timeout: 60000 });
+      await validateEppFilter(page, current);
     });
   });
 
@@ -29,7 +23,7 @@ test.describe("MX QST - Official EPP", () => {
     await test.step("Add the configured official MX EPP product from PDP to cart", async () => {
       const current = cfg();
       requireProductConfig(current);
-      const cart = await addConfiguredEppProduct(page, current, { currencyPattern: /\$\s*[\d.,]+/ });
+      const cart = await addConfiguredEppProduct(page, current, { fromPlp: true, currencyPattern: /\$\s*[\d.,]+/ });
       await cart.validateProductInCart();
     });
   });
@@ -47,13 +41,11 @@ test.describe("MX QST - Official EPP", () => {
     await test.step("Reach MX EPP checkout and validate the contact-information section", async () => {
       const current = cfg();
       requireProductConfig(current);
+      const customer = require('../../../../../utils/eppRuntimeData.cjs').getEppContact(current);
+      test.skip(!customer, 'BLOCKED: EPP contact QA data is missing.');
       const cart = await addConfiguredEppProduct(page, current, { currencyPattern: /\$\s*[\d.,]+/ });
       await cart.proceedToCheckout();
-      await expect(page).toHaveURL(/checkout|guestlogin|login|account/i, { timeout: 60000 });
-      const contact = page.getByPlaceholder(/correo|email|nombre|name|tel[eé]fono|phone/i)
-        .or(page.locator('input[name="firstName"], input[name="lastName"], input[name="phone"], input[type="email"]'))
-        .filter({ visible: true }).first();
-      await expect(contact).toBeVisible({ timeout: 60000 });
+      await validateEppContact(page, current, customer);
     });
   });
 
@@ -68,13 +60,13 @@ test.describe("MX QST - Official EPP", () => {
 
   test("SAM-25045 @blocked @destructive @qst @mx @epp @registered - Payment using credit card with reg user", async () => {
     await test.step("Keep the official MX EPP card-payment case represented without submitting an unapproved order", async () => {
-      test.skip(true, "MX EPP card payment requires authenticated EPP checkout plus explicit ALLOW_PAYMENT_SUBMIT authorization and approved card/order handling.");
+      test.skip(true, "BLOCKED_NOT_IMPLEMENTED: EPP registered checkout and card provider contract are not runtime-proven; no payment is submitted.");
     });
   });
 
   test("SAM-25046 @blocked @destructive @qst @mx @epp - Pay in Cash", async () => {
     await test.step("Keep the official MX EPP cash-payment case represented without placing an order", async () => {
-      test.skip(true, "MX EPP Pay in Cash requires a runtime-proven EPP checkout/payment path and explicit order authorization.");
+      test.skip(true, "BLOCKED_NOT_IMPLEMENTED: EPP cash provider, controlled order total and provider limit are not runtime-proven; no order is submitted.");
     });
   });
 });

@@ -1,6 +1,6 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../../../../../utils/eppTestFixtures";
 import eppConfigModule from "../../../../../config/markets/epp";
-import { addConfiguredEppProduct, openEppStore, validateEppCartUi } from "../../../../../flows/eppStorefront";
+import { addConfiguredEppProduct, validateEppLogin, validateEppFilter, validateEppCheckout, validateEppContact, openEppStore, validateEppCartUi } from "../../../../../flows/eppStorefront";
 
 const { getEppConfig } = eppConfigModule;
 const cfg = () => getEppConfig("CL");
@@ -15,9 +15,7 @@ test.describe("CL QST - EPP Official P1", () => {
   test("SAM-24836 @qst @cl @epp @safe - Epp Login", async ({ page }) => {
     await test.step("Open the official CL EPP storefront and complete the supplied JET85 verification gate when present", async () => {
       const current = cfg();
-      await openEppStore(page, current);
-      await expect(page).toHaveURL((url) => url.hostname === current.rootUrl.hostname);
-      await expect(page.locator("body")).toContainText(/Samsung|Tienda|Shop|Producto|Alianza/i, { timeout: 60000 });
+      await validateEppLogin(page, current);
     });
   });
 
@@ -46,25 +44,25 @@ test.describe("CL QST - EPP Official P1", () => {
       const cart = await addConfiguredEppProduct(page, current, { currencyPattern: /\$\s*[\d.,]+/ });
       await cart.validateCheckoutButton();
       await cart.proceedToCheckout();
-      await expect(page).toHaveURL(/checkout|guestlogin|login|account/i, { timeout: 60000 });
+      await validateEppCheckout(page, current);
     });
   });
 
   test("SAM-24864 @blocked @destructive @qst @cl @epp @registered - Payment using credit / Debit card with reg user", async () => {
     await test.step("Represent the official CL EPP card-payment case without unauthorized order placement", async () => {
-      test.skip(true, "CL EPP card payment requires a supplied EPP PDP/SKU, authenticated checkout and explicit ALLOW_PAYMENT_SUBMIT authorization before order placement is enabled.");
+      test.skip(true, "BLOCKED_NOT_IMPLEMENTED: eligible EPP SKU, registered checkout and card provider contract are not proven.");
     });
   });
 
   test("SAM-24865 @blocked @destructive @qst @cl @epp - Payment using Direct Bank Transfer", async () => {
     await test.step("Represent the official CL EPP Direct Bank Transfer case and its CS dependency", async () => {
-      test.skip(true, "CL EPP Direct Bank Transfer requires the EPP checkout path plus CS/BackOffice approval or rejection handling; it is not safe to fabricate this dependency.");
+      test.skip(true, "BLOCKED_NOT_IMPLEMENTED: EPP bank-transfer provider/order contract is not proven. Subsequent CS/BackOffice actions remain a separate manual procedure.");
     });
   });
 
   test("SAM-24866 @blocked @destructive @qst @cl @epp - Order confirmation screen", async () => {
     await test.step("Represent the official CL EPP order-confirmation case without fabricating an order", async () => {
-      test.skip(true, "CL EPP order confirmation requires a successfully authorized EPP order from a payment scenario; no order is created implicitly for evidence.");
+      test.skip(true, "BLOCKED_NOT_IMPLEMENTED: this case requires its own newly created and confirmed EPP order; no compatible payment flow is proven.");
     });
   });
 });

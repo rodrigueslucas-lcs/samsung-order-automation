@@ -38,6 +38,9 @@ function walk(current, out = []) {
   for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
     if (entry.isDirectory() && ignoredDirs.has(entry.name)) continue;
     const absolute = path.join(current, entry.name);
+    // Chrome profiles are mutable runtime state, never source consumers. Reading
+    // their component manifests races browser updates and can expose auth data.
+    if (entry.isDirectory() && path.relative(root, absolute).replace(/\\/g, "/") === "playwright/profiles") continue;
     if (entry.isDirectory()) walk(absolute, out);
     else if (entry.isFile() && (explicitFiles.has(entry.name) || textExtensions.has(path.extname(entry.name).toLowerCase()))) {
       out.push({ absolute, relative: path.relative(root, absolute).replace(/\\/g, "/") });
