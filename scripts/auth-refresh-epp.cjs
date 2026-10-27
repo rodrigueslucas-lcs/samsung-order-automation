@@ -11,10 +11,20 @@ const { authProfileControl, openAuthProfile } = require("../utils/authStorefront
 const { completeAccountLogin, discardRejectedAccountPages } = require("../utils/authAccountLogin.cjs");
 const { writeJsonAtomically } = require("../utils/atomicJson");
 const { proveEppAccess: observe, findEppVerifiedContinue, eppAccountLoginAction } = require("../utils/eppAccessState.cjs");
+const { installEppNavigationGuard } = require('../utils/eppNavigationGuard.cjs');
 
 function isEppPage(page, config) {
   try { const url = new URL(page.url()); return !page.isClosed() && url.origin === config.rootUrl.origin && url.pathname.startsWith(config.rootUrl.pathname); }
   catch { return false; }
+}
+
+function assertEppAuthContinuation(page, guard) {
+  const blocked = guard?.lastBlocked();
+  if (blocked) throw Object.assign(new Error('EPP navigation denied; no login retry.'), {exitCode:78,eppReason:blocked.reason});
+  const url = new URL(page.url());
+  if (url.hostname === 'account.samsung.com' && /^\/iam\/blocked(?:\/|$)/i.test(url.pathname)) {
+    throw Object.assign(new Error('Samsung Account security denied this authorization; operator review required.'), {exitCode:78,eppReason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED'});
+  }
 }
 
 function readHandoff(files) {
@@ -29,7 +39,7 @@ async function refresh(market, environment) {
   const credentials = getPrimaryEppCredentials(config);
   const lease = acquireEppLease(config);
   fs.mkdirSync(files.directory, { recursive: true });
-  let browser, success = false, startedNewAccountFlow = false, stage = "CONNECT_BROWSER";
+  let browser, guard, success = false, startedNewAccountFlow = false, stage = "CONNECT_BROWSER";
   const report = message => console.log(`[auth:epp] ${config.market} ${config.environment} FIRST · ${message}`);
   try {
     report("START · isolated EPP profile; no Base Store state imported");
@@ -44,11 +54,13 @@ async function refresh(market, environment) {
       },
     });
     const context = browser.contexts()[0];
+    guard = await installEppNavigationGuard(context,config);
     await discardRejectedAccountPages(context);
     let page = context.pages().find(candidate => { try { return new URL(candidate.url()).hostname === "account.samsung.com"; } catch { return false; } });
     if (!page) {
       stage = "STAGING_BOOTSTRAP";
       page = context.pages().find(candidate => isEppPage(candidate, config)) || context.pages()[0] || await context.newPage();
+      await guard.protectPage(page);
       await prepareAuthBrowserWindow(page);
       // Resume an owned registration/verification dialog in place. Navigation
       // would discard its successful code confirmation and could repeat work.
@@ -95,8 +107,10 @@ async function refresh(market, environment) {
       if (handoff.passwordAttempted && await page.locator('input[type="password"]:visible').count()) throw Object.assign(new Error("Previous password outcome requires manual review; no repeat submit."), { exitCode: 79 });
       await prepareAuthBrowserWindow(page);
       report("Samsung Account opened; automatic FIRST credentials, human CAPTCHA/MFA only");
+      assertEppAuthContinuation(page,guard);
       await completeAccountLogin(page, { market: config.market.toLowerCase(), hostname: config.rootUrl.hostname, credentials,
         timeout: 600000, ...eppLoginResumeOptions(handoff, startedNewAccountFlow),
+        pause: async ms => { assertEppAuthContinuation(page,guard); await new Promise(resolve=>setTimeout(resolve,ms)); },
         log: message => {
           if (message.startsWith("AUTH_HANDOFF_AUDIT ")) {
             try { writeJsonAtomically(files.handoff, { ...readHandoff(files), ...JSON.parse(message.slice("AUTH_HANDOFF_AUDIT ".length)) }); } catch {}
@@ -157,12 +171,16 @@ async function refresh(market, environment) {
     success = true;
     report("READY · independent EPP verify passed; state exported; closing owned browser");
   } catch (error) {
+    if (guard?.lastBlocked()) { error.eppReason = guard.lastBlocked().reason; error.exitCode = 78; }
     error.eppStage = stage;
     throw error;
   } finally {
-    if (success && browser) try { const cdp = await browser.newBrowserCDPSession(); await cdp.send("Browser.close"); } catch {}
-    await browser?.close().catch(() => {});
-    lease.release();
+    try { await guard?.dispose(); }
+    finally {
+      if (success && browser) try { const cdp = await browser.newBrowserCDPSession(); await cdp.send("Browser.close"); } catch {}
+      try { await browser?.close(); }
+      finally { lease.release(); }
+    }
   }
 }
 
@@ -172,4 +190,4 @@ if (require.main === module) refresh(process.argv[2], process.argv[3] || "S2").c
   console.error(`[auth:epp] ${status} · ${error.eppStage || "PRECONDITIONS"} · ${error.eppReason || code} · browser preserved when intervention is needed; no raw provider error or credential printed.`);
   process.exitCode = error.exitCode || 1;
 });
-module.exports = { refresh, observe, isEppPage };
+module.exports = { refresh, observe, isEppPage, assertEppAuthContinuation };

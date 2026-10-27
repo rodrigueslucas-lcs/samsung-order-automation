@@ -45,7 +45,7 @@ test.describe("CO QST - Official EPP", () => {
       const customer = require('../../../../../utils/eppRuntimeData.cjs').getEppContact(current);
       test.skip(!customer, 'BLOCKED: EPP contact QA data is missing.');
       const cart = await addConfiguredEppProduct(page, current, { currencyPattern: /\$\s*[\d.,]+/ });
-      await cart.proceedToCheckout();
+      await cart.proceedToAuthenticatedCheckout();
       await validateEppContact(page, current, customer);
     });
   });

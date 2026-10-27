@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { inventory, extractResults, buildRows, prerequisiteReason } = require('../../scripts/report-epp-homologation.cjs');
+const { inventory, extractResults, buildRows, prerequisiteReason, mergeObservation } = require('../../scripts/report-epp-homologation.cjs');
 test('EPP matrix represents 26 unique official cases and 52 environment rows without inventing runtime PASS', () => {
   const scope = inventory();
   assert.equal(scope.length,26);
@@ -25,4 +25,16 @@ test('matrix preserves actionable blocker categories without copying sensitive d
   assert.equal(prerequisiteReason('BLOCKED: contact QA data is missing'),'MISSING_EPP_CONTACT_DATA');
   assert.equal(prerequisiteReason('BLOCKED_NOT_IMPLEMENTED: card flow'),'PAYMENT_ADAPTER_NOT_IMPLEMENTED');
   assert.equal(prerequisiteReason('unrecognized sensitive fixture data'),'PREREQUISITE_NOT_MET');
+});
+test('a prerequisite block cannot erase a proven PASS, and remains visible as current state', () => {
+  const pass = { tc:'SAM-25022', result:'PASS', runtime:'TARGETED_RUNTIME', notes:'EXPECTED_BEHAVIOR_PROVEN' };
+  const block = { tc:'SAM-25022', result:'BLOCKED', runtime:'PREREQUISITE_CHECK', notes:'AUTH_OR_ENTITLEMENT_REQUIRED' };
+  const merged = mergeObservation(pass,block);
+  assert.equal(merged.result,'PASS');
+  assert.equal(merged.runtime,'HISTORICAL_TARGETED_RUNTIME');
+  assert.equal(merged.latestAttempt.result,'BLOCKED');
+  assert.match(merged.notes,/CURRENT_AUTH_OR_ENTITLEMENT_REQUIRED/);
+  const fail = { tc:'SAM-25022', result:'FAIL', runtime:'TARGETED_RUNTIME', notes:'INSPECT_IGNORED_PLAYWRIGHT_REPORT' };
+  assert.deepEqual(mergeObservation(pass,fail),fail);
+  assert.deepEqual(mergeObservation(fail,pass),pass);
 });

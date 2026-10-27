@@ -3,15 +3,19 @@ const { installEppSessionStorage } = require("./eppSession.cjs");
 const { proveEppAccess } = require("./eppAccessState.cjs");
 const { watchEppServerProof } = require("./eppServerProof.cjs");
 const { openAuthProfile } = require("./authStorefrontReady.cjs");
+const { installEppNavigationGuard } = require('./eppNavigationGuard.cjs');
 
 async function verifyEppSnapshot(config, snapshot, { expectedEmail, timeout = 60000, configureContext = async () => {} } = {}) {
   const browser = await chromium.launch({ channel: "chrome", headless: true });
+  let guard, proof;
   try {
     const context = await browser.newContext({ storageState: snapshot.storageState });
+    guard = await installEppNavigationGuard(context,config);
     await installEppSessionStorage(context, config, snapshot.sessionStorage);
     await configureContext(context);
-    const proof = watchEppServerProof(context, config, { expectedEmail });
+    proof = watchEppServerProof(context, config, { expectedEmail });
     const page = await context.newPage();
+    await guard.protectPage(page);
     await page.goto(config.rootUrl.href, { waitUntil: "domcontentloaded", timeout });
     const deadline = Date.now() + timeout;
     let ui;
@@ -36,7 +40,15 @@ async function verifyEppSnapshot(config, snapshot, { expectedEmail, timeout = 60
     };
     proof.stop();
     return result;
-  } finally { await browser.close(); }
+  } catch (error) {
+    if (guard?.lastBlocked()) Object.assign(error,{exitCode:78,eppReason:guard.lastBlocked().reason});
+    else if (error.name === 'TimeoutError' && !error.eppReason) error.eppReason='EPP_NAVIGATION_OR_RENDER_TIMEOUT';
+    throw error;
+  } finally {
+    proof?.stop();
+    try { await guard?.dispose(); }
+    finally { await browser.close(); }
+  }
 }
 
 module.exports = { verifyEppSnapshot };

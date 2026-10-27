@@ -49,6 +49,14 @@ function extractResults(document) {
   visit(document.suites);
   return results;
 }
+function mergeObservation(previous, current) {
+  if (previous?.result === 'PASS' && ['BLOCKED','HUMAN_REQUIRED','NOT_RUN'].includes(current.result)) {
+    return { ...previous, runtime: 'HISTORICAL_TARGETED_RUNTIME',
+      notes: `HISTORICAL_PASS_CURRENT_${current.notes}`,
+      latestAttempt: { runtime: current.runtime, result: current.result, notes: current.notes } };
+  }
+  return current;
+}
 function buildRows(scope, observed = new Map()) {
   return scope.flatMap(item => ['S1','S2'].map(environment => {
     const found = observed.get(`${item.market}:${environment}:${item.tc}`);
@@ -64,7 +72,10 @@ function report() {
       const file = path.join(directory,run,'results.json');
       if (!fs.existsSync(file)) continue;
       const results = extractResults(JSON.parse(fs.readFileSync(file,'utf8')));
-      for (const result of results) observed.set(`${market}:${environment}:${result.tc}`,result);
+      for (const result of results) {
+        const key = `${market}:${environment}:${result.tc}`;
+        observed.set(key,mergeObservation(observed.get(key),result));
+      }
     }
   }
   const rows = buildRows(inventory(), observed);
@@ -81,4 +92,4 @@ if (require.main === module) {
   try { report(); }
   catch { console.error('[epp-homologation] Unable to read/write a complete report; no raw report, identity or provider data printed.'); process.exitCode = 1; }
 }
-module.exports = { inventory, extractResults, buildRows, prerequisiteReason, report };
+module.exports = { inventory, extractResults, buildRows, prerequisiteReason, mergeObservation, report };

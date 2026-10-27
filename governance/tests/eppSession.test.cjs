@@ -3,7 +3,13 @@ const assert = require("node:assert/strict");
 const path = require("node:path");
 const { getEppConfig } = require("../../config/markets/epp");
 const { getEppSessionPaths, getPrimaryEppCredentials, loadEppSession, installEppSessionStorage, eppLoginResumeOptions } = require("../../utils/eppSession.cjs");
-const { isEppPage } = require("../../scripts/auth-refresh-epp.cjs");
+const { isEppPage, assertEppAuthContinuation } = require("../../scripts/auth-refresh-epp.cjs");
+
+test('EPP security denial and blocked redirects stop continuation without exposing the provider URL',()=>{
+  assert.throws(()=>assertEppAuthContinuation({url:()=> 'https://account.samsung.com/iam/blocked?secret=fixture'}),e=>e.exitCode===78&&e.eppReason==='SAMSUNG_ACCOUNT_SECURITY_BLOCKED'&&!e.message.includes('fixture'));
+  assert.throws(()=>assertEppAuthContinuation({url:()=> 'about:blank'},{lastBlocked:()=>({reason:'PRODUCTION_NAVIGATION_BLOCKED'})}),e=>e.eppReason==='PRODUCTION_NAVIGATION_BLOCKED');
+  assert.doesNotThrow(()=>assertEppAuthContinuation({url:()=> 'https://account.samsung.com/iam/login'}));
+});
 test('fresh EPP login never inherits an old email checkpoint', () => {
   assert.deepEqual(eppLoginResumeOptions({ emailPhase:'CHALLENGE', passwordAttempted:true },true), { resumeOnly:false, resumeEmailPhase:'NONE' });
   assert.deepEqual(eppLoginResumeOptions({ emailPhase:'NONE' }), { resumeOnly:false, resumeEmailPhase:'NONE' });

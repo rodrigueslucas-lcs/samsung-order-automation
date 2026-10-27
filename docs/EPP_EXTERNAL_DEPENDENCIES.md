@@ -77,7 +77,7 @@ hold fixture teardown indefinitely.
 | Market / environment | Proven outcome | Remaining prerequisite |
 |---|---|---|
 | MX S1 | Independent EPP FIRST authentication, entitlement and logout verified; owned browser closed | Eligible PLP/PDP data for this programme |
-| MX S2 | Independent EPP FIRST verified; **SAM-25022 and SAM-25044 live PASS** | PLP/filter data, contact fixture and proven EPP order/payment contract |
+| MX S2 | Independent EPP FIRST verified; **SAM-25022, SAM-25044 and SAM-25034 live PASS** | Eligible PLP/filter data and proven EPP order/payment contract |
 | CO S1 | Email/password automatic after stale-handoff fix; callback did not establish EPP acceptance | Successful provider callback and EPP entitlement |
 | CO S2 | Cookie bootstrap and verification-success route inspected; client attempted Production `/shop/` after double-slash programme route | Correct staging activation return; Production was blocked |
 | PE S1 | Email, CAPTCHA continuation and password submit observed; no accepted storefront return | Successful callback/entitlement |
@@ -89,6 +89,67 @@ No EPP order/payment was submitted. Existing cart entries were preserved. Do not
 classify generic timeouts as environment defects. PE code rejection is a data
 blocker; the CO S2 staging-to-Production deviation is an observed defect with its
 internal configuration cause still unisolated. Neither has an invented Jira ID.
+
+### Continuation evidence (2026-10-27)
+
+The published implementation was continued after `git pull --ff-only` confirmed
+`010eb6d`, `e56ebde` and `eb2d239`. Scope remains 26 IDs: MX 5/7, CO 5/6,
+PE 4/6 and CL 4/7 implemented safe cases; the other eight remain explicit
+payment prerequisites, not executable payment coverage.
+
+* **MX S2 SAM-25034 PASS:** the EPP contact test incorrectly called the guest
+  checkout transition although the registered contact page had already opened.
+  MX/CO EPP contact cases now use the existing authenticated transition. The MX
+  rerun proved contact completion through delivery. Its synthetic QA contact
+  fixture is stored only in ignored `playwright/.auth/epp/runtime-data.json`.
+* **MX S2 SAM-25020 / SAM-25021 BLOCKED:** executed individually; no eligible
+  EPP PLP was proven (`MISSING_OR_UNPROVEN_EPP_PLP`). Registered programme search
+  returned HTTP 200 with zero products/facets, including the observed locale.
+  The supplied PDP remained purchasable; that does not prove a PLP/filter flow.
+* **MX S1:** historical authentication/entitlement/logout proof is preserved.
+  This continuation found GNB catalogue links pointing to Production and did
+  not follow them. No eligible S1 PLP/PDP was proven. A fresh independent
+  verification did not complete; later programme identity was not accepted.
+  This is not evidence of a new application defect or an expired-session diagnosis.
+* **CO S1:** Samsung Account returned `/iam/blocked` with a visible security
+  denial (`SAMSUNG_ACCOUNT_SECURITY_BLOCKED`). No repeated login was attempted.
+  Provider/operator clearance and successful callback/entitlement are required.
+* **CO S2:** public staging still reaches the corporate registration gate.
+  The previously observed staging-to-Production deviation remains unresolved.
+  No activation link was replayed and no Jira ID is invented.
+* **PE S1:** the OAuth return target identified staging API `/pe/login/return`,
+  but the resulting window reached the Production programme registration.
+  No Production form was submitted. The internal configuration cause remains
+  unisolated; staging callback/registration return configuration needs review.
+* **PE S2:** `VERIFICATION_CODE_REJECTED` remains a data/access blocker. The
+  rejected code was not submitted again. A valid programme code is required.
+* **CL S1:** the native EPP window showed access and authenticated logout, but
+  fresh independent verification did not complete. Login/entitlement remains
+  unhomologated for this continuation; no native-only success is counted as PASS.
+* **CL S2:** the public homepage rendered without a functional login/profile
+  entry. The previous `checkAccess=true` plus anonymous identity remains
+  insufficient. Functional registered entry and eligible catalogue are required.
+
+The EPP-only Chromium guard now checks document navigation and commerce writes
+with CDP Fetch interception, including server redirect hops. A real local
+Chromium test proves allowed staging redirects/cookies and denial of a later
+Production redirect. No callback is rewritten, credential request proxied or
+Production fallback enabled. Security-denied Account pages and blocked redirects
+stop EPP continuation without a repeated credential submit. Independent verifier
+cleanup releases its observers/interceptor on failure as well as success.
+
+Historical PASS cannot be erased by a newer prerequisite block; the matrix keeps
+the current blocked attempt separately. A contradictory functional FAIL still
+replaces PASS. Current matrix: **3 PASS, 49 BLOCKED, 0 FAIL** across 52 rows.
+Authentication probes are supporting evidence, not official TC PASS.
+
+For MX SAM-25045/25046, CO SAM-24953, PE SAM-25138/25140 and CL
+SAM-24864/24865/24866, a correct programme identity, eligible SKU, checkout,
+provider, approved staging payment fixture, duplicate-prevention contract and
+expected confirmation must all be proven. MX has safe delivery evidence, but
+its EPP payment provider/fixture/confirmation contract is still unproven. Other
+markets are additionally blocked by the access/catalogue findings above.
+No EPP order or payment was submitted in this continuation.
 
 `npm run qst:epp:report` writes the required 52-row table (26 IDs × S1/S2) to
 ignored `test-results/epp/homologation/matrix.md` and `matrix.json`, using actual
