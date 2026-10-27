@@ -81,6 +81,10 @@ function getEppConfig(market, environment = process.env) {
   const override = String(environment[`${code}_EPP_STOREFRONT_URL`] || "").trim();
   const entryUrl = new URL(override || source.storefrontUrl);
   if (entryUrl.protocol !== "https:") throw new Error(`${code} EPP storefront must use https.`);
+  const expectedHost = envName === "S2" ? "stg2.shop.samsung.com" : "stg.shop.samsung.com";
+  if (entryUrl.hostname !== expectedHost || entryUrl.port || entryUrl.username || entryUrl.password) {
+    throw new Error(`${code} EPP storefront must use the configured ${envName} staging host.`);
+  }
   if (!entryUrl.pathname.toLowerCase().startsWith(`/${code.toLowerCase()}/multistore/`)) {
     throw new Error(`${code} EPP storefront must stay inside /${code.toLowerCase()}/multistore/.`);
   }
@@ -88,9 +92,13 @@ function getEppConfig(market, environment = process.env) {
   const explicitPdp = String(environment[`${code}_EPP_QST_PDP_URL`] || "").trim();
   const pdpUrl = explicitPdp ? new URL(explicitPdp) : (/\/p\//i.test(entryUrl.pathname) ? entryUrl : null);
   const sku = String(environment[`${code}_EPP_QST_SKU`] || source.sku || "").trim() || null;
-  if (pdpUrl && (pdpUrl.hostname !== rootUrl.hostname || !pdpUrl.pathname.toLowerCase().startsWith(`/${code.toLowerCase()}/multistore/`))) {
+  if (pdpUrl && (pdpUrl.origin !== rootUrl.origin || pdpUrl.username || pdpUrl.password || !pdpUrl.pathname.startsWith(rootUrl.pathname) || !/\/p\/[^/]+\/?$/.test(pdpUrl.pathname))) {
     throw new Error(`${code} EPP PDP must stay on the configured staging multistore.`);
   }
+  if (pdpUrl && sku && decodeURIComponent(pdpUrl.pathname.split('/').filter(Boolean).at(-1)) !== sku) throw new Error("EPP PDP and SKU must identify the same product.");
+  const plpValue = String(environment[`${code}_EPP_QST_PLP_URL`] || "").trim();
+  const plpUrl = plpValue ? new URL(plpValue) : null;
+  if (plpUrl && (plpUrl.origin !== rootUrl.origin || !plpUrl.pathname.startsWith(rootUrl.pathname) || plpUrl.username || plpUrl.password)) throw new Error("EPP PLP must stay inside the configured staging multistore.");
   return Object.freeze({
     market: code,
     environment: envName,
@@ -99,6 +107,7 @@ function getEppConfig(market, environment = process.env) {
     rootUrl,
     pdpUrl,
     sku,
+    plpUrl,
     cartUrl: new URL("cart", rootUrl),
     verificationCode: source.verificationCode,
     accessMode: source.accessMode,

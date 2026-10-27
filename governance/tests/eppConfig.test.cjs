@@ -20,6 +20,26 @@ const expected = {
     S2: ["stg2.shop.samsung.com", "/cl/multistore/alianzas/alianzas/", "JET85", "verification-code"],
   },
 };
+test('EPP rejects mismatched PDP/SKU and PLP routes outside its programme', () => {
+  assert.throws(() => getEppConfig('MX', { MX_EPP_QST_SKU:'OTHER' }), /same product/);
+  assert.throws(() => getEppConfig('MX', { MX_EPP_QST_PLP_URL:'https://stg2.shop.samsung.com/mx/c/phones' }), /configured staging multistore/);
+  const cfg = getEppConfig('MX', { MX_EPP_QST_PLP_URL:'https://stg2.shop.samsung.com/mx/multistore/pymesmx/pymesmx/c/phones' });
+  assert.match(cfg.plpUrl.pathname,/pymesmx\/c\/phones$/);
+});
+
+for (const market of ["MX", "CO", "PE", "CL"]) {
+  test(`${market} rejects production, wrong environment and foreign multistore overrides`, () => {
+    const base = getEppConfig(market, {});
+    for (const host of ["shop.samsung.com", "stg.shop.samsung.com", "stg2.shop.samsung.com.evil.example"]) {
+      const url = new URL(base.entryUrl);
+      url.hostname = host;
+      assert.throws(() => getEppConfig(market, { [`${market}_EPP_STOREFRONT_URL`]: url.href }), /staging host/);
+    }
+    assert.throws(() => getEppConfig(market, { [`${market}_EPP_QST_PDP_URL`]: `${base.rootUrl.origin}/${market.toLowerCase()}/multistore/other/other/p/SKU` }), /configured staging multistore/);
+    assert.throws(() => getEppConfig(market, { [`${market}_EPP_QST_PDP_URL`]: base.rootUrl.href }), /configured staging multistore/);
+    assert.throws(() => getEppConfig(market, { [`${market}_EPP_QST_PDP_URL`]: base.rootUrl.href.replace("https:", "http:") + "p/SKU" }), /configured staging multistore/);
+  });
+}
 
 for (const [market, environments] of Object.entries(expected)) {
   for (const [environment, [host, rootPath, verificationCode, accessMode]] of Object.entries(environments)) {
