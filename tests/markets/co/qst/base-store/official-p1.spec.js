@@ -59,6 +59,8 @@ async function authenticatedPage(browser,cfg,{desktopProfile=false}={}){
   const auth=getCoAuthState();
   let page;
   if(desktopProfile){
+    // The normal newPage guard validates auth immediately. Prepare the native
+    // window first, then perform that same validation explicitly before reuse.
     page=await context.newPage();
     if(headed) await authBrowserWindow.prepareAuthBrowserWindow(page);
     await auth.applyAuthSessionStorage(context);
@@ -520,8 +522,8 @@ test("SAM-24898 @qst @co @base-store - Checkout button on cart page",async({page
 test("SAM-24899 @qst @co @base-store - Order Summary on checkout page",async({page},i)=>runCanonicalCase("SAM-24899",page,i));
 test("SAM-24900 @qst @co @base-store - Step 1 Contact Details Section",async({page},i)=>runCanonicalCase("SAM-24900",page,i));
 test("SAM-24901 @qst @co @base-store @registered - Add Edit saved new address",async({browser},i)=>{
-  evidence(i,"SAM-24901");
   test.skip(process.env.ALLOW_PROFILE_WRITE!=="1","Persistent CO address edits require ALLOW_PROFILE_WRITE=1.");
+  evidence(i,"SAM-24901");
   const {context,page,delivery}=await coRegisteredDelivery(browser);
   try{
     const secondaryNumber=`113-${Date.now()%10000}`;
@@ -570,8 +572,8 @@ test("SAM-24902 @qst @co @base-store @registered - Select saved address",async({
   }finally{await context.close();}
 });
 test("SAM-24903 @qst @co @base-store @registered - Save option for reg user",async({browser},i)=>{
-  evidence(i,"SAM-24903");
   test.skip(process.env.ALLOW_PROFILE_WRITE!=="1","Saving CO profile addresses requires ALLOW_PROFILE_WRITE=1.");
+  evidence(i,"SAM-24903");
   const {context,page,delivery}=await coRegisteredDelivery(browser);
   try{
     const secondaryNumber=`113-${Date.now()%10000}`;
@@ -670,11 +672,14 @@ test("SAM-24919 @destructive @qst @co @base-store - Track Order",async({page,con
   orderNumber=confirmationText.match(/N[uú]mero de pedido:\s*(CO\d{6}-\d{8})/i)?.[1];
   expect(orderNumber,"CO confirmation must display the public order number used by Track Order.").toBeTruthy();
   expect(created.orderCode.startsWith(orderNumber),"The confirmation order must match the submitted checkout response.").toBe(true);
+  // CO intermittently omits the email from confirmation copy; the tracking
+  // lookup below verifies the actual order/email association (OTP on S2).
   console.log(`[co-tracking] fresh guest order ${orderNumber} confirmed for ${email}`);
   i.annotations.push({type:"co-tracking-created-order",description:`Fresh guest order ${orderNumber} for ${email}`});
   const confirmedIdentity=coTrackingPrerequisite.getCoTrackingPrerequisite({market:"CO",environment:cfg.environment,confirmed:true,sku:cfg.sku,orderNumber,email,inbox},cfg.environment,cfg.sku);
   expect(confirmedIdentity,"Tracking must use the order and mailbox confirmed in this execution.").toEqual({orderNumber,email,inbox});
   fs.mkdirSync(path.dirname(fixturePath),{recursive:true});
+  // Investigation receipt only: the official TC never reads a previous order.
   atomicJson.writeJsonAtomically(fixturePath,{market:"CO",environment:cfg.environment,confirmed:true,sku:cfg.sku,orderNumber,email,inbox});
   recordBusinessEvidence(i,{orderCode:orderNumber,createdInThisExecution:true});
   const ordersUrl=new URL("/co/mypage/orders",cfg.baseUrl.origin).toString();
