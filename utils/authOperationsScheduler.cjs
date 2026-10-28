@@ -21,8 +21,10 @@ function schedulerView(input, now = Date.now()) {
   result.executing = input.running === true;
   return result;
 }
-function readScheduler(environment = 'S2', { platform = process.platform, run = execFileSync, env = process.env, now = Date.now() } = {}) {
-  const name = taskName(environment);
+function readScheduler(environment = 'S2', { platform = process.platform, run = execFileSync, env = process.env, now = Date.now(),scope='BASE_STORE' } = {}) {
+  const baseName = taskName(environment);
+  if(!['BASE_STORE','EPP'].includes(scope))throw Error('Unknown scheduler scope.');
+  const name = scope==='EPP'?'SamsungSMB-EppAuthKeepAlive-'+environment:baseName;
   if (platform !== 'win32') return schedulerView(null, now);
   const script = `$ErrorActionPreference='Stop'; $task=Get-ScheduledTask -TaskName '${name}'; $info=Get-ScheduledTaskInfo -TaskName '${name}'; [xml]$xml=Export-ScheduledTask -TaskName '${name}'; $ns=New-Object System.Xml.XmlNamespaceManager($xml.NameTable); $ns.AddNamespace('t','http://schemas.microsoft.com/windows/2004/02/mit/task'); $logon=$xml.SelectSingleNode('//t:LogonTrigger',$ns); $principal=$xml.SelectSingleNode('//t:Principal/t:UserId',$ns); $interval=$xml.SelectSingleNode('//t:TimeTrigger/t:Repetition/t:Interval',$ns); function Resolve-AuthTaskSid([string]$value){if($value -match '^S-1-'){return $value};return ([System.Security.Principal.NTAccount]$value).Translate([System.Security.Principal.SecurityIdentifier]).Value}; [pscustomobject]@{known=$true;enabled=[bool]$task.Settings.Enabled;running=($task.State -eq 'Running');interval=$interval.InnerText;startupEnabled=($null -ne $logon -and $logon.Enabled -ne 'false' -and (Resolve-AuthTaskSid $logon.UserId) -eq (Resolve-AuthTaskSid $principal.InnerText));ignoreNew=([string]$task.Settings.MultipleInstances -eq 'IgnoreNew');interactiveOnly=([string]$task.Principal.LogonType -eq 'Interactive');lastRun=$info.LastRunTime.ToUniversalTime().ToString('o');nextRun=$info.NextRunTime.ToUniversalTime().ToString('o');lastResult=[long]$info.LastTaskResult}|ConvertTo-Json -Compress`;
   try {

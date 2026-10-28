@@ -36,8 +36,15 @@ function buildModel({ cycles = [], scheduler, activity, corrupt = 0, environment
     const stale = Boolean(latest && SUCCESS.has(latest.status) && now-Date.parse(latest.at)>freshnessMs);
     const boundary=own.filter(e=>SUCCESS.has(e.status)||e.status==='HANDOFF_ENDED').at(-1);
     const unresolvedHuman=human&&(!boundary||own.indexOf(human)>own.indexOf(boundary));
+    const condition=[...own].reverse().find(e=>SUCCESS.has(e.status)||['NEEDS_REFRESH','FAILED'].includes(e.status));
+    const verifiedAge=verified?Math.max(0,now-Date.parse(verified.at)):null;
+    const gateWithoutNewProof=human&&(!verified||own.indexOf(human)>own.indexOf(verified));
+    const health=unresolvedHuman?'HUMAN_REQUIRED':condition?.status==='NEEDS_REFRESH'?'EXPIRED':condition?.status==='FAILED'?'BLOCKED':gateWithoutNewProof?'STALE':verified&&verifiedAge<=freshnessMs?'HEALTHY':'STALE';
+    const observedOperation=latest?.status==='VERIFYING'?'VERIFYING':latest?.status==='REFRESHING'?'REFRESHING':'IDLE';
+    const operationRecent=latest&&now-Date.parse(latest.at)<(observedOperation==='VERIFYING'?10:20)*60000;
+    const operation=observedOperation!=='IDLE'&&operationRecent&&scheduler?.executing!==false?observedOperation:'IDLE';
     return {
-      market,slot,status:unresolvedHuman?'HUMAN_REQUIRED':stale?'STALE':latest?.status||'NO_DATA',at:unresolvedHuman?human.at:latest?.at||null,lastOutcome:latest?.status||'NO_DATA',
+      market,slot,environment,health,operation,lastAttempts:latest?.attempts||null,operationStartedAt:operation==='IDLE'?null:latest.at,lastVerified:verified?.at||null,verifiedAgeMs:verifiedAge,status:unresolvedHuman?'HUMAN_REQUIRED':stale?'STALE':latest?.status||'NO_DATA',at:unresolvedHuman?human.at:latest?.at||null,lastOutcome:latest?.status||'NO_DATA',
       lastVerify:verified?.at||null,lastRefresh:refreshed?.at||null,lastHuman:human?.at||null,
       reason:latest?.reason||null,
       verifyDurationMs:[...own].reverse().find(e=>e.verifyDurationMs!==undefined)?.verifyDurationMs??null,
@@ -63,9 +70,10 @@ function buildModel({ cycles = [], scheduler, activity, corrupt = 0, environment
   const average = key => {const values=samples.filter(e=>Number.isFinite(e[key])).map(e=>e[key]);return values.length?values.reduce((a,b)=>a+b,0)/values.length:null;};
   return {
     environment,generatedAt:new Date(now).toISOString(),scheduler:scheduler||{status:'UNKNOWN'},activity:activity||{known:false,active:[],queued:[]},sessions,
+    lastCompletedCycle:history.filter(c=>c.state==='COMPLETE').map(c=>c.finishedAt||c.startedAt).sort((a,b)=>Date.parse(a)-Date.parse(b)).at(-1)||null,
     attention:sessions.filter(s=>s.status==='HUMAN_REQUIRED'),lastCheck:history.map(c=>c.finishedAt||c.events.at(-1)?.at||c.startedAt).sort((a,b)=>Date.parse(a)-Date.parse(b)).at(-1)||null,
     timeline:events.slice(-60).reverse(),corrupt,
-    metrics:{healthy:sessions.filter(s=>SUCCESS.has(s.status)).length,total:6,cycles:history.filter(c=>c.origin!=='MANUAL_REFRESH').length,
+    metrics:{healthy:sessions.filter(s=>s.health==='HEALTHY').length,total:6,cycles:history.filter(c=>c.origin!=='MANUAL_REFRESH').length,
       healthyCycles:history.filter(c=>c.state==='COMPLETE'&&c.identities.length===6&&c.identities.every(i=>SUCCESS.has(i.status))).length,
       retries:today.filter(e=>e.kind==='identity'&&VERIFY_OUTCOMES.has(e.status)&&(e.attempts||0)>1).length,
       recoveries:today.filter(e=>e.status==='RECOVERED').length,human:humanToday,

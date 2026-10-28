@@ -100,9 +100,17 @@ and 1 for blocked/unproven/finalization failures. A task result of 1 therefore
 requires the typed summary: a documented external EPP blocker is not evidence
 that the Windows trigger failed or that every session is expired.
 
-The Auth Operations item remains an observer-only static HTML Publisher job.
-Its existing builder/publisher/history are preserved; the public link uses the
-configured display origin. Resource repair changes only the Jenkins isolated
+The Auth Operations item remains an observer-only HTML Publisher job, displaying
+the complete dashboard with local CSS and countdown assets. Its finite builder
+copies only the three public dashboard files; it performs no authentication.
+An explicitly enabled local report mirror updates only the current job-level
+public report, never historical builds, credentials or session files. Its NTFS
+write permission must be granted explicitly to the reporting user.
+Base Store health and current operations are independent. EPP has its own table,
+using maintenance summaries, independently verified identity metadata and typed
+checkpoints; Samsung Account login alone never proves EPP entitlement. Old proof
+becomes STALE, not EXPIRED. Missing browser/email phase data is not invented.
+The public link uses the configured display origin. Resource repair changes only the Jenkins isolated
 resource URL to a currently assigned local address, preserving CSP/auth settings.
 No new plugin or market execution is required. Real iPhone reachability and
 Windows logon execution require separate device/runtime evidence.
