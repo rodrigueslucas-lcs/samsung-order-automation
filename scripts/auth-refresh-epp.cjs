@@ -19,6 +19,14 @@ function isEppPage(page, config) {
   catch { return false; }
 }
 
+async function needsEppBootstrap(page,config) {
+  if(!isEppPage(page,config))return true;
+  // A retained blank document is not a rendered programme. Recover staging
+  // setup once; a rendered page (including an external gate) stays in place.
+  try{return !(await page.locator('body').innerText({timeout:3000})).trim();}
+  catch{return false;}
+}
+
 function assertEppAuthContinuation(page, guard) {
   const blocked = guard?.lastBlocked();
   if (blocked) throw Object.assign(new Error('EPP navigation denied; no login retry.'), {exitCode:78,eppReason:blocked.reason});
@@ -35,18 +43,22 @@ function readHandoff(files) {
 }
 
 async function refresh(market, environment) {
-  const config = getEppConfig(market, { ENVIRONMENT: environment });
+  const config = getEppConfig(market, { ...process.env, ENVIRONMENT: environment, [`${String(market).toUpperCase()}_QST_ENVIRONMENT`]:environment });
+  const resumeOnly = process.env.EPP_AUTH_RESUME_ONLY === '1';
+  const interactiveTimeout = Number(process.env.EPP_AUTH_INTERACTIVE_TIMEOUT_MS || 600000);
+  if (!Number.isFinite(interactiveTimeout) || interactiveTimeout < 1000 || interactiveTimeout > 600000) throw new Error('Invalid EPP interactive timeout.');
   const files = getEppSessionPaths(config);
   const credentials = getPrimaryEppCredentials(config);
   const lease = acquireEppLease(config);
   fs.mkdirSync(files.directory, { recursive: true });
   let browser, guard, success = false, startedNewAccountFlow = false, stage = "CONNECT_BROWSER";
-  const report = message => console.log(`[auth:epp] ${config.market} ${config.environment} FIRST · ${message}`);
+  const report = message => console.log(`[auth:epp] ${config.market} ${config.environment} ${config.authSlot === 'second' ? 'SECOND' : 'FIRST'} · ${message}`);
   try {
     report("START · isolated EPP profile; no Base Store state imported");
     browser = await connectAuthBrowser({ chromium, profileDir: files.profile, market: config.market.toLowerCase(), environment: config.environment }, {
       log: () => {},
       launch: () => {
+        if (resumeOnly) throw Object.assign(new Error('Retained EPP browser is unavailable; no login restart.'), { exitCode: 79, eppReason: 'EPP_HANDOFF_BROWSER_MISSING' });
         const chrome = ["C:/Program Files/Google/Chrome/Application/chrome.exe", "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe", path.join(process.env.LOCALAPPDATA || "", "Google/Chrome/Application/chrome.exe")].find(file => fs.existsSync(file));
         if (!chrome) throw new Error("Chrome executable is unavailable.");
         const child = spawn(chrome, [`--user-data-dir=${files.profile}`, "--remote-debugging-port=0", "--disable-background-mode", "--start-maximized", "--no-first-run", "--no-default-browser-check", "--hide-crash-restore-bubble", "--new-window", "about:blank"], { detached: true, stdio: "ignore", windowsHide: true });
@@ -66,7 +78,7 @@ async function refresh(market, environment) {
       await prepareAuthBrowserWindow(page);
       // Resume an owned registration/verification dialog in place. Navigation
       // would discard its successful code confirmation and could repeat work.
-      if (!isEppPage(page, config)) {
+      if (await needsEppBootstrap(page, config)) {
         await page.goto(new URL("/getcookie.html", config.rootUrl).href, { waitUntil: "commit", timeout: 30000 });
         await page.getByText(/You can access pages now/i).first().waitFor({ timeout: 15000 });
         await page.goto(config.rootUrl.href, { waitUntil: "commit", timeout: 60000 });
@@ -92,6 +104,7 @@ async function refresh(market, environment) {
         if (profile.state === "signed-out") loginAction = profile.login;
       }
       if (loginAction) {
+        if (resumeOnly) throw Object.assign(new Error('Retained EPP login is not in progress; no new authorization.'), { exitCode: 79, eppReason: 'EPP_HANDOFF_NOT_READY' });
         stage = "EPP_LOGIN_ACTION";
         report("opening the official EPP Samsung Account action once");
         await page.waitForFunction(() => typeof window.samsung?.account?.signIn === "function", null, { timeout: 30000 });
@@ -113,18 +126,32 @@ async function refresh(market, environment) {
     if (new URL(page.url()).hostname === "account.samsung.com") {
       stage = "SAMSUNG_ACCOUNT";
       const handoff = readHandoff(files);
+      if (resumeOnly && config.authSlot !== 'second' && typeof handoff.passwordAttempted !== 'boolean') throw Object.assign(new Error('Retained EPP credential outcome is unknown; no replay.'),{exitCode:79,eppReason:'HANDOFF_STATE_UNKNOWN'});
       if (handoff.passwordAttempted && await page.locator('input[type="password"]:visible').count()) throw Object.assign(new Error("Previous password outcome requires manual review; no repeat submit."), { exitCode: 79 });
       await prepareAuthBrowserWindow(page);
-      report("Samsung Account opened; automatic FIRST credentials, human CAPTCHA/MFA only");
+      report("Samsung Account opened; human CAPTCHA/MFA only");
       assertEppAuthContinuation(page,guard);
+      if (config.authSlot === 'second') {
+        await require('../utils/authAccountQr.cjs').openSecondAccountQr(page, { slot: 'second', log: report });
+        report('HUMAN_REQUIRED · scan with the SECOND identity; FIRST credentials are never entered');
+        const deadline = Date.now() + interactiveTimeout;
+        while (new URL(page.url()).hostname === 'account.samsung.com' && Date.now() < deadline) {
+          assertEppAuthContinuation(page, guard);
+          if (new URL(page.url()).pathname === '/iam/sign-in/status/terms') {
+            await completeAccountLogin(page, { market: config.market.toLowerCase(), hostname: config.rootUrl.hostname, passwordAlreadySubmitted: true, resumeOnly: true, credentials: {}, timeout: Math.max(1000, deadline - Date.now()), log: report });
+          } else await page.waitForTimeout(500);
+        }
+        if (new URL(page.url()).hostname === 'account.samsung.com') throw Object.assign(new Error('EPP SECOND needs human verification.'), {exitCode:79,eppReason:'EPP_SECOND_HUMAN_REQUIRED'});
+      } else {
       await completeAccountLogin(page, { market: config.market.toLowerCase(), hostname: config.rootUrl.hostname, credentials,
-        timeout: 600000, ...eppLoginResumeOptions(handoff, startedNewAccountFlow),
+        timeout: interactiveTimeout, passwordAlreadySubmitted: handoff.passwordAttempted === true, ...eppLoginResumeOptions(handoff, startedNewAccountFlow), ...(resumeOnly ? {resumeOnly:true} : {}),
         pause: async ms => { assertEppAuthContinuation(page,guard); await new Promise(resolve=>setTimeout(resolve,ms)); },
         log: message => {
           if (message.startsWith("AUTH_HANDOFF_AUDIT ")) {
             try { writeJsonAtomically(files.handoff, { ...readHandoff(files), ...JSON.parse(message.slice("AUTH_HANDOFF_AUDIT ".length)) }); } catch {}
           } else report(message.replace(/^\[auth:login:[^\]]+\]\s*/, ""));
         } });
+      }
     }
     stage = "EPP_ACCESS";
     page = context.pages().find(candidate => isEppPage(candidate, config)) || context.pages().find(candidate => { try { return new URL(candidate.url()).origin === config.rootUrl.origin; } catch { return false; } }) || page;
@@ -148,6 +175,7 @@ async function refresh(market, environment) {
       state = await observe(page, config);
       if (state.status === "READY") break;
       if (state.reason === "CORPORATE_ACTIVATION_REQUIRED") {
+        if (process.env.EPP_AUTH_MAINTENANCE === '1') throw Object.assign(new Error('EPP maintenance cannot request corporate activation.'), {exitCode:78,eppReason:'CORPORATE_ACTIVATION_REQUIRED'});
         await email.fill(credentials.email);
         const handoff = readHandoff(files);
         if (!handoff.corporateLinkRequestedAt) {
@@ -189,6 +217,9 @@ async function refresh(market, environment) {
       error.eppReason = denied.reason; error.exitCode = 78;
     }
     error.eppStage = stage;
+    if (error.exitCode === 78 || error.eppReason === 'CORPORATE_ACTIVATION_REQUIRED') {
+      writeJsonAtomically(files.handoff, { ...readHandoff(files), blockedReason: error.eppReason, blockedAt: new Date().toISOString() });
+    }
     throw error;
   } finally {
     try { await guard?.dispose(); }
@@ -206,4 +237,4 @@ if (require.main === module) refresh(process.argv[2], process.argv[3] || "S2").c
   console.error(`[auth:epp] ${status} · ${error.eppStage || "PRECONDITIONS"} · ${error.eppReason || code} · browser preserved when intervention is needed; no raw provider error or credential printed.`);
   process.exitCode = error.exitCode || 1;
 });
-module.exports = { refresh, observe, isEppPage, assertEppAuthContinuation };
+module.exports = { refresh, observe, isEppPage, needsEppBootstrap, assertEppAuthContinuation };

@@ -7,10 +7,12 @@ const leaseModule = require("./authMarketLease.cjs");
 function getEppSessionPaths(config) {
   const { market, environment } = config;
   if (!["MX", "CO", "PE", "CL"].includes(market) || !["S1", "S2"].includes(environment)) throw new Error("Invalid EPP identity.");
-  const directory = path.join(root, "playwright", ".auth", "epp", environment.toLowerCase(), market.toLowerCase());
+  const slot = config.authSlot || 'primary';
+  if (!['primary', 'second'].includes(slot) || (slot === 'second' && !['MX', 'CO'].includes(market))) throw new Error('Invalid EPP account slot.');
+  const directory = path.join(root, "playwright", ".auth", "epp", environment.toLowerCase(), market.toLowerCase(), ...(slot === 'second' ? ['second'] : []));
   return {
     directory,
-    profile: path.join(root, "playwright", "profiles", "epp", `${environment.toLowerCase()}-${market.toLowerCase()}-qa`),
+    profile: path.join(root, "playwright", "profiles", "epp", `${environment.toLowerCase()}-${market.toLowerCase()}-${slot === 'second' ? 'second' : 'qa'}`),
     state: path.join(directory, "state.json"), session: path.join(directory, "session-storage.json"),
     metadata: path.join(directory, "identity.json"), handoff: path.join(directory, "handoff.json"), lock: path.join(directory, "refresh.lock"),
   };
@@ -19,6 +21,16 @@ function getEppSessionPaths(config) {
 // Lucas explicitly authorized the configured FIRST credential for isolated EPP.
 // Only credentials are shared; no Base Store state/profile/bundle is loaded.
 function getPrimaryEppCredentials(config, environment = process.env, io = fs) {
+  if (config.authSlot === 'second') {
+    const file = environment[`${config.market}_EPP_SECOND_CREDENTIAL_FILE`] || path.join(root, 'playwright', '.auth', `${config.market.toLowerCase()}-second-storefront-user.json`);
+    let second;
+    try { second = JSON.parse(io.readFileSync(file, 'utf8')); } catch { throw Object.assign(new Error('EPP SECOND identity is not provisioned; FIRST fallback is forbidden.'),{eppReason:'EPP_SECOND_IDENTITY_NOT_PROVISIONED'}); }
+    const email = environment[`${config.market}_EPP_SECOND_EMAIL`] || second.email;
+    if (typeof email !== 'string' || !email.trim()) throw Object.assign(new Error('EPP SECOND identity is not provisioned.'),{eppReason:'EPP_SECOND_IDENTITY_NOT_PROVISIONED'});
+    const first=getPrimaryEppCredentials({...config,authSlot:'primary'},environment,io);
+    if(email.trim().toLowerCase()===first.email.trim().toLowerCase())throw Object.assign(new Error('EPP SECOND must differ from FIRST.'),{eppReason:'EPP_SECOND_IDENTITY_NOT_INDEPENDENT'});
+    return { email: email.trim(), password: null };
+  }
   const explicit = environment[`${config.market}_EPP_CREDENTIAL_FILE`];
   const candidates = explicit ? [path.resolve(explicit)] : ["samsung-storefront-user.json", "mx-storefront-user.json", "co-storefront-user.json", "pe-storefront-user.json", "cl-storefront-user.json"].map(name => path.join(root, "playwright", ".auth", name));
   let local = {};
@@ -37,7 +49,7 @@ function loadEppSession(config, io = fs) {
   if (!io.existsSync(files.metadata)) return { storageState: { cookies: [], origins: [] }, sessionStorage: {} };
   try {
     const identity = JSON.parse(io.readFileSync(files.metadata, "utf8"));
-    if (identity.store !== "EPP" || identity.market !== config.market || identity.environment !== config.environment || identity.root !== config.rootUrl.href || identity.verified !== true) throw new Error();
+    if (identity.store !== "EPP" || identity.market !== config.market || identity.environment !== config.environment || identity.root !== config.rootUrl.href || (identity.authSlot || 'primary') !== (config.authSlot || 'primary') || identity.verified !== true) throw new Error();
     const storageState = JSON.parse(io.readFileSync(files.state, "utf8"));
     const sessionStorage = JSON.parse(io.readFileSync(files.session, "utf8"));
     if (!Array.isArray(storageState.cookies) || !Array.isArray(storageState.origins) || !sessionStorage || Array.isArray(sessionStorage) || typeof sessionStorage !== "object") throw new Error();
@@ -59,7 +71,7 @@ function persistVerifiedEppSession(config, snapshot, { io = fs, write = writeJso
   io.mkdirSync(files.directory, { recursive: true });
   write(files.state, snapshot.storageState);
   write(files.session, snapshot.sessionStorage);
-  write(files.metadata, { store: "EPP", market: config.market, environment: config.environment, root: config.rootUrl.href, verified: true, serverAccepted: true, verifiedAt: now() });
+  write(files.metadata, { store: "EPP", market: config.market, environment: config.environment, authSlot: config.authSlot || 'primary', root: config.rootUrl.href, verified: true, serverAccepted: true, verifiedAt: now() });
 }
 
 function acquireEppLease(config, environment = process.env, { io = fs, acquire = leaseModule.acquireMarketLease, register = leaseModule.registerLeaseProcess } = {}) {

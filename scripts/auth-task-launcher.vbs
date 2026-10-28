@@ -7,7 +7,7 @@ executable = WScript.Arguments(0)
 scriptName = WScript.Arguments(1)
 If LCase(fso.GetFileName(executable)) <> "node.exe" Then WScript.Quit 64
 If Not fso.FileExists(executable) Then WScript.Quit 64
-If scriptName <> "auth-keepalive-once.cjs" And scriptName <> "auth-operations-dashboard.cjs" Then WScript.Quit 64
+If scriptName <> "auth-keepalive-once.cjs" And scriptName <> "auth-epp-keepalive-once.cjs" And scriptName <> "auth-operations-dashboard.cjs" Then WScript.Quit 64
 root = fso.GetParentFolderName(fso.GetParentFolderName(WScript.ScriptFullName))
 shell.CurrentDirectory = root
 command = Quoted(executable) & " " & Quoted(fso.BuildPath(fso.BuildPath(root, "scripts"), scriptName))

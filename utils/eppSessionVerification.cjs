@@ -31,7 +31,7 @@ async function verifyEppSnapshot(config, snapshot, { expectedEmail, timeout = 60
     if (ui.status !== "READY" || !proof.accepted()) {
       const server = proof.snapshot();
       const human = server.reason === "SERVER_AUTH_REJECTED" || server.reason === "SERVER_IDENTITY_NOT_PROVEN" || server.reason === "EPP_ENTITLEMENT_NOT_PROVEN";
-      throw Object.assign(new Error("EPP independent verification did not prove authenticated access."), { exitCode: human ? 79 : 1, eppReason: server.reason === "SERVER_PROOF_PENDING" ? ui.reason : server.reason });
+      throw Object.assign(new Error("EPP independent verification did not prove authenticated access."), { exitCode: human ? 79 : 1, eppReason: server.reason === "SERVER_PROOF_PENDING" ? ui.reason : server.reason, eppProof: server });
     }
     const profile = await openAuthProfile(page, { market: config.market.toLowerCase(), prepareWindow: async () => {} });
     if (profile.state !== "authenticated") throw Object.assign(new Error("EPP logout proof missing."), { exitCode: 79, eppReason: "EPP_IDENTITY_REQUIRED" });

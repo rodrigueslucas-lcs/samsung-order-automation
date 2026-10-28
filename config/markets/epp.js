@@ -79,6 +79,8 @@ function getEppConfig(market, environment = process.env) {
     environment[`${code}_QST_ENVIRONMENT`] || environment.ENVIRONMENT || "S2"
   );
   const source = EPP_ACCESS[code][envName];
+  const authSlot = String(environment[`${code}_EPP_AUTH_SLOT`] || environment.EPP_AUTH_SLOT || 'primary').toLowerCase();
+  if (!['primary', 'second'].includes(authSlot) || (authSlot === 'second' && !['MX', 'CO'].includes(code))) throw new Error('Unsupported EPP account slot.');
   const override = String(environment[`${code}_EPP_STOREFRONT_URL`] || "").trim();
   const entryUrl = new URL(override || source.storefrontUrl);
   if (entryUrl.protocol !== "https:") throw new Error(`${code} EPP storefront must use https.`);
@@ -102,6 +104,7 @@ function getEppConfig(market, environment = process.env) {
   if (plpUrl && (plpUrl.origin !== rootUrl.origin || !plpUrl.pathname.startsWith(rootUrl.pathname) || plpUrl.username || plpUrl.password)) throw new Error("EPP PLP must stay inside the configured staging multistore.");
   return Object.freeze({
     market: code,
+    authSlot,
     environment: envName,
     environmentLabel: envName === "S2" ? "S2/STG2" : "S1/STG",
     entryUrl,

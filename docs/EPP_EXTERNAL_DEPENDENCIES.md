@@ -2,6 +2,41 @@
 
 Only dependencies that cannot be resolved from the repository are listed here.
 
+## Targeted reconciliation and maintenance, 2026-10-28
+
+Historical PASS results remain valid evidence of their recorded runs; they are
+not a claim that a later session is still authenticated. The eight isolated EPP
+S1/S2 snapshots were rechecked: server identity was not proven in any combination.
+Base Store FIRST/SECOND renewal is not EPP entitlement proof.
+
+After the operator completed the new challenges, MX S2 FIRST finished independent
+READY and CL S1 FIRST was recovered from its retained native session by the
+keep-alive, independently verified, published and closed. MX S2 then completed
+repeated KEEP_ALIVE_OK / SESSION_REUSED cycles without Account/login. A retained
+blank MX EPP document required one staging getcookie bootstrap before its official
+login action could proceed; refresh now applies that recovery only to an observed
+empty owned EPP document, preserving rendered programme/gate pages.
+
+MX S2 was independently recovered and its account order history returned HTTP 200.
+The only EPP order exposed was **MX261026-78768209**, status SHIPPING_REQUESTED.
+No new payment was submitted. The earlier cash initiation remains SUBMITTING,
+without a conclusive public order number/provider reference. It must not be
+resubmitted automatically; Samsung/provider reconciliation is required.
+
+PE S2 remains VERIFICATION_CODE_REJECTED (no repeat code submission); CO S2 still
+requires corporate entitlement/activation confirmation. An unauthenticated route
+read without a Production redirect does not prove that its callback defect is
+fixed. CL S2 requires independent identity and usable EPP commerce. CL S1 Delivery
+was not rerun merely because shared auth changed; hidden address fields remain an
+external prerequisite pending a material change.
+
+The operator supplied [SAM-25146](https://jira.secext.samsung.net/browse/SAM-25146)
+as a footer defect reference. Its supplied title scopes CO/PE S1 Base Store/EPP;
+the recorded EPP footer failure is CL S1 SAM-24841. This is a related investigation
+reference, not a quarantine of CL or other environments. Confirm affected
+market/environment/page and exact missing-footer signature before changing result
+semantics. A generic timeout or unrelated cart failure must still fail.
+
 ## Official QST multi-market access (2026-10-26)
 
 The supplied staging URLs are centralized in `config/markets/epp.js` for MX, CO,

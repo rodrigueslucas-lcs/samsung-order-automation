@@ -3,7 +3,7 @@ const { loadEppSession, getPrimaryEppCredentials, persistVerifiedEppSession, acq
 const { verifyEppSnapshot } = require('../utils/eppSessionVerification.cjs');
 
 async function verify(market, environment = 'S2') {
-  const config = getEppConfig(market, { ENVIRONMENT: environment });
+  const config = getEppConfig(market, { ...process.env, ENVIRONMENT: environment, [`${String(market).toUpperCase()}_QST_ENVIRONMENT`]:environment });
   const lease = acquireEppLease(config);
   try {
     const state = loadEppSession(config);

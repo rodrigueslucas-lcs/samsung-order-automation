@@ -23,6 +23,15 @@ async function captureAuthBrowser({ market, environment, slot }, {
   catch(error) { if(error.code==='ECONNREFUSED'||/ECONNREFUSED/.test(String(error.message)))return null;throw error; }
   return {
     fingerprint: require('node:crypto').createHash('sha256').update(endpoint).digest('hex'),
+    async readEppSnapshot(rootValue) {
+      const root = new URL(rootValue);
+      if (root.protocol !== 'https:' || !['stg.shop.samsung.com','stg2.shop.samsung.com'].includes(root.hostname) || !/^\/(mx|pe|co|cl)\/multistore\//.test(root.pathname)) throw new Error('Snapshot must target a staging EPP programme.');
+      const context = browser.contexts()[0];
+      if (!context || context.pages().some(page => { try { return new URL(page.url()).hostname === 'account.samsung.com'; } catch { return false; } })) return null;
+      const page = context.pages().find(page => page.url().startsWith(root.href));
+      if (!page) return null;
+      return { storageState: await context.storageState(), sessionStorage: await page.evaluate(() => Object.fromEntries(Object.entries(sessionStorage))) };
+    },
     async closeVerified() {
       if (!browser.isConnected()) return;
       const session = await browser.newBrowserCDPSession();

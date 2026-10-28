@@ -37,6 +37,10 @@ function executeRun(run, { acquire = acquireEppLease, spawn = spawnSync } = {}) 
   // until the worker exits, including every failure/launch-error path.
   const lease = run.command.includes("--list") ? null : acquire(getEppConfig(run.env.TEST_MARKET, run.env), run.env);
   try {
+    if (lease && (run.env.EPP_SESSION_BUNDLE_FILE || run.env.EPP_AUTH_PREFLIGHT === '1')) {
+      const checked = spawn(process.execPath, [path.resolve(__dirname,'auth-epp-preflight.cjs')], { cwd:path.resolve(__dirname,'..'),env:{...run.env,...lease.env},stdio:'inherit',windowsHide:true });
+      if (checked.status !== 0) return checked.status ?? 1;
+    }
     const result = spawn(process.execPath, run.command, { cwd: path.resolve(__dirname, ".."), env: { ...run.env, ...lease?.env }, stdio: "inherit", windowsHide: true });
     return result.status ?? 1;
   } finally { lease?.release(); }

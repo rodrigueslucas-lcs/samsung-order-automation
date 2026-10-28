@@ -3,7 +3,7 @@ const { registerLeaseProcess } = require('../utils/authMarketLease.cjs');
 let target;
 try {
   target = path.resolve(process.argv[2] || '');
-  if (path.dirname(target) !== path.resolve('scripts') || !/^auth-(?:login|refresh|verify|package|publish-jenkins|resume-human)(?:-[a-z]+)*\.cjs$/.test(path.basename(target))) throw new Error('Invalid leased auth child.');
+  if (path.dirname(target) !== path.resolve('scripts') || !(path.basename(target)==='auth-epp-maintenance-child.cjs'||/^auth-(?:login|refresh|verify|package|publish-jenkins|resume-human)(?:-[a-z]+)*\.cjs$/.test(path.basename(target)))) throw new Error('Invalid leased auth child.');
   const leave = registerLeaseProcess();
   process.once('exit', leave);
 } catch {
