@@ -1,16 +1,16 @@
 // Submit each credential step once. A CAPTCHA/MFA or warm SSO return is a
 // handoff, never a reason to submit email/password again or claim authentication.
 async function completeAccountLogin(page, { market, hostname, credentials, timeout = 600000,
-  now = Date.now, pause = ms => new Promise(resolve => setTimeout(resolve, ms)), log = console.log, resumeOnly = false, resumeEmailPhase = 'NONE' }) {
+  now = Date.now, pause = ms => new Promise(resolve => setTimeout(resolve, ms)), log = console.log, resumeOnly = false, resumeEmailPhase = 'NONE', passwordAlreadySubmitted = false }) {
   if (!['mx', 'pe', 'co', 'cl'].includes(market) || !['stg.shop.samsung.com', 'stg2.shop.samsung.com'].includes(hostname)) throw new Error('Account login requires a known staging market.');
   const report = message => log(`[auth:login:${market}] ${message}`);
   const email = page.locator('input#account, input[type="email"], input[name="email"], #iptLgnPlnID').filter({ visible: true }).first();
   const password = page.locator('input[type="password"], #iptLgnPlnPD').filter({ visible: true }).first();
   if(!['NONE','READY','CHALLENGE'].includes(resumeEmailPhase))throw new Error('Invalid retained email phase.');
-  let emailSubmitted = resumeOnly&&resumeEmailPhase==='CHALLENGE', passwordSubmitted = false, human = false, humanReported = false;
+  let emailSubmitted = resumeOnly&&resumeEmailPhase==='CHALLENGE', passwordSubmitted = passwordAlreadySubmitted, human = false, humanReported = false;
   let emailFilled = resumeOnly&&resumeEmailPhase!=='NONE', passwordFilled = false, captchaActivated = false;
   let emailChallengePending = emailSubmitted, emailChallengeContinued = false;
-  let emailRestored = false;
+  let emailRestored = false, termsSubmitted = false;
   let resolvedCredentials;
   const configured = () => resolvedCredentials ||= (typeof credentials === 'function' ? credentials() : credentials) || {};
   const returned = () => {
@@ -98,6 +98,23 @@ async function completeAccountLogin(page, { market, hostname, credentials, timeo
       human = true; await pause(250); continue;
     }
     human = false; humanReported=false;
+    if (url.pathname === '/iam/sign-in/status/terms') {
+      // Only the observed mandatory terms/privacy gate; no marketing consent.
+      if (!termsSubmitted) {
+        for (const id of ['TC', 'PN']) {
+          const control = page.locator('#' + id);
+          // The policy route commits before Samsung mounts its form.
+          await control.waitFor({ state: 'attached', timeout: 10000 });
+          if (await control.count() !== 1) { const error = new Error('Samsung policy gate changed; manual review required.'); error.exitCode = 79; throw error; }
+          if (!await control.isChecked()) await page.locator('label').filter({ has: control }).click({ timeout: 5000 });
+          if (!await control.isChecked()) throw new Error('Samsung required policy selection was not confirmed.');
+        }
+        termsSubmitted = true;
+        report('accepting required updated terms and privacy once; optional consent unchanged');
+        await page.getByRole('button', { name: /^(?:Acepto|Accept|I agree)$/i }).click({ timeout: 10000 });
+      }
+      await pause(250); continue;
+    }
     if(resumeOnly&&resumeEmailPhase!=='NONE'&&await email.isVisible()&&!await password.isVisible()) {
       formAction='email-read';const value=(await email.inputValue({timeout:1500})).trim();formAction='';
       if(!value&&!emailRestored){formAction='email-fill';await email.fill(configured().email,{timeout:2000});formAction='';emailRestored=true;report('configured email restored after provider reset');}

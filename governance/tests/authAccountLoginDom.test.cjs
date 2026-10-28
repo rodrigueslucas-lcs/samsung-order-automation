@@ -83,3 +83,14 @@ for (const market of ['mx','pe','co','cl']) for (const host of ['stg.shop.samsun
     } finally { await context.close(); }
   });
 }
+
+for (const market of ['mx','pe','co','cl']) for (const host of ['stg.shop.samsung.com','stg2.shop.samsung.com']) {
+ test(market+' '+host+': password submission continues through mandatory policy gate without optional consent', async()=>{
+  const context=await browser.newContext(),page=await context.newPage();
+  const terms=`<label><input id="TC" type="checkbox">Términos y condiciones</label><label><input id="PN" type="checkbox">Aviso de privacidad</label><label><input id="all" type="checkbox">All</label><input id="marketing" type="checkbox"><button onclick="if(!document.querySelector('#TC').checked||!document.querySelector('#PN').checked||document.querySelector('#all').checked||document.querySelector('#marketing').checked)throw Error('Policy scope mismatch');location.href='https://${host}/${market}/'">Acepto</button>`;
+  const password=`<input type="password"><button onclick="if(document.querySelector('[type=password]').value!=='fixture-only')throw Error('Missing password');location.href='https://account.samsung.com/iam/sign-in/status/terms'">Iniciar sesión</button>`;
+  let passwordSubmits=0;
+  await page.route('**/*',r=>{const u=new URL(r.request().url());if(u.pathname.endsWith('/terms'))passwordSubmits++;return r.fulfill({status:200,contentType:'text/html; charset=utf-8',body:u.hostname===host?'<main>Storefront</main>':u.pathname.endsWith('/terms')?'<div id=policy></div><script>setTimeout(()=>document.querySelector("#policy").innerHTML='+JSON.stringify(terms)+',300)</script>':password});});
+  try {await page.goto('https://account.samsung.com/iam/sign-in/password');await completeAccountLogin(page,{market,hostname:host,credentials:{email:'fixture@example.test',password:'fixture-only'},timeout:10000,log(){}});assert.equal(passwordSubmits,1);assert.equal(new URL(page.url()).hostname,host);}finally{await context.close();}
+ });
+}

@@ -37,11 +37,12 @@ async function resumeHumanHandoff({market,environment,slot,passwordAttempted=tru
     if(account) {
       const passwordVisible=await account.locator('input[type="password"], #iptLgnPlnPD').filter({visible:true}).first().isVisible();
       const retainedEmail=phase!=='NONE'&&await account.locator('input#account, input[type="email"], input[name="email"], #iptLgnPlnID').filter({visible:true}).first().isVisible();
-      if(attempted||(!passwordVisible&&!retainedEmail))return{status:'HUMAN_REQUIRED',passwordAttempted:attempted,emailPhase:phase};
+      const termsVisible=new URL(account.url()).pathname==='/iam/sign-in/status/terms';
+      if(!termsVisible&&(attempted||(!passwordVisible&&!retainedEmail)))return{status:'HUMAN_REQUIRED',passwordAttempted:attempted,emailPhase:phase};
       const configured=credentials({market,slot},{env,authRoot,read});
       if(!configured)return{status:'HUMAN_REQUIRED',passwordAttempted:attempted,emailPhase:phase};
       try {
-        await complete(account,{market,hostname:host,credentials:configured,resumeOnly:true,resumeEmailPhase:phase,timeout:20000,log:line=>{
+        await complete(account,{market,hostname:host,credentials:configured,resumeOnly:true,resumeEmailPhase:phase,passwordAlreadySubmitted:attempted,timeout:20000,log:line=>{
           if(String(line).startsWith('AUTH_HANDOFF_AUDIT ')) {try{const audit=JSON.parse(String(line).slice(19));attempted=audit.passwordAttempted===true;phase=['READY','CHALLENGE'].includes(audit.emailPhase)?audit.emailPhase:'NONE';}catch{attempted=true;phase='NONE';}}
           else log(line);
         }});
