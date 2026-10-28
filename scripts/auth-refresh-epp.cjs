@@ -11,7 +11,7 @@ const { prepareAuthBrowserWindow } = require("../utils/authBrowserWindow.cjs");
 const { authProfileControl, openAuthProfile } = require("../utils/authStorefrontReady.cjs");
 const { completeAccountLogin, discardRejectedAccountPages } = require("../utils/authAccountLogin.cjs");
 const { writeJsonAtomically } = require("../utils/atomicJson");
-const { proveEppAccess: observe, findEppVerifiedContinue, eppAccountLoginAction } = require("../utils/eppAccessState.cjs");
+const { proveEppAccess: observe, findEppVerifiedContinue, eppAccountLoginAction, configuredEppAuthEntry } = require("../utils/eppAccessState.cjs");
 const { installEppNavigationGuard } = require('../utils/eppNavigationGuard.cjs');
 
 function isEppPage(page, config) {
@@ -79,6 +79,13 @@ async function refresh(market, environment) {
       }
       const login = eppAccountLoginAction(page);
       await Promise.any([login.waitFor({ timeout: 60000 }), page.locator('input[type="email"]:visible').first().waitFor({ timeout: 60000 }), page.getByRole("textbox", { name: /c[oó]digo|verification/i }).first().waitFor({ timeout: 60000 }), authProfileControl(page).waitFor({ state: "visible", timeout: 60000 })]).catch(() => {});
+      const officialEntry=configuredEppAuthEntry(config,{url:page.url(),loginVisible:await login.isVisible(),profileVisible:await authProfileControl(page).isVisible(),emailVisible:await page.locator('input[type="email"]:visible').first().isVisible(),codeVisible:await page.getByRole('textbox',{name:/c[oó]digo|verification/i}).or(page.getByPlaceholder(/c[oó]digo|verification/i)).first().isVisible(),pendingVerification:Boolean(await findEppVerifiedContinue(page))});
+      if(officialEntry){
+        report('opening the configured programme auth entry once; homepage has no login action');
+        await page.goto(officialEntry.href,{waitUntil:'commit',timeout:60000});
+        assertEppAuthContinuation(page,guard);
+        await login.waitFor({state:'visible',timeout:30000});
+      }
       let loginAction = await login.isVisible() ? login : null;
       if (!loginAction && await authProfileControl(page).isVisible()) {
         const profile = await openAuthProfile(page, { market: config.market.toLowerCase(), prepareWindow: async () => {} });

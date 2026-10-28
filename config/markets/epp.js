@@ -51,6 +51,7 @@ const EPP_ACCESS = Object.freeze({
     }),
     S2: Object.freeze({
       storefrontUrl: "https://stg2.shop.samsung.com/cl/multistore/alianzas/alianzas/",
+      authPath: "auth/multistore",
       verificationCode: "JET85",
       accessMode: "verification-code",
       sku: null,
@@ -105,6 +106,7 @@ function getEppConfig(market, environment = process.env) {
     environmentLabel: envName === "S2" ? "S2/STG2" : "S1/STG",
     entryUrl,
     rootUrl,
+    authEntryUrl: source.authPath ? new URL(source.authPath, rootUrl) : null,
     pdpUrl,
     sku,
     plpUrl,

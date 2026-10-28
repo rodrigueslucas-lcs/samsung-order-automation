@@ -53,10 +53,29 @@ export async function completeClFlowSandbox(page, { orderCode, storefrontOrigin 
   await page.waitForURL(url => url.origin === target.origin && url.pathname.startsWith("/cl/"), { timeout: 90000 });
 }
 
-export async function continueClRegisteredDeliveryToPayment(page) {
+export async function completeClRegisteredContact(page,customer={}) {
+  await expect(page).toHaveURL(/CHECKOUT_STEP_(CONTACT_INFO|DELIVERY)/i,{timeout:60000});
+  if(!/CHECKOUT_STEP_CONTACT_INFO/i.test(page.url()))return;
+  const contact=page.locator('[data-activestepname="CHECKOUT_STEP_CONTACT_INFO"]');
+  for(const [name,fallback] of [['firstName',customer.firstName||'Cliente'],['lastName',customer.lastName||'Prueba'],['phone',customer.phone||'987654321']]){
+    const field=contact.locator(`input[name="${name}"]:visible`).first();
+    if(!(await field.inputValue()).trim())await field.fill(fallback);
+  }
+  const document=contact.locator('input[name="vatNumber"]:visible').first();
+  if(await document.count()){
+    const value=(await document.inputValue()).replace(/\./g,'');
+    if(!/^\d{7,8}-[\dkK]$/.test(value))await document.fill(customer.documentNumber||'12345678-5');
+  }
+  await contact.getByRole('button',{name:/Continuar a despacho/i}).click();
+  await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i,{timeout:60000});
+}
+
+export async function continueClRegisteredDeliveryToPayment(page,{addressReady=false}={}) {
+  if(!addressReady){
   const saved = page.getByRole("radio", { name: /Mis direcciones/i });
   await saved.locator("xpath=ancestor::mat-radio-button[1]").click();
   await expect(saved).toBeChecked();
+  }
   const shipping = page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
   const delivery = shipping.getByText(/Entrega d[ií]a siguiente|Despacho est[aá]ndar/i)
     .filter({ visible: true }).first();

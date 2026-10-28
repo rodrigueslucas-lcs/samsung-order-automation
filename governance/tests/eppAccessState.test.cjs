@@ -1,6 +1,15 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { classifyEppAccess, observeEppAccess } = require("../../utils/eppAccessState.cjs");
+const {configuredEppAuthEntry}=require('../../utils/eppAccessState.cjs');
+test('configured EPP auth entry only resumes an empty programme homepage',()=>{
+ const rootUrl=new URL('https://stg2.shop.samsung.com/cl/multistore/alianzas/alianzas/');
+ const cfg={rootUrl,authEntryUrl:new URL('auth/multistore',rootUrl)};
+ assert.equal(configuredEppAuthEntry(cfg,{url:rootUrl.href}).href,cfg.authEntryUrl.href);
+ for(const flag of ['loginVisible','profileVisible','emailVisible','codeVisible','pendingVerification'])assert.equal(configuredEppAuthEntry(cfg,{url:rootUrl.href,[flag]:true}),null);
+ for(const url of ['https://account.samsung.com/',new URL('registration',rootUrl).href,new URL('auth/multistore',rootUrl).href])assert.equal(configuredEppAuthEntry(cfg,{url}),null);
+ assert.throws(()=>configuredEppAuthEntry({...cfg,authEntryUrl:new URL('https://www.samsung.com/shop/')},{url:rootUrl.href}),/configured staging programme/);
+});
 const rootUrl = "https://stg2.shop.samsung.com/pe/multistore/beneficios_empleados/beneficios_empleados/";
 const state = overrides => classifyEppAccess({ url: rootUrl, rootUrl, ...overrides });
 

@@ -74,4 +74,12 @@ function eppAccountLoginAction(page) {
     .filter({ hasText: /\S/, visible: true }).first();
 }
 
-module.exports = { classifyEppAccess, observeEppAccess, proveEppAccess, findEppVerifiedContinue, eppAccountLoginAction };
+function configuredEppAuthEntry(config,{url,loginVisible,profileVisible,codeVisible,emailVisible,pendingVerification}){
+  if(!config.authEntryUrl||loginVisible||profileVisible||codeVisible||emailVisible||pendingVerification)return null;
+  const current=new URL(url),root=new URL(config.rootUrl),target=new URL(config.authEntryUrl);
+  if(current.origin!==root.origin||current.pathname!==root.pathname)return null;
+  if(target.origin!==root.origin||target.pathname!==root.pathname+'auth/multistore'||target.search||target.hash||target.username||target.password)throw new Error('EPP auth entry must remain on its configured staging programme.');
+  return target;
+}
+
+module.exports = { classifyEppAccess, observeEppAccess, proveEppAccess, findEppVerifiedContinue, eppAccountLoginAction, configuredEppAuthEntry };

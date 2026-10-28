@@ -2,6 +2,17 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { prepareClPaymentCart, validateClPaymentCartTarget } = require('../../flows/cl/paymentCart.cjs');
 const cfg = { environment: 'S2', cartUrl: 'https://stg2.shop.samsung.com/cl/cart', sku: 'TARGET' };
+test('CL EPP cleanup requires explicit exact programme and environment, without changing Base Store defaults',()=>{
+  for(const [environment,host] of [['S1','stg.shop.samsung.com'],['S2','stg2.shop.samsung.com']]){
+    const rootUrl=new URL('https://'+host+'/cl/multistore/alianzas/alianzas/');
+    const config={environment,cartUrl:new URL('cart',rootUrl).href,storefront:{market:'CL',environment,rootUrl}};
+    assert.match(validateClPaymentCartTarget(config),/\/v2\/alianzas\/users\/current\/carts\/current$/);
+    assert.throws(()=>validateClPaymentCartTarget({...config,cartUrl:'https://'+host+'/cl/cart'}),/canonical staging programme/);
+    assert.throws(()=>validateClPaymentCartTarget({...config,storefront:{...config.storefront,market:'MX'}}),/canonical staging programme/);
+    assert.throws(()=>validateClPaymentCartTarget({...config,storefront:{...config.storefront,rootUrl:new URL('https://www.samsung.com/cl/multistore/alianzas/alianzas/')}}),/canonical staging programme/);
+  }
+  assert.match(validateClPaymentCartTarget(cfg),/\/v2\/cl\/users\/current\/carts\/current$/);
+});
 
 test('CL payment cleanup refuses production, foreign paths and mismatched environments', () => {
   for (const config of [{ ...cfg, environment: 'S3' }, { ...cfg, environment: 'S1' },

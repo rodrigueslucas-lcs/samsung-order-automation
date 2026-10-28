@@ -1,10 +1,27 @@
 function validateClPaymentCartTarget(config) {
   const url = new URL(config.cartUrl);
   const hosts = { S1: 'stg.shop.samsung.com', S2: 'stg2.shop.samsung.com' };
+  const store=config.storefront;
+  if(store){
+    const root=new URL(store.rootUrl);
+    if(store.market!=='CL'||store.environment!==config.environment||root.protocol!=='https:'||root.hostname!==hosts[config.environment]||root.port||root.username||root.password||root.search||root.hash||root.pathname!=='/cl/multistore/alianzas/alianzas/'||url.href!==new URL('cart',root).href)throw new Error('CL EPP payment cart must match its canonical staging programme.');
+    return `https://${config.environment.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/alianzas/users/current/carts/current`;
+  }
   if (!hosts[config.environment] || url.protocol !== 'https:' || url.hostname !== hosts[config.environment] || url.pathname !== '/cl/cart') {
     throw new Error('CL payment cart preparation requires the S1/S2 staging cart.');
   }
   return `https://${config.environment.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/cl/users/current/carts/current`;
+}
+
+async function normalizeClPaymentQuantity(page,cart){
+  const {expect}=require('@playwright/test');
+  const quantity=page.getByRole('textbox',{name:'Quantity'}).filter({visible:true});
+  await expect(quantity).toHaveCount(1,{timeout:30000});
+  const initial=Number(await quantity.inputValue());
+  if(!Number.isInteger(initial)||initial<1||initial>20)throw new Error('CL order test requires one controlled cart row with 1–20 units before normalization.');
+  const decrease=page.getByRole('button',{name:'-',exact:true}).filter({visible:true});
+  for(let count=initial;count>1;count--){await decrease.click();await cart.waitForQuantityValue(quantity,String(count-1));}
+  await expect(quantity).toHaveValue('1');
 }
 
 async function prepareClPaymentCart(page, config) {
@@ -47,4 +64,4 @@ async function prepareClPaymentCart(page, config) {
   throw new Error('CL payment cart preparation exceeded ten product removals.');
 }
 
-module.exports = { prepareClPaymentCart, validateClPaymentCartTarget };
+module.exports = { prepareClPaymentCart, validateClPaymentCartTarget, normalizeClPaymentQuantity };

@@ -11,7 +11,7 @@ function pageObject(name, expect) {
 }
 function paymentScenario(initial) {
   let expanded = initial, clicks = 0, pending = false;
-  const mode = { getAttribute: async () => String(expanded), waitFor: async () => {},
+  const mode = { getAttribute: async name => name === 'aria-expanded' ? String(expanded) : null, waitFor: async () => {},
     scrollIntoViewIfNeeded: async () => {}, click: async () => { clicks++; pending = true; } };
   const PaymentPage = pageObject('PaymentPage', locator => ({ toHaveAttribute: async (name, expected) => {
     assert.equal(locator, mode); assert.equal(name, 'aria-expanded');

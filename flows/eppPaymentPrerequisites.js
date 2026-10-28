@@ -8,6 +8,8 @@ import assertions from '../utils/eppBusinessAssertions.cjs';
 import {submitMxEppCard,validateMxEppConfirmation} from './eppMxCardPayment';
 import attempts from '../utils/eppOrderAttempt.cjs';
 import {watchMxEppCashDetails,inspectMxEppCash} from './eppMxCashPrerequisites';
+import {completeClEppCheckout} from './eppClCheckout';
+import clPaymentCart from './cl/paymentCart.cjs';
 
 // Discovery alone cannot pass a payment case. A proven market adapter may
 // continue only under the explicit payment-submit opt-in below.
@@ -28,6 +30,10 @@ export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProvi
     if(!cfg.pdpUrl||!cfg.sku)return blocked('MISSING_OR_UNPROVEN_EPP_PRODUCT','An eligible programme PDP/SKU is required.','PRODUCT');
     const cart=await addConfiguredEppProduct(page,cfg,{resetMxCart:cfg.market==='MX'});
     if(cfg.market==='MX')await cart.validateControlledSingleSku(cfg.sku);
+    if(cfg.market==='CL'){
+      await clPaymentCart.prepareClPaymentCart(page,{...cfg,storefront:cfg});
+      await clPaymentCart.normalizeClPaymentQuantity(page,cart);
+    }
     await cart.proceedToAuthenticatedCheckout();
     assertions.assertStoreRoute(page.url(),cfg,/^checkout\//);
     if(cfg.market==='MX') {
@@ -40,6 +46,12 @@ export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProvi
       await expect(fresh).toBeVisible({timeout:30000});await fresh.check({force:true});await expect(fresh).toBeChecked();
       await checkout.fillDelivery(data.delivery,{registered:true});
       await checkout.selectDeliveryAndContinue();
+    }else if(cfg.market==='CL'){
+      const prerequisite=await completeClEppCheckout(page,cfg,capture);
+      if(prerequisite){
+        if(!proof.accepted())return blocked('AUTH_OR_ENTITLEMENT_REQUIRED','EPP identity/entitlement was not retained at CL Delivery.','AUTH');
+        return prerequisite;
+      }
     }
     const step=new URL(page.url()).searchParams.get('step');
     if(cfg.market!=='MX'&&step==='CHECKOUT_STEP_CONTACT_INFO'&&!runtime.getEppContact(cfg))return blocked('MISSING_EPP_CONTACT_DATA','EPP checkout rendered Contact; approved contact/delivery mass for this market and environment is not configured.','CONTACT');

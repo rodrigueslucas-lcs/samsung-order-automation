@@ -11,7 +11,7 @@ import backofficeCredentialsModule from "../../../../../utils/backofficeAdminCre
 import clSamsungCredentials from "../../../../../utils/clSamsungCredentials";
 import clAuthLoginReturn from "../../../../../utils/clAuthLoginReturn.cjs";
 import { addConfiguredProductToClCart, bootstrapClStorefront, selectClCheckoutOption } from "../../../../../flows/cl/qstFlows";
-import { executeClPaymentOrder } from "../../../../../flows/cl/paymentFlows";
+import { executeClPaymentOrder, completeClRegisteredContact as completeClContact } from "../../../../../flows/cl/paymentFlows";
 import clCareFlows from "../../../../../flows/cl/careFlows.cjs";
 import clPaymentCart from "../../../../../flows/cl/paymentCart.cjs";
 import authBrowserWindow from "../../../../../utils/authBrowserWindow.cjs";
@@ -63,22 +63,7 @@ test.describe("CL QST - Base Store Official P1", () => {
   }
 
   async function completeClRegisteredContact(page) {
-    await expect(page).toHaveURL(/CHECKOUT_STEP_(CONTACT_INFO|DELIVERY)/i, { timeout: 60000 });
-    if (!/CHECKOUT_STEP_CONTACT_INFO/i.test(page.url())) return;
-    await test.step("Complete required registered contact details before delivery", async () => {
-      const contact = page.locator('[data-activestepname="CHECKOUT_STEP_CONTACT_INFO"]');
-      for (const [name, fallback] of [["firstName", "Cliente"], ["lastName", "Prueba"], ["phone", "987654321"]]) {
-        const field = contact.locator(`input[name="${name}"]:visible`).first();
-        if (!(await field.inputValue()).trim()) await field.fill(fallback);
-      }
-      const document = contact.locator('input[name="vatNumber"]:visible').first();
-      if (await document.count()) {
-        const value = (await document.inputValue()).replace(/\./g, "");
-        if (!/^\d{7,8}-[\dkK]$/.test(value)) await document.fill("12345678-5");
-      }
-      await contact.getByRole("button", { name: /Continuar a despacho/i }).click();
-      await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i, { timeout: 60000 });
-    });
+    await test.step("Complete required registered contact details before delivery", () => completeClContact(page));
   }
 
   async function selectClNewAddress(page) {
@@ -110,19 +95,7 @@ test.describe("CL QST - Base Store Official P1", () => {
     const current = existingProduct
       ? new CartPage(page, { cartUrl: cfg.cartUrl.href, sku: cfg.sku, productNamePattern: null, checkoutButtonPattern: /^Continuar$/i })
       : await addConfiguredProductToClCart(page, cfg);
-    if (singleItem) {
-      const quantity = page.getByRole("textbox", { name: "Quantity" }).filter({ visible: true });
-      await expect(quantity).toHaveCount(1, { timeout: 30000 });
-      const initial = Number(await quantity.inputValue());
-      expect(initial, "CL order test requires one controlled cart row with 1–20 units before normalization").toBeGreaterThanOrEqual(1);
-      expect(initial).toBeLessThanOrEqual(20);
-      const decrease = page.getByRole("button", { name: "-", exact: true }).filter({ visible: true });
-      for (let count = initial; count > 1; count -= 1) {
-        await decrease.click();
-        await current.waitForQuantityValue(quantity, String(count - 1));
-      }
-      await expect(quantity).toHaveValue("1");
-    }
+    if (singleItem) await clPaymentCart.normalizeClPaymentQuantity(page, current);
     await current.proceedToAuthenticatedCheckout();
     await completeClRegisteredContact(page);
     await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i, { timeout: 60000 });
