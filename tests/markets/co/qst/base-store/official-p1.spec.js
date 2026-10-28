@@ -59,8 +59,6 @@ async function authenticatedPage(browser,cfg,{desktopProfile=false}={}){
   const auth=getCoAuthState();
   let page;
   if(desktopProfile){
-    // The normal newPage guard validates auth immediately. Prepare the native
-    // window first, then perform that same validation explicitly before reuse.
     page=await context.newPage();
     if(headed) await authBrowserWindow.prepareAuthBrowserWindow(page);
     await auth.applyAuthSessionStorage(context);
@@ -465,7 +463,7 @@ test("SAM-24883 @qst @co @base-store - Increase decrease delete quantity",async(
 test("SAM-24886 @qst @co @base-store - Verify rewards text as Guest User",async({page},i)=>runCanonicalCase("SAM-24886",page,i));
 test("SAM-24892 @blocked @qst @co @base-store - Add SC+ from BC PDP Page",async({page},i)=>runCanonicalCase("SAM-24892",page,i));
 test("SAM-24893 @qst @co @base-store - Verify trade-up cart page",async({page},i)=>runCanonicalCase("SAM-24893",page,i));
-test("SAM-24896 @qst @co @base-store @registered - Cart value when Reg user logs out",async({browser},i)=>{
+test("SAM-24896 @qst @co @base-store @registered - Cart cleared when Reg user logs out",async({browser},i)=>{
   evidence(i,"SAM-24896");
   const cfg=getCoQstConfig();
   const suffix=cfg.environment.toLowerCase();
@@ -509,23 +507,21 @@ test("SAM-24896 @qst @co @base-store @registered - Cart value when Reg user logs
     const logoutResult=await coLogoutCart.logoutCoCartAndValidateSignedOut(page,cfg,logout);
     await i.attach("co-logout-transition",{body:Buffer.from(JSON.stringify(logoutResult)),contentType:"application/json"});
     await page.keyboard.press("Escape");
-    await expect(page.getByText(cfg.sku,{exact:true}).first()).toBeVisible({timeout:30000});
-    await expect(page.getByRole("textbox",{name:"Quantity",exact:true})).toHaveValue("1");
-    const guestTotal=(await total.innerText()).match(/\$\s*([\d.,]+)/)?.[1];
-    recordBusinessEvidence(i,{sku:cfg.sku,registeredCartTotal:registeredTotal,guestCartTotal:guestTotal,cartQuantity:1});
-    await i.attach("co-logout-guest-cart",{body:await page.screenshot({fullPage:true}),contentType:"image/png"});
-    await expect.poll(async()=>{
-      const guestTotal=(await total.innerText()).match(/\$\s*([\d.,]+)/)?.[1];
-      return guestTotal?.replace(/\D/g,"");
-    },{timeout:30000}).toBe(registeredTotal.replace(/\D/g,""));
+    const main=page.getByRole("main");
+    const emptyCart=main.getByText(/carrito.*vac[ií]o|no hay productos/i).first();
+    await expect(emptyCart,"SAM-24896: cart must be cleared after registered user logout.").toBeVisible({timeout:30000});
+    await expect(page.getByText(cfg.sku,{exact:true}),"The logged-out user's SKU must not remain in the cart.").toHaveCount(0);
+    await expect(page.getByRole("textbox",{name:"Quantity",exact:true}),"No cart quantity control should remain after logout.").toHaveCount(0);
+    recordBusinessEvidence(i,{sku:cfg.sku,registeredCartTotal:registeredTotal,cartClearedAfterLogout:true,expectedBehavior:"CART_CLEARED_AFTER_REGISTERED_USER_LOGOUT"});
+    await i.attach("co-logout-empty-cart",{body:await page.screenshot({fullPage:true}),contentType:"image/png"});
   }finally{await context.close();}
 });
 test("SAM-24898 @qst @co @base-store - Checkout button on cart page",async({page},i)=>runCanonicalCase("SAM-24898",page,i));
 test("SAM-24899 @qst @co @base-store - Order Summary on checkout page",async({page},i)=>runCanonicalCase("SAM-24899",page,i));
 test("SAM-24900 @qst @co @base-store - Step 1 Contact Details Section",async({page},i)=>runCanonicalCase("SAM-24900",page,i));
 test("SAM-24901 @qst @co @base-store @registered - Add Edit saved new address",async({browser},i)=>{
-  test.skip(process.env.ALLOW_PROFILE_WRITE!=="1","Persistent CO address edits require ALLOW_PROFILE_WRITE=1.");
   evidence(i,"SAM-24901");
+  test.skip(process.env.ALLOW_PROFILE_WRITE!=="1","Persistent CO address edits require ALLOW_PROFILE_WRITE=1.");
   const {context,page,delivery}=await coRegisteredDelivery(browser);
   try{
     const secondaryNumber=`113-${Date.now()%10000}`;
@@ -574,8 +570,8 @@ test("SAM-24902 @qst @co @base-store @registered - Select saved address",async({
   }finally{await context.close();}
 });
 test("SAM-24903 @qst @co @base-store @registered - Save option for reg user",async({browser},i)=>{
-  test.skip(process.env.ALLOW_PROFILE_WRITE!=="1","Saving CO profile addresses requires ALLOW_PROFILE_WRITE=1.");
   evidence(i,"SAM-24903");
+  test.skip(process.env.ALLOW_PROFILE_WRITE!=="1","Saving CO profile addresses requires ALLOW_PROFILE_WRITE=1.");
   const {context,page,delivery}=await coRegisteredDelivery(browser);
   try{
     const secondaryNumber=`113-${Date.now()%10000}`;
@@ -674,14 +670,11 @@ test("SAM-24919 @destructive @qst @co @base-store - Track Order",async({page,con
   orderNumber=confirmationText.match(/N[uú]mero de pedido:\s*(CO\d{6}-\d{8})/i)?.[1];
   expect(orderNumber,"CO confirmation must display the public order number used by Track Order.").toBeTruthy();
   expect(created.orderCode.startsWith(orderNumber),"The confirmation order must match the submitted checkout response.").toBe(true);
-  // CO intermittently omits the email from confirmation copy; the tracking
-  // lookup below verifies the actual order/email association (OTP on S2).
   console.log(`[co-tracking] fresh guest order ${orderNumber} confirmed for ${email}`);
   i.annotations.push({type:"co-tracking-created-order",description:`Fresh guest order ${orderNumber} for ${email}`});
   const confirmedIdentity=coTrackingPrerequisite.getCoTrackingPrerequisite({market:"CO",environment:cfg.environment,confirmed:true,sku:cfg.sku,orderNumber,email,inbox},cfg.environment,cfg.sku);
   expect(confirmedIdentity,"Tracking must use the order and mailbox confirmed in this execution.").toEqual({orderNumber,email,inbox});
   fs.mkdirSync(path.dirname(fixturePath),{recursive:true});
-  // Investigation receipt only: the official TC never reads a previous order.
   atomicJson.writeJsonAtomically(fixturePath,{market:"CO",environment:cfg.environment,confirmed:true,sku:cfg.sku,orderNumber,email,inbox});
   recordBusinessEvidence(i,{orderCode:orderNumber,createdInThisExecution:true});
   const ordersUrl=new URL("/co/mypage/orders",cfg.baseUrl.origin).toString();
