@@ -2,6 +2,33 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { verifyIdentity, recoverIdentity, packageAndPublishMarket, runKeepAliveCycle, identityEnv } = require('../../utils/authKeepAliveRunner.cjs');
 const quiet = () => {};
+
+test('PE and CL finalize and release while MX and CO SECOND wait for the operator',async()=>{
+  const s=cycleFixture();let release;const gate=new Promise(resolve=>{release=resolve;});
+  s.deps.verify=async identity=>({...identity,status:identity.slot==='second'?'NEEDS_REFRESH':'HEALTHY'});
+  s.deps.recover=async identity=>{s.calls.push(`refresh:${identity.market}:${identity.slot}`);await gate;return{...identity,status:'RECOVERED'};};
+  const running=runKeepAliveCycle({},s.deps);
+  try{
+    for(let tick=0;tick<30&&!s.calls.includes('refresh:co:second');tick++)await new Promise(resolve=>setImmediate(resolve));
+    for(const market of ['pe','cl']){assert.ok(s.calls.includes('finalize:'+market));assert.ok(s.calls.includes('release:'+market));}
+    assert.ok(!s.calls.includes('release:mx'));assert.ok(!s.calls.includes('release:co'));
+  }finally{release();}
+  assert.equal((await running).ok,true);
+  for(const market of ['pe','cl'])assert.equal(s.calls.filter(c=>c==='release:'+market).length,1);
+});
+
+test('startup opens all four FIRST recoveries before any SECOND verification or human wait',async()=>{
+  const s=cycleFixture();let release;const gate=new Promise(resolve=>{release=resolve;});
+  s.deps.verify=async identity=>{s.calls.push(`verify:${identity.market}:${identity.slot}`);return{...identity,status:identity.slot==='primary'?'NEEDS_REFRESH':'HEALTHY'};};
+  s.deps.recover=async identity=>{s.calls.push(`refresh:${identity.market}:${identity.slot}`);await gate;return{...identity,status:'RECOVERED'};};
+  const running=runKeepAliveCycle({},s.deps);
+  try{
+    for(let tick=0;tick<30&&!s.calls.includes('refresh:cl:primary');tick++)await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(s.calls.filter(c=>c.startsWith('refresh:')&&c.endsWith(':primary')).length,4);
+    assert.ok(!s.calls.some(c=>c.startsWith('verify:')&&c.endsWith(':second')));
+  }finally{release();}
+  assert.equal((await running).ok,true);
+});
 test('a failed FIRST with a retained browser defers visible SECOND recovery', async () => {
   const s = cycleFixture('NEEDS_REFRESH');
   s.deps.recover = async identity => { s.calls.push(`refresh:${identity.market}:${identity.slot}`); return {...identity, status: identity.market === 'mx' ? 'FAILED' : 'RECOVERED'}; };

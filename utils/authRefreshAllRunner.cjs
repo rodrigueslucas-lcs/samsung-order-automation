@@ -152,6 +152,7 @@ async function refreshAll({ markets, environment, slot, env = process.env } = {}
   const human = settled.filter((result) => result.status === 'HUMAN_REQUIRED').length;
   const busy = settled.filter((result) => result.status === 'BUSY').length;
   const failed = settled.length - ready - human - busy;
+  if(busy)log(' BUSY: another keep-alive, refresh or build owns these profiles. Do not start repeated refreshes; check the active auth operation/dashboard. BUSY alone does not prove an expired session.');
   log('------------------------------------------------------------');
   log(` READY ${ready}/${settled.length} · HUMAN ${human} · BUSY ${busy} · FAILED ${failed} · total ${Math.round((Date.now() - startedAt) / 1000)}s`);
   log('============================================================');

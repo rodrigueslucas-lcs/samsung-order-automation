@@ -146,7 +146,7 @@ function limitConcurrency(maximum) {
 async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MARKET_SLOTS), publish = true, env = process.env, onEvent = () => {} } = {}, { verify = verifyIdentity, recover = recoverIdentity, resume = resumeIdentity, captureBrowser = require('./authBrowserLifecycle.cjs').captureAuthBrowser, browserClosed = require('./authBrowserLifecycle.cjs').authBrowserClosed, finalize = packageAndPublishMarket, acquireMarket = acquireMarketLease, readState = readCheckpoint, saveState = saveCheckpoint, hash = fileHash, log = console.log, now = Date.now } = {}) {
   const target = normalizeEnvironment(environment);
   if (!Array.isArray(markets) || !markets.length || markets.some(m => !MARKET_SLOTS[m])) throw new Error('Unsupported keep-alive market scope.');
-  const selected = [...new Set(markets)], verifyLane = limitConcurrency(3), refreshLane = limitConcurrency(2);
+  const selected = [...new Set(markets)], verifyLane = limitConcurrency(4), refreshLane = limitConcurrency(4);
   // Observability cannot change authentication, publication or lock outcomes.
   const notify = event => { try { onEvent(event); } catch {} };
   log('[auth:keepalive] ' + target + ': ' + selected.join(',').toUpperCase() + '; two strict checks; FIRST recovery before SECOND.');
@@ -161,7 +161,8 @@ async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MAR
         record.state=readState(record.market,target);
       } catch(error) {fail(record,error.code==='AUTH_BUSY'?'BUSY':'FAILED');}
     }
-    await Promise.all(records.filter(r=>!r.failed).flatMap(record=>record.checked.map(async(identity,index)=>{
+    const verifySlot=async slot=>Promise.all(records.filter(r=>!r.failed).flatMap(record=>record.checked.map(async(identity,index)=>{
+      if(identity.slot!==slot)return;
       try {record.checked[index]=await verifyLane(async()=>{ notify({...identity,status:'VERIFYING'}); const started=now(); const result=await verify({...identity,env:record.env}); const measured={...result,verifyDurationMs:Math.max(0,now()-started)}; notify(measured); return measured; });}
       catch {record.checked[index]={...identity,status:'FAILED'};}
     })));
@@ -219,9 +220,7 @@ async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MAR
         catch {record.checked[index]={market,environment,slot,status:'FAILED'};}
       })));
     };
-    await recoverSlot('primary');
-    await recoverSlot('second');
-    await Promise.all(records.map(async record=>{
+    const finalizeRecords=async targets=>Promise.all(targets.map(async record=>{
       record.final={market:record.market,status:'SKIPPED',published:false};
       if(record.failed)return;
       try {
@@ -257,6 +256,19 @@ async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MAR
         notify({kind:'bundle',...record.final});
       } catch {fail(record);}
     }));
+    // Startup must reach all four FIRST login windows before spending time on
+    // SECOND health checks. Four independent FIRST gates must not queue behind
+    // two ten-minute CAPTCHA waits while holding every market lease.
+    await verifySlot('primary');
+    await recoverSlot('primary');
+    // PE/CL have no SECOND account. Publish/close/release them now instead of
+    // keeping their completed profiles BUSY during MX/CO QR intervention.
+    const primaryOnly=records.filter(record=>!MARKET_SLOTS[record.market].includes('second'));
+    await finalizeRecords(primaryOnly);
+    for(const record of primaryOnly){try{record.release?.();record.release=null;}catch{fail(record);record.final={market:record.market,status:'SKIPPED',published:false};}}
+    await verifySlot('second');
+    await recoverSlot('second');
+    await finalizeRecords(records.filter(record=>MARKET_SLOTS[record.market].includes('second')));
   } finally {
     for(const record of records)for(const handle of Object.values(record.resumeHandles||{}))try{await handle.dispose();}catch{}
     for(const record of records)try{record.release?.();}catch{fail(record);record.final={market:record.market,status:'SKIPPED',published:false};}
