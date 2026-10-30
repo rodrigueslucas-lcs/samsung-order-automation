@@ -1,5 +1,13 @@
 # Isolated EPP session maintenance
 
+Independent verification starts with the same staging origin's
+`/getcookie.html`, confirms `You can access pages now`, and only then opens the
+programme. Existing identity storage does not replace staging routing setup.
+SystemParking observed without setup cannot prove expired authentication.
+Cookie/navigation timeouts must remain distinct from rejected credentials;
+they must not start repeated login attempts. The cookie-first sequence has a
+regression test covering an already saved identity without a login window.
+
 EPP maintenance never imports Base Store cookies, storage or bundles. It reuses
 the shared lease, browser lifecycle, hidden task launcher and Jenkins activity
 guard. PRIMARY means FIRST. SECOND is supported only for MX/CO and requires its
@@ -114,3 +122,65 @@ The public link uses the configured display origin. Resource repair changes only
 resource URL to a currently assigned local address, preserving CSP/auth settings.
 No new plugin or market execution is required. Real iPhone reachability and
 Windows logon execution require separate device/runtime evidence.
+
+## Programme-aware routing and evidence
+
+Use the existing configuration, selecting an approved programme explicitly with
+`CO_EPP_PROGRAM=alianzas_co` (or the corresponding market variable). CO S2 priority
+is alianzas_co, then estudiantes_co; co_epp_agre is retained as a known blocked
+programme, never an automatic fallback. PE short routes are independent candidates
+with unproven entitlement; Yape has a single-inspection checkpoint, no registration
+or email retry. CL alianzas and existing MX roots remain represented.
+
+Alternative programmes use `playwright/.auth/epp/<env>/<market>/programs/<id>/`
+and profiles under `playwright/profiles/epp/programs/<id>/`. FIRST/SECOND remain
+separate. Legacy programmes keep their existing paths and credential IDs.
+Alternative bundle names/credential IDs include the programme suffix; a bundle
+for one root cannot be installed as another. Ignored runtime data for alternatives
+belongs in `<env>.<market>.programs.<id>`, never inherited from another programme.
+Market/environment leases still serialize shared account use across programmes.
+
+`node scripts/inspect-epp-program.cjs CO S2 alianzas_co` performs a bounded,
+read-only programme inspection. It never logs in, requests activation, submits a
+code, changes a cart or pays. Same-market EPP state can seed inspection, but only
+fresh exact-programme server identity/access and storefront proof can produce a
+verified export. No Base Store state is imported. Safe observations are stored
+beside the programme metadata as `program-observation.json`; no response bodies,
+tokens, emails or session contents are recorded. Yape refuses a second automatic
+inspection after this checkpoint exists.
+
+Visible refreshes are serialized. Once a human gate remains pending, later
+identities may be verified silently but no second login window is started.
+Blocked programme policy prevents automatic login before profile/bundle changes.
+Account activation dialogs support both Continuar comprando and Seguir comprando
+only after an actual verified-account success message.
+
+Auth Operations reads the same registry, maintenance summaries, per-programme
+identity metadata and safe observations. Programme health is never shared across
+siblings. Callback behaviour is shown separately; registration, identity,
+entitlement and storefront remain distinct. Regional task activity does not
+invent a per-programme in-progress step. No Jenkins job/CSP/task configuration
+change is required by this routing code.
+
+The common CO Samsung identity header may be used inside the isolated EPP profile
+when a programme registration page has no account control. This creates a fresh
+Samsung identity there; it imports no Base Store state, and is never EPP proof.
+After its callback, the exact programme identity/access and authenticated UI are
+verified independently before any EPP export. A verified programme greeting can
+prove the landing UI without an account menu; a greeting alone never proves
+identity or entitlement, nor product/cart/checkout functionality.
+
+### Scoped native capture and bounded verifier cleanup
+
+Recovery first checks an existing exact owned EPP native profile, then independently
+verifies its snapshot before replacing an older export. Capture reads cookies and
+the current staging programme's local/session storage in place; it does not use
+full storageState origin navigation. Capture and disconnect have deadlines so an
+unresponsive browser cannot retain a market lease indefinitely. Only the newly
+created headless verifier's owned ChildProcess can be terminated during cleanup.
+Native human-intervention windows are not terminated by that cleanup.
+
+After an actual Samsung callback reaches same-origin SystemParking, recovery
+uses getcookie then the canonical EPP root in the same context. It never repeats
+the password submit. Existing visible getcookie readiness is reused. A greeting
+or checkAccess=true without independently accepted identity remains unproven.

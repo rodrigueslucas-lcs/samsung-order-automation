@@ -56,13 +56,16 @@ async function main({argv=process.argv.slice(2),env=process.env,read=readCycles,
   } catch { /* Unavailable metadata is displayed as unknown, never as idle. */ }
   const model=buildModel({cycles:[...stored.cycles,...legacy],scheduler:scheduler(args.environment,{env,now:now()}),activity:buildActivity,corrupt:stored.corrupt,environment:args.environment,now:now()});
   const eppViews=['S1','S2'].map(environment=>{
-    const metadata=Object.fromEntries(['MX','PE','CO','CL'].map(market=>[market,readMetadata(path.resolve(args.sourceRoot,'playwright/.auth/epp',environment.toLowerCase(),market.toLowerCase(),'identity.json'))]));
-    const maintenance=Object.fromEntries(['MX','PE','CO','CL'].map(market=>{const file=path.resolve(args.sourceRoot,'playwright/.auth/epp',environment.toLowerCase(),market.toLowerCase(),'keepalive.json');const data=readMetadata(file);let observedAt=null;try{observedAt=fs.statSync(file).mtime.toISOString();}catch{}return[market,data?{human:data.human===true,blockedReason:typeof data.blockedReason==='string'?data.blockedReason:null,observedAt}:null];}));
-    return eppView(readMetadata(path.join(root,'auth-keepalive',`epp-last-cycle-${environment.toLowerCase()}-primary.json`)),environment,now(),metadata,maintenance);
+    const programs=['MX','PE','CO','CL'].flatMap(market=>require('../config/markets/epp').getEppPrograms(market,environment).map(program=>({market,program,key:market+':'+program.id,directory:path.resolve(args.sourceRoot,'playwright/.auth/epp',environment.toLowerCase(),market.toLowerCase(),...(program.legacy?[]:['programs',program.id]))})));
+    const metadata=Object.fromEntries(programs.map(p=>[p.key,readMetadata(path.join(p.directory,'identity.json'))]));
+    const observations=Object.fromEntries(programs.map(p=>[p.key,readMetadata(path.join(p.directory,'program-observation.json'))]));
+    const maintenance=Object.fromEntries(programs.map(p=>{const file=path.join(p.directory,'keepalive.json');const data=readMetadata(file);let observedAt=null;try{observedAt=fs.statSync(file).mtime.toISOString();}catch{}return[p.key,data?{human:data.human===true,blockedReason:typeof data.blockedReason==='string'?data.blockedReason:null,observedAt}:null];}));
+    return eppView(readMetadata(path.join(root,'auth-keepalive',`epp-last-cycle-${environment.toLowerCase()}-primary.json`)),environment,now(),metadata,maintenance,observations);
   });
   model.epp={generatedAt:eppViews.map(v=>v.generatedAt).filter(Boolean).sort().at(-1)||null,sessions:eppViews.flatMap(v=>v.sessions.filter(r=>r.environment===args.environment||r.observed))};
   model.eppScheduler=scheduler(args.environment,{env,now:now(),scope:'EPP'});
-  for(const row of model.epp.sessions)if(row.environment===args.environment&&model.eppScheduler.executing===true){row.operation='KEEP_ALIVE';row.operationStartedAt=model.eppScheduler.lastRun;}
+  // The task exposes regional activity, not a reliable active programme step.
+  // Render the regional operation separately rather than marking every programme active.
   const html=render(model,{refreshUrl:args.refreshUrl,refreshOrigin});
   fs.mkdirSync(args.output,{recursive:true});
   await atomicText(path.join(args.output,'styles.css'),fs.readFileSync(path.resolve(__dirname,'../reporting/auth-operations/styles.css'),'utf8'));

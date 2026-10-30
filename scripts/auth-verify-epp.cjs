@@ -4,6 +4,7 @@ const { verifyEppSnapshot } = require('../utils/eppSessionVerification.cjs');
 
 async function verify(market, environment = 'S2') {
   const config = getEppConfig(market, { ...process.env, ENVIRONMENT: environment, [`${String(market).toUpperCase()}_QST_ENVIRONMENT`]:environment });
+  if(config.programPolicy?.allowAutomaticRetry===false&&['BLOCKED_CALLBACK_TO_PRODUCTION','VERIFICATION_CODE_REJECTED','ENTITLEMENT_OR_STOREFRONT_RENDER_BLOCKED'].includes(config.programPolicy.knownStatus))throw Object.assign(new Error('Programme excluded by observed blocker.'),{exitCode:78,eppReason:config.programPolicy.knownStatus});
   const lease = acquireEppLease(config);
   try {
     const state = loadEppSession(config);
@@ -14,7 +15,7 @@ async function verify(market, environment = 'S2') {
   } finally { lease.release(); }
 }
 if (require.main === module) verify(process.argv[2], process.argv[3]).catch(error => {
-  const status = error.exitCode === 79 ? 'HUMAN_REQUIRED' : error.code === 'AUTH_BUSY' ? 'BUSY' : 'FAIL';
+  const status = error.exitCode === 79 ? 'HUMAN_REQUIRED' : error.exitCode===78?'BLOCKED':error.code === 'AUTH_BUSY' ? 'BUSY' : 'FAIL';
   console.error(`[auth:epp:verify] ${status} · ${error.eppReason || 'EPP_VERIFICATION_NOT_COMPLETED'} · no credentials or raw provider response printed`);
   process.exitCode = error.exitCode || 1;
 });

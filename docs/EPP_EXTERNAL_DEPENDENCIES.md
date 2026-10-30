@@ -2,6 +2,123 @@
 
 Only dependencies that cannot be resolved from the repository are listed here.
 
+## Latest targeted progress, 2026-10-29 (console evidence retained)
+
+PE S2 membership VIP SAM-25138 and SAM-25140 passed with the same single causal
+card order **PE261028-78774153** (4658.30 PEN, RB45DG6300B1PE quantity 1).
+The order was recovered read-only after a submit timeout, then the actual
+confirmation was validated. No second PE submit occurred. Evidence logs:
+`.agent/tmp/epp-pe-causal-order-recovery.log` and
+`.agent/tmp/epp-pe-confirmation-official.log` (local, ignored).
+
+MX S1 mxtotalplay gained SAM-25020, SAM-25021 and SAM-25034 PASS with the
+programme-offered SM-F741BLBJLTM. SAM-25044 then passed after fixing the
+normal-flow/positive-tooltip stacking comparison (16 regression tests passed).
+MX S1 card reached Delivery, which rendered three Marketplace options instead
+of the ETA/Standard template expected by the helper. No financial submit was
+made. Its exact selection/availability contract remains unproven; do not label
+this timeout as session expiration or submit a payment through a guessed mode.
+
+CL S2 SAM-24836 passed after fixing independent verification of authenticated
+legacy programme homepages. Identity plus entitlement remain mandatory.
+Two controlled CL S2 PDPs returned HTTP 200 and an empty commerce shell without
+any product OCC request, while programme/config/CMS APIs returned HTTP 200.
+This is an observed EPP commerce blocker, not proof of out-of-stock data.
+CL S1 Delivery remains blocked by selected new-address mode with hidden fields.
+Cart navigation footer content remains missing/incomplete in MX S1, CL S1 and
+PE S2; the supplied SAM-25146 scope does not justify quarantining every market.
+CO S2 still requires independently accepted corporate activation/identity.
+
+Confirmed MX261026-78768209 is preserved. Existing MX S2 cash initiation remains
+ambiguous and must not be resubmitted. No MX S1/CL/CO order was created.
+
+Artifact limitation: a temporary diagnostic Playwright configuration accidentally
+used the default test-results output directory and removed prior local report,
+screenshot and trace directories. Console logs and durable order records were
+not removed. The temporary configuration now has an isolated output directory.
+The regenerated matrix contains NOT_RUN where original result JSON is absent;
+this is missing artifact provenance, not a retraction of logged historical PASS.
+Do not advertise a reconstructed aggregate as a complete raw runtime matrix.
+The following sections retain historical observations and may be superseded by
+the targeted results above.
+
+## Earlier functional recovery, 2026-10-29 (superseded snapshot)
+
+The latest targeted matrix has **12 PASS, 2 FAIL, 38 BLOCKED** across 52
+market/environment rows. Compared with the preceding 8-PASS snapshot, MX
+SAM-25021 was restored and PE SAM-25109, SAM-25113 and SAM-25125 gained runtime
+PASS. This is not a full campaign or a claim that every saved session is current.
+
+| Programme | Proven progress | Remaining causal prerequisite |
+|---|---|---|
+| MX S2 pymesmx | 6/7 PASS; SM-F741BLBJLTM offered by the original PDP and successfully added | Cash initiation remains inconclusive; read-only history lists only the existing confirmed EPP card order |
+| CL S1 alianzas | Login, Add to Cart, Checkout PASS | Cart footer missing; new address selected but fields hidden, no usable saved QA address or delivery modes |
+| PE S2 pe_membership_vip | Login, Add to Cart, Checkout PASS with RB45DG6300B1PE | Cart footer missing; registered Contact/Delivery integration added but payment-provider runtime not yet proven |
+| CO S2 alianzas_co | Exact isolated profile examined | Corporate activation/identity not independently accepted; access=true alone is insufficient |
+
+PE evidence: `test-results/epp/pe/s2/2026-10-29T16-25-36-385Z-34792`
+and `2026-10-29T16-28-32-115Z-34792`. PE Cart UI fails specifically at the
+missing Shop/Tienda footer heading, after product/summary/checkout checks. CL
+has the same missing-heading signature. SAM-25146 is a supplied related defect,
+but its stated CO/PE S1 scope does not authorize quarantine of CL S1 or PE S2.
+
+No new order or payment submission occurred. Confirmed MX261026-78768209 and
+its SAM-25045 PASS remain preserved. The cash account-history reconciliation
+returned HTTP 200 with six orders, only one belonging to pymesmx: the confirmed
+card order. Absence from that history is not sufficient to retry provider cash
+initiation; retain INCONCLUSIVE_EXISTING_ATTEMPT.
+
+The latest PE payment prerequisite attempt was stopped by the independent auth
+preflight (SESSION_NOT_PROVEN). A subsequent recovery failed at staging setup,
+before Account login. Its underlying navigation cause remains unproven; do not
+label it an application defect or claim that payment integration passed runtime.
+Approved existing PE QA contact/address fixtures were provisioned only in ignored
+programme runtime data. No Base Store auth state was imported.
+
+Centelec's alternative canonical route again attempted Production and was
+blocked. Yape was not retried. CO RT53 rendering investigation remains paused.
+
+## Earlier coverage continuation, 2026-10-29 (superseded snapshot)
+
+No new payment/order was submitted. MX order `MX261026-78768209` remains
+preserved and SAM-25045 was not rerun. SAM-25046 stopped at the durable
+`AMBIGUOUS_EPP_ORDER_ATTEMPT` guard, before cart reset or financial submit;
+provider/backend reconciliation is required before another cash attempt.
+
+MX S2 SAM-25020 (PDP variants/selectors) passed again. SAM-25021 found the
+configured `SM-F741BLBKLTM` visibly sold out. This is fresh availability evidence,
+not a timeout or a proven automation defect. A purchasable programme-specific
+variant and current isolated EPP identity are required for the next Add run.
+
+CL S1 SAM-24836 and PE S2 membership VIP SAM-25109 stopped at
+`EPP_IDENTITY_REQUIRED`. Their exported states did not prove current EPP login.
+CL's subsequent cookie-first read returned HTTP 200 for the programme and its
+users/current/checkAccess, but identity was anonymous while access was true.
+This is not HEALTHY. A previous direct-root probe reached SystemParking without
+staging setup; that observation alone is not an application defect. The verifier
+now confirms getcookie setup before opening the programme, even with saved state.
+No repeat login or payment was forced through the blocked prerequisites.
+
+PE VIP's canonical route is `/pe/multistore/pe_membership_vip/pe_membership_vip/`.
+Earlier independent HEALTHY evidence remains historical; a later anonymous
+identity cannot be promoted based on checkAccess alone. Centelec remains
+programme-context unproven: its short route used Base Store API context and the
+previous alternative multistore route attempted Production (blocked). Yape was
+not retried this round.
+
+CO RT53DG6220S9CO investigation is paused. Its exact SKU exists in the aliases'
+product API, but a rendered PDP/CTA is unproven. The deeper comparison timed out
+before collecting a PDP document. Approval, price, category and channel settings
+are therefore hypotheses, not a root cause. Retain
+`MISSING_OR_UNPROVEN_EPP_PRODUCT` with a technical rendering investigation pending.
+
+Official PASS rows across both environments, before -> after this round:
+MX 6 -> 5 / 14; CL 3 -> 3 / 14; PE 0 -> 0 / 12; CO 0 -> 0 / 12.
+No new official PASS was obtained. The new MX sold-out failure supersedes that
+TC's historical result; prerequisite-blocked reruns preserve historical PASS
+separately from their latestAttempt. The matrix contains 8 PASS, 2 FAIL and
+42 BLOCKED rows. This is evidence accounting, not a full-suite execution.
+
 ## Targeted reconciliation and maintenance, 2026-10-28
 
 Historical PASS results remain valid evidence of their recorded runs; they are
@@ -373,3 +490,113 @@ Validation for this continuation: 183/183 focused EPP and affected MX/CL unit/DO
 2026-10-28 closeout: broad refactor composite completed architecture/audits/all configured discoveries, then governance finished 954/958 and stopped. Two failures were a stale PaymentPage VM mock (id incorrectly returned aria-expanded); the mock now respects the queried attribute. Two Windows subprocess fixtures timed out under the composite. All 13 isolated tests covering those files passed after the mock fix, including both real subprocess fixtures. The original composite is not claimed green. Executive reporting passed 4/4; remaining reporting result is recorded in closeout evidence.
 
 Remaining reporting checks completed: MX runtime/reporting 33/33 PASS.
+
+## Multi-programme routing — 2026-10-28
+
+Market/environment is not a programme identity. `config/markets/epp.js` now holds
+an ordered programme registry; operator observations are routing policy, not
+runtime authentication evidence. Existing legacy roots, namespaces and bundles
+remain valid. `getEppConfig` selects the first eligible programme by priority; explicit legacy
+programme IDs preserve access to existing namespaces without rewriting old state.
+
+| Market/env | Programme | Canonical path | Policy / evidence |
+| --- | --- | --- | --- |
+| CO S2 | alianzas_co | /co/multistore/alianzas_co/alianzas_co/ | First choice; verified-account dialog and welcome observed in operator browser. Isolated identity/access proof is still mandatory. |
+| CO S2 | estudiantes_co | /co/multistore/estudiantes_co/estudiantes_co/ | Second choice; reported 400 callback may recover through one canonical navigation. Never classify the 400 alone as invalid credentials. |
+| CO S2 | co_epp_agre | /co/multistore/co_epp_agre/co_epp_agre/ | BLOCKED_CALLBACK_TO_PRODUCTION; excluded from automatic retries. |
+| PE S2 | pe_centelec | /pe/pe_centelec/pe_centelec/ | Entitlement unproven. Probe observed API site `pe`, not programme-specific proof. |
+| PE S2 | pe_membership_vip | /pe/multistore/pe_membership_vip/pe_membership_vip/ | Independent identity/access/UI previously proven; latest targeted login prerequisite requires renewed EPP identity. |
+| PE S2 | pe_yape | /pe/multistore/pe_yape/pe_yape/ | One controlled inspection only. Current clean-context probe reached auth gate, not an empty DOM; identity unproven. Historical white-screen report remains distinct. |
+| CL S1/S2 | alianzas | /cl/multistore/alianzas/alianzas/ | Preserve historical proof; verify existing state before any login. Current S1 verification returned OUTSIDE_EPP_STORE, not a proven credential rejection. |
+
+Where applicable, access requires Samsung Account **and** the programme's
+Backoffice MultiStore > Retirees whitelist, programme entitlement and functional
+storefront. The operator reported manual whitelist changes. Automation does not
+change Retirees or infer entitlement from a greeting, email activation or
+`checkAccess=true` alone.
+
+An activation link opened successfully in an already authenticated operator
+browser is not proof that another profile inherited that identity. The supplied
+link was attempted once in the isolated CO profile and returned the staging
+`multistore/verifyEmail/failure` route. No repeated email/link submission is
+permitted. No activation token is stored in the repository or diagnostics.
+
+Pending clarification for Samsung/India: confirm programme-specific API/site
+context and canonical routes for the two short PE paths; provide eligible
+programme PDP/SKUs for CO aliases; confirm the supported Samsung identity entry
+and callback contract when an EPP registration page exposes no account control.
+No new order/payment/cash attempt is part of this routing round. Existing MX
+order evidence and all historical PASS remain unchanged.
+
+Final runtime proof: CO S2 alianzas_co and estudiantes_co each returned accepted
+programme-specific users/current + checkAccess and authenticated storefront in an
+independent QA context. estudiantes_co reused only a same-market/slot EPP identity
+seed; its own access was revalidated, without login. Neither needed a 400 callback
+recovery in this run. The reported BROKEN_400 behaviour remains a known contract,
+covered by tests, not falsely claimed as reproduced.
+
+The legacy QN85QN85DBKXZL candidate was not proven eligible in either CO alias.
+Five targeted SAFE cases on alianzas_co (SAM-24929/24930/24931/24942/24952) were
+BLOCKED by missing programme PDP/product data; no application PASS was forced.
+No new order, payment, cart mutation or MX cash action occurred.
+
+### Latest MX S1 continuation
+The Marketplace selector and delivery-response race were corrected with 9 passing regression tests. The subsequent official discovery stopped at EPP_IDENTITY_REQUIRED before checkout. One renewal attempt then stopped at STAGING_SETUP_NAVIGATION / EPP_NAVIGATION_OR_RENDER_TIMEOUT before CAPTCHA; no financial action was executed and the end-to-end delivery correction remains unproven. No live owned browser was found during exact-profile cleanup. This setup timeout has no established external root cause and must not be labelled an application bug.
+
+## CL-only closure — S1, 2026-10-29
+
+This round executed only CL EPP business flows. The seven official cases are
+classified in ignored `test-results/epp/cl/closure-2026-10-29.md` and `.json`.
+Three historical PASS results are preserved: SAM-24836, SAM-24840, SAM-24851.
+SAM-24841 remains the operator-confirmed known footer defect. SAM-25146 is the
+supplied related reference; no Jira issue or quarantine scope was changed.
+
+### Confirmed shipping-address application defect
+
+SAM-24864 (`alianzas`), SAM-24865 (`ventab2b_cl`) and SAM-24866 (`alianzas`)
+all stopped at Delivery, before any financial submission. Independent programme
+users/current and checkAccess accepted the registered identity. After selecting
+new address and waiting 30 seconds, the existing street field count was 1, but
+visible street and region controls were both 0. Both native input interaction
+and keyboard activation reproduced the failure. The saved-address alternative
+also exposed no usable address card, although the same EPP account's read-only
+address API returned one complete shipping address with country CL.
+
+Reproduction: staging cookie bootstrap -> EPP login -> eligible
+`SM-S918BZKILTL` PDP -> cart quantity 1 -> Contact -> Delivery -> select new
+address. Expected: editable address controls and a usable delivery selection.
+Actual: selected new-address radio without visible street/region controls;
+Payment cannot be reached. Samsung must repair the address UI or expose a
+usable saved address through the supported checkout UI. No hidden fields were
+filled and no address was created through an API.
+
+Exact raw results:
+
+- SAM-24864: `test-results/epp/cl/s1/2026-10-29T23-00-57-355Z-75732/results.json`.
+- SAM-24865 after automation correction: `test-results/epp/cl/s1/2026-10-29T23-19-59-408Z-138348/results.json`.
+- SAM-24866: `test-results/epp/cl/s1/2026-10-29T23-25-50-112Z-39596/results.json`.
+
+Each run retains its masked Delivery screenshot. Additional local diagnostic
+logs are `cl-only-radio-interaction.log`, `cl-only-address-country.log` and
+`cl-only-bank-pdp.log` under ignored `.agent/tmp/`.
+
+### Automation correction and documented programmes
+
+The CL payment cart helper incorrectly hardcoded `alianzas`. It now resolves
+only a registered canonical CL programme and uses that programme's own OCC
+endpoint; foreign programmes, origins and environments still fail. This fix
+was proven by the transfer TC progressing into Delivery in `ventab2b_cl`.
+Documented `colaboradores` and `ventab2b_cl` are explicit isolated CL options,
+with automatic renewal disabled; `alianzas` remains the default. No scheduler,
+Jenkins, dashboard or Base Store auth was changed. The transfer programme had
+independently accepted identity/access and a visible purchasable PDP before
+its checkout was executed. The internal programme did not provide a completed
+usable alternative; it was not promoted to HEALTHY.
+
+Validation: 36 focused config/programme/CL checkout/cart tests passed;
+architecture validation passed; CL EPP list contains exactly 7 official cases.
+No payment/provider acceptance or Order Confirmation PASS is claimed. There
+were zero payment submits and zero new orders in this CL round. No missing
+SKU/contact/card fixture or missing access was proven to cause these three
+Delivery blockers. S2 received only read-only route/config discovery; these
+results do not homologate S2 payments.

@@ -6,6 +6,7 @@ const { acquireEppLease } = require("../utils/eppSession.cjs");
 
 function buildRun(market, args = [], sourceEnv = process.env, {readData = require('../utils/eppRuntimeData.cjs').getEppRuntimeData} = {}) {
   let config = getEppConfig(market, sourceEnv);
+  sourceEnv={...sourceEnv,[`${config.market}_EPP_PROGRAM`]:config.program};
   // Optional proven product mass lives with the other ignored EPP fixtures.
   // Explicit operator overrides still win; listing never depends on local data.
   const product = args.includes('--list') ? null : readData(config)?.product;

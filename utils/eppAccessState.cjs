@@ -26,15 +26,15 @@ function classifyEppAccess({ url, rootUrl, body = "", corporateEmailVisible = fa
 async function observeEppAccess(page, config) {
   let dom;
   try {
-    dom = await page.evaluate(() => {
+    dom = await page.evaluate(({allowProgrammeWelcome}) => {
       const visible = e => !!(e.getBoundingClientRect().width && e.getBoundingClientRect().height);
       return { body: document.body?.innerText || "",
         corporateEmailVisible: [...document.querySelectorAll('input[type="email"]')].some(visible),
         codeVisible: [...document.querySelectorAll("input")].some(e => visible(e) && /verification|access code|c[oó]digo|clave de acceso/i.test(`${e.placeholder} ${e.getAttribute("aria-label") || ""} ${[...(e.labels || [])].map(label => label.textContent).join(" ")}`)),
         codeRejected: [...document.querySelectorAll('mat-error,.mat-mdc-form-field-error,[role="alert"]')].some(e => visible(e) && /c[oó]digo.*(?:v[aá]lido|incorrecto)|invalid.*verification code|verification code.*invalid/i.test(e.textContent)),
         commerceVisible: [...document.querySelectorAll('.product-card,.product-detail,.product-details,.product-detail-container,.pdp,cx-page-layout.ProductDetailsPageTemplate,[data-component="product-card"]')].some(visible),
-        authenticatedHomepageVisible: !!document.querySelector('cx-page-layout.LandingPage2Template') && [...document.querySelectorAll('a,button,span')].some(e => visible(e) && /^Cerrar sesi[oó]n$|^Sign out$|^Salir$/i.test(e.textContent.trim())) };
-    });
+        authenticatedHomepageVisible: (!!document.querySelector('cx-page-layout.LandingPage2Template')||allowProgrammeWelcome) && [...document.querySelectorAll('a,button,span,div,p,h1,h2,h3')].some(e => visible(e) && /^Cerrar sesi[oó]n$|^Sign out$|^Salir$|^Welcome,\s+\S+|^Bienvenid[oa],?\s+\S+/i.test(e.textContent.trim())) };
+    },{allowProgrammeWelcome:!!config.programNamespace});
   } catch (error) {
     // A read racing a real navigation is pending, not an invalid identity.
     // The caller's deadline bounds further observation; no action is replayed.
@@ -47,10 +47,10 @@ async function observeEppAccess(page, config) {
 }
 
 async function findEppVerifiedContinue(page) {
-  const success = page.getByText(/Tu cuenta ha sido verificada con éxito|Your account has been successfully verified/i).filter({ visible: true }).first();
+  const success = page.getByText(/Tu cuenta ha sido verificada con éxito|¡Éxito!\s*Tu cuenta ha sido verificada|Your account has been successfully verified/i).filter({ visible: true }).first();
   if (!(await success.isVisible().catch(() => false))) return null;
-  const button = page.getByRole("button", { name: /^Continuar comprando$|^Continue shopping$/i })
-    .or(page.getByRole("link", { name: /^Continuar comprando$|^Continue shopping$/i })).filter({ visible: true }).first();
+  const button = page.getByRole("button", { name: /^Continuar comprando$|^Seguir comprando$|^Continue shopping$/i })
+    .or(page.getByRole("link", { name: /^Continuar comprando$|^Seguir comprando$|^Continue shopping$/i })).filter({ visible: true }).first();
   return await button.isVisible().catch(() => false) ? button : null;
 }
 

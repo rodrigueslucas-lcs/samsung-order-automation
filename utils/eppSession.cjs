@@ -8,11 +8,13 @@ function getEppSessionPaths(config) {
   const { market, environment } = config;
   if (!["MX", "CO", "PE", "CL"].includes(market) || !["S1", "S2"].includes(environment)) throw new Error("Invalid EPP identity.");
   const slot = config.authSlot || 'primary';
+  const program=config.programNamespace;
+  if(program&&!/^[a-z][a-z0-9_]{1,60}$/.test(program))throw new Error('Invalid EPP programme namespace.');
   if (!['primary', 'second'].includes(slot) || (slot === 'second' && !['MX', 'CO'].includes(market))) throw new Error('Invalid EPP account slot.');
-  const directory = path.join(root, "playwright", ".auth", "epp", environment.toLowerCase(), market.toLowerCase(), ...(slot === 'second' ? ['second'] : []));
+  const directory = path.join(root, "playwright", ".auth", "epp", environment.toLowerCase(), market.toLowerCase(), ...(program?['programs',program]:[]), ...(slot === 'second' ? ['second'] : []));
   return {
     directory,
-    profile: path.join(root, "playwright", "profiles", "epp", `${environment.toLowerCase()}-${market.toLowerCase()}-${slot === 'second' ? 'second' : 'qa'}`),
+    profile: path.join(root, "playwright", "profiles", "epp", ...(program?['programs',program]:[]), `${environment.toLowerCase()}-${market.toLowerCase()}-${slot === 'second' ? 'second' : 'qa'}`),
     state: path.join(directory, "state.json"), session: path.join(directory, "session-storage.json"),
     metadata: path.join(directory, "identity.json"), handoff: path.join(directory, "handoff.json"), lock: path.join(directory, "refresh.lock"),
   };
@@ -65,13 +67,40 @@ async function installEppSessionStorage(context, config, values) {
   }, { origin: config.rootUrl.origin, prefix: config.rootUrl.pathname, values });
 }
 
+async function captureEppPageState(context,page,config,{timeoutMs=15000}={}){
+  const root=new URL(config.rootUrl),current=new URL(page.url());
+  if(root.protocol!=='https:'||!['stg.shop.samsung.com','stg2.shop.samsung.com'].includes(root.hostname)||current.origin!==root.origin||!current.pathname.startsWith(root.pathname))throw new Error('EPP capture must remain in its exact staging programme.');
+  if(!Number.isFinite(timeoutMs)||timeoutMs<=0)throw new Error('Invalid EPP snapshot deadline.');
+  let timer;
+  try{return await Promise.race([(async()=>{
+    const [cookies,storage]=await Promise.all([context.cookies(),page.evaluate(()=>({
+      localStorage:Object.entries(localStorage).map(([name,value])=>({name,value})),
+      sessionStorage:Object.fromEntries(Object.entries(sessionStorage)),
+    }))]);
+    return{storageState:{cookies,origins:[{origin:root.origin,localStorage:storage.localStorage}]},sessionStorage:storage.sessionStorage};
+  })(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Object.assign(new Error('EPP snapshot capture did not finish.'),{code:'EPP_SNAPSHOT_TIMEOUT',eppReason:'EPP_SNAPSHOT_TIMEOUT'})),timeoutMs);})]);}finally{clearTimeout(timer);}
+}
+
+function loadEppProgramSeed(config,{load=loadEppSession}={}){
+  const own=load(config);
+  if(own.storageState.cookies.length||own.storageState.origins.length)return {snapshot:own,sourceProgram:config.program};
+  const {getEppPrograms,getEppConfig}=require('../config/markets/epp');
+  for(const program of getEppPrograms(config.market,config.environment)){
+    if(program.id===config.program)continue;
+    const sibling=getEppConfig(config.market,{ENVIRONMENT:config.environment,EPP_PROGRAM:program.id,EPP_AUTH_SLOT:config.authSlot||'primary'});
+    try{const candidate=load(sibling);if(candidate.storageState.cookies.length||candidate.storageState.origins.length)return {snapshot:candidate,sourceProgram:program.id};}catch{/* Unproven sibling state is not a seed. */}
+  }
+  return {snapshot:own,sourceProgram:null};
+}
+
 function persistVerifiedEppSession(config, snapshot, { io = fs, write = writeJsonAtomically, now = () => new Date().toISOString() } = {}) {
   if (!snapshot.proof?.userAccepted || !snapshot.proof?.accessAccepted) throw new Error("Unverified EPP state must not be exported.");
   const files = getEppSessionPaths(config);
   io.mkdirSync(files.directory, { recursive: true });
   write(files.state, snapshot.storageState);
   write(files.session, snapshot.sessionStorage);
-  write(files.metadata, { store: "EPP", market: config.market, environment: config.environment, authSlot: config.authSlot || 'primary', root: config.rootUrl.href, verified: true, serverAccepted: true, verifiedAt: now() });
+  write(files.metadata, { store: "EPP", market: config.market, environment: config.environment, authSlot: config.authSlot || 'primary', root: config.rootUrl.href, verified: true, serverAccepted: true, verifiedAt: now(),...(snapshot.proof.callbackStatus==='BROKEN_400'?{callbackStatus:'BROKEN_400'}:{}) });
+  if(snapshot.proof.storefrontAccepted===true)write(path.join(files.directory,'program-observation.json'),{store:'EPP',market:config.market,environment:config.environment,program:config.program,root:config.rootUrl.href,slot:config.authSlot||'primary',observedAt:now(),proof:{userAccepted:true,accessAccepted:true},identity:'AUTHENTICATED',entitlement:'VALID',storefront:'OK',health:'HEALTHY',reason:null,callbackStatus:snapshot.proof.callbackStatus==='BROKEN_400'?'BROKEN_400':null,action:'VERIFIED',retries:0});
 }
 
 function acquireEppLease(config, environment = process.env, { io = fs, acquire = leaseModule.acquireMarketLease, register = leaseModule.registerLeaseProcess } = {}) {
@@ -90,4 +119,4 @@ function eppLoginResumeOptions(handoff = {}, startedNewFlow = false) {
   return { resumeOnly: !startedNewFlow && phase !== 'NONE', resumeEmailPhase: phase };
 }
 
-module.exports = { getEppSessionPaths, getPrimaryEppCredentials, loadEppSession, installEppSessionStorage, persistVerifiedEppSession, acquireEppLease, eppLoginResumeOptions };
+module.exports = { getEppSessionPaths, getPrimaryEppCredentials, loadEppSession, loadEppProgramSeed, installEppSessionStorage, captureEppPageState, persistVerifiedEppSession, acquireEppLease, eppLoginResumeOptions };

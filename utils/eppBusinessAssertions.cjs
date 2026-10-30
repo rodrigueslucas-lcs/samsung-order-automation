@@ -119,15 +119,18 @@ async function proveTooltipAboveBackToTop(page) {
       };
       const tips = contexts(tip), backs = contexts(control);
       while (tips.length && backs.length && tips[0].node === backs[0].node) { tips.shift(); backs.shift(); }
-      return { overlap: false, tooltipOnTop: !!tips.length && !!backs.length && tips[0].z > backs[0].z };
+      // A node without a remaining stacking context paints in the common
+      // context at level zero. Requiring both chains rejects normal-flow
+      // controls even when the tooltip has a proven positive stacking level.
+      return { overlap: false, tooltipOnTop: (tips[0]?.z ?? 0) > (backs[0]?.z ?? 0), tooltipContexts:tips.map(x=>x.z), controlContexts:backs.map(x=>x.z) };
     }
     const stack = document.elementsFromPoint((left + right) / 2, (top + bottom) / 2);
     const tipIndex = stack.findIndex(node => node === tip || tip.contains(node));
     const backIndex = stack.findIndex(node => node === control || control.contains(node));
-    return { overlap: true, tooltipOnTop: tipIndex >= 0 && (backIndex < 0 || tipIndex < backIndex) };
+    return { overlap: true, tooltipOnTop: tipIndex >= 0 && (backIndex < 0 || tipIndex < backIndex),tipIndex,backIndex };
   }, backHandle);
   await backHandle.dispose();
-  expect(result.tooltipOnTop, 'Official EPP expected result requires Back to Top behind the visible tooltip').toBe(true);
+  expect(result.tooltipOnTop, 'Official EPP expected result requires Back to Top behind the visible tooltip: '+JSON.stringify(result)).toBe(true);
 }
 
 async function completeContact(page, config, customer) {

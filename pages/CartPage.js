@@ -97,6 +97,16 @@ export default class CartPage extends BasePage {
 
   async loadMxCartState() {
     const {apiOrigin,cartPath}=require('../utils/mxStorefrontScope.cjs').resolveMxStorefrontScope(this.cartUrl,this.storefront,'cart');
+    if(this.storefront&&this.observedCartResponse){
+      const observed=this.observedCartResponse,u=new URL(observed.url());
+      if(u.origin!==apiOrigin||u.pathname!==cartPath||observed.request().method()!=='GET')throw new Error('MX EPP observed cart belongs to another endpoint.');
+      const authorization=await observed.request().headerValue('authorization');
+      const response=await this.page.context().request.get(apiOrigin+cartPath,{headers:{origin:new URL(this.cartUrl).origin,referer:this.cartUrl,...(authorization?{authorization}:{})},timeout:15000,maxRedirects:0}).catch(()=>{throw new Error('MX EPP cart read failed; request details suppressed.');});
+      if(!response.ok())throw new Error(`MX EPP cart read returned HTTP ${response.status()}.`);
+      const cart=await response.json();
+      if(!Array.isArray(cart.entries))throw new Error('MX EPP cart entries were not proven.');
+      return{productEntries:cart.entries.filter(entry=>entry.product?.code&&!entry.isHideForDisplay&&!entry.serviceEntry)};
+    }
 
     const currentCartResponse = this.page.waitForResponse(
       (response) => {

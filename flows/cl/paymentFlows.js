@@ -70,21 +70,43 @@ export async function completeClRegisteredContact(page,customer={}) {
   await expect(page).toHaveURL(/CHECKOUT_STEP_DELIVERY/i,{timeout:60000});
 }
 
-export async function continueClRegisteredDeliveryToPayment(page,{addressReady=false}={}) {
+export async function continueClRegisteredDeliveryToPayment(page,{addressReady=false,diagnose=false,storefront=null}={}) {
+  const exchanges=[];
+  const observe=response=>{const u=new URL(response.url());if(response.request().method()==='POST'&&/^s[12]-smb-api-cdn\.ecom-stg\.samsung\.com$/.test(u.hostname))exchanges.push({path:u.pathname.replace(/\/users\/[^/]+\//,'/users/[identity]/'),status:response.status()});};
+  if(diagnose)page.on('response',observe);
+  try{
   if(!addressReady){
   const saved = page.getByRole("radio", { name: /Mis direcciones/i });
-  await saved.locator("xpath=ancestor::mat-radio-button[1]").click();
+  if(!await saved.isChecked())await saved.locator("xpath=ancestor::mat-radio-button[1]").click();
   await expect(saved).toBeChecked();
   }
   const shipping = page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
   const delivery = shipping.getByText(/Entrega d[ií]a siguiente|Despacho est[aá]ndar/i)
     .filter({ visible: true }).first();
   await expect(delivery).toBeVisible({ timeout: 30000 });
-  await delivery.click();
-  const terms = shipping.locator('input[name="termsAndCondition"]:visible');
+  if(storefront){
+    const site=storefront.apiSite||storefront.rootUrl.pathname.split('/').filter(Boolean)[2];
+    const origin=`https://${storefront.environment.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com`;
+    // The checked radio/updated price is optimistic. Continue must wait for
+    // the native delivery save to complete; never replay a payment or POST.
+    const saved=page.waitForResponse(response=>{const u=new URL(response.url());return response.request().method()==='POST'&&u.origin===origin&&u.pathname===`/tokocommercewebservices/v2/${site}/users/current/carts/current/deliverymodes/update`;},{timeout:60000});
+    const [response]=await Promise.all([saved,delivery.click()]);
+    if(!response.ok()||await response.finished())throw new Error('CL EPP delivery persistence failed; no payment submitted.');
+  }else await delivery.click();
+  // EPP exposes the same legal choice by its accessible label, while the
+  // native input name differs from Base Store. Scope to Delivery and avoid
+  // selecting the unrelated subscription or invoice checkboxes.
+  const terms = shipping.getByRole('checkbox', { name: /^Acepto los t[eé]rminos y condiciones/i });
   if (!(await terms.isChecked())) await terms.check({ force: true });
   await page.getByRole("button", { name: /Continuar al pago/i }).click();
   await expect(page).toHaveURL(/CHECKOUT_STEP_PAYMENT/i, { timeout: 60000 });
+  }finally{
+    if(diagnose){
+      page.off('response',observe);
+      const state=await page.evaluate(()=>({invalid:[...document.querySelectorAll('input:invalid,select:invalid,textarea:invalid')].map(e=>({name:e.name,type:e.type,visible:!!(e.getBoundingClientRect().width&&e.getBoundingClientRect().height),message:e.validationMessage})),radios:[...document.querySelectorAll('input[type="radio"]')].filter(e=>/delivery_mode_option/.test(e.name)).map(e=>({name:e.name,checked:e.checked})),errors:[...document.querySelectorAll('mat-error,[role="alert"]')].filter(e=>e.getBoundingClientRect().height).map(e=>e.textContent.trim().replace(/\S+@\S+/g,'[email]').replace(/\d{4,}/g,'[digits]'))}));
+      await test.info().attach('CL EPP Delivery diagnostics',{body:JSON.stringify({exchanges,state}),contentType:'application/json'});
+    }
+  }
 }
 
 export async function selectClInterestFreeInstallments(payment, testInfo) {

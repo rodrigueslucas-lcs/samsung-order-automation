@@ -5,15 +5,26 @@ const { authBrowserClosed } = require('../../utils/authBrowserLifecycle.cjs');
 for(const [name,snapshot,expected] of [['absent',{known:true,profiles:[]},true],['live exact profile',{known:true,profiles:['/fixture/s2-mx-qa']},false],['unknown',{known:false,profiles:[]},false]])test(`OS browser probe fails closed: ${name}`,()=>{assert.equal(authBrowserClosed({market:'mx',environment:'S2',slot:'primary'},{platform:'win32',profilesRoot:'/fixture',canonical:value=>value.replaceAll('\\','/'),run:()=>JSON.stringify(snapshot)}),expected);});
 const { refreshAuth } = require('../../utils/authRefreshRunner.cjs');
 
+test('a stalled native EPP snapshot and disconnect cannot retain the profile lease indefinitely',async()=>{
+  const root='https://stg2.shop.samsung.com/mx/multistore/program/program/';
+  const never=()=>new Promise(()=>{});
+  const h=await captureAuthBrowser({market:'mx',environment:'S2',slot:'primary'},{
+    profilesRoot:'/fixture/epp',readFile:()=> '43210\n/devtools/browser/fixture-id',snapshotTimeoutMs:15,disconnectTimeoutMs:15,
+    chromium:{connectOverCDP:async()=>({contexts:()=>[{pages:()=>[{url:()=>root,evaluate:never}],cookies:never}],close:never})},
+  });
+  await assert.rejects(h.readEppSnapshot(root),e=>e.code==='EPP_NATIVE_SNAPSHOT_TIMEOUT');
+  await h.dispose();
+});
+
 test('EPP native readback rejects Production/Base Store and preserves an active Account gate',async()=>{
   let pages=[{url:()=> 'https://account.samsung.com/iam/oauth2/authorize'}],reads=0;
-  const h=await captureAuthBrowser({market:'mx',environment:'S2',slot:'primary'},{profilesRoot:'/fixture/epp',readFile:()=> '43210\n/devtools/browser/fixture-id',chromium:{connectOverCDP:async()=>({contexts:()=>[{pages:()=>pages,storageState:async()=>{reads++;return{cookies:[],origins:[]};}}],close:async()=>{}})}});
+  const h=await captureAuthBrowser({market:'mx',environment:'S2',slot:'primary'},{profilesRoot:'/fixture/epp',readFile:()=> '43210\n/devtools/browser/fixture-id',chromium:{connectOverCDP:async()=>({contexts:()=>[{pages:()=>pages,cookies:async()=>{reads++;return[];},storageState:async()=>assert.fail('must not visit other stored origins')}],close:async()=>{}})}});
   await assert.rejects(h.readEppSnapshot('https://www.samsung.com/mx/multistore/program/program/'),/staging EPP/);
   await assert.rejects(h.readEppSnapshot('https://stg2.shop.samsung.com/mx/'),/staging EPP/);
   const root='https://stg2.shop.samsung.com/mx/multistore/program/program/';
   assert.equal(await h.readEppSnapshot(root),null);assert.equal(reads,0);
-  pages=[{url:()=>root,evaluate:async()=>({fixture:'private-fixture'})}];
-  assert.deepEqual((await h.readEppSnapshot(root)).sessionStorage,{fixture:'private-fixture'});assert.equal(reads,1);await h.dispose();
+  pages=[{url:()=>root,evaluate:async()=>({localStorage:[],sessionStorage:{fixture:'private-fixture'}})}];
+  const snapshot=await h.readEppSnapshot(root);assert.deepEqual(snapshot.sessionStorage,{fixture:'private-fixture'});assert.equal(snapshot.storageState.origins[0].origin,'https://stg2.shop.samsung.com');assert.equal(reads,1);await h.dispose();
 });
 
 for (const market of ['mx', 'pe', 'co', 'cl']) for (const environment of ['S1', 'S2']) {

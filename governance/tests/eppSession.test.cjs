@@ -4,6 +4,23 @@ const path = require("node:path");
 const { getEppConfig } = require("../../config/markets/epp");
 const { getEppSessionPaths, getPrimaryEppCredentials, loadEppSession, installEppSessionStorage, eppLoginResumeOptions } = require("../../utils/eppSession.cjs");
 const { isEppPage, assertEppAuthContinuation } = require("../../scripts/auth-refresh-epp.cjs");
+const {captureEppPageState}=require('../../utils/eppSession.cjs');
+
+test('EPP capture reads the current staging programme in place without visiting stored origins',async()=>{
+  const config=getEppConfig('MX',{});
+  const snapshot=await captureEppPageState({cookies:async()=>[],storageState:()=>{throw Error('must not navigate');}},{url:()=>config.rootUrl.href,evaluate:async()=>({localStorage:[{name:'synthetic',value:'fixture'}],sessionStorage:{synthetic:'fixture'}})},config);
+  assert.equal(snapshot.storageState.origins.length,1);
+  assert.equal(snapshot.storageState.origins[0].origin,config.rootUrl.origin);
+  assert.equal(snapshot.sessionStorage.synthetic,'fixture');
+});
+test('EPP capture rejects a foreign programme before reading storage',async()=>{
+  const config=getEppConfig('MX',{});
+  await assert.rejects(captureEppPageState({}, {url:()=>config.rootUrl.origin+'/mx/'},config),/exact staging programme/);
+});
+test('EPP capture times out without accepting suspended storage as a valid snapshot',async()=>{
+  const config=getEppConfig('MX',{});
+  await assert.rejects(captureEppPageState({cookies:()=>new Promise(()=>{})},{url:()=>config.rootUrl.href,evaluate:async()=>({})},config,{timeoutMs:10}),error=>error.code==='EPP_SNAPSHOT_TIMEOUT');
+});
 
 test('EPP security denial and blocked redirects stop continuation without exposing the provider URL',()=>{
   assert.throws(()=>assertEppAuthContinuation({url:()=> 'https://account.samsung.com/iam/blocked?secret=fixture'}),e=>e.exitCode===78&&e.eppReason==='SAMSUNG_ACCOUNT_SECURITY_BLOCKED'&&!e.message.includes('fixture'));
@@ -21,7 +38,7 @@ for (const market of ["MX", "PE", "CO", "CL"]) for (const environment of ["S1", 
   test(`${market} ${environment} isolates EPP files and profiles from Base Store`, () => {
     const config = getEppConfig(market, { ENVIRONMENT: environment });
     const files = getEppSessionPaths(config);
-    assert.match(files.directory.replace(/\\/g, "/"), new RegExp(`/playwright/\\.auth/epp/${environment.toLowerCase()}/${market.toLowerCase()}$`));
+    assert.match(files.directory.replace(/\\/g, "/"), new RegExp(`/playwright/\\.auth/epp/${environment.toLowerCase()}/${market.toLowerCase()}${config.programNamespace?'/programs/'+config.program:''}$`));
     assert.match(files.profile.replace(/\\/g, "/"), /\/playwright\/profiles\/epp\//);
     assert.notEqual(files.profile, path.resolve(`playwright/profiles/${environment.toLowerCase()}-${market.toLowerCase()}-qa`));
   });

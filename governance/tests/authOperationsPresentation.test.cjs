@@ -15,3 +15,11 @@ test('activity filters enumerate loaded event kinds only and retain escaping',()
 test('freshness uses recorded generation time and never adds requests',()=>{const {freshness}=require('../../reporting/auth-operations/countdown.js');assert.equal(freshness(new Date(now-12000).toISOString(),now),'Data updated 12s ago');assert.equal(freshness('bad',now),'Data timestamp unavailable');});
 
 test('missing canonical origin never refreshes a root-relative path on the isolated resource domain',()=>{const html=render(fixture(),{refreshUrl:'/userContent/samsung-smb-auth/s2/index.html'});assert.match(html,/content="45"/);assert.doesNotMatch(html,/content="45;url=\/userContent/);});
+test('EPP summary counts programs and adds conservative recovery and entitlement diagnostics',()=>{
+ const m=fixture();m.epp={sessions:[{market:'mx',environment:'S2',program:'pymesmx',health:'STALE',identity:'AUTHENTICATED',entitlement:'VALID',storefront:'UNKNOWN'},{market:'co',environment:'S2',program:'co_epp_agre',health:'BLOCKED',identity:'UNKNOWN',entitlement:'UNKNOWN',reason:'CORPORATE_ACTIVATION_REQUIRED'}]};
+ const html=render(m);assert.match(html,/2 programs tracked/);assert.match(html,/RECOVERABLE<\/dt><dd>1/);assert.match(html,/ENTITLEMENT UNKNOWN<\/dt><dd>1/);assert.match(html,/CO · S2 · co_epp_agre · CORPORATE_ACTIVATION_REQUIRED/);
+ m.epp.sessions[0].reason='OUTSIDE_EPP_STORE';assert.match(render(m),/RECOVERABLE<\/dt><dd>0/);
+});
+test('top scheduler labels reuse existing state semantics and compact actions stay in the summary',()=>{
+ const m=fixture();m.scheduler.executing=true;m.eppScheduler={status:'DEGRADED'};const html=render(m);assert.match(html,/Base Store scheduler: <b>RUNNING/);assert.match(html,/EPP scheduler: <b>ERROR/);assert.ok(html.indexOf('compact-actions')<html.indexOf('aria-label="Human Action Required"'));m.scheduler.executing=false;assert.match(render(m),/Base Store scheduler: <b>IDLE/);
+});

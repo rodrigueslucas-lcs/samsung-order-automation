@@ -1,12 +1,21 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+async function boundedRead(operation, timeout, code) {
+  let timer;
+  try { return await Promise.race([Promise.resolve().then(operation),new Promise((_,reject)=>{
+    timer=setTimeout(()=>reject(Object.assign(new Error(code),{code})),timeout);
+  })]); } finally { clearTimeout(timer); }
+}
+
 // Capture the exact native browser after login, before verification. Holding
 // this connection avoids reconnecting to a port reused by another browser.
 async function captureAuthBrowser({ market, environment, slot }, {
   chromium = require('@playwright/test').chromium,
   profilesRoot = path.resolve('playwright/profiles'), readFile = fs.readFileSync,
+  snapshotTimeoutMs=15000,disconnectTimeoutMs=5000,
 } = {}) {
+  if(![snapshotTimeoutMs,disconnectTimeoutMs].every(n=>Number.isFinite(n)&&n>0&&n<=60000))throw new Error('Invalid native browser operation deadline.');
   if (!['mx', 'pe', 'co', 'cl'].includes(market) || !['S1', 'S2'].includes(environment) || !['primary', 'second'].includes(slot)) throw new Error('Invalid auth browser identity.');
   const profile = `${environment.toLowerCase()}-${market}-${slot === 'second' ? 'second' : 'qa'}`;
   let endpoint;
@@ -30,7 +39,11 @@ async function captureAuthBrowser({ market, environment, slot }, {
       if (!context || context.pages().some(page => { try { return new URL(page.url()).hostname === 'account.samsung.com'; } catch { return false; } })) return null;
       const page = context.pages().find(page => page.url().startsWith(root.href));
       if (!page) return null;
-      return { storageState: await context.storageState(), sessionStorage: await page.evaluate(() => Object.fromEntries(Object.entries(sessionStorage))) };
+        return boundedRead(async()=>{
+          // Full storageState can visit unrelated origins retained by this
+          // native profile. Read only the owned staging origin in place.
+          return require('./eppSession.cjs').captureEppPageState(context,page,{rootUrl:root});
+        },snapshotTimeoutMs,'EPP_NATIVE_SNAPSHOT_TIMEOUT');
     },
     async closeVerified() {
       if (!browser.isConnected()) return;
@@ -38,7 +51,7 @@ async function captureAuthBrowser({ market, environment, slot }, {
       try { await session.send('Browser.close'); }
       catch (error) { if (browser.isConnected()) throw error; }
     },
-    async dispose() { await browser.close().catch(() => {}); },
+      async dispose() { await boundedRead(()=>browser.close(),disconnectTimeoutMs,'AUTH_BROWSER_DISCONNECT_TIMEOUT').catch(() => {}); },
   };
 }
 

@@ -63,7 +63,7 @@ test.describe("CL QST - EPP Official P1", () => {
 
   test("SAM-24866 @preflight @destructive @qst @cl @epp - Order confirmation screen", async ({page}) => {
     await test.step("Inspect authenticated EPP cart, checkout and payment prerequisites", async () => {
-      await runEppPaymentPrerequisiteCase(page,cfg(),{kind:'card'});
+      await runEppPaymentPrerequisiteCase(page,cfg(),{kind:'card',confirmationOnly:true});
     });
   });
 });

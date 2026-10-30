@@ -6,15 +6,17 @@ const source = fs.readFileSync('pages/CheckoutPage.js', 'utf8')
   .replace(/^import .*;\r?\n/gm, '').replace('export default ', '');
 const Checkout = vm.runInNewContext(`${source}\nCheckoutPage`, { BasePage: class {}, URL });
 
-function fixture({ status = 200, failedBody = false } = {}) {
+function fixture({ status = 200, failedBody = false, site = 'pe', origin = null } = {}) {
   let resolve, reject, check, clicked = 0, bodyFinished = false;
   const checkout = Object.create(Checkout.prototype);
+  if(site!=='pe')checkout.peApiSite=site;
+  if(origin)checkout.peApiOrigin=origin;
   checkout.page = { waitForResponse: (predicate, options) => {
     check = predicate; assert.equal(options.timeout, 90000);
     return new Promise((r, j) => { resolve = r; reject = j; });
   } };
   const response = (host, method = 'POST', actualStatus = status) => ({
-    url: () => `https://${host}/tokocommercewebservices/v2/pe/users/current/carts/current/deliverymodes/update`,
+    url: () => `https://${host}/tokocommercewebservices/v2/${site}/users/current/carts/current/deliverymodes/update`,
     request: () => ({ method: () => method }), ok: () => actualStatus === 200, status: () => actualStatus,
     finished: async () => { bodyFinished = true; return failedBody ? new Error('closed') : null; },
   });
@@ -37,6 +39,12 @@ test('PE shipping does not complete on optimistic radio click before persisted u
   assert.deepEqual(s.state(), { clicked: 1, bodyFinished: false });
   s.complete(); await pending;
   assert.deepEqual(s.state(), { clicked: 1, bodyFinished: true });
+});
+
+test('PE EPP shipping waits for its programme update rather than the Base Store endpoint',async()=>{
+  const s=fixture({site:'pe_membership_vip',origin:'https://s2-smb-api-cdn.ecom-stg.samsung.com'});
+  const pending=s.run();s.complete();await pending;
+  assert.deepEqual(s.state(),{clicked:1,bodyFinished:true});
 });
 for (const [options, pattern] of [[{ status: 400 }, /HTTP 400/], [{ failedBody: true }, /did not complete/]]) {
   test(`PE shipping fails closed without another click: ${pattern}`, async () => {

@@ -1,0 +1,15 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync('flows/eppMxCardPayment.js','utf8').replace(/^import .*;\r?\n/gm,'').replace(/export async function/g,'async function');
+function fixture({foreign=false,ambiguous=false}={}){
+ const calls=[],root=new URL('https://stg2.shop.samsung.com/cl/multistore/alianzas/alianzas/');let url=new URL('checkout/one?step=CHECKOUT_STEP_PAYMENT',root).href;
+ const page={url:()=>url,frameLocator:()=>({locator:()=>({evaluate:async()=>foreign?'foreign.example':'secure-fields.mercadopago.com'})}),getByRole:()=>({filter:()=>({count:async()=>0})}),getByText:()=>({first:()=>({})})};
+ class MarketPaymentPage{
+ constructor(_,opts){assert.equal(opts.market,'CL');calls.push('CL-helper');}
+ async selectCreditCard(){calls.push('select');}async fillCardData(){calls.push('fill');}async validateCreditCardReady(){calls.push('ready');}
+ async placeOrderAndCapture(options){calls.push('submit');assert.ok(options.submitResponsePathPattern.test('/tokocommercewebservices/v2/alianzas/users/current/carts/current/paymentmodes/cl-mercadoCC/submitOrder'));assert.ok(!options.submitResponsePathPattern.test('/tokocommercewebservices/v2/cl/users/current/carts/current/paymentmodes/cl-mercadoCC/submitOrder'));if(ambiguous)throw Error('private provider body');url=new URL('orderConfirmation;orderCode=CL261030-12345678',root).href;return{orderCode:'CL261030-12345678'};}}
+ const run=vm.runInNewContext(source+'\nsubmitClEppCard;',{URL,RegExp,MarketPaymentPage,clTestCard:{getClTestCard:()=>Object.fromEntries(['number','holderName','expiry','cvv','document'].map(x=>[x,'synthetic']))},expect:()=>({toHaveURL:async()=>{},toBeVisible:async()=>{}}),test:{info:()=>({attach:async()=>{}})},assertions:{assertStoreRoute:()=>{}},guards:{requirePaymentSubmitOptIn:()=>calls.push('optin')},attemptModule:{beginEppOrderAttempt:()=>{calls.push('marker');return{observe:()=>calls.push('observed'),confirm:()=>calls.push('confirmed')};}}});
+ return{calls,run:()=>run(page,{market:'CL',environment:'S2',rootUrl:root},async()=>{})};
+}
+test('CL reuses its own approved card fixture and helper with EPP endpoints and causal confirmation',async()=>{const f=fixture();assert.equal((await f.run()).status,'PASS');assert.equal(f.calls.filter(x=>x==='submit').length,1);assert.ok(f.calls.indexOf('marker')<f.calls.indexOf('submit'));assert.ok(f.calls.includes('confirmed'));});
+test('CL never fills card data in a foreign secure field',async()=>{const f=fixture({foreign:true});await assert.rejects(f.run(),/provider contract/);assert.ok(!f.calls.includes('fill'));assert.ok(!f.calls.includes('submit'));});
+test('CL ambiguous submit preserves its attempt and suppresses raw provider details',async()=>{const f=fixture({ambiguous:true});await assert.rejects(f.run(),e=>/EPP_SINGLE_SUBMIT_UNCONFIRMED/.test(e.message)&&!e.message.includes('private'));assert.equal(f.calls.filter(x=>x==='submit').length,1);assert.ok(!f.calls.includes('confirmed'));});

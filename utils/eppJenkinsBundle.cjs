@@ -4,7 +4,7 @@ async function publishBundle(config,file,env=process.env,{request=fetch}={}) {
   const bundle=JSON.parse(fs.readFileSync(file,'utf8'));
   require('./eppKeepAlive.cjs').validateBundle(config,bundle);
   const cfg=publisherEnvironment(env);
-  const id=`samsung-epp-${config.market.toLowerCase()}-${config.environment.toLowerCase()}-${config.authSlot||'primary'}-session-bundle`;
+  const id=`samsung-epp-${config.market.toLowerCase()}-${config.environment.toLowerCase()}-${config.authSlot||'primary'}${config.programNamespace?'-'+config.programNamespace:''}-session-bundle`;
   const headers={Authorization:'Basic '+Buffer.from(cfg.JENKINS_USER+':'+cfg.JENKINS_API_TOKEN).toString('base64')};
   const read=async(relative,options={})=>request(cfg.JENKINS_URL+relative,{redirect:'manual',signal:AbortSignal.timeout(30000),...options,headers:{...headers,...options.headers}});
   const domain='/manage/credentials/store/system/domain/_',credential=domain+'/credential/'+id;

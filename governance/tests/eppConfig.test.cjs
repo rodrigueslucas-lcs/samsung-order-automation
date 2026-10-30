@@ -44,7 +44,7 @@ for (const market of ["MX", "CO", "PE", "CL"]) {
 for (const [market, environments] of Object.entries(expected)) {
   for (const [environment, [host, rootPath, verificationCode, accessMode]] of Object.entries(environments)) {
     test(`${market} ${environment} EPP config keeps the supplied official staging route and access model`, () => {
-      const config = getEppConfig(market, { [`${market}_QST_ENVIRONMENT`]: environment });
+      const config = getEppConfig(market, { [`${market}_QST_ENVIRONMENT`]: environment, EPP_PROGRAM: rootPath.split("/")[3] });
       assert.equal(config.rootUrl.hostname, host);
       assert.equal(config.rootUrl.pathname, rootPath);
       assert.equal(config.verificationCode, verificationCode);
@@ -59,7 +59,7 @@ test("MX S2 and CO S2 derive PDP/SKU directly from the supplied official EPP tes
   assert.equal(mx.sku, "SM-F741BLBKLTM");
   assert.match(mx.pdpUrl.pathname, /\/p\/SM-F741BLBKLTM$/i);
 
-  const co = getEppConfig("CO", { CO_QST_ENVIRONMENT: "S2" });
+  const co = getEppConfig("CO", { CO_QST_ENVIRONMENT: "S2", EPP_PROGRAM:"co_epp_agre" });
   assert.equal(co.sku, "QN85QN85DBKXZL");
   assert.match(co.pdpUrl.pathname, /\/p\/QN85QN85DBKXZL$/i);
 });

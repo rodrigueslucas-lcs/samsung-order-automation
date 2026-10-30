@@ -1,5 +1,10 @@
 const test=require('node:test');const assert=require('node:assert/strict');const{chromium}=require('@playwright/test');
 const{dismissEppNotificationTutorial,installEppOverlayDismissal}=require('../../utils/eppStorefrontOverlays.cjs');
+test('a tutorial detached during its close action is already dismissed, not a login failure',async()=>{
+ const close={isVisible:async()=>true,click:async()=>{throw Error('detached');},filter(){return this;},first(){return this;}};
+ const notice={locator:()=>close,isVisible:async()=>false};
+ assert.equal(await dismissEppNotificationTutorial({url:()=>config.rootUrl.href,locator:()=>notice},config),true);
+});
 const config={rootUrl:new URL('https://stg2.shop.samsung.com/mx/multistore/pymesmx/pymesmx/')};let browser;
 test.before(async()=>{browser=await chromium.launch({headless:true});});test.after(async()=>browser?.close());
 async function fixture(action,{url=config.rootUrl.href,html=''}={}){const context=await browser.newContext();try{const page=await context.newPage();await page.route('**/*',r=>r.fulfill({contentType:'text/html',body:html}));await page.goto(url);await action(page);}finally{await context.close();}}

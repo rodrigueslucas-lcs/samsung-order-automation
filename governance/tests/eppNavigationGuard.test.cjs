@@ -63,3 +63,18 @@ test('commerce writes cannot escape the selected EPP environment',async()=>{
   assert.equal((await request('https://s2-smb-api-cdn.ecom-stg.samsung.com'+suffix,{navigation:false,method:'POST'})).action,'continue');
   for(const origin of ['https://s1-smb-api-cdn.ecom-stg.samsung.com','https://shop.samsung.com']) assert.equal((await request(origin+suffix,{navigation:false,method:'POST'})).action,'abort');
 });
+
+test('explicit email verification is programme-bound and opt-in; default navigation guard remains closed',()=>{
+ const cfg=getEppConfig('CO',{EPP_PROGRAM:'alianzas_co'}),url='https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/alianzas_co/users/current/multistore/registration/verifyEmail?token=fixture';
+ assert.equal(blockedEppRequest(cfg,{url,document:true,top:true}).reason,'UNAPPROVED_NAVIGATION_BLOCKED');assert.equal(blockedEppRequest(cfg,{url,document:true,top:true,allowEmailVerification:true}),null);
+ assert.equal(blockedEppRequest(cfg,{url:url.replace('/alianzas_co/','/co_epp_agre/'),document:true,top:true,allowEmailVerification:true}).reason,'UNAPPROVED_NAVIGATION_BLOCKED');assert.equal(blockedEppRequest(cfg,{url:'https://www.samsung.com/shop/',document:true,top:true,allowEmailVerification:true}).reason,'PRODUCTION_NAVIGATION_BLOCKED');
+});
+test('CL payment opt-in allows only genuine Flow sandbox, never Flow production or Samsung production',()=>{
+ const {blockedEppRequest}=require('../../utils/eppNavigationGuard.cjs');
+ const cfg={market:'CL',environment:'S2',rootUrl:new URL('https://stg2.shop.samsung.com/cl/multistore/alianzas/alianzas/')};
+ const req={url:'https://sandbox.flow.cl/sandbox',document:true,top:true,allowClSandbox:true};
+ assert.equal(blockedEppRequest(cfg,req),null);
+ assert.equal(blockedEppRequest(cfg,{...req,allowClSandbox:false}).reason,'UNAPPROVED_NAVIGATION_BLOCKED');
+ assert.equal(blockedEppRequest({...cfg,market:'PE'},req).reason,'UNAPPROVED_NAVIGATION_BLOCKED');
+ for(const url of ['https://www.flow.cl/','https://flow.cl/','https://sandbox.flow.cl.evil.example/','https://www.samsung.com/cl/'])assert.ok(blockedEppRequest(cfg,{...req,url}));
+});

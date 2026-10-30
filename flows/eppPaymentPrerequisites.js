@@ -5,17 +5,24 @@ import session from '../utils/eppSession.cjs';
 import server from '../utils/eppServerProof.cjs';
 import runtime from '../utils/eppRuntimeData.cjs';
 import assertions from '../utils/eppBusinessAssertions.cjs';
-import {submitMxEppCard,validateMxEppConfirmation} from './eppMxCardPayment';
+import {submitMxEppCard,submitPeEppCard,submitClEppCard,validateMxEppConfirmation} from './eppMxCardPayment';
 import attempts from '../utils/eppOrderAttempt.cjs';
 import {watchMxEppCashDetails,inspectMxEppCash} from './eppMxCashPrerequisites';
 import {completeClEppCheckout} from './eppClCheckout';
+import {completePeEppCheckout,normalizeEppPaymentCart} from './eppPeCheckout';
 import clPaymentCart from './cl/paymentCart.cjs';
+import {validateExistingEppCardOrder} from './eppCardConfirmation';
+import {submitClEppBank} from './eppClBankPayment';
 
 // Discovery alone cannot pass a payment case. A proven market adapter may
 // continue only under the explicit payment-submit opt-in below.
 export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProviderReady=null}={}) {
   const proof=server.watchEppServerProof(page.context(),cfg,{expectedEmail:session.getPrimaryEppCredentials(cfg).email});
   const cash=cfg.market==='MX'&&kind==='cash'?watchMxEppCashDetails(page,cfg):null;
+  let observedCartResponse;
+  const site=cfg.apiSite||cfg.rootUrl.pathname.split('/').filter(Boolean)[2],apiOrigin=`https://${cfg.environment.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com`;
+  const recordCart=response=>{const u=new URL(response.url());if(response.request().method()==='GET'&&u.origin===apiOrigin&&u.pathname===`/tokocommercewebservices/v2/${site}/users/current/carts/current`&&response.ok())observedCartResponse=response;};
+  page.on('response',recordCart);
   const blocked=(reason,detail,stage)=>({status:'BLOCKED',reason,detail,stage});
   const capture=async name=>{
     const path=test.info().outputPath(name+'.png');
@@ -23,16 +30,24 @@ export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProvi
     await test.info().attach(name,{path,contentType:'image/png'});
   };
   try {
+    let reconciliation=null;
     // A programme homepage can have no commerce CMS slots even when its
     // supplied PDP is functional. Prove access at that real eligible entry.
     await openEppStore(page,{...cfg,entryUrl:cfg.pdpUrl||cfg.rootUrl});await proof.settle();
     if(!proof.accepted())return blocked('AUTH_OR_ENTITLEMENT_REQUIRED','Independent EPP registered access was not accepted.','AUTH');
     if(!cfg.pdpUrl||!cfg.sku)return blocked('MISSING_OR_UNPROVEN_EPP_PRODUCT','An eligible programme PDP/SKU is required.','PRODUCT');
-    const cart=await addConfiguredEppProduct(page,cfg,{resetMxCart:cfg.market==='MX'});
+    const cart=await addConfiguredEppProduct(page,cfg,{resetMxCart:cfg.market==='MX'&&cfg.environment==='S2'});
+    if(cfg.market==='MX'&&cfg.environment==='S1'){
+      if(!observedCartResponse)throw new Error('MX EPP cart evidence not observed; no unproven checkout.');
+      cart.observedCartResponse=observedCartResponse;
+      reconciliation=await normalizeEppPaymentCart(page,cfg,cart,{observedResponse:observedCartResponse});
+    }
     if(cfg.market==='MX')await cart.validateControlledSingleSku(cfg.sku);
+    if(cfg.market==='PE')reconciliation=await normalizeEppPaymentCart(page,cfg,cart,{observedResponse:observedCartResponse});
     if(cfg.market==='CL'){
-      await clPaymentCart.prepareClPaymentCart(page,{...cfg,storefront:cfg});
-      await clPaymentCart.normalizeClPaymentQuantity(page,cart);
+      if(!observedCartResponse)throw new Error('CL EPP cart request was not observed; no blind reload or payment.');
+      const prepared=await clPaymentCart.prepareClPaymentCart(page,{...cfg,storefront:cfg},{observedResponse:observedCartResponse});
+      await clPaymentCart.normalizeClPaymentQuantity(page,cart,{readBack:prepared?.readCart});
     }
     await cart.proceedToAuthenticatedCheckout();
     assertions.assertStoreRoute(page.url(),cfg,/^checkout\//);
@@ -52,6 +67,9 @@ export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProvi
         if(!proof.accepted())return blocked('AUTH_OR_ENTITLEMENT_REQUIRED','EPP identity/entitlement was not retained at CL Delivery.','AUTH');
         return prerequisite;
       }
+    }else if(cfg.market==='PE'){
+      const prerequisite=await completePeEppCheckout(page,cfg,capture);
+      if(prerequisite)return prerequisite;
     }
     const step=new URL(page.url()).searchParams.get('step');
     if(cfg.market!=='MX'&&step==='CHECKOUT_STEP_CONTACT_INFO'&&!runtime.getEppContact(cfg))return blocked('MISSING_EPP_CONTACT_DATA','EPP checkout rendered Contact; approved contact/delivery mass for this market and environment is not configured.','CONTACT');
@@ -67,19 +85,23 @@ export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProvi
     const desired=kind==='cash'?/efectivo|cash|oxxo/i:kind==='transfer'?/transfer|banc|spei/i:/tarjeta|cr[eé]dito|d[eé]bito|credit|debit|webpay/i;
     if(!providers.some(label=>desired.test(label)))return blocked('PROVIDER_NOT_AVAILABLE',`No ${kind} provider was offered for the controlled EPP checkout.`,'PAYMENT');
     if(!proof.accepted())return blocked('AUTH_OR_ENTITLEMENT_REQUIRED','EPP identity/entitlement changed before provider continuation.','PROVIDER');
-    if(onProviderReady)return await onProviderReady(page,cfg,capture);
+    if(onProviderReady)return await onProviderReady(page,cfg,capture,reconciliation);
     if(cash)return await inspectMxEppCash(page,cfg,capture,cash);
     return blocked('PAYMENT_FLOW_NOT_PROVEN','Provider is visible; its EPP backend, approved test-data and confirmation contract must be proven before enabling a submit adapter.','PROVIDER');
-  } finally {cash?.stop();proof.stop();}
+  } finally {page.off('response',recordCart);cash?.stop();proof.stop();}
 }
 
 export async function runEppPaymentPrerequisiteCase(page,cfg,options){
   // This case includes a fresh cart, Contact, Delivery and provider discovery;
   // keep their bounded stage waits inside one explicit end-to-end budget.
   test.setTimeout(420000);
-  if(process.env.EPP_RESUME_PENDING_ORDER==='1'&&(cfg.market!=='MX'||options?.kind!=='card'))throw new Error('Read-only EPP order recovery is restricted to the proven MX card adapter.');
-  if(cfg.market==='MX'){
-    const pending=['card','cash'].map(kind=>attempts.pendingEppOrderAttempt(cfg,kind)).find(Boolean);
+  if(['PE','CL'].includes(cfg.market)&&options?.confirmationOnly){
+    const confirmed=attempts.latestConfirmedEppOrder(cfg,'card');
+    if(confirmed){await validateExistingEppCardOrder(page,cfg,confirmed);return;}
+  }
+  if(process.env.EPP_RESUME_PENDING_ORDER==='1'&&(!['MX','PE'].includes(cfg.market)||options?.kind!=='card'))throw new Error('Read-only EPP order recovery is restricted to the proven MX/PE card adapters.');
+  if(['MX','PE','CL'].includes(cfg.market)){
+    const pending=(cfg.market==='CL'?['card','transfer']:['card','cash']).map(kind=>attempts.pendingEppOrderAttempt(cfg,kind)).find(Boolean);
     if(process.env.EPP_RESUME_PENDING_ORDER==='1'&&!pending){
       test.skip(true,'PAYMENT_FLOW_NOT_PROVEN: no pending EPP attempt exists for read-only recovery.');
       throw new Error('No pending EPP attempt; read-only recovery cannot reset a cart.');
@@ -94,7 +116,7 @@ export async function runEppPaymentPrerequisiteCase(page,cfg,options){
         await openEppStore(page,{...cfg,entryUrl:cfg.rootUrl});await proof.settle();
         if(!proof.accepted())test.skip(true,'AUTH_OR_ENTITLEMENT_REQUIRED: existing order recovery needs verified EPP identity.');
         const target=new URL('orderConfirmation;orderCode='+encodeURIComponent(pending.orderCode),cfg.rootUrl);
-        const site=cfg.rootUrl.pathname.split('/').filter(Boolean)[2];
+        const site=cfg.apiSite||cfg.rootUrl.pathname.split('/').filter(Boolean)[2];
         const api=`https://${cfg.environment.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com`;
         const readback=page.waitForResponse(response=>{const u=new URL(response.url());return response.request().method()==='GET'&&u.origin===api&&u.pathname===`/tokocommercewebservices/v2/${site}/users/current/orders/${pending.orderCode}`;},{timeout:120000});
         const [response]=await Promise.all([readback,page.goto(target.href,{waitUntil:'commit',timeout:60000})]);
@@ -112,8 +134,9 @@ export async function runEppPaymentPrerequisiteCase(page,cfg,options){
     test.skip(true,'PAYMENT_SUBMIT_NOT_AUTHORIZED: the proven MX S2 card adapter requires ALLOW_PAYMENT_SUBMIT=1.');
     throw new Error('PAYMENT_SUBMIT_NOT_AUTHORIZED: no cart or payment mutation is allowed.');
   }
-  const submit=cfg.market==='MX'&&cfg.environment==='S2'&&options?.kind==='card'&&process.env.ALLOW_PAYMENT_SUBMIT==='1';
-  const observed=await probeEppPaymentPrerequisites(page,cfg,{...options,onProviderReady:submit?submitMxEppCard:null});
+  const submit=['MX','PE','CL'].includes(cfg.market)&&(cfg.market==='MX'||cfg.environment==='S2')&&options?.kind==='card'&&process.env.ALLOW_PAYMENT_SUBMIT==='1';
+  const bank=cfg.market==='CL'&&cfg.environment==='S2'&&options?.kind==='transfer'&&process.env.ALLOW_PAYMENT_SUBMIT==='1';
+  const observed=await probeEppPaymentPrerequisites(page,cfg,{...options,onProviderReady:bank?submitClEppBank:submit?(cfg.market==='CL'?submitClEppCard:cfg.market==='PE'?submitPeEppCard:submitMxEppCard):null});
   if(observed.status==='PASS'&&observed.orderCode)return;
   test.info().annotations.push({type:'epp-prerequisite',description:`${observed.reason}: ${observed.stage}`});
   test.skip(observed.status==='BLOCKED',`${observed.reason}: ${observed.detail}`);

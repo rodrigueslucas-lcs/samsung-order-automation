@@ -2,7 +2,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {getEppSessionPaths}=require('./eppSession.cjs');
 function beginEppOrderAttempt(config,kind,{io=fs,now=()=>new Date().toISOString()}={}){
- if(!['card','cash'].includes(kind))throw new Error('Unsupported EPP payment attempt.');
+ if(!['card','cash','transfer'].includes(kind))throw new Error('Unsupported EPP payment attempt.');
  const directory=getEppSessionPaths(config).directory;
  io.mkdirSync(directory,{recursive:true});
  const filename=path.join(directory,`order-attempt-${kind}.json`);
@@ -33,4 +33,21 @@ function confirmPendingEppOrder(config,kind,orderCode,io=fs){
  io.writeFileSync(filename,JSON.stringify({...record,status:'CONFIRMED'}));
  io.renameSync(filename,path.join(directory,`confirmed-${kind}-${orderCode}.json`));
 }
-module.exports={beginEppOrderAttempt,pendingEppOrderAttempt,confirmPendingEppOrder};
+function observePendingEppOrder(config,kind,orderCode,io=fs){
+ const record=pendingEppOrderAttempt(config,kind,io);
+ if(!record||!new RegExp(`^${config.market}\\d{6}-\\d{8}(?:_\\d+)?$`).test(orderCode)||(record.orderCode&&record.orderCode!==orderCode))throw new Error('Pending EPP observation requires its own reconciled order.');
+ io.writeFileSync(path.join(getEppSessionPaths(config).directory,`order-attempt-${kind}.json`),JSON.stringify({...record,status:'OBSERVED_ORDER',orderCode}));
+}
+function latestConfirmedEppOrder(config,kind='card',io=fs){
+ if(!['card','cash','transfer'].includes(kind))throw new Error('Unsupported EPP payment attempt.');
+ const directory=getEppSessionPaths(config).directory;
+ if(!io.existsSync(directory))return null;
+ const names=io.readdirSync(directory).filter(name=>new RegExp(`^confirmed-${kind}-${config.market}\\d{6}-\\d{8}(?:_\\d+)?\\.json$`).test(name));
+ const records=names.map(name=>{
+  const record=JSON.parse(io.readFileSync(path.join(directory,name),'utf8'));
+  if(record.status!=='CONFIRMED'||record.market!==config.market||record.environment!==config.environment||record.kind!==kind||name!==`confirmed-${kind}-${record.orderCode}.json`||!Number.isFinite(Date.parse(record.at)))throw new Error('Confirmed EPP order record is invalid; no submit is allowed.');
+  return record;
+ });
+ return records.sort((a,b)=>Date.parse(b.at)-Date.parse(a.at))[0]||null;
+}
+module.exports={beginEppOrderAttempt,pendingEppOrderAttempt,confirmPendingEppOrder,observePendingEppOrder,latestConfirmedEppOrder};

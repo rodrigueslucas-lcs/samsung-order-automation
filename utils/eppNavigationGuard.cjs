@@ -1,19 +1,21 @@
 // EPP is Chromium-only. Fetch interception checks every HTTP redirect hop,
 // without proxying auth requests, rewriting callbacks or exposing cookies.
-function blockedEppRequest(config, {url: value, method='GET', document=false, top=false}) {
+function blockedEppRequest(config, {url: value, method='GET', document=false, top=false,allowEmailVerification=false,allowClSandbox=false}) {
   const url = new URL(value);
   const api = `https://${config.environment === 'S1' ? 's1' : 's2'}-smb-api-cdn.ecom-stg.samsung.com`;
   const production = ['samsung.com','www.samsung.com','shop.samsung.com'].includes(url.hostname) ||
     (url.hostname.endsWith('.shop.samsung.com') && !['stg.shop.samsung.com','stg2.shop.samsung.com'].includes(url.hostname));
   const commerceWrite = url.pathname.startsWith('/tokocommercewebservices/') && !['GET','HEAD','OPTIONS'].includes(method);
-  const allowed = url.origin === config.rootUrl.origin || url.origin === 'https://account.samsung.com' ||
-    (url.origin === api && /^\/tokocommercewebservices\/v2\/[^/]+\/login\/return\/?$/.test(url.pathname));
+  const verification=allowEmailVerification&&method==='GET'&&config.program&&url.pathname===`/tokocommercewebservices/v2/${config.program}/users/current/multistore/registration/verifyEmail`;
+  const paymentSandbox=allowClSandbox&&config.market==='CL'&&config.environment==='S2'&&url.origin==='https://sandbox.flow.cl';
+  const allowed = paymentSandbox || url.origin === config.rootUrl.origin || url.origin === 'https://account.samsung.com' ||
+    (url.origin === api && (/^\/tokocommercewebservices\/v2\/[^/]+\/login\/return\/?$/.test(url.pathname)||verification));
   const reason = document && production ? 'PRODUCTION_NAVIGATION_BLOCKED' :
     document && top && !allowed ? 'UNAPPROVED_NAVIGATION_BLOCKED' :
     commerceWrite && ![config.rootUrl.origin,api].includes(url.origin) ? 'UNAPPROVED_COMMERCE_WRITE_BLOCKED' : null;
   return reason ? {reason,host:url.hostname} : null;
 }
-async function installEppNavigationGuard(context, config) {
+async function installEppNavigationGuard(context, config,{allowEmailVerification=false,allowClSandbox=false}={}) {
   let last = null;
   const sessions = new Map();
   const protectPage = page => {
@@ -21,7 +23,7 @@ async function installEppNavigationGuard(context, config) {
       const session = await context.newCDPSession(page);
       const {frameTree} = await session.send('Page.getFrameTree');
       session.on('Fetch.requestPaused', async event => {
-        const blocked = blockedEppRequest(config,{...event.request,document:event.resourceType==='Document',top:event.frameId===frameTree.frame.id});
+        const blocked = blockedEppRequest(config,{...event.request,document:event.resourceType==='Document',top:event.frameId===frameTree.frame.id,allowEmailVerification,allowClSandbox});
         try {
           if (blocked) {
             last={...blocked,path:safeNavigationPath(event.request.url)};

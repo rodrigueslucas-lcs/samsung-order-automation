@@ -55,3 +55,7 @@ test("PE-specific login text uses the real sign-in component and never account c
     assert.equal(await eppAccountLoginAction(page).count(), 0);
   } finally { await context.close(); }
 });
+
+test('observed programme greeting is UI evidence only and never replaces the independent server proof',async()=>{const context=await browser.newContext();try{const page=await context.newPage();await page.route('**/*',r=>r.fulfill({contentType:'text/html',body:'<div>Welcome, QA USER</div>'}));await page.goto(rootUrl.href);assert.equal((await observeEppAccess(page,{rootUrl})).status,'BLOCKED');assert.equal((await observeEppAccess(page,{rootUrl,programNamespace:'fixture'})).status,'READY');await page.goto(new URL('p/fixture',rootUrl).href);assert.equal((await observeEppAccess(page,{rootUrl,programNamespace:'fixture'})).status,'BLOCKED');}finally{await context.close();}});
+
+test('observed CO verified-account dialog supports Seguir comprando without resubmitting a code',async()=>{const context=await browser.newContext();try{const page=await context.newPage();await page.setContent('<div role="dialog"><p>¡Éxito! Tu cuenta ha sido verificada.</p><button>Seguir comprando</button></div>');assert.ok(await findEppVerifiedContinue(page));}finally{await context.close();}});

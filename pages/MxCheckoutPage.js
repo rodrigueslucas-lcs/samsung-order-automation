@@ -245,14 +245,24 @@ export default class MxCheckoutPage extends BasePage {
 
     const legacyStandardDeliveryCards = this.page
       .locator("label")
-      .filter({ hasText: /Entrega Est[aá]ndar/i })
+      .filter({ hasText: this.storefront ? /Entrega Est[aá]ndar|^Standard Delivery Marketplace\b/i : /Entrega Est[aá]ndar/i })
       .filter({ visible: true });
     const deliveryEta = this.page
       .getByText(/Recibir[aá]s tu producto|Enviaremos tu producto/i)
       .filter({ visible: true })
       .first();
 
-    await deliveryEta.waitFor({ state: "visible", timeout: 60000 });
+    // The proven EPP S1 Marketplace template exposes a selectable Standard
+    // radio without an ETA. Require its unique rendered card; do not accept
+    // the two identically named generic Marketplace options or guess a mode.
+    const marketplaceStandard = this.storefront
+      ? this.page.locator('label').filter({hasText:/^Standard Delivery Marketplace\b/i}).filter({visible:true})
+      : null;
+    if (!marketplaceStandard || !(await marketplaceStandard.count())) {
+      await deliveryEta.waitFor({ state: "visible", timeout: 60000 });
+    } else if (await marketplaceStandard.count() !== 1) {
+      throw new Error('EPP Marketplace delivery requires exactly one Standard delivery card.');
+    }
     const legacyCardCount = await legacyStandardDeliveryCards.count();
     let selectedDeliveryMode;
     if (legacyCardCount) {
@@ -264,11 +274,25 @@ export default class MxCheckoutPage extends BasePage {
 
       const standardDeliveryCard = legacyStandardDeliveryCards.first();
       if(this.storefront){
+        const marketplaceUpdate = marketplaceStandard && await marketplaceStandard.count()
+          ? this.page.waitForResponse(response => {
+            const url=new URL(response.url());
+            const root=new URL(this.storefront.rootUrl);
+            const site=root.pathname.split('/').filter(Boolean)[2];
+            return response.request().method()==='POST' &&
+              url.origin===`https://${this.storefront.environment.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com` &&
+              url.pathname===`/tokocommercewebservices/v2/${site}/users/current/carts/current/deliverymodes/update`;
+          },{timeout:30000}) : null;
+        marketplaceUpdate?.catch(()=>{});
         // EPP stages this choice locally and commits it with checkout/update
         // on Continue. It need not emit Base Store's deliverymodes/update POST.
         await standardDeliveryCard.click();
         const selected=await standardDeliveryCard.evaluate(card=>Boolean(card.control?.checked||card.querySelector('input[type="radio"]')?.checked));
         if(!selected)throw new Error('EPP delivery card did not become selected.');
+        if(marketplaceUpdate){
+          const response=await marketplaceUpdate;
+          if(!response.ok()||await response.finished())throw new Error('EPP Marketplace delivery update was not acknowledged; Continue was not clicked.');
+        }
       }else{
       const deliveryModeUpdate = this.page.waitForResponse(
         (response) =>

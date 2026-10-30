@@ -29,7 +29,7 @@ export const test = base.extend({
       const config = configuration(testInfo);
       const market = config.market;
       const session = eppSession.loadEppSession(config);
-      const guard = await navigationGuard.installEppNavigationGuard(context,config);
+      const guard = await navigationGuard.installEppNavigationGuard(context,config,{allowClSandbox:config.market==='CL'&&config.environment==='S2'&&process.env.ALLOW_PAYMENT_SUBMIT==='1'});
       await eppSession.installEppSessionStorage(context, config, session.sessionStorage);
       const proof = serverProof.watchEppServerProof(context, config);
       const id = testInfo.title.match(/SAM-\d+/)?.[0];
@@ -37,14 +37,15 @@ export const test = base.extend({
     try { await use(guard); }
     finally {
       try {
+        const denied=guard.lastBlocked();
+        if(denied)await testInfo.attach('EPP navigation guard',{body:JSON.stringify(denied),contentType:'application/json'});
         await proof.settle();
         const page = context.pages().find(candidate => {
           const url = new URL(candidate.url());
           return url.origin === config.rootUrl.origin && url.pathname.startsWith(config.rootUrl.pathname);
         });
         if (proof.accepted() && page) eppSession.persistVerifiedEppSession(config, {
-          storageState: await context.storageState(),
-          sessionStorage: await page.evaluate(() => Object.fromEntries(Object.entries(sessionStorage))),
+          ...await eppSession.captureEppPageState(context,page,config),
           proof: proof.snapshot(),
         });
       } finally { proof.stop(); await guard.dispose(); }

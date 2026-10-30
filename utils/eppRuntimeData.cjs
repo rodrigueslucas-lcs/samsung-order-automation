@@ -6,7 +6,8 @@ function getEppRuntimeData(config, io = fs) {
   if (!io.existsSync(filename)) return null;
   try {
     const source = JSON.parse(io.readFileSync(filename, 'utf8'));
-    const data = source[config.environment]?.[config.market];
+    const market = source[config.environment]?.[config.market];
+    const data = config.programNamespace ? market?.programs?.[config.programNamespace] : market;
     return data && typeof data === 'object' && !Array.isArray(data) ? data : null;
   } catch { throw new Error('EPP ignored QA data file is invalid; contents suppressed.'); }
 }

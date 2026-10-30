@@ -1,8 +1,14 @@
 import BasePage from "./BasePage";
 
 export default class CheckoutPage extends BasePage {
-  constructor(page) {
+  constructor(page, { storefront = null } = {}) {
     super(page);
+    if (storefront) {
+      const expected = require('../config/markets/epp').getEppConfig('PE', { ENVIRONMENT: storefront.environment, EPP_PROGRAM: storefront.program });
+      if (storefront.market !== 'PE' || storefront.rootUrl.href !== expected.rootUrl.href) throw new Error('PE checkout requires its configured staging programme.');
+      this.peApiSite = expected.apiSite || expected.rootUrl.pathname.split('/').filter(Boolean)[2];
+      this.peApiOrigin = `https://${storefront.environment.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com`;
+    }
 
     this.firstNameInput = page.getByRole("textbox", { name: "firstName" });
     this.lastNameInput = page.getByRole("textbox", { name: "lastName" });
@@ -32,7 +38,7 @@ export default class CheckoutPage extends BasePage {
     const form = this.page.waitForResponse(response => {
       const resource = new URL(response.url());
       return resource.protocol === 'https:' && resource.hostname === apiHost &&
-        resource.pathname === '/tokocommercewebservices/v2/pe/dynamicforms/CHECKOUT_CUSTOMER_INFO' &&
+        resource.pathname === `/tokocommercewebservices/v2/${this.peApiSite || 'pe'}/dynamicforms/CHECKOUT_CUSTOMER_INFO` &&
         response.request().method() === 'GET';
     }, { timeout: 90000 }).then(async response => {
       if (!response.ok()) throw new Error(`PE customer contact form service returned HTTP ${response.status()}.`);
@@ -950,7 +956,8 @@ export default class CheckoutPage extends BasePage {
     const saved = this.page.waitForResponse(response => {
       const url = new URL(response.url());
       const matches = /^s[12]-smb-api-cdn\.ecom-stg\.samsung\.com$/.test(url.hostname)
-        && /\/v2\/pe\/users\/current\/carts\/current\/deliverymodes\/update$/.test(url.pathname)
+        && (!this.peApiOrigin || url.origin === this.peApiOrigin)
+        && url.pathname === `/tokocommercewebservices/v2/${this.peApiSite || 'pe'}/users/current/carts/current/deliverymodes/update`
         && response.request().method() === "POST";
       if (!matches) return false;
       // The storefront can retry this pre-payment update itself after a 5xx.

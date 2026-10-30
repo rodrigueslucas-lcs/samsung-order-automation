@@ -34,7 +34,7 @@ function makeBundle(config,snapshot) {
     snapshot:{...normalizedSnapshot(snapshot),proof:snapshot.proof}};
 }
 function contentHash(bundle) {return crypto.createHash('sha256').update(JSON.stringify(canonical(bundle))).digest('hex');}
-function bundlePath(config) { return path.resolve('playwright/.session-packages/epp',`${config.market.toLowerCase()}-${config.environment.toLowerCase()}-${config.authSlot||'primary'}-session-bundle.json`); }
+function bundlePath(config) { return path.resolve('playwright/.session-packages/epp',`${config.market.toLowerCase()}-${config.environment.toLowerCase()}-${config.authSlot||'primary'}${config.programNamespace?'-'+config.programNamespace:''}-session-bundle.json`); }
 function validateBundle(config,bundle) {
   if (bundle.schemaVersion!==1||bundle.store!=='EPP'||bundle.market!==config.market||bundle.environment!==config.environment||bundle.root!==config.rootUrl.href||bundle.authSlot!==(config.authSlot||'primary')||!bundle.snapshot?.proof?.userAccepted||!bundle.snapshot?.proof?.accessAccepted||!Array.isArray(bundle.snapshot?.storageState?.cookies)||!Array.isArray(bundle.snapshot?.storageState?.origins)||!bundle.snapshot?.sessionStorage||Array.isArray(bundle.snapshot.sessionStorage)) throw new Error('EPP bundle identity/programme mismatch.');
   return {storageState:bundle.snapshot.storageState,sessionStorage:bundle.snapshot.sessionStorage};
@@ -60,17 +60,18 @@ async function refresh(config,env,{resumeOnly=false,onHuman=()=>{}}={}) {
     tail=(tail+String(chunk)).slice(-12000);
     if (/CAPTCHA\/MFA requires human completion|HUMAN_REQUIRED|SECOND.*QR/i.test(String(chunk))) onHuman();
   };
-  const child=await runNodeScript('scripts/auth-epp-maintenance-child.cjs',{...env,[`${config.market}_EPP_AUTH_SLOT`]:config.authSlot||'primary',[`${config.market}_QST_ENVIRONMENT`]:config.environment,EPP_KEEPALIVE_MARKET:config.market,EPP_KEEPALIVE_ENVIRONMENT:config.environment,EPP_AUTH_SLOT:config.authSlot||'primary',EPP_AUTH_MAINTENANCE:'1',EPP_AUTH_RESUME_ONLY:resumeOnly?'1':'0',EPP_AUTH_INTERACTIVE_TIMEOUT_MS:'600000'}, {timeoutMs:700000,stdout:output,stderr:output});
+  const child=await runNodeScript('scripts/auth-epp-maintenance-child.cjs',{...env,[`${config.market}_EPP_AUTH_SLOT`]:config.authSlot||'primary',[`${config.market}_QST_ENVIRONMENT`]:config.environment,[`${config.market}_EPP_PROGRAM`]:config.program,EPP_KEEPALIVE_MARKET:config.market,EPP_KEEPALIVE_ENVIRONMENT:config.environment,EPP_AUTH_SLOT:config.authSlot||'primary',EPP_AUTH_MAINTENANCE:'1',EPP_AUTH_RESUME_ONLY:resumeOnly?'1':'0',EPP_AUTH_INTERACTIVE_TIMEOUT_MS:'600000'}, {timeoutMs:700000,stdout:output,stderr:output});
   const line=tail.split(/\r?\n/).findLast(value=>value.startsWith('EPP_AUTH_RESULT '));
   try { result=JSON.parse(line.slice(16)); } catch { result={status:child.code===79?'HUMAN_REQUIRED':child.code===78?'BLOCKED':'UNPROVEN',reason:'EPP_REFRESH_NOT_PROVEN'}; }
   return result;
 }
 async function maintainIdentity(config,{allowRefresh=false,publish=false,env=process.env}={},dependencies={}) {
-  const d={verify,refresh,load:sessions.loadEppSession,persist:sessions.persistVerifiedEppSession,acquire:sessions.acquireEppLease,read:readCheckpoint,save:(cfg,state)=>writeJsonAtomically(checkpointPath(cfg),state),clearHandoff:cfg=>fs.rmSync(sessions.getEppSessionPaths(cfg).handoff,{force:true}),capture:cfg=>captureAuthBrowser({market:cfg.market.toLowerCase(),environment:cfg.environment,slot:cfg.authSlot||'primary'},{profilesRoot:path.resolve('playwright/profiles/epp')}),package:packageBundle,publish:require('./eppJenkinsBundle.cjs').publishBundle,...dependencies};
+  const d={verify,refresh,load:sessions.loadEppSession,persist:sessions.persistVerifiedEppSession,acquire:sessions.acquireEppLease,read:readCheckpoint,save:(cfg,state)=>writeJsonAtomically(checkpointPath(cfg),state),clearHandoff:cfg=>fs.rmSync(sessions.getEppSessionPaths(cfg).handoff,{force:true}),capture:cfg=>captureAuthBrowser({market:cfg.market.toLowerCase(),environment:cfg.environment,slot:cfg.authSlot||'primary'},{profilesRoot:path.dirname(sessions.getEppSessionPaths(cfg).profile)}),package:packageBundle,publish:require('./eppJenkinsBundle.cjs').publishBundle,...dependencies};
   const base={market:config.market,environment:config.environment,slot:config.authSlot||'primary',store:'EPP',program:config.rootUrl.pathname};
   let lease,owned,checkpoint;
   const finish=(status,reason,extra={})=>({...base,status,...(reason?{reason}:{}),...extra});
   try {
+    if(config.programPolicy?.allowAutomaticRetry===false&&['BLOCKED_CALLBACK_TO_PRODUCTION','BLOCKED_EXTERNAL','STORE_FRONT_RENDER_BLOCKED','ENTITLEMENT_OR_STOREFRONT_RENDER_BLOCKED','VERIFICATION_CODE_REJECTED','PROGRAM_CONTEXT_NOT_PROVEN'].includes(config.programPolicy.knownStatus))return finish('BLOCKED',config.programPolicy.knownStatus,{blockerSource:'PROGRAM_POLICY',loginAttempts:0});
     lease=d.acquire(config,env);checkpoint=d.read(config);
     const runtimeEnv={...env,...lease.env};
     const existing=d.load(config);
@@ -91,7 +92,7 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
       // Resume an audited existing human handoff only; never start a new login
       // because a network/context check was inconclusive.
       if(outcome.status!=='INVALID'&&!(checkpoint.human&&owned&&allowRefresh))return finish(checkpoint.human?'HUMAN_REQUIRED':'UNPROVEN',checkpoint.human?'EPP_HUMAN_PENDING':outcome.reason,{proof:outcome.proof});
-      if(!allowRefresh)return finish(checkpoint.human?'HUMAN_REQUIRED':'BLOCKED',checkpoint.human?'EPP_HUMAN_PENDING':'EPP_AUTH_RECOVERY_REQUIRED',{proof:outcome.proof});
+      if(!allowRefresh||config.programPolicy?.allowAutomaticRetry===false)return finish(checkpoint.human?'HUMAN_REQUIRED':'BLOCKED',checkpoint.human?'EPP_HUMAN_PENDING':'EPP_AUTH_RECOVERY_REQUIRED',{proof:outcome.proof});
       if(checkpoint.human&&!owned)return finish('HUMAN_REQUIRED','EPP_HANDOFF_BROWSER_MISSING');
       const recovery=await d.refresh(config,runtimeEnv,{resumeOnly:!!checkpoint.human,onHuman:()=>{checkpoint={...checkpoint,human:true};d.save(config,checkpoint);}});
       if(recovery.status!=='REFRESHED') {
@@ -116,14 +117,16 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
     // Only an exact owned EPP browser, after independent proof and publication.
     if(owned&&nativeVerified)await owned.closeVerified();
     return finish(recovered?'REFRESHED':'KEEP_ALIVE_OK',null,{action:recovered?'REFRESHED':'SESSION_REUSED',proof:outcome.proof,bundleChanged:checkpoint.contentHash!==hash,published,...(humanPending?{humanPending:true}:{})});
-  } catch(error) { return finish(error.code==='AUTH_BUSY'?'BUSY':'UNPROVEN',error.code==='AUTH_BUSY'?'EPP_IDENTITY_BUSY':'EPP_MAINTENANCE_UNPROVEN'); }
+  } catch(error) { return finish(error.code==='AUTH_BUSY'?'BUSY':'UNPROVEN',error.code==='AUTH_BUSY'?'EPP_IDENTITY_BUSY':error.code==='EPP_NATIVE_SNAPSHOT_TIMEOUT'?error.code:'EPP_MAINTENANCE_UNPROVEN'); }
   finally {await owned?.dispose();lease?.release();}
 }
 async function runCycle({environment='S2',markets=['MX','PE','CO','CL'],slot='primary',...options}={},dependencies={}) {
-  const lane=limitConcurrency(2),results=[];
+  const lane=limitConcurrency(options.allowRefresh?1:2),results=[];let humanPending=false;
   await Promise.all(markets.map(market=>lane(async()=>{
-    try {const config=getEppConfig(market,{ENVIRONMENT:environment,EPP_AUTH_SLOT:slot});
-      results.push(await maintainIdentity(config,options,dependencies));
+    try {const config=getEppConfig(market,{...options.env,ENVIRONMENT:environment,EPP_AUTH_SLOT:slot});
+      const result=await maintainIdentity(config,humanPending?{...options,allowRefresh:false}:options,dependencies);
+      if(humanPending&&result.reason==='EPP_AUTH_RECOVERY_REQUIRED')result.reason='EPP_INTERACTIVE_GATE_PENDING';
+      results.push(result);if(result.status==='HUMAN_REQUIRED')humanPending=true;
     } catch {results.push({market,environment,slot,store:'EPP',status:'BLOCKED',reason:'UNSUPPORTED_EPP_IDENTITY'});}
   })));
   return {environment,store:'EPP',identities:results,ok:results.every(r=>['KEEP_ALIVE_OK','REFRESHED'].includes(r.status))};

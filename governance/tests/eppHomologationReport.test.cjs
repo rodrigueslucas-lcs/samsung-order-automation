@@ -1,6 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { inventory, extractResults, buildRows, prerequisiteReason, mergeObservation } = require('../../scripts/report-epp-homologation.cjs');
+const {classifyObservation}=require('../../scripts/report-epp-homologation.cjs');
+test('triage distinguishes fixable unknowns from proven external prerequisites without changing outcomes',()=>{
+ for(const [notes,classification]of [['MISSING_EPP_CONTACT_DATA','MASS_REQUIRED'],['CORPORATE_ACTIVATION_REQUIRED','ACCESS_REQUIRED'],['HUMAN_REQUIRED','HUMAN_REQUIRED'],['MISSING_EXPECTED_CART_FOOTER','APPLICATION_BUG'],['PRODUCTION_NAVIGATION_BLOCKED','ENVIRONMENT_BLOCKER'],['PAYMENT_FLOW_NOT_PROVEN','AUTOMATION_FIXABLE']])assert.equal(classifyObservation({result:'BLOCKED',notes}).classification,classification);
+ assert.equal(classifyObservation({result:'PASS',notes:'EXPECTED_BEHAVIOR_PROVEN'}).classification,'');
+ assert.equal(prerequisiteReason('EPP_IDENTITY_REQUIRED: sensitive details suppressed'),'EPP_IDENTITY_REQUIRED');
+});
 test('EPP matrix represents 26 unique official cases and 52 environment rows without inventing runtime PASS', () => {
   const scope = inventory();
   assert.equal(scope.length,26);
@@ -8,8 +14,8 @@ test('EPP matrix represents 26 unique official cases and 52 environment rows wit
   const rows = buildRows(scope);
   assert.equal(rows.length,52);
   assert.ok(rows.every(r=>r.result==='NOT_RUN'));
-  assert.equal(scope.filter(r=>r.implementation==='PREREQUISITE_FLOW').length,7);
-  assert.equal(scope.filter(r=>r.implementation==='IMPLEMENTED').length,19);
+  assert.equal(scope.filter(r=>r.implementation==='PREREQUISITE_FLOW').length,5);
+  assert.equal(scope.filter(r=>r.implementation==='IMPLEMENTED').length,21);
   assert.equal(scope.filter(r=>r.implementation==='BLOCKED_NOT_IMPLEMENTED').length,0);
   assert.equal(scope.filter(r=>r.implementation==='PARTIAL').length,0);
 });

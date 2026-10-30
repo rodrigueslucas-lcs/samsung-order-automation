@@ -6,6 +6,14 @@ const vm = require('node:vm');
 const source = fs.readFileSync('pages/CartPage.js', 'utf8')
   .replace(/^import .*;\r?\n/gm, '').replace('export default class CartPage', 'class CartPage');
 const Cart = vm.runInNewContext(`${source}\nCartPage;`, { BasePage: class {}, URL, require:name=>{assert.equal(name,'../utils/mxStorefrontScope.cjs');return require('../../utils/mxStorefrontScope.cjs');} });
+test('MX EPP cart readback stays in place and refuses an observed request from another site',async()=>{
+ const cfg=require('../../config/markets/epp').getEppConfig('MX',{ENVIRONMENT:'S1'}),cart=Object.create(Cart.prototype),api='https://s1-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/mxtotalplay/users/current/carts/current';
+ cart.storefront=cfg;cart.cartUrl=cfg.cartUrl.href;
+ cart.observedCartResponse={url:()=>api,request:()=>({method:()=> 'GET',headerValue:async()=> 'synthetic'})};
+ let gets=0;cart.page={goto:async()=>{throw Error('must not reload');},context:()=>({request:{get:async(url,options)=>{assert.equal(url,api);assert.equal(options.maxRedirects,0);gets++;return{ok:()=>true,json:async()=>({entries:[{product:{code:'TARGET'},quantity:1}]})};}}})};
+ assert.equal((await cart.loadMxCartState()).productEntries[0].product.code,'TARGET');assert.equal(gets,1);
+ cart.observedCartResponse={...cart.observedCartResponse,url:()=>api.replace('mxtotalplay','mx')};await assert.rejects(cart.loadMxCartState(),/another endpoint/);assert.equal(gets,1);
+});
 
 function removal({ environment = 'S2', status = 200, interrupted = false, bodyGate } = {}) {
   const events = [];

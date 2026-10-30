@@ -28,3 +28,30 @@ for(const options of [{epp:false},{same:false},{resolved:false}])test('unresolve
  const f=fixture(options);if(options.resolved===false)await assert.rejects(f.run(),/populate district/);else await f.run();assert.ok(f.calls.includes('lookup'));assert.ok(f.calls.includes('blur'));if(options.epp===false||options.same===false)assert.ok(!f.calls.includes('fill:postal:'));
 });
 test('postal lookup rejection remains a failure',async()=>{await assert.rejects(fixture({same:false,status:500}).run(),/HTTP 500/);});
+
+function marketplaceFixture({duplicate=false,epp=true,status=200}={}){
+ const calls=[];
+ const checkout=Object.create(vm.runInNewContext(source+'\nMxCheckoutPage;',{BasePage:class{},contactTransition:{continueMxDeliveryToPayment:async()=>calls.push('continue')},URL}).prototype);
+ checkout.storefront=epp?{rootUrl:new URL('https://stg.shop.samsung.com/mx/multistore/mxtotalplay/mxtotalplay/'),environment:'S1'}:null;
+ const card={count:async()=>duplicate?2:1,first(){return this;},filter(){return this;},click:async()=>calls.push('select-standard'),evaluate:async()=>true};
+ const empty={count:async()=>0,filter(){return this;}};
+ const button={first(){return this;},filter(){return this;},waitFor:async()=>{},count:async()=>1,scrollIntoViewIfNeeded:async()=>{},isEnabled:async()=>true,click:async()=>{}};
+ checkout.page={url:()=> 'https://stg.shop.samsung.com/mx/multistore/mxtotalplay/mxtotalplay/checkout/one?step=CHECKOUT_STEP_DELIVERY',
+ locator:selector=>selector==='label'?card:empty,
+ waitForResponse:async predicate=>{const response={url:()=> 'https://s1-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/mxtotalplay/users/current/carts/current/deliverymodes/update',request:()=>({method:()=> 'POST'}),ok:()=>status===200,finished:async()=>{calls.push('ack');return null;}};assert.equal(predicate(response),true);assert.equal(predicate({...response,url:()=> 'https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/mxtotalplay/users/current/carts/current/deliverymodes/update'}),false);return response;},
+ getByText:()=>({filter(){return this;},first(){return this;},waitFor:async()=>{throw Error('legacy ETA required');}}),
+ getByRole:role=>role==='button'?button:empty};
+ return{calls,run:()=>checkout.selectDeliveryAndContinue()};
+}
+test('proven EPP Marketplace Standard radio advances without a nonexistent legacy ETA',async()=>{
+ const f=marketplaceFixture();await f.run();assert.deepEqual(f.calls,['select-standard','ack','continue']);
+});
+test('ambiguous Marketplace Standard cards never advance',async()=>{
+ const f=marketplaceFixture({duplicate:true});await assert.rejects(f.run(),/exactly one/);assert.deepEqual(f.calls,[]);
+});
+test('failed Marketplace acknowledgement never clicks Continue',async()=>{
+ const f=marketplaceFixture({status:500});await assert.rejects(f.run(),/not acknowledged/);assert.deepEqual(f.calls,['select-standard']);
+});
+test('Base Store still requires its existing delivery ETA contract',async()=>{
+ const f=marketplaceFixture({epp:false});await assert.rejects(f.run(),/legacy ETA required/);assert.deepEqual(f.calls,[]);
+});

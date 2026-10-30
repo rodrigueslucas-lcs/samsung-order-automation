@@ -70,6 +70,12 @@ test('official tooltip assertion rejects control above popup', async () => {
 test('tooltip stacking is proven without requiring rectangle overlap', async () => {
   await fixture('<button style="position:fixed;bottom:10px;right:10px;z-index:1">Back to top</button><div role="tooltip" style="position:fixed;top:10px;left:10px;z-index:2">Help</div>', proveTooltipAboveBackToTop);
 });
+test('tooltip above normal-flow control does not require an explicit control stacking context', async () => {
+  await fixture('<button>Back to top</button><div role="tooltip" style="position:fixed;bottom:10px;right:10px;z-index:1060">Help</div>', proveTooltipAboveBackToTop);
+});
+test('negative tooltip stacking does not pass against a normal-flow control', async () => {
+  await fixture('<button>Back to top</button><div role="tooltip" style="position:fixed;bottom:10px;right:10px;z-index:-1">Help</div>', page => assert.rejects(() => proveTooltipAboveBackToTop(page)));
+});
 test('registered contact proves prefilled email, filled fields and delivery transition', async () => {
   await fixture(`<input name="email" value="synthetic@example.invalid"><input name="firstName"><input name="lastName"><input name="phone"><button onclick="history.pushState({},'', '?step=CHECKOUT_STEP_DELIVERY')">Continuar</button>`, page => completeContact(page, config, { firstName:'QA',lastName:'Fixture',phone:'5555555555' }), 'checkout/one?step=CHECKOUT_STEP_CONTACT_INFO');
 });

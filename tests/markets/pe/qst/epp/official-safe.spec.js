@@ -50,15 +50,15 @@ test.describe("PE QST - Official EPP", () => {
     });
   });
 
-  test("SAM-25138 @preflight @destructive @qst @pe @epp @registered - Payment using credit card with reg user", async ({page}, testInfo) => {
-    await test.step("Inspect authenticated EPP cart, checkout and payment prerequisites", async () => {
+  test("SAM-25138 @destructive @qst @pe @epp @registered - Payment using credit card with reg user", async ({page}, testInfo) => {
+    await test.step("Complete PE EPP card checkout or reconcile the existing causal order", async () => {
       await runEppPaymentPrerequisiteCase(page,cfg(),{kind:'card'});
     });
   });
 
-  test("SAM-25140 @preflight @destructive @qst @pe @epp - Order confirmation screen", async ({page}, testInfo) => {
-    await test.step("Inspect authenticated EPP cart, checkout and payment prerequisites", async () => {
-      await runEppPaymentPrerequisiteCase(page,cfg(),{kind:'card'});
+  test("SAM-25140 @destructive @qst @pe @epp - Order confirmation screen", async ({page}, testInfo) => {
+    await test.step("Validate the causal PE EPP order confirmation without duplicate submit", async () => {
+      await runEppPaymentPrerequisiteCase(page,cfg(),{kind:'card',confirmationOnly:true});
     });
   });
 });
