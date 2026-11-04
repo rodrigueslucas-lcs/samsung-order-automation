@@ -6,7 +6,7 @@ function matchesKnownDefectEvidence(defect, result) {
     if(/^(?:FAIL|ERROR|BROKEN|TIMED_OUT)/i.test(result.status||''))return actualCashFailure;
     return /MX_EPP_CASH_TRANSACTION_FAILED\s+pymesmx/.test(text)||actualCashFailure;
   }
-  if(defect.jira==='SAM-25146'&&defect.market==='CL'&&defect.samId==='SAM-24841'&&defect.store==='EPP'){
+  if(defect.jira==='SAM-25146'&&defect.store==='EPP'&&((defect.market==='CL'&&defect.samId==='SAM-24841')||(defect.market==='PE'&&defect.samId==='SAM-25114'))){
     const evidence=[result.error,result.message,result.blockedReason,result.statusDetails?.message,...(result.errors||[]).map(item=>item.message),...(result.annotations||[]).map(item=>item.description)].filter(value=>typeof value==='string').join('\n');
     return /MISSING_EXPECTED_CART_FOOTER/.test(evidence);
   }

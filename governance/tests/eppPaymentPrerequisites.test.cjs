@@ -62,3 +62,15 @@ test('CL frontend card acceptance requires its own causal GET/UI and preserves t
  record.status='OBSERVED_ORDER';record.orderCode='CL261104-12345678';
  await run({}, {market:'CL',environment:'S2'}, {kind:'card'});assert.deepEqual(calls,['GET-and-UI','acceptance']);assert.equal(record.status,'OBSERVED_ORDER');
 });
+
+test('PE reuses only its own confirmed card with no newer unresolved attempt',async()=>{
+ const calls=[],record={market:'PE',environment:'S2',kind:'card',status:'CONFIRMED',orderCode:'PE261028-12345678'};
+ let pending=null;
+ const run=vm.runInNewContext(source+'\nrunEppPaymentPrerequisiteCase;',{
+  process:{env:{ALLOW_PAYMENT_SUBMIT:'0'}},attempts:{pendingEppOrderAttempt:()=>pending,latestConfirmedEppOrder:(_,kind)=>{assert.equal(kind,'card');return record;}},
+  validateExistingEppCardOrder:async(_,cfg,r)=>{assert.equal(cfg.market,'PE');assert.equal(r,record);calls.push('own-GET-and-UI');},test:{setTimeout(){},skip(){}},
+ });
+ await run({}, {market:'PE',environment:'S2'}, {kind:'card'});assert.deepEqual(calls,['own-GET-and-UI']);assert.equal(record.status,'CONFIRMED');
+ calls.length=0;pending={kind:'card',status:'SUBMITTING'};
+ await assert.rejects(run({}, {market:'PE',environment:'S2'}, {kind:'card'}),/AMBIGUOUS/);assert.deepEqual(calls,[]);
+});

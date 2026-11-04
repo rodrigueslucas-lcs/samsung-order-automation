@@ -638,3 +638,28 @@ Automation fixes include headed/null-viewport compatibility, CL Delivery persist
 SAM-25046 (pymesmx) is linked to https://jira.secext.samsung.net/browse/RT-779284: Pay in Cash transaction fails during checkout via Mercado Pago. Operator evidence shows Paga en efectivo selected, then a return to CHECKOUT_STEP_PAYMENT with “Lo sentimos, su transacción no fue exitosa”, reproduced in two browsers. This is operator-supplied runtime evidence, not a new automation reproduction.
 
 The known blocker is restricted to MX EPP S2 pymesmx cash. S1, Base Store, other markets, auth/data failures, ambiguous old attempts and unrelated timeouts do not inherit this classification. The official case records the known defect before another cash attempt; the existing initiation remains untouched. Remove/revalidate the quarantine when the reported cash defect is fixed. No additional cash payment was submitted to create this link.
+
+## PE/CO S2 targeted continuation — 2026-11-04
+
+PE pe_membership_vip: RB45DG6300B1PE was added successfully in an official headed SAM-25113 run (54.8s; run 2026-11-04T19-14-25-370Z-156384). The Flip6 screenshot does not invalidate this separately proven mass. The next targeted run found the persisted identity expired: root login and read-only card/confirmation cases required EPP_IDENTITY_REQUIRED, while the cart rendered Samsung Checkout Express and Checkout como invitado. Cart UI/checkout previously timed out seeking Continuar. Automation now recognizes the legitimate PE guest CTA for UI inspection only and explicitly blocks registered checkout when the login/guest alternatives are shown. It does not click guest or claim registered access.
+
+The confirmed causal PE card order PE261028-78774153 is preserved. Card revalidation now reuses that confirmed record only when no newer unresolved card/cash attempt exists; no new payment was submitted. The renewed-session official runtime subsequently revalidated card/confirmation read-only, as recorded below.
+
+Independent recovery initially encountered local sandbox ERR_NETWORK_ACCESS_DENIED on the staging cookie page. With authorized network access it reached a real Samsung CAPTCHA. This is not evidence of a Samsung environment defect. The first wait ended before the operator returned: PE reached /iam/error/authorize; CO retained a password step without an active controller. A controlled CO resume filled/submitted its previously unsent password once but the expired authorization returned AUTH_PROVIDER_ERROR. New authorizations were obtained only after that positive expiry evidence. Both PE and CO then automatically filled email/password, submitted once, independently verified programme identity/access/UI and closed their owned browsers. No Base Store state or SECOND identity was imported.
+
+CO alianzas_co: after independent FIRST verification passed, headed SAM-24930 rechecked RT53DG6220S9CO at its canonical S2 EPP PDP. Result BLOCKED: COMMERCE_CONTENT_NOT_RENDERED. Identity recovery did not fix product presentation. No product was added and no order/payment was submitted. Evidence: test-results/epp/co/s2/2026-11-04T20-31-52-723Z-135572/results.json. Samsung must investigate eligible product/CMS presentation for this programme; the precise backend cause remains unproven, so no Jira ID or payment failure is invented.
+
+### PE S2 final targeted disposition
+
+| TC | Result | Evidence/basis |
+|---|---|---|
+| SAM-25109 | PASS | Renewed independent EPP login, 36.2s |
+| SAM-25113 | PASS | RB45DG6300B1PE added from PDP, quantity proved |
+| SAM-25114 | KNOWN DEFECT / BLOCKED | SAM-25146: empty footer only after product/image/summary/checkout checks pass |
+| SAM-25125 | PASS | Registered checkout navigation, 58.3s |
+| SAM-25138 | PASS | Read-only causal card order PE261028-78774153 revalidation, no new submit |
+| SAM-25140 | PASS | Same causal order public confirmation revalidated |
+
+Five PASS and one known defect; this consolidates targeted runs, not a new full campaign. Evidence: test-results/epp/pe/s2/2026-11-04T20-24-02-500Z-138992/results.json (four PASS; initial raw footer FAIL preserved) and test-results/epp/pe/s2/2026-11-04T20-35-58-516Z-145420/results.json (exact footer signature, known-defect annotation and blocked skip). Original STG1 Jira title is retained; the PE S2 mapping is supported by the independently observed empty-footer signature and restricted to pe_membership_vip. Partial footer differences, product failures and timeouts are never quarantined.
+
+Focused validation: 31/31 checkout/order/footer/reporting tests and 33/33 shared login/handoff tests passed; official scope and business-step gates passed. Runtime logs also include .agent/tmp/pe-s2-vip-renewed-targets.log, pe-s2-footer-known-runtime.log, pe-s2-epp-fresh-recovery.log, co-s2-epp-fresh-recovery.log and co-s2-rt53-current-add.log. No secrets or runtime state are tracked.

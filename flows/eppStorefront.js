@@ -161,16 +161,23 @@ export async function validateEppCartUi(cart,{market,environment,program}={}) {
   await expect(row.getByRole('heading').first()).toBeVisible();
   await expect(row.getByText(cart.currencyPattern).first()).toBeVisible();
   await cart.validateOrderSummary();
-  await cart.validateCheckoutButton();
+  // PE exposes its legitimate guest/express choices when no account is active.
+  // Cart UI may inspect that CTA; registered checkout must never click it as a substitute.
+  const guestCheckout=market==='PE'?cart.page.getByRole('button',{name:/^Checkout como invitado$/i}):null;
+  if(guestCheckout&&await guestCheckout.isVisible()&&!await cart.continueButton.isVisible()){
+    await expect(guestCheckout).toBeEnabled();
+    await cart.screenshot('epp-cart-guest-checkout-available');
+  }else await cart.validateCheckoutButton();
   const footer = cart.page.getByRole('contentinfo');
   const headings=market==='CL'?[/^Productos$/i,/^Tiendas$/i,/^Soporte$/i,/^Compa[nñ][ií]a$/i]:[/^Shop$|^Tienda$/i,/^Account$|^Cuenta$/i,/^Soporte$|^Support$/i];
   try{
     for(const name of headings)await expect(footer.getByRole('heading',{name})).toBeVisible({timeout:market==='CL'?15000:5000});
   }catch(error){
     const state={footers:await footer.count(),headings:await footer.getByRole('heading').filter({visible:true}).count(),links:await footer.getByRole('link').filter({visible:true}).count()};
-    if(market==='CL'&&environment==='S2'&&program==='alianzas'&&state.footers<=1&&state.headings===0&&state.links===0){
-      await cart.screenshot('epp-cl-cart-footer-missing');
-      await test.info().attach('CL EPP empty footer signature',{body:JSON.stringify({market,environment,program,...state}),contentType:'application/json'});
+    const observedProgramme=(market==='CL'&&program==='alianzas')||(market==='PE'&&program==='pe_membership_vip');
+    if(observedProgramme&&environment==='S2'&&state.footers<=1&&state.headings===0&&state.links===0){
+      await cart.screenshot('epp-cart-footer-missing');
+      await test.info().attach('EPP empty footer signature',{body:JSON.stringify({market,environment,program,...state}),contentType:'application/json'});
       test.info().annotations.push({type:'known-defect',description:'SAM-25146: operator-linked empty cart footer'});
       test.skip(true,'ENVIRONMENT_DEFECT: MISSING_EXPECTED_CART_FOOTER; known defect SAM-25146. Product, summary and checkout checks passed before the footer check.');
     }

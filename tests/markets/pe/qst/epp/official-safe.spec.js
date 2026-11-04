@@ -35,7 +35,7 @@ test.describe("PE QST - Official EPP", () => {
       const current = cfg();
       requireProductConfig(current);
       const cart = await addConfiguredEppProduct(page, current, { currencyPattern: /S\/\s*[\d,.]+/ });
-      await validateEppCartUi(cart);
+      await validateEppCartUi(cart,current);
     });
   });
 
@@ -44,6 +44,8 @@ test.describe("PE QST - Official EPP", () => {
       const current = cfg();
       requireProductConfig(current);
       const cart = await addConfiguredEppProduct(page, current, { currencyPattern: /S\/\s*[\d,.]+/ });
+      test.skip(await page.getByRole('button',{name:/^Samsung Checkout Express$/i}).isVisible()&&await page.getByRole('button',{name:/^Checkout como invitado$/i}).isVisible(),
+        'BLOCKED: AUTH_OR_ENTITLEMENT_REQUIRED — PE EPP cart offers login/guest checkout; registered checkout cannot use a guest substitute.');
       await cart.validateCheckoutButton();
       await cart.proceedToAuthenticatedCheckout();
       await validateEppCheckout(page, current);

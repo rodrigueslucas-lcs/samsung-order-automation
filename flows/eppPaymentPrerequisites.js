@@ -95,6 +95,12 @@ export async function runEppPaymentPrerequisiteCase(page,cfg,options){
   // This case includes a fresh cart, Contact, Delivery and provider discovery;
   // keep their bounded stage waits inside one explicit end-to-end budget.
   test.setTimeout(420000);
+  if(cfg.market==='PE'&&options?.kind==='card'&&!options.confirmationOnly&&!attempts.pendingEppOrderAttempt(cfg,'card')&&!attempts.pendingEppOrderAttempt(cfg,'cash')){
+    const confirmed=attempts.latestConfirmedEppOrder(cfg,'card');
+    // Revalidate the already proven PE card order before considering a new
+    // checkout. A newer unresolved initiation must retain its existing guard.
+    if(confirmed){await validateExistingEppCardOrder(page,cfg,confirmed);return;}
+  }
   if(['PE','CL'].includes(cfg.market)&&options?.confirmationOnly){
     const confirmed=attempts.latestConfirmedEppOrder(cfg,'card');
     if(confirmed){await validateExistingEppCardOrder(page,cfg,confirmed);return;}

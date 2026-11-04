@@ -310,6 +310,20 @@
       "notes": "Operator identified CL EPP cart UI as affected by the known footer issue. CL S2 alianzas reproduction on 2026-11-04 proved contentinfo without navigation headings or links after product, summary and checkout passed. Original ticket title is retained; quarantine is restricted to this observed empty-footer signature, not generic timeouts or partial footer differences."
     },
     {
+      "market": "PE",
+      "environment": "S2",
+      "store": "EPP",
+      "samId": "SAM-25114",
+      "jira": "SAM-25146",
+      "url": "https://jira.secext.samsung.net/browse/SAM-25146",
+      "title": "QST STG1 SMB CO/PE BS and EPP Footer Section Missing on PDP/Checkout/Cart Page",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "Medium",
+      "rootCause": "Storefront Issue",
+      "notes": "PE S2 pe_membership_vip headed runtime 2026-11-04 proved empty contentinfo after SKU RB45DG6300B1PE, quantity, image, summary and checkout CTA passed. Operator supplied SAM-25146 for PE EPP footer. Original STG1 ticket title retained; S2 mapping requires exact empty-footer signature, never generic timeout or partial labels."
+    },
+    {
       "market": "MX",
       "environment": "S2",
       "store": "EPP",

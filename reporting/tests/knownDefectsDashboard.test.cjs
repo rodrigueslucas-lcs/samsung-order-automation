@@ -21,6 +21,13 @@ test('CL S2 EPP footer defect requires the exact empty-footer signature, not a g
  assert.equal(activeKnownDefects({...current,environment:'S1'},registry).length,0);
 });
 
+test('PE S2 EPP empty-footer mapping cannot hide product or auth failures',()=>{
+ const current={market:'PE',environment:'S2',store:'EPP',tests:[{samId:'SAM-25114',status:'SKIPPED-BLOCKED',blockedReason:'ENVIRONMENT_DEFECT: MISSING_EXPECTED_CART_FOOTER'}]};
+ assert.equal(activeKnownDefects(current,registry)[0].defect.jira,'SAM-25146');
+ for(const blockedReason of ['TimeoutError','Product missing','AUTH_OR_ENTITLEMENT_REQUIRED','Partial footer label mismatch'])assert.equal(activeKnownDefects({...current,tests:[{samId:'SAM-25114',status:'FAIL',blockedReason}]},registry).length,0);
+ assert.equal(activeKnownDefects({...current,environment:'S1'},registry).length,0);
+});
+
 function runtime(status = 'SKIPPED-BLOCKED') {
   return {
     market: 'MX',
