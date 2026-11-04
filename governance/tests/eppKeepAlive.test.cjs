@@ -45,3 +45,46 @@ test('EPP bundle cannot be installed as Base Store or another slot/programme',()
 test('hash ignores cookie ordering, not cookie or store/slot contents',()=>{const s=snapshot();s.storageState.cookies.push({...s.storageState.cookies[0],name:'other'});const a=makeBundle(cfg,s);s.storageState.cookies.reverse();assert.equal(contentHash(a),contentHash(makeBundle(cfg,s)));assert.notEqual(contentHash(a),contentHash(makeBundle({...cfg,authSlot:'second'},s)));});
 
 test('one pending human EPP gate prevents another visible refresh in the regional cycle',async()=>{const f=fixture(['INVALID']);f.d.read=()=>({});f.d.save=()=>{};f.d.refresh=async()=>{f.calls.push('refresh');return{status:'HUMAN_REQUIRED'};};const result=await runCycle({markets:['MX','CO','CL'],allowRefresh:true},f.d);assert.equal(f.calls.filter(c=>c==='refresh').length,1);assert.equal(result.identities[0].status,'HUMAN_REQUIRED');assert.ok(result.identities.slice(1).every(r=>r.reason==='EPP_INTERACTIVE_GATE_PENDING'));});
+
+test('CO S2 restricted programme verifies a real existing session without starting login',async()=>{
+  const restricted=getEppConfig('CO',{ENVIRONMENT:'S2',CO_EPP_PROGRAM:'co_epp_agre'});
+  assert.equal(restricted.programPolicy.allowAutomaticRetry,false);
+  const f=fixture(['HEALTHY']);
+  const r=await maintainIdentity(restricted,{allowRefresh:true,publish:false},f.d);
+  assert.equal(r.status,'KEEP_ALIVE_OK');
+  assert.equal(r.action,'SESSION_REUSED');
+  assert.equal(f.calls.filter(c=>c==='verify').length,1);
+  assert.ok(!f.calls.includes('refresh'));
+  assert.ok(f.calls.includes('persist'));
+});
+test('CO S2 restricted programme remains blocked after read-only verification fails',async()=>{
+  const restricted=getEppConfig('CO',{ENVIRONMENT:'S2',CO_EPP_PROGRAM:'co_epp_agre'});
+  const f=fixture([{status:'INVALID',reason:'SERVER_IDENTITY_NOT_PROVEN'}]);
+  const r=await maintainIdentity(restricted,{allowRefresh:true,publish:true},f.d);
+  assert.equal(r.status,'BLOCKED');
+  assert.equal(r.reason,'BLOCKED_CALLBACK_TO_PRODUCTION');
+  assert.equal(r.blockerSource,'PROGRAM_POLICY');
+  assert.equal(r.currentReason,'SERVER_IDENTITY_NOT_PROVEN');
+  assert.equal(r.loginAttempts,0);
+  assert.ok(f.calls.includes('verify'));
+  for(const forbidden of ['refresh','persist','package','publish'])assert.ok(!f.calls.includes(forbidden));
+});
+test('MX security checkpoint remains protected from login even when independent check is invalid',async()=>{
+  const f=fixture([{status:'INVALID',reason:'SERVER_IDENTITY_NOT_PROVEN'}]);
+  f.state={blockedReason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED',blockerObservedAt:'2026-11-03T16:00:00Z'};
+  const r=await maintainIdentity(cfg,{allowRefresh:true},f.d);
+  assert.equal(r.status,'BLOCKED');
+  assert.equal(r.reason,'SAMSUNG_ACCOUNT_SECURITY_BLOCKED');
+  assert.equal(r.blockerSource,'CHECKPOINT');
+  assert.equal(r.currentReason,'SERVER_IDENTITY_NOT_PROVEN');
+  assert.equal(r.blockerObservedAt,'2026-11-03T16:00:00Z');
+  assert.ok(!f.calls.includes('refresh'));
+});
+test('a verified MX profile removes its obsolete security checkpoint without a login replay',async()=>{
+  const f=fixture(['HEALTHY']);
+  f.state={blockedReason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED'};
+  const r=await maintainIdentity(cfg,{allowRefresh:true},f.d);
+  assert.equal(r.status,'KEEP_ALIVE_OK');
+  assert.equal(f.state.blockedReason,null);
+  assert.ok(!f.calls.includes('refresh'));
+});
