@@ -42,13 +42,15 @@ function model({ action = false } = {}) {
 }
 test('S2 summary renders four named primary EPP programmes and keeps alternatives in inventory', () => {
   const html = view(model(), {}, helpers);
-  assert.match(html, /class="base-hero-panel"/);
-  assert.match(html, /PRIMARY OPERATIONS · BASE STORE/);
-  assert.match(html, /class="base-session-grid"/);
-  assert.equal((html.match(/class="base-session-card /g) || []).length, 6);
+  assert.match(html, /class="kpi health-kpi green"/);
+  assert.match(html, /<p>Base Store<\/p>/);
+  assert.match(html, /6<em> \/ 6 healthy<\/em>/);
+  assert.match(html, /aria-label="Base Store identities"/);
+  assert.equal((html.match(/data-identity="/g) || []).length, 6);
   assert.match(html, /SECOND/);
-  assert.ok(html.indexOf("base-hero-panel") < html.indexOf("epp-primary-kpi"));
   assert.match(html, /FIRST/);
+  assert.ok(html.indexOf('<p>Base Store</p>') < html.indexOf("epp-primary-kpi"));
+  assert.doesNotMatch(html, /base-session-grid/);
   assert.match(html, /4 TARGET MARKETS/);
   for (const [, program] of primary) assert.match(html, new RegExp('>' + program + '<'));
   assert.match(html, /Other configured EPP programmes/);
