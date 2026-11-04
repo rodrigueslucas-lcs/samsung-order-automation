@@ -73,7 +73,7 @@
       const label=item.querySelector('dt')?.textContent.trim()||'';
       item.dataset.state=label.toLowerCase().replaceAll(' ','-');
     });
-    const actionKpi=[...document.querySelectorAll('.executive-grid>.kpi')].find(node=>!node.classList.contains('health-kpi'));
+    const actionKpi=[...document.querySelectorAll('.executive-grid>.kpi')].find(node=>!node.classList.contains('health-kpi')&&!node.classList.contains('epp-primary-kpi'));
     actionKpi?.classList.add('action-kpi');
     [...document.querySelectorAll('.compact-actions li')].forEach(item=>{item.textContent=item.textContent.replaceAll('_',' ');});
   }
