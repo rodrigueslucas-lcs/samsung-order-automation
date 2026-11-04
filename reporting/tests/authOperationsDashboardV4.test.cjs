@@ -25,6 +25,7 @@ function model({ action = false } = {}) {
       operation: 'IDLE', bundle: 'SAME', jenkins: 'UPDATED',
     })),
     epp: { sessions: [
+      { market: 'cl', program: 'alianzas', environment: 'S1', health: 'HEALTHY', operation: 'IDLE', identity: 'AUTHENTICATED', entitlement: 'VALID' },
       ...primary.map(([market, program]) => ({
         market, program, environment: 'S2', health: action && market === 'co' ? 'HUMAN_REQUIRED' : 'STALE',
         status: 'NO_DATA', operation: 'IDLE', reason: action && market === 'co' ? 'CORPORATE_ACTIVATION_REQUIRED' : null,
@@ -46,6 +47,8 @@ test('S2 summary renders four named primary EPP programmes and keeps alternative
   for (const [, program] of primary) assert.match(html, new RegExp('>' + program + '<'));
   assert.match(html, /Other configured EPP programmes/);
   assert.match(html, /1 not in active scope/);
+  assert.doesNotMatch(html, /data-epp-identity="cl:S1:alianzas"/);
+  assert.match(html, /data-epp-identity="cl:S2:alianzas"/);
   assert.doesNotMatch(html, /aria-label="Human Action Required"/);
   assert.match(html, /data-event-market-filter/);
   assert.match(html, /data-event-type-filter/);
