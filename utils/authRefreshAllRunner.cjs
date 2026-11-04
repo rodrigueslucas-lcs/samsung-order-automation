@@ -104,6 +104,7 @@ function runMarketRefresh(market, environment, slot = 'primary', baseEnv = proce
 
 async function refreshAll({ markets, environment, slot, env = process.env } = {}, {
   runMarket = runMarketRefresh,
+  followActive = runMarket===runMarketRefresh?require('./authRefreshFollow.cjs').followActiveRecovery:async()=>null,
   log = console.log,
   error = console.error,
 } = {}) {
@@ -124,7 +125,16 @@ async function refreshAll({ markets, environment, slot, env = process.env } = {}
   const settled = await Promise.all(selectedMarkets.map(async (market) => {
     log(`[${market.toUpperCase()}] START · ${selectedEnvironment} · ${selectedSlot}`);
     try {
-      return await runMarket(market, selectedEnvironment, selectedSlot, env, { stdout: log, stderr: error });
+      if(env.AUTH_REFRESH_FOLLOW_ACTIVE!=='0'){
+        const followed=await followActive(market,selectedEnvironment,selectedSlot,env,{log});
+        if(followed)return followed;
+      }
+      const result=await runMarket(market, selectedEnvironment, selectedSlot, env, { stdout: log, stderr: error });
+      if(result.status==='BUSY'&&env.AUTH_REFRESH_FOLLOW_ACTIVE!=='0'){
+        const followed=await followActive(market,selectedEnvironment,selectedSlot,env,{log});
+        if(followed)return followed;
+      }
+      return result;
     } catch (failure) {
       return {
         market,

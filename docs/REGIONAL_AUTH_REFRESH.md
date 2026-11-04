@@ -19,6 +19,8 @@ Each market still executes, in order:
 
 `READY` keeps the same meaning as the individual refresh command. No regional READY is emitted for a market that did not complete its own pipeline.
 
+When the regional command finds that the scheduled keep-alive already owns a requested market, it follows that exact live recovery instead of starting a competing login or immediately failing BUSY. SECOND remains visibly queued behind pending FIRST gates. It reports READY only after the requested identity is proven and the same cycle acknowledges the bundle synchronization required by `--publish`. Ownership that cannot be correlated safely, or an unrelated job/profile owner, remains BUSY. Following never removes leases, retries credentials or opens another window; it is bounded to 25 minutes by default (`AUTH_REFRESH_FOLLOW_TIMEOUT_MS`, maximum 30 minutes).
+
 ## Parallelism model
 Parallelism exists only between markets:
 

@@ -43,6 +43,7 @@ function cleanCycle(input) {
     identities: (Array.isArray(input.identities) ? input.identities : []).map(identity).filter(Boolean),
     finalized: (Array.isArray(input.finalized) ? input.finalized : []).map(finalized).filter(Boolean), events: [],
   };
+  if(Number.isInteger(input.ownerPid)&&input.ownerPid>0)result.ownerPid=input.ownerPid;
   result.identities = [...new Map(result.identities.map(row=>[row.market+':'+row.slot,row])).values()];
   result.finalized = [...new Map(result.finalized.map(row=>[row.market,row])).values()];
   if (input.activity) result.activity = activity(input.activity);
@@ -84,7 +85,7 @@ function beginCycle({ environment = 'S2', markets = Object.keys(SLOTS) } = {}, {
   if (!['S1', 'S2'].includes(environment)) throw new Error('Invalid auth operations environment.');
   const start = now();
   const file = path.join(directory, `cycle-${start}-${crypto.randomUUID()}.json`);
-  let cycle = { schemaVersion: 1, environment, startedAt: new Date(start).toISOString(), finishedAt: null, state: 'RUNNING', identities: [], finalized: [], events: [] };
+  let cycle = { schemaVersion: 1, environment, ownerPid:process.pid, startedAt: new Date(start).toISOString(), finishedAt: null, state: 'RUNNING', identities: [], finalized: [], events: [] };
   const persist = () => { cycle = cleanCycle(cycle); fs.mkdirSync(directory, { recursive: true }); write(file, cycle); };
   persist();
   return {
