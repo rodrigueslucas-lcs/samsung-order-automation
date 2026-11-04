@@ -53,6 +53,10 @@ test('S2 summary renders four named primary EPP programmes and keeps alternative
   assert.match(html, /data-event-market-filter/);
   assert.match(html, /data-event-type-filter/);
   assert.match(html, /<span class="chip slate">IDLE<\/span>/);
+  assert.match(html, /EPP scheduler <span class="chip amber">REVIEW<\/span>/);
+  assert.match(html, /1 · REVIEW SESSION RESULTS/);
+  assert.match(html, /Last check/);
+  assert.match(html, /Evidence/);
 });
 test('human action panel appears for primary intervention, not alternative-only intervention', () => {
   const noPrimaryAction = view(model(), {}, helpers);
