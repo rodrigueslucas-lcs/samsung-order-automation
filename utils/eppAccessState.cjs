@@ -47,10 +47,10 @@ async function observeEppAccess(page, config) {
 }
 
 async function findEppVerifiedContinue(page) {
-  const success = page.getByText(/Tu cuenta ha sido verificada con éxito|¡Éxito!\s*Tu cuenta ha sido verificada|Your account has been successfully verified/i).filter({ visible: true }).first();
+  const success = page.getByText(/Tu cuenta ha sido verificada con éxito|¡Éxito!\s*Tu cuenta ha sido verificada|¡Logrado!\s*Su cuenta ha sido verificada|Your account has been successfully verified/i).filter({ visible: true }).first();
   if (!(await success.isVisible().catch(() => false))) return null;
-  const button = page.getByRole("button", { name: /^Continuar comprando$|^Seguir comprando$|^Continue shopping$/i })
-    .or(page.getByRole("link", { name: /^Continuar comprando$|^Seguir comprando$|^Continue shopping$/i })).filter({ visible: true }).first();
+  const button = page.getByRole("button", { name: /^Continuar comprando$|^Seguir comprando$|^Comenzar a Comprar$|^Continue shopping$/i })
+    .or(page.getByRole("link", { name: /^Continuar comprando$|^Seguir comprando$|^Comenzar a Comprar$|^Continue shopping$/i })).filter({ visible: true }).first();
   return await button.isVisible().catch(() => false) ? button : null;
 }
 

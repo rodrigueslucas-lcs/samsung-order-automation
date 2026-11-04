@@ -78,3 +78,13 @@ test('CL payment opt-in allows only genuine Flow sandbox, never Flow production 
  assert.equal(blockedEppRequest({...cfg,market:'PE'},req).reason,'UNAPPROVED_NAVIGATION_BLOCKED');
  for(const url of ['https://www.flow.cl/','https://flow.cl/','https://sandbox.flow.cl.evil.example/','https://www.samsung.com/cl/'])assert.ok(blockedEppRequest(cfg,{...req,url}));
 });
+
+test('CL Flow return permits only its observed same-programme staging callback with payment opt-in',()=>{
+ const cfg=getEppConfig('CL',{ENVIRONMENT:'S2',CL_EPP_PROGRAM:'alianzas'});
+ const url='https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/alianzas/carts/CL261104-12345678/paymentmodes/cl-flowKhipu/response';
+ const req={url,document:true,top:true,allowClSandbox:true};
+ for(const method of ['GET','POST'])assert.equal(blockedEppRequest(cfg,{...req,method}),null);
+ for(const changed of [{allowClSandbox:false},{method:'DELETE'},{url:url.replace('/alianzas/','/ventab2b_cl/')},{url:url.replace('s2-smb-api','s1-smb-api')},{url:url.replace('/cl-flowKhipu/','/cl-mercadoCC/')},{url:url.replace('/CL261104-12345678/','/invalid/')}])assert.ok(blockedEppRequest(cfg,{...req,...changed}));
+ assert.ok(blockedEppRequest({...cfg,market:'PE'},req));
+ assert.equal(blockedEppRequest(cfg,{...req,url:'https://www.samsung.com/shop/'}).reason,'PRODUCTION_NAVIGATION_BLOCKED');
+});

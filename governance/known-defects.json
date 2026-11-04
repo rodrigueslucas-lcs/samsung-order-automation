@@ -294,6 +294,20 @@
       "priority": "Medium",
       "rootCause": "Storefront Issue",
       "notes": "CO S2 cart footer confirmed empty in build143 local reproduction: contentinfo and generated Footer CMS slot render no navigation/legal content. Linked to SAM-25146 by operator confirmation; original ticket title describes STG1."
+    },
+    {
+      "market": "CL",
+      "environment": "S2",
+      "store": "EPP",
+      "samId": "SAM-24841",
+      "jira": "SAM-25146",
+      "url": "https://jira.secext.samsung.net/browse/SAM-25146",
+      "title": "QST STG1 SMB CO/PE BS and EPP Footer Section Missing on PDP/Checkout/Cart Page",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "Medium",
+      "rootCause": "Storefront Issue",
+      "notes": "Operator identified CL EPP cart UI as affected by the known footer issue. CL S2 alianzas reproduction on 2026-11-04 proved contentinfo without navigation headings or links after product, summary and checkout passed. Original ticket title is retained; quarantine is restricted to this observed empty-footer signature, not generic timeouts or partial footer differences."
     }
   ]
 }

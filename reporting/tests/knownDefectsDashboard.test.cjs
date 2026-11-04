@@ -6,6 +6,13 @@ const path = require('node:path');
 const { normalizeEnvironment, activeKnownDefects, annotateDashboard } = require('../../scripts/annotate-known-defects-dashboard.cjs');
 const registry = require('../../governance/known-defects.json');
 
+test('CL S2 EPP footer defect requires the exact empty-footer signature, not a generic failure',()=>{
+ const current={market:'CL',environment:'S2',store:'EPP',tests:[{samId:'SAM-24841',status:'SKIPPED-BLOCKED',blockedReason:'ENVIRONMENT_DEFECT: MISSING_EXPECTED_CART_FOOTER'}]};
+ assert.equal(activeKnownDefects(current,registry)[0].defect.jira,'SAM-25146');
+ for(const blockedReason of ['Product missing','TimeoutError','Partial footer label mismatch'])assert.equal(activeKnownDefects({...current,tests:[{samId:'SAM-24841',status:'FAIL',blockedReason}]},registry).length,0);
+ assert.equal(activeKnownDefects({...current,environment:'S1'},registry).length,0);
+});
+
 function runtime(status = 'SKIPPED-BLOCKED') {
   return {
     market: 'MX',

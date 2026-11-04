@@ -600,3 +600,35 @@ were zero payment submits and zero new orders in this CL round. No missing
 SKU/contact/card fixture or missing access was proven to cause these three
 Delivery blockers. S2 received only read-only route/config discovery; these
 results do not homologate S2 payments.
+
+## CL S2 EPP continuation — 2026-11-04
+
+Scope: `alianzas`, S2 only. Earlier S1 Delivery defects do not classify S2.
+
+- Independent EPP FIRST identity, access and storefront were verified READY after operator CAPTCHA; password and submit were automatic and the owned window closed.
+- The operator created `CL261104-78817132` with the approved staging Mastercard. Its confirmation displayed the public order number. This is operator-assisted UI evidence, not an automated registered-card PASS.
+- Fixed automation: CL S2 EPP now selects the operator-proven standard 2–4-day shipping service instead of the first next-day offer. The targeted registered-card run reached Payment and submitted once; Base Store selection is unchanged.
+- SAM-24864 runtime returned `submitOrderDataWsDto` business code `601`. Read-only authenticated history reconciled that exact attempt to `CL261104-78817197_261104132359768`, SKU `SM-S918BZKILTL`, quantity 1, status `TEMPORARY`, full-amount-paid=false and token-paid=false. The corrected diagnostic and official runtime DO prove the public number and validation heading. Earlier reports of missing public number were caused by an overescaped diagnostic regex, not an application defect. Payment acceptance remains unproven; the 601 result is preserved. Do not claim the Mastercard is generally rejected: the operator successfully used it.
+- SAM-24865: official targeted PASS after one bank submit and genuine Flow simulator confirmation, followed by read-only recovery of its own order. The first return was blocked by the navigation guard at the same-programme S2 `cl-flowKhipu/response` callback; this exact path is now allowed only with CL S2 payment opt-in. Production, other sites/methods and other environments stay blocked. No transfer submit was repeated.
+- SAM-24866: automated official targeted PASS (32.5s) for `CL261104-78817197`, read-only with ALLOW_PAYMENT_SUBMIT=0. OCC returns either the exact internal identifier or its public form; the validator accepts those two forms and rejects unrelated numbers/suffixes. This confirmation-only PASS does not promote SAM-24864 or change its payment state. Operator confirmations `CL261104-78817132` and `CL261104-78817310` remain separate assisted evidence.
+- Optional backend follow-up: explain the original 601 response. The operator explicitly defined this round's acceptance as causal order creation, public number and Order Confirmation, without asserting a later settlement status. SAM-24864 now passes an official headed read-only verification of its own causal card order under that criterion; the original response and marker are retained. No additional card submit is required.
+
+Evidence (ignored local runtime): `.agent/tmp/cl-s2-nov4-standard-card-runtime.log`; `test-results/epp/cl/s2/2026-11-04T13-21-45-358Z-148784/results.json`; `.agent/tmp/cl-s2-nov4-temporary-readback-final.log`; `.agent/tmp/cl-s2-nov4-temporary-confirmation.png`; `test-results/epp/cl/s2/operator-CL261104-78817132/confirmation-observation.json`.
+
+Validation: 29 focused CL/payment/attempt/confirmation tests passed; official scope, report-visible business steps and repository architecture gates passed. No new financial submit was retried after code 601. Historical PASS results are preserved.
+
+### Final CL S2 disposition (2026-11-04)
+
+| TC | Result | Basis |
+|---|---|---|
+| SAM-24836 | PASS | Independent programme login/identity/access runtime |
+| SAM-24840 | PASS | Headed S2 PDP Add to Cart |
+| SAM-24841 | KNOWN DEFECT / BLOCKED | SAM-25146, exact empty-footer signature after product/summary/checkout assertions; not a PASS |
+| SAM-24851 | PASS | Headed registered checkout; CL cliente/despacho labels recognized |
+| SAM-24864 | PASS | Operator-defined frontend acceptance, causal card order CL261104-78817197, public number and confirmation; original 601 retained, no settlement assertion |
+| SAM-24865 | PASS | Single native bank submit, Flow simulator, causal confirmation recovered read-only |
+| SAM-24866 | PASS | API/public ID and UI confirmation of the causal order, no additional submit |
+
+All seven CL implementations are executable. This is a consolidation of targeted runtime evidence, not a claim that a new seven-case campaign was executed. The actual outcome is six PASS plus one known application defect. Neither S1 nor other markets were revalidated in this closure. No credentials, card data, cookies or session artifacts are committed.
+
+Automation fixes include headed/null-viewport compatibility, CL Delivery persistence and shipping selection, CL checkout/footer localization, same-order public/internal identifier handling, bounded bank-form loading, the strict staging Flow return and durable read-only recovery. Existing reconciled card/bank orders are reverified rather than needlessly resubmitted; ambiguous attempts and unrelated failures still block/fail.

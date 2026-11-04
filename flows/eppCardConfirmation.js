@@ -5,8 +5,10 @@ import session from '../utils/eppSession.cjs';
 import server from '../utils/eppServerProof.cjs';
 
 // Read the same causal card order; this flow has no cart mutation or submit.
-export async function validateExistingEppCardOrder(page,cfg,record){
- if(record.market!==cfg.market||record.environment!==cfg.environment||record.status!=='CONFIRMED'||record.kind!=='card')throw new Error('EPP confirmation must use its own confirmed causal card record.');
+export async function validateExistingEppCardOrder(page,cfg,record,{allowObservedOrder=false}={}){
+ const observed=allowObservedOrder&&cfg.market==='CL'&&record.status==='OBSERVED_ORDER';
+ const clTransfer=cfg.market==='CL'&&record.kind==='transfer'&&record.providerConfirmationSubmitted===true&&(observed||record.status==='CONFIRMED');
+ if(record.market!==cfg.market||record.environment!==cfg.environment||(!observed&&record.status!=='CONFIRMED')||(record.kind!=='card'&&!clTransfer))throw new Error('EPP confirmation must use its own confirmed causal card record or an explicitly reconciled CL observed order.');
  const proof=server.watchEppServerProof(page.context(),cfg,{expectedEmail:session.getPrimaryEppCredentials(cfg).email});
  try{
   await openEppStore(page,{...cfg,entryUrl:cfg.rootUrl});await proof.settle();
@@ -16,8 +18,12 @@ export async function validateExistingEppCardOrder(page,cfg,record){
   const site=cfg.apiSite||cfg.rootUrl.pathname.split('/').filter(Boolean)[2],origin=`https://${cfg.environment.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com`;
   const pending=page.waitForResponse(r=>{const u=new URL(r.url());return r.request().method()==='GET'&&u.origin===origin&&u.pathname===`/tokocommercewebservices/v2/${site}/users/current/orders/${code}`;},{timeout:60000});
   const [response]=await Promise.all([pending,page.goto(new URL('orderConfirmation;orderCode='+encodeURIComponent(code),cfg.rootUrl).href,{waitUntil:'commit',timeout:60000})]);
-  if(!response.ok()||(await response.json()).code!==code.replace(/_\d+$/,''))throw new Error('EPP confirmation API did not prove the causal public order number.');
+  const order=response.ok()?await response.json():null;
+  // OCC can return the exact internal code or its public form. The GET is
+  // already bound to this causal internal ID; neither another public order
+  // nor a different internal suffix is acceptable.
+  if(!order||![code,code.replace(/_\d+$/,'')].includes(order.code))throw new Error('EPP confirmation API did not prove the causal public order number.');
   await validateMxEppConfirmation(page,cfg,code);
-  await test.info().attach('EPP causal order confirmation',{body:JSON.stringify({market:cfg.market,environment:cfg.environment,program:cfg.program,orderCode:code,readOnly:true,submitCount:0}),contentType:'application/json'});
+  await test.info().attach('EPP causal order confirmation',{body:JSON.stringify({market:cfg.market,environment:cfg.environment,program:cfg.program,orderCode:code,sourceState:record.status,readOnly:true,submitCount:0,...(observed?{paymentAcceptanceProven:false}:{})}),contentType:'application/json'});
  }finally{proof.stop();}
 }

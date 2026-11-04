@@ -29,7 +29,7 @@ function blockClS2OrderClosureKnownDefect(testInfo, environment) {
   test.skip(true, "KNOWN DEFECT RT-751761: CL S2 cannot currently complete order creation/confirmation; payment/order-dependent official TCs are non-gating until the defect is resolved.");
 }
 
-export async function completeClFlowSandbox(page, { orderCode, storefrontOrigin }) {
+export async function completeClFlowSandbox(page, { orderCode, storefrontOrigin,onConfirmationSubmitted=null }) {
   destructiveGuards.requirePaymentSubmitOptIn();
   const current = new URL(page.url());
   const target = new URL(storefrontOrigin);
@@ -50,6 +50,7 @@ export async function completeClFlowSandbox(page, { orderCode, storefrontOrigin 
       Boolean(window.jQuery._data(button, "events")?.click?.length);
   }, null, { timeout: 60000 });
   await page.getByRole("button", { name: /^Confirmar$/i }).click();
+  if(onConfirmationSubmitted)await onConfirmationSubmitted();
   await page.waitForURL(url => url.origin === target.origin && url.pathname.startsWith("/cl/"), { timeout: 90000 });
 }
 
@@ -81,8 +82,13 @@ export async function continueClRegisteredDeliveryToPayment(page,{addressReady=f
   await expect(saved).toBeChecked();
   }
   const shipping = page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
-  const delivery = shipping.getByText(/Entrega d[ií]a siguiente|Despacho est[aá]ndar/i)
-    .filter({ visible: true }).first();
+  // The operator-proven CL S2 EPP route uses standard 2–4 day shipping.
+  // Keep Base Store selection unchanged; do not silently switch services.
+  const delivery = storefront?.market==='CL' && storefront.environment==='S2'
+    ? shipping.getByRole('listitem').filter({hasText:/Despacho est[aá]ndar/})
+      .filter({hasText:/2\s*-\s*4\s*d[ií]as/i}).filter({visible:true})
+    : shipping.getByText(/Entrega d[ií]a siguiente|Despacho est[aá]ndar/i)
+      .filter({ visible: true }).first();
   await expect(delivery).toBeVisible({ timeout: 30000 });
   if(storefront){
     const site=storefront.apiSite||storefront.rootUrl.pathname.split('/').filter(Boolean)[2];

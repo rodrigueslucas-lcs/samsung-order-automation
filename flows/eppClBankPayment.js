@@ -20,6 +20,9 @@ export async function submitClEppBank(page,cfg,capture){
  if(await header.getAttribute('aria-expanded')!=='true')await header.click();
  await expect(header).toHaveAttribute('aria-expanded','true');
  const button=panel.getByRole('button',{name:/^[¡!]?Pagar ahora!?.*$/i}).filter({visible:true});
+ // The expanded header precedes the native lazy bank form ("Espera un
+ // momento"). Do not create a financial marker while it is still loading.
+ await expect(button).toBeVisible({timeout:60000});
  await expect(button).toHaveCount(1);await expect(button).toBeEnabled({timeout:60000});
  const payment=new MarketPaymentPage(page,{market:'CL'});payment.screenshot=capture;payment.placeOrderButton=button;
  const site=cfg.apiSite||cfg.rootUrl.pathname.split('/').filter(Boolean)[2];
@@ -29,7 +32,7 @@ export async function submitClEppBank(page,cfg,capture){
  catch{throw new Error('CL_EPP_BANK_SINGLE_SUBMIT_UNCONFIRMED: marker preserved; reconcile before another submit.');}
  attempt.observe(result.orderCode);
  await page.waitForURL(url=>url.hostname==='sandbox.flow.cl'||url.origin===cfg.rootUrl.origin&&/orderConfirmation/.test(url.pathname),{timeout:60000});
- if(new URL(page.url()).hostname==='sandbox.flow.cl')await completeClFlowSandbox(page,{orderCode:result.orderCode,storefrontOrigin:cfg.rootUrl.origin});
+ if(new URL(page.url()).hostname==='sandbox.flow.cl')await completeClFlowSandbox(page,{orderCode:result.orderCode,storefrontOrigin:cfg.rootUrl.origin,onConfirmationSubmitted:()=>attempts.recordClFlowConfirmationSubmitted(cfg,result.orderCode)});
  await validateMxEppConfirmation(page,cfg,result.orderCode);
  attempt.confirm(result.orderCode);await capture('epp-cl-bank-causal-confirmation');
  await test.info().attach('EPP CL bank causal order',{body:JSON.stringify({market:'CL',environment:'S2',program:cfg.program,orderCode:result.orderCode,provider:'Khipu',confirmationValidated:true,submitCount:1}),contentType:'application/json'});

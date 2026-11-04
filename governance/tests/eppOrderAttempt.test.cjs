@@ -16,3 +16,24 @@ test('only a confirmed causal order releases the active marker',()=>{const io=me
 test('S1 and S2 attempt markers stay isolated',()=>{const io=memory();beginEppOrderAttempt(cfg,'card',{io});beginEppOrderAttempt({...cfg,environment:'S1'},'card',{io});assert.equal(io.files.size,2);});
 
 test('CL bank submit has its own durable single-shot marker',()=>{const io=memory(),cl={market:'CL',environment:'S2'};const a=beginEppOrderAttempt(cl,'transfer',{io});assert.throws(()=>beginEppOrderAttempt(cl,'transfer',{io}),/AMBIGUOUS/);a.observe('CL261030-12345678');a.confirm('CL261030-12345678');assert.equal(JSON.parse([...io.files.values()][0]).kind,'transfer');});
+
+test('Flow confirmation stage preserves the same transfer marker and rejects another order',()=>{
+ const {recordClFlowConfirmationSubmitted}=require('../../utils/eppOrderAttempt.cjs'),io=memory(),cl={market:'CL',environment:'S2'};
+ io.existsSync=f=>io.files.has(f);io.readFileSync=f=>io.files.get(f);
+ const a=beginEppOrderAttempt(cl,'transfer',{io});
+ assert.throws(()=>recordClFlowConfirmationSubmitted(cl,'CL261104-12345678',io),/observed CL transfer/);
+ a.observe('CL261104-12345678');assert.throws(()=>recordClFlowConfirmationSubmitted(cl,'CL261104-87654321',io),/observed CL transfer/);
+ recordClFlowConfirmationSubmitted(cl,'CL261104-12345678',io);
+ const record=JSON.parse([...io.files.values()][0]);assert.equal(record.status,'OBSERVED_ORDER');assert.equal(record.providerConfirmationSubmitted,true);assert.equal(io.files.size,1);
+});
+
+test('only a conclusive rejection plus complete causal history can archive an unresolved CL attempt',()=>{
+ const {archiveRejectedEppOrderAttempt}=require('../../utils/eppOrderAttempt.cjs'),io=memory(),cl={market:'CL',environment:'S2'},at='2026-10-30T00:00:00Z';
+ io.existsSync=f=>io.files.has(f);io.readFileSync=f=>io.files.get(f);
+ beginEppOrderAttempt(cl,'card',{io,now:()=>at});
+ const proof={market:'CL',environment:'S2',attemptAt:at,providerBusinessCode:601,readOnly:true,historyComplete:true,candidates:[]};
+ for(const change of [{market:'MX'},{environment:'S1'},{providerBusinessCode:500},{historyComplete:false},{candidates:[{code:'CL261030-12345678'}]},{attemptAt:'2026-10-31T00:00:00Z'}])assert.throws(()=>archiveRejectedEppOrderAttempt(cl,'card',{...proof,...change},io),/conclusive/);
+ assert.equal(archiveRejectedEppOrderAttempt(cl,'card',proof,io).submitRetried,false);
+ assert.equal(JSON.parse([...io.files.values()][0]).status,'REJECTED');
+ beginEppOrderAttempt(cl,'card',{io});assert.equal(io.files.size,2);
+});

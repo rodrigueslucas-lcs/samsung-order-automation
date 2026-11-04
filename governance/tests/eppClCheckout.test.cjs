@@ -54,3 +54,15 @@ test('EPP Delivery awaits its own native persistence response before Continue, w
  await new Promise(resolve=>setImmediate(resolve));assert.ok(!calls.includes('continue'));finish();await pending;
  assert.deepEqual(calls,['listen','shipping','saving','saved','terms','continue']);
 });
+
+test('CL S2 EPP chooses the operator-proven standard 2-4 service instead of first next-day offer',async()=>{
+ const code=fs.readFileSync('flows/cl/paymentFlows.js','utf8').replace(/^import .*;\r?\n/gm,'').replace(/export async function/g,'async function');
+ const calls=[];
+ const delivery={filter:options=>{if(options.hasText){assert.ok(options.hasText.test(calls.length?'Gratis. 2-4 días hábiles':'Despacho estándar'));calls.push('filter');}return delivery;},click:async()=>calls.push('shipping')};
+ const shipping={getByRole:role=>role==='listitem'?delivery:{isChecked:async()=>true},getByText:()=>{throw Error('Must not choose first shipping offer');}};
+ const response={url:()=> 'https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/alianzas/users/current/carts/current/deliverymodes/update',request:()=>({method:()=> 'POST'}),ok:()=>true,finished:async()=>null};
+ const page={locator:()=>shipping,getByRole:()=>({click:async()=>calls.push('continue')}),waitForResponse:async predicate=>{assert.ok(predicate(response));return response;}};
+ const run=vm.runInNewContext(code+'\ncontinueClRegisteredDeliveryToPayment;',{URL,evidenceContext:{recordBusinessEvidence(){}},expect:()=>({toBeVisible:async()=>{},toHaveURL:async()=>{}})});
+ await run(page,{addressReady:true,storefront:{market:'CL',environment:'S2',rootUrl:new URL('https://stg2.shop.samsung.com/cl/multistore/alianzas/alianzas/')}});
+ assert.deepEqual(calls,['filter','filter','shipping','continue']);
+});

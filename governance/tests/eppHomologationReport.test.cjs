@@ -14,8 +14,10 @@ test('EPP matrix represents 26 unique official cases and 52 environment rows wit
   const rows = buildRows(scope);
   assert.equal(rows.length,52);
   assert.ok(rows.every(r=>r.result==='NOT_RUN'));
-  assert.equal(scope.filter(r=>r.implementation==='PREREQUISITE_FLOW').length,5);
-  assert.equal(scope.filter(r=>r.implementation==='IMPLEMENTED').length,21);
+  assert.equal(scope.filter(r=>r.implementation==='PREREQUISITE_FLOW').length,2);
+  assert.equal(scope.filter(r=>r.implementation==='IMPLEMENTED').length,24);
+  assert.equal(scope.filter(r=>r.market==='CL').length,7);
+  assert.ok(scope.filter(r=>r.market==='CL').every(r=>r.implementation==='IMPLEMENTED'));
   assert.equal(scope.filter(r=>r.implementation==='BLOCKED_NOT_IMPLEMENTED').length,0);
   assert.equal(scope.filter(r=>r.implementation==='PARTIAL').length,0);
 });

@@ -23,6 +23,7 @@ export default defineConfig({
     ...devices["Desktop Chrome"], channel: "chrome",
     headless: process.env.BROWSER_MODE !== "headed",
     viewport: process.env.BROWSER_MODE === "headed" ? null : { width: 1440, height: 900 },
+    deviceScaleFactor: process.env.BROWSER_MODE === "headed" ? undefined : devices["Desktop Chrome"].deviceScaleFactor,
     launchOptions: { args: ["--start-maximized"], devtools: false },
     // Access codes must not be captured by Playwright action logs or video.
     // Enable business tracing only after a separate untraced access fixture exists.

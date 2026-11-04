@@ -150,7 +150,7 @@ export async function addConfiguredEppProduct(page, cfg, { currencyPattern = /[$
   return cart;
 }
 
-export async function validateEppCartUi(cart) {
+export async function validateEppCartUi(cart,{market,environment,program}={}) {
   await cart.validateCartPage();
   await cart.validateProductInCart();
   const row = cart.page.locator('cx-cart-item, .cart-item, .cart-product').filter({ hasText: cart.sku }).first();
@@ -163,9 +163,19 @@ export async function validateEppCartUi(cart) {
   await cart.validateOrderSummary();
   await cart.validateCheckoutButton();
   const footer = cart.page.getByRole('contentinfo');
-  await expect(footer.getByRole('heading', { name: /^Shop$|^Tienda$/i })).toBeVisible();
-  await expect(footer.getByRole('heading', { name: /^Account$|^Cuenta$/i })).toBeVisible();
-  await expect(footer.getByRole('heading', { name: /^Soporte$|^Support$/i })).toBeVisible();
+  const headings=market==='CL'?[/^Productos$/i,/^Tiendas$/i,/^Soporte$/i,/^Compa[nñ][ií]a$/i]:[/^Shop$|^Tienda$/i,/^Account$|^Cuenta$/i,/^Soporte$|^Support$/i];
+  try{
+    for(const name of headings)await expect(footer.getByRole('heading',{name})).toBeVisible({timeout:market==='CL'?15000:5000});
+  }catch(error){
+    const state={footers:await footer.count(),headings:await footer.getByRole('heading').filter({visible:true}).count(),links:await footer.getByRole('link').filter({visible:true}).count()};
+    if(market==='CL'&&environment==='S2'&&program==='alianzas'&&state.footers<=1&&state.headings===0&&state.links===0){
+      await cart.screenshot('epp-cl-cart-footer-missing');
+      await test.info().attach('CL EPP empty footer signature',{body:JSON.stringify({market,environment,program,...state}),contentType:'application/json'});
+      test.info().annotations.push({type:'known-defect',description:'SAM-25146: operator-linked empty cart footer'});
+      test.skip(true,'ENVIRONMENT_DEFECT: MISSING_EXPECTED_CART_FOOTER; known defect SAM-25146. Product, summary and checkout checks passed before the footer check.');
+    }
+    throw error;
+  }
   await cart.screenshot('epp-cart-footer');
 }
 

@@ -50,4 +50,18 @@ function latestConfirmedEppOrder(config,kind='card',io=fs){
  });
  return records.sort((a,b)=>Date.parse(b.at)-Date.parse(a.at))[0]||null;
 }
-module.exports={beginEppOrderAttempt,pendingEppOrderAttempt,confirmPendingEppOrder,observePendingEppOrder,latestConfirmedEppOrder};
+function archiveRejectedEppOrderAttempt(config,kind,evidence,io=fs){
+ const record=pendingEppOrderAttempt(config,kind,io);
+ if(!record||record.status!=='SUBMITTING'||record.orderCode||evidence?.market!==config.market||evidence?.environment!==config.environment||evidence?.program!==config.program||evidence?.attemptAt!==record.at||evidence?.providerBusinessCode!==601||evidence?.readOnly!==true||evidence?.historyComplete!==true||!Array.isArray(evidence.candidates)||evidence.candidates.length)throw new Error('Rejected EPP attempt requires its own conclusive provider rejection and complete empty causal history.');
+ const directory=getEppSessionPaths(config).directory,source=path.join(directory,`order-attempt-${kind}.json`),target=path.join(directory,`rejected-${kind}-${Date.parse(record.at)}.json`);
+ if(!Number.isFinite(Date.parse(record.at))||io.existsSync(target))throw new Error('Rejected EPP attempt archive is not safe to overwrite.');
+ io.writeFileSync(source,JSON.stringify({...record,status:'REJECTED',reason:'PAYMENT_REJECTED_601',historyComplete:true,reconciledAt:new Date().toISOString()}));
+ io.renameSync(source,target);
+ return{status:'REJECTED',submitRetried:false};
+}
+function recordClFlowConfirmationSubmitted(config,orderCode,io=fs){
+ const record=pendingEppOrderAttempt(config,'transfer',io);
+ if(config.market!=='CL'||config.environment!=='S2'||!record||record.status!=='OBSERVED_ORDER'||record.orderCode!==orderCode)throw new Error('Flow confirmation must belong to the observed CL transfer.');
+ io.writeFileSync(path.join(getEppSessionPaths(config).directory,'order-attempt-transfer.json'),JSON.stringify({...record,providerConfirmationSubmitted:true}));
+}
+module.exports={beginEppOrderAttempt,pendingEppOrderAttempt,confirmPendingEppOrder,observePendingEppOrder,latestConfirmedEppOrder,archiveRejectedEppOrderAttempt,recordClFlowConfirmationSubmitted};

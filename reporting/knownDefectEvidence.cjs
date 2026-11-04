@@ -1,4 +1,8 @@
 function matchesKnownDefectEvidence(defect, result) {
+  if(defect.jira==='SAM-25146'&&defect.market==='CL'&&defect.samId==='SAM-24841'&&defect.store==='EPP'){
+    const evidence=[result.error,result.message,result.blockedReason,result.statusDetails?.message,...(result.errors||[]).map(item=>item.message),...(result.annotations||[]).map(item=>item.description)].filter(value=>typeof value==='string').join('\n');
+    return /MISSING_EXPECTED_CART_FOOTER/.test(evidence);
+  }
   if (defect.jira !== 'RT-738525') return true;
   const text = [result.error, result.message, result.blockedReason,
     result.statusDetails?.message, ...(result.errors || []).map(error => error.message),

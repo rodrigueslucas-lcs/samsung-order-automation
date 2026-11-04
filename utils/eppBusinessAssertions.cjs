@@ -26,6 +26,12 @@ async function proveCheckout(page, config) {
       /^checkout\//.test(url.pathname.slice(config.rootUrl.pathname.length));
   }, { timeout: 30000 }).toBe(true);
   assertStoreRoute(page.url(), config, /^checkout\//);
+  if(config.market==='CL'){
+    // Registered CL can enter Delivery directly with Contact collapsed.
+    // Its template uses cliente/despacho, not the other markets' labels.
+    await expect(page.getByRole('heading',{name:/^(?:[12]\.\s*)?(?:Datos del cliente|Informaci[oó]n de despacho)$/i}).filter({visible:true}).first()).toBeVisible({timeout:30000});
+    return;
+  }
   await expect(page.locator('input[name="firstName"], input[formcontrolname="firstName"], input[name="address1"], input[formcontrolname="address1"]').filter({ visible: true }).first()
     .or(page.getByText(/Datos de contacto|Informaci[oó]n de contacto|Direcci[oó]n de entrega|M[eé]todo de entrega/i).filter({ visible: true }).first()).first()).toBeVisible();
 }

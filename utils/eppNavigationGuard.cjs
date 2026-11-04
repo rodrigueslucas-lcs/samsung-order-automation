@@ -8,7 +8,11 @@ function blockedEppRequest(config, {url: value, method='GET', document=false, to
   const commerceWrite = url.pathname.startsWith('/tokocommercewebservices/') && !['GET','HEAD','OPTIONS'].includes(method);
   const verification=allowEmailVerification&&method==='GET'&&config.program&&url.pathname===`/tokocommercewebservices/v2/${config.program}/users/current/multistore/registration/verifyEmail`;
   const paymentSandbox=allowClSandbox&&config.market==='CL'&&config.environment==='S2'&&url.origin==='https://sandbox.flow.cl';
-  const allowed = paymentSandbox || url.origin === config.rootUrl.origin || url.origin === 'https://account.samsung.com' ||
+  const site=config.apiSite||config.program||config.rootUrl.pathname.split('/').filter(Boolean)[2];
+  const flowRoute=url.pathname.match(/^\/tokocommercewebservices\/v2\/([^/]+)\/carts\/(CL\d{6}-\d{8}(?:_\d+)?)\/paymentmodes\/cl-flowKhipu\/response$/);
+  const flowReturn=allowClSandbox&&config.market==='CL'&&config.environment==='S2'&&url.origin===api&&['GET','POST'].includes(method)&&
+    flowRoute?.[1]===site;
+  const allowed = paymentSandbox || flowReturn || url.origin === config.rootUrl.origin || url.origin === 'https://account.samsung.com' ||
     (url.origin === api && (/^\/tokocommercewebservices\/v2\/[^/]+\/login\/return\/?$/.test(url.pathname)||verification));
   const reason = document && production ? 'PRODUCTION_NAVIGATION_BLOCKED' :
     document && top && !allowed ? 'UNAPPROVED_NAVIGATION_BLOCKED' :

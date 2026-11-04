@@ -54,6 +54,14 @@ test('variant navigation cannot substitute a Base Store product for EPP proof',a
 test('checkout proof requires actual multistore checkout content', async () => {
   await fixture('<input name="firstName" aria-label="firstName">', page => proveCheckout(page, config), 'checkout/one?step=CHECKOUT_STEP_CONTACT_INFO');
 });
+
+test('CL registered checkout accepts its rendered Delivery heading without blank Contact inputs',async()=>{
+ const cl={market:'CL',environment:'S2',rootUrl:new URL('https://stg2.shop.samsung.com/cl/multistore/alianzas/alianzas/')};
+ await fixture('<h2>2. Información de despacho</h2>',async page=>{
+  await page.goto(new URL('checkout/one?step=CHECKOUT_STEP_DELIVERY',cl.rootUrl).href);
+  await proveCheckout(page,cl);
+ });
+});
 test('PLP-to-PDP selects the exact configured product variant before Add', async () => {
   const current = { ...config, sku: 'QA-SKU', pdpUrl: new URL('p/QA-SKU',config.rootUrl) };
   await fixture(`<a href="${current.pdpUrl.href}">Configured variant</a>`, async page => {
