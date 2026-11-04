@@ -121,6 +121,7 @@
     "auth:verify:epp": "node scripts/auth-verify-epp.cjs",
     "qst:epp:access": "node scripts/discover-epp-access.cjs",
     "qst:epp:report": "node scripts/report-epp-homologation.cjs",
+    "auth:refresh:epp:all": "node scripts/auth-refresh-all-epp.cjs",
     "auth:keepalive:epp": "node scripts/auth-epp-keepalive-once.cjs",
     "auth:keepalive:epp:install": "node scripts/auth-epp-keepalive-task.cjs --install",
     "auth:operations:resource:check": "node scripts/auth-operations-resource.cjs"
