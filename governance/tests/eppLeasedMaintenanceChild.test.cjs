@@ -4,6 +4,6 @@ test('real EPP maintenance child enters the shared leased wrapper and reports a 
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'epp-child-contract-')),lease=acquireMarketLease('mx','S2',{directory});let stdout='',stderr='';
   try{const result=await runNodeScript('scripts/auth-epp-maintenance-child.cjs',{...process.env,...lease.env,EPP_LEASE_TOKEN:lease.env.AUTH_MARKET_LEASE,EPP_KEEPALIVE_MARKET:'INVALID_FIXTURE',EPP_KEEPALIVE_ENVIRONMENT:'S2'},{timeoutMs:120000,stdout:chunk=>{stdout+=chunk;},stderr:chunk=>{stderr+=chunk;}});
     assert.equal(result.timedOut,false);assert.equal(result.code,1);assert.notEqual(result.diagnostic,'CHILD_LEASE_NOT_REGISTERED');assert.doesNotMatch(stderr,/Child refused/);assert.match(stdout,/EPP_AUTH_RESULT /);assert.doesNotMatch(stdout,/START|Samsung Account opened/);
-    const line=stdout.split(/\r?\n/).find(line=>line.startsWith('EPP_AUTH_RESULT '));assert.equal(JSON.parse(line.slice(16)).status,'UNPROVEN');
+    const line=stdout.split(/\r?\n/).find(line=>line.startsWith('EPP_AUTH_RESULT '));const diagnostic=JSON.parse(line.slice(16));assert.equal(diagnostic.status,'UNPROVEN');assert.equal(diagnostic.phase,'PRECONDITIONS');assert.equal(diagnostic.kind,'Error');assert.doesNotMatch(line,/password|cookie|token|stg2\.shop/i);
   }finally{lease();if(fs.existsSync(directory)&&fs.readdirSync(directory).length===0)fs.rmdirSync(directory);}
 });
