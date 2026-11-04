@@ -42,7 +42,12 @@ function model({ action = false } = {}) {
 }
 test('S2 summary renders four named primary EPP programmes and keeps alternatives in inventory', () => {
   const html = view(model(), {}, helpers);
-  assert.match(html, /class="executive-side"/);
+  assert.match(html, /class="base-hero-panel"/);
+  assert.match(html, /PRIMARY OPERATIONS · BASE STORE/);
+  assert.match(html, /class="base-session-grid"/);
+  assert.equal((html.match(/class="base-session-card /g) || []).length, 4);
+  assert.ok(html.indexOf("base-hero-panel") < html.indexOf("epp-primary-kpi"));
+  assert.match(html, /FIRST/);
   assert.match(html, /4 TARGET MARKETS/);
   for (const [, program] of primary) assert.match(html, new RegExp('>' + program + '<'));
   assert.match(html, /Other configured EPP programmes/);
