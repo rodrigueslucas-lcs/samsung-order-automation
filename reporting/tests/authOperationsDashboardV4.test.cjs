@@ -20,8 +20,8 @@ const primary = [
 function model({ action = false } = {}) {
   return {
     environment: 'S2', generatedAt: '2026-11-04T18:00:00.000Z',
-    sessions: ['mx', 'pe', 'co', 'cl'].map(market => ({
-      market, environment: 'S2', slot: 'primary', health: 'HEALTHY',
+    sessions: [['mx','primary'],['mx','second'],['pe','primary'],['co','primary'],['co','second'],['cl','primary']].map(([market,slot]) => ({
+      market, environment: 'S2', slot, health: 'HEALTHY',
       operation: 'IDLE', bundle: 'SAME', jenkins: 'UPDATED',
     })),
     epp: { sessions: [
@@ -45,7 +45,8 @@ test('S2 summary renders four named primary EPP programmes and keeps alternative
   assert.match(html, /class="base-hero-panel"/);
   assert.match(html, /PRIMARY OPERATIONS · BASE STORE/);
   assert.match(html, /class="base-session-grid"/);
-  assert.equal((html.match(/class="base-session-card /g) || []).length, 4);
+  assert.equal((html.match(/class="base-session-card /g) || []).length, 6);
+  assert.match(html, /SECOND/);
   assert.ok(html.indexOf("base-hero-panel") < html.indexOf("epp-primary-kpi"));
   assert.match(html, /FIRST/);
   assert.match(html, /4 TARGET MARKETS/);
