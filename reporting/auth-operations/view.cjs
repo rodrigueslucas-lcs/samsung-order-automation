@@ -14,11 +14,11 @@ function view(model,options,h){
   const market=row=>row.market==='all'?'<b>ALL</b>':`<span class="table-market">${flag(row.market)}<b>${e(row.market.toUpperCase())}</b></span>`;
   const badge=row=>chip(healthLabel(health(row)),color(health(row)));
   const recoverable=row=>health(row)==='STALE'&&row.identity==='AUTHENTICATED'&&row.entitlement==='VALID'&&row.storefront!=='BLOCKED'&&!row.reason;
+  const environmentEpp=epp.filter(r=>r.environment===model.environment);
   const eppMarkets=['mx','pe','co','cl'].map(m=>({market:m,count:environmentEpp.filter(r=>r.market===m).length})).filter(x=>x.count>0);
   // Operational S2 scope is one approved programme per market. Other known
   // programmes remain visible as inventory, never as a false auth-health failure.
   const PRIMARY_EPP=Object.freeze({mx:'pymesmx',pe:'pe_membership_vip',co:'co_epp_agre',cl:'alianzas'});
-  const environmentEpp=epp.filter(r=>r.environment===model.environment);
   const primaryEpp=model.environment==='S2'?['mx','pe','co','cl'].map(m=>environmentEpp.find(r=>r.market===m&&r.program===PRIMARY_EPP[m])).filter(Boolean):environmentEpp;
   const inactiveEpp=model.environment==='S2'?environmentEpp.filter(r=>!primaryEpp.includes(r)):[];
   const eppMarketSummary=eppMarkets.map(x=>`${x.market.toUpperCase()} ${x.count}`).join(' · ');
