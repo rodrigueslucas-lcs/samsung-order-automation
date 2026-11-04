@@ -30,7 +30,7 @@ async function main({argv=process.argv.slice(2),env=process.env,cycle=runCycle,a
   const active=await activity(env,{markets:args.markets.map(m=>m.toLowerCase())});
   if(!active.idle){log('[EPP] BUSY · market builds active; no session operation started');return 3;}
   const summary=await cycle({...args,env});
-  for(const r of summary.identities)log(`[EPP][${r.market}][${r.environment}][${r.slot==='second'?'SECOND':'FIRST'}] session=${r.session||'UNPROVEN'} program=${r.program||'UNSUPPORTED'} users/current=${r.proof?.userAccepted?'AUTHENTICATED':'UNPROVEN'} entitlement=${r.proof?.accessAccepted?'VALID':'UNPROVEN'} action=${r.status} reuse=${r.action||'NONE'} reason=${r.reason||'NONE'} source=${r.blockerSource||'CURRENT'}${r.currentReason?' currentReason='+r.currentReason:''}`);
+  for(const r of summary.identities)log(`[EPP][${r.market}][${r.environment}][${r.slot==='second'?'SECOND':'FIRST'}] session=${r.session||'UNPROVEN'} program=${r.program||'UNSUPPORTED'} users/current=${r.proof?.userAccepted?'AUTHENTICATED':'UNPROVEN'} entitlement=${r.proof?.accessAccepted?'VALID':'UNPROVEN'} action=${r.status} reuse=${r.action||'NONE'} reason=${r.reason||'NONE'} source=${r.blockerSource||'CURRENT'}${r.currentReason?' currentReason='+r.currentReason:''}${r.phase?' phase='+r.phase:''}${r.kind?' kind='+r.kind:''}`);
   const dir=path.resolve('test-results/auth-keepalive');fs.mkdirSync(dir,{recursive:true});
   save(path.join(dir,`epp-last-cycle-${args.environment.toLowerCase()}-${args.slot}.json`),{generatedAt:new Date().toISOString(),...summary});
   return summary.ok?0:summary.identities.some(r=>r.status==='HUMAN_REQUIRED')?2:1;
