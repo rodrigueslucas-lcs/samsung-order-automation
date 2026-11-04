@@ -47,3 +47,46 @@
 @media(max-width:1250px){.executive-grid{grid-template-columns:minmax(240px,1fr) minmax(400px,1.5fr)}.executive-grid>.action-kpi{grid-column:1/-1}}
 @media(max-width:850px){.executive-grid{grid-template-columns:1fr}.executive-grid>.action-kpi{grid-column:auto}.epp-primary-total{white-space:normal}}
 @media(max-width:550px){.epp-primary-grid{grid-template-columns:1fr}.epp-primary-heading{flex-direction:column}.epp-market-card .epp-state-note{min-height:0}.epp-primary-kpi strong em{font-size:14px}.epp-alternates>summary span{display:block;margin:5px 0 0}}
+
+/* V4: more useful density, readable session facts and resilient EPP labels. */
+.executive-grid{display:grid;grid-template-columns:minmax(260px,0.85fr) minmax(0,2fr);align-items:start;gap:18px}
+.executive-side{display:grid;gap:16px;min-width:0;align-content:start}
+.executive-side>.kpi{min-width:0}
+.executive-side .health-kpi{padding:22px}
+.executive-side .action-kpi{padding:20px!important}
+.executive-side .action-kpi dl{grid-template-columns:repeat(2,minmax(0,1fr))}
+.epp-primary-kpi{min-width:0}
+.epp-market-card dl>div{display:block;min-width:0;margin:0;text-align:left}
+.epp-market-card dt{display:block;font-size:10px;line-height:1.4;letter-spacing:.25px;color:#526984}
+.epp-market-card dd{display:block;margin-top:5px;font-size:12px;line-height:1.4;color:#203953;font-weight:750;text-align:left;overflow-wrap:normal;word-break:normal;hyphens:none;white-space:normal}
+.epp-market-card h3{font-size:16px;overflow-wrap:normal;word-break:break-word}
+.epp-market-card .epp-state-note{color:#415773;font-size:11.5px;font-weight:550;min-height:0}
+.epp-market-card dl{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:12px;row-gap:11px}
+.epp-primary-kpi small{color:#526984}
+.epp-market-card .epp-country{white-space:nowrap}
+.identity-table{font-size:12px}
+.identity-table th{color:#405674;font-weight:800;letter-spacing:.35px}
+.identity-table td{color:#243951;font-size:12px;line-height:1.45;font-weight:550;vertical-align:middle}
+.identity-table td small{color:#62758e;font-size:10.5px;line-height:1.5}
+.identity-table td:nth-child(3){color:#1d3655;font-weight:700}
+.identity-table .chip{font-size:10px;white-space:nowrap}
+.identity-table td{overflow-wrap:normal;word-break:normal}
+.table-scroll{overflow-x:auto;scrollbar-width:thin}
+.dashboard-section>.hint{color:#546780}
+@media(max-width:1150px){
+  .executive-grid{grid-template-columns:minmax(240px,0.75fr) minmax(0,1.65fr)}
+  .epp-market-card dl{grid-template-columns:1fr}
+  .epp-market-card dl>div:last-child{grid-column:auto}
+}
+@media(max-width:850px){
+  .executive-grid{grid-template-columns:1fr}
+  .executive-side{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+  .epp-market-card dl{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .epp-market-card dl>div:last-child{grid-column:1/-1}
+}
+@media(max-width:570px){
+  .executive-side,.epp-primary-grid{grid-template-columns:1fr}
+  .epp-market-card dl{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .epp-market-card dl>div:last-child{grid-column:1/-1}
+  .executive-side .action-kpi dl{grid-template-columns:1fr 1fr}
+}
