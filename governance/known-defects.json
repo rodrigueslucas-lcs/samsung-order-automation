@@ -308,6 +308,20 @@
       "priority": "Medium",
       "rootCause": "Storefront Issue",
       "notes": "Operator identified CL EPP cart UI as affected by the known footer issue. CL S2 alianzas reproduction on 2026-11-04 proved contentinfo without navigation headings or links after product, summary and checkout passed. Original ticket title is retained; quarantine is restricted to this observed empty-footer signature, not generic timeouts or partial footer differences."
+    },
+    {
+      "market": "MX",
+      "environment": "S2",
+      "store": "EPP",
+      "samId": "SAM-25046",
+      "jira": "RT-779284",
+      "url": "https://jira.secext.samsung.net/browse/RT-779284",
+      "title": "[MX][EPP][S2] – Pay in Cash transaction fails during checkout via Mercado Pago",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "Critical",
+      "rootCause": "Environment Issue",
+      "notes": "Operator reproduced pymesmx cash failure in two browsers: Mercado Pago returns to CHECKOUT_STEP_PAYMENT with Lo sentimos, su transacción no fue exitosa. This link applies only to SAM-25046 MX EPP S2 and the cash-specific signature. Existing ambiguous cash initiation remains protected; no submit is retried."
     }
   ]
 }

@@ -632,3 +632,9 @@ Validation: 29 focused CL/payment/attempt/confirmation tests passed; official sc
 All seven CL implementations are executable. This is a consolidation of targeted runtime evidence, not a claim that a new seven-case campaign was executed. The actual outcome is six PASS plus one known application defect. Neither S1 nor other markets were revalidated in this closure. No credentials, card data, cookies or session artifacts are committed.
 
 Automation fixes include headed/null-viewport compatibility, CL Delivery persistence and shipping selection, CL checkout/footer localization, same-order public/internal identifier handling, bounded bank-form loading, the strict staging Flow return and durable read-only recovery. Existing reconciled card/bank orders are reverified rather than needlessly resubmitted; ambiguous attempts and unrelated failures still block/fail.
+
+## MX S2 cash — operator-confirmed known defect RT-779284
+
+SAM-25046 (pymesmx) is linked to https://jira.secext.samsung.net/browse/RT-779284: Pay in Cash transaction fails during checkout via Mercado Pago. Operator evidence shows Paga en efectivo selected, then a return to CHECKOUT_STEP_PAYMENT with “Lo sentimos, su transacción no fue exitosa”, reproduced in two browsers. This is operator-supplied runtime evidence, not a new automation reproduction.
+
+The known blocker is restricted to MX EPP S2 pymesmx cash. S1, Base Store, other markets, auth/data failures, ambiguous old attempts and unrelated timeouts do not inherit this classification. The official case records the known defect before another cash attempt; the existing initiation remains untouched. Remove/revalidate the quarantine when the reported cash defect is fixed. No additional cash payment was submitted to create this link.

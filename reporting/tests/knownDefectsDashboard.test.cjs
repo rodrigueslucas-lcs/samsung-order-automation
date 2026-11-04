@@ -6,6 +6,14 @@ const path = require('node:path');
 const { normalizeEnvironment, activeKnownDefects, annotateDashboard } = require('../../scripts/annotate-known-defects-dashboard.cjs');
 const registry = require('../../governance/known-defects.json');
 
+test('MX S2 EPP cash RT-779284 is linked only to its exact cash signature',()=>{
+ const current={market:'MX',environment:'S2',store:'EPP',tests:[{samId:'SAM-25046',status:'SKIPPED-BLOCKED',blockedReason:'ENVIRONMENT_DEFECT: MX_EPP_CASH_TRANSACTION_FAILED pymesmx'}]};
+ assert.equal(activeKnownDefects(current,registry)[0].defect.jira,'RT-779284');
+ for(const blockedReason of ['TimeoutError','AUTH_OR_ENTITLEMENT_REQUIRED','AMBIGUOUS_EPP_ORDER_ATTEMPT','PAYMENT_FLOW_NOT_PROVEN'])assert.equal(activeKnownDefects({...current,tests:[{samId:'SAM-25046',status:'FAIL',blockedReason}]},registry).length,0);
+ assert.equal(activeKnownDefects({...current,tests:[{samId:'SAM-25046',status:'FAIL',error:'Unrelated fixture failure',annotations:[{type:'known-defect',description:'MX_EPP_CASH_TRANSACTION_FAILED pymesmx'}]}]},registry).length,0);
+ for(const change of [{market:'PE'},{environment:'S1'},{store:'BASE_STORE'}])assert.equal(activeKnownDefects({...current,...change},registry).length,0);
+});
+
 test('CL S2 EPP footer defect requires the exact empty-footer signature, not a generic failure',()=>{
  const current={market:'CL',environment:'S2',store:'EPP',tests:[{samId:'SAM-24841',status:'SKIPPED-BLOCKED',blockedReason:'ENVIRONMENT_DEFECT: MISSING_EXPECTED_CART_FOOTER'}]};
  assert.equal(activeKnownDefects(current,registry)[0].defect.jira,'SAM-25146');

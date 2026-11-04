@@ -67,7 +67,12 @@ test.describe("MX QST - Official EPP", () => {
 
   test("SAM-25046 @preflight @destructive @qst @mx @epp - Pay in Cash", async ({page}) => {
     await test.step("Inspect authenticated EPP cart, checkout and payment prerequisites", async () => {
-      await runEppPaymentPrerequisiteCase(page,cfg(),{kind:'cash'});
+      const current=cfg();
+      if(current.environment==='S2'&&current.program==='pymesmx'){
+        test.info().annotations.push({type:'known-defect',description:'RT-779284: MX_EPP_CASH_TRANSACTION_FAILED pymesmx; operator reproduced Mercado Pago cash return failure in two browsers.'});
+        test.skip(true,'ENVIRONMENT_DEFECT: MX_EPP_CASH_TRANSACTION_FAILED pymesmx — RT-779284. Operator-confirmed cash failure returns to Payment with “Lo sentimos, su transacción no fue exitosa”. No cash submit retried.');
+      }
+      await runEppPaymentPrerequisiteCase(page,current,{kind:'cash'});
     });
   });
 });
