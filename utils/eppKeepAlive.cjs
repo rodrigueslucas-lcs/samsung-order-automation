@@ -71,7 +71,10 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
   let lease,owned,checkpoint;
   const finish=(status,reason,extra={})=>({...base,status,...(reason?{reason}:{}),...extra});
   try {
-    if(config.programPolicy?.allowAutomaticRetry===false&&['BLOCKED_CALLBACK_TO_PRODUCTION','BLOCKED_EXTERNAL','STORE_FRONT_RENDER_BLOCKED','ENTITLEMENT_OR_STOREFRONT_RENDER_BLOCKED','VERIFICATION_CODE_REJECTED','PROGRAM_CONTEXT_NOT_PROVEN'].includes(config.programPolicy.knownStatus))return finish('BLOCKED',config.programPolicy.knownStatus,{blockerSource:'PROGRAM_POLICY',loginAttempts:0});
+    // A historical programme restriction forbids *login recovery*, not read-only
+    // verification of a valid session already owned by the exact S2 programme.
+    // The verifier retains the staging/Production navigation guard.
+    const policyReason=config.programPolicy?.allowAutomaticRetry===false&&['BLOCKED_CALLBACK_TO_PRODUCTION','BLOCKED_EXTERNAL','STORE_FRONT_RENDER_BLOCKED','ENTITLEMENT_OR_STOREFRONT_RENDER_BLOCKED','VERIFICATION_CODE_REJECTED','PROGRAM_CONTEXT_NOT_PROVEN'].includes(config.programPolicy.knownStatus)?config.programPolicy.knownStatus:null;
     lease=d.acquire(config,env);checkpoint=d.read(config);
     const runtimeEnv={...env,...lease.env};
     const existing=d.load(config);
@@ -87,6 +90,9 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
       outcome=second.status==='INVALID'&&second.reason===outcome.reason?second:second.status==='HEALTHY'?second:{status:second.status==='BLOCKED'?'BLOCKED':'UNPROVEN',reason:second.reason||'EPP_VERIFY_DISAGREEMENT'};
     }
     if(outcome.status!=='HEALTHY') {
+      // Never initiate Account login for restricted programmes. Still report
+      // the observed verifier result to distinguish policy from live evidence.
+      if(policyReason)return finish('BLOCKED',policyReason,{blockerSource:'PROGRAM_POLICY',currentReason:outcome.reason||'SESSION_NOT_VERIFIED',loginAttempts:0,session:base.session});
       if(outcome.status==='BLOCKED') {d.save(config,{...checkpoint,blockedReason:outcome.reason});return finish('BLOCKED',outcome.reason,{proof:outcome.proof});}
       if(checkpoint.blockedReason)return finish('BLOCKED',checkpoint.blockedReason,{proof:outcome.proof,blockerSource:'CHECKPOINT',currentReason:outcome.reason,blockerObservedAt:checkpoint.blockerObservedAt});
       // Resume an audited existing human handoff only; never start a new login
