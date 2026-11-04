@@ -17,7 +17,7 @@ function view(model,options,h){
   const eppMarkets=['mx','pe','co','cl'].map(m=>({market:m,count:epp.filter(r=>r.market===m).length})).filter(x=>x.count>0);
   // Operational S2 scope is one approved programme per market. Other known
   // programmes remain visible as inventory, never as a false auth-health failure.
-  const PRIMARY_EPP=Object.freeze({mx:'pymesmx',pe:'pe_membership_vip',co:'alianzas_co',cl:'alianzas'});
+  const PRIMARY_EPP=Object.freeze({mx:'pymesmx',pe:'pe_membership_vip',co:'co_epp_agre',cl:'alianzas'});
   const primaryEpp=model.environment==='S2'?['mx','pe','co','cl'].map(m=>epp.find(r=>r.market===m&&r.program===PRIMARY_EPP[m])).filter(Boolean):epp;
   const inactiveEpp=model.environment==='S2'?epp.filter(r=>!primaryEpp.includes(r)):[];
   const primaryNames=new Set(primaryEpp.map(r=>r.market+':'+r.program));
