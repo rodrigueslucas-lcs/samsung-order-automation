@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { view } = require('../auth-operations/view.cjs');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const escape = value => String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');
 const helpers = {
@@ -72,4 +74,16 @@ test('human action panel appears for primary intervention, not alternative-only 
   const actualPrimaryAction = view(model({ action: true }), {}, helpers);
   assert.match(actualPrimaryAction, /aria-label="Human Action Required"/);
   assert.match(actualPrimaryAction, /Confirm corporate activation/);
+});
+
+test('final CSS preserves a Base Store-first two-tier executive layout without prior competing V4 rules', () => {
+  const css = fs.readFileSync(path.join(__dirname, '../auth-operations/styles.css'), 'utf8');
+  const final = css.slice(css.indexOf('/* V5 final layout:'));
+  assert.match(final, /grid-template-areas:"base actions" "epp epp"/);
+  assert.match(final, /\.epp-primary-grid\{grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
+  assert.match(final, /@media\(max-width:1240px\)/);
+  assert.match(final, /@media\(max-width:820px\)/);
+  assert.match(final, /@media\(max-width:560px\)/);
+  assert.doesNotMatch(css, /\/\* V4: more useful density/);
+  assert.doesNotMatch(css, /\.base-hero-panel\{/);
 });
