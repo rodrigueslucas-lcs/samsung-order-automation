@@ -104,7 +104,7 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
       if(recovery.status!=='REFRESHED') {
         if(recovery.status==='HUMAN_REQUIRED')d.save(config,{...checkpoint,human:true});
         if(recovery.status==='BLOCKED')d.save(config,{...checkpoint,blockedReason:recovery.reason});
-        return finish(recovery.status,recovery.reason);
+        return finish(recovery.status,recovery.reason,{...(recovery.phase?{phase:recovery.phase}:{}),...(recovery.kind?{kind:recovery.kind}:{})});
       }
       outcome=await d.verify(config,d.load(config));
       if(outcome.status!=='HEALTHY')return finish(outcome.status==='BLOCKED'?'BLOCKED':'UNPROVEN',outcome.reason);
