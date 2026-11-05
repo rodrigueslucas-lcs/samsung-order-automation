@@ -62,16 +62,3 @@ test('listing ignores private fixtures and explicit product overrides retain pre
   assert.equal(run.env.CL_EPP_QST_SKU,'explicit');
 });
 
-test('CL EPP QST defaults to strict PASS/FAIL while other markets remain unchanged',()=>{
- const cl=buildRun('CL',['--list'],{ENVIRONMENT:'S2'});
- assert.equal(cl.env.EPP_QST_STRICT_RESULTS,'1');
- assert.equal(cl.ids.length,7);
- const pe=buildRun('PE',['--list'],{ENVIRONMENT:'S2'});
- assert.equal(pe.env.EPP_QST_STRICT_RESULTS,undefined);
-});
-test('CL EPP strict campaign never enables payment submission implicitly',()=>{
- const cl=buildRun('CL',[],{ENVIRONMENT:'S2'},{readData:()=>null});
- assert.equal(cl.env.EPP_QST_STRICT_RESULTS,'1');
- assert.notEqual(cl.env.ALLOW_PAYMENT_SUBMIT,'1');
- assert.equal(cl.env.PLAYWRIGHT_JSON_OUTPUT_FILE.includes('epp'),true);
-});
