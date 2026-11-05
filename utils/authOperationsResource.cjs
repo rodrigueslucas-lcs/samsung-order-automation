@@ -15,8 +15,35 @@ async function repairResourceOrigin({apply=false,env=process.env,resourceAddress
   const path='/userContent/samsung-smb-auth/s2/index.html';
   const response=await request(config.JENKINS_URL+path,{headers,redirect:'manual',signal:AbortSignal.timeout(15000)});
   const location=response.headers.get('location');
-  if(response.status!==302||!location)throw new Error('Jenkins isolated resource redirect was not observed.');
-  const previous=new URL(location).origin;
+  // HTML Publisher reports are not always mirrored to /userContent. If that
+  // diagnostic URL is absent, read the Resource Root setting itself via the
+  // same admin-only Jenkins script console needed to repair it. Read-only
+  // inspection must not change CSP, jobs, credentials or report files.
+  let crumb;
+  const getCrumb=async()=>{
+    if(crumb)return crumb;
+    const reply=await request(config.JENKINS_URL+'/crumbIssuer/api/json',{headers,redirect:'manual'});
+    if(!reply.ok)throw new Error('Jenkins crumb unavailable.');
+    crumb=await reply.json();
+    if(!crumb?.crumbRequestField||!crumb?.crumb)throw new Error('Jenkins crumb unavailable.');
+    return crumb;
+  };
+  const groovy=async script=>{
+    const token=await getCrumb();
+    const reply=await request(config.JENKINS_URL+'/scriptText',{method:'POST',redirect:'manual',headers:{...headers,[token.crumbRequestField]:token.crumb,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({script}).toString()});
+    if(reply.status===403)throw Object.assign(new Error('Resource repair requires Jenkins Overall/Administer and script-console permission.'),{code:'JENKINS_ADMIN_REQUIRED'});
+    if(!reply.ok)throw new Error('Jenkins resource configuration was not acknowledged.');
+    return reply.text();
+  };
+  let previous;
+  if(response.status===302&&location)previous=new URL(location,config.JENKINS_URL).origin;
+  else {
+    const current=await groovy("def c=jenkins.model.Jenkins.get().getExtensionList(jenkins.security.ResourceDomainConfiguration.class)[0]; println('RESOURCE_ORIGIN '+(c.getUrl() ?: ''))");
+    const marker=current.split(/\\r?\\n/).find(line=>line.startsWith('RESOURCE_ORIGIN '));
+    if(!marker)throw new Error('Jenkins resource configuration was not acknowledged.');
+    const url=marker.slice('RESOURCE_ORIGIN '.length).trim();
+    previous=url?new URL(url).origin:null;
+  }
   const api=new URL(config.JENKINS_URL);
   // On a local Jenkins, use a different but stable loopback hostname. A
   // public IPv6 may rotate, whereas localhost and 127.0.0.1 stay local.
@@ -36,14 +63,9 @@ async function repairResourceOrigin({apply=false,env=process.env,resourceAddress
   if(![200,404].includes(reachable.status)||!reachable.headers.get('x-jenkins'))throw new Error('Stable resource hostname did not reach this Jenkins.');
   if(previous===target)return {changed:false,origin:target};
   if(!apply)return {changed:false,needsRepair:true,previous,origin:target};
-  const crumbResponse=await request(config.JENKINS_URL+'/crumbIssuer/api/json',{headers,redirect:'manual'});
-  if(!crumbResponse.ok)throw new Error('Jenkins crumb unavailable.');
-  const crumb=await crumbResponse.json();
   // Change only the resource-domain URL. No CSP, permissions, auth or job change.
   const script="def c=jenkins.model.Jenkins.get().getExtensionList(jenkins.security.ResourceDomainConfiguration.class)[0]; c.setUrl('"+target+"/'); c.save(); println('RESOURCE_ORIGIN_UPDATED')";
-  const result=await request(config.JENKINS_URL+'/scriptText',{method:'POST',redirect:'manual',headers:{...headers,[crumb.crumbRequestField]:crumb.crumb,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({script}).toString()});
-  if(result.status===403)throw Object.assign(new Error('Resource repair requires Jenkins Overall/Administer and script-console permission.'),{code:'JENKINS_ADMIN_REQUIRED'});
-  if(!result.ok||!(await result.text()).includes('RESOURCE_ORIGIN_UPDATED'))throw new Error('Jenkins resource configuration was not acknowledged.');
+  if(!(await groovy(script)).includes('RESOURCE_ORIGIN_UPDATED'))throw new Error('Jenkins resource configuration was not acknowledged.');
   return {changed:true,previous,origin:target};
 }
 module.exports={repairResourceOrigin,stableResourceAddress};
