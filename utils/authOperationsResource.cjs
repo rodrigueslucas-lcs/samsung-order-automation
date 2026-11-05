@@ -39,7 +39,7 @@ async function repairResourceOrigin({apply=false,env=process.env,resourceAddress
   if(response.status===302&&location)previous=new URL(location,config.JENKINS_URL).origin;
   else {
     const current=await groovy("def c=jenkins.model.Jenkins.get().getExtensionList(jenkins.security.ResourceDomainConfiguration.class)[0]; println('RESOURCE_ORIGIN '+(c.getUrl() ?: ''))");
-    const marker=current.split(/\\r?\\n/).find(line=>line.startsWith('RESOURCE_ORIGIN '));
+    const marker=current.split(/\r?\n/).find(line=>line.startsWith('RESOURCE_ORIGIN '));
     if(!marker)throw new Error('Jenkins resource configuration was not acknowledged.');
     const url=marker.slice('RESOURCE_ORIGIN '.length).trim();
     previous=url?new URL(url).origin:null;
