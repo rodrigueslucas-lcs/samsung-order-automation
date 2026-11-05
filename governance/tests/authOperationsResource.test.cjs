@@ -56,3 +56,22 @@ test('HTML Publisher without userContent mirror falls back to admin-only resourc
   assert.match(new URLSearchParams(scripts[0].options.body).get('script'),/c\.getUrl\(/);
   assert.ok(!f.calls.some(c=>new URLSearchParams(c.options.body||'').get('script')?.includes('c.setUrl(')));
 });
+
+test('HTML Publisher missing mirror can repair resource origin after safe admin read',async()=>{
+  const f=fixture({missingMirror:true});
+  const result=await repairResourceOrigin({env,apply:true},f.dependencies);
+  assert.equal(result.changed,true);
+  assert.equal(result.origin,'http://localhost:8080');
+  const scripts=f.calls.filter(c=>c.url.endsWith('/scriptText'));
+  assert.equal(scripts.length,2);
+  assert.match(new URLSearchParams(scripts[0].options.body).get('script'),/c\.getUrl\(/);
+  assert.match(new URLSearchParams(scripts[1].options.body).get('script'),/c\.setUrl\(/);
+  assert.equal(f.calls.filter(c=>c.url.endsWith('/crumbIssuer/api/json')).length,1);
+});
+test('resource CLI defaults to stable loopback without selecting a public IPv6',async()=>{
+ const {main}=require('../../scripts/auth-operations-resource.cjs');
+ let calls=0;
+ const result=await main({argv:[],repair:async options=>{calls++;assert.equal(options.resourceAddress,null);assert.equal(options.apply,false);return {changed:false,origin:'http://localhost:8080'};},log:()=>{},error:()=>assert.fail('default must succeed')});
+ assert.equal(result,0);
+ assert.equal(calls,1);
+});
