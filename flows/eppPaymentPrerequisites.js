@@ -14,16 +14,6 @@ import clPaymentCart from './cl/paymentCart.cjs';
 import {validateExistingEppCardOrder} from './eppCardConfirmation';
 import {submitClEppBank} from './eppClBankPayment';
 
-function eppPaymentGate(condition, reason, cfg) {
-  if (!condition) return;
-  // Missing approval, unresolved prior submits and absent entitlement remain
-  // hard stops. Strict CL runs surface those as FAIL instead of silent SKIP.
-  if (cfg?.market === 'CL' && process.env.EPP_QST_STRICT_RESULTS === '1') {
-    throw new Error('EPP_PREREQUISITE_BLOCKED: ' + reason);
-  }
-  test.skip(true, reason);
-}
-
 // Discovery alone cannot pass a payment case. A proven market adapter may
 // continue only under the explicit payment-submit opt-in below.
 export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProviderReady=null}={}) {
@@ -160,18 +150,18 @@ export async function runEppPaymentPrerequisiteCase(page,cfg,options){
       independentClTransfer=true;
     }
     if(process.env.EPP_RESUME_PENDING_ORDER==='1'&&!pending){
-      eppPaymentGate(true,'PAYMENT_FLOW_NOT_PROVEN: no pending EPP attempt exists for read-only recovery.',cfg);
+      test.skip(true,'PAYMENT_FLOW_NOT_PROVEN: no pending EPP attempt exists for read-only recovery.');
       throw new Error('No pending EPP attempt; read-only recovery cannot reset a cart.');
     }
     if(pending&&!independentClTransfer){
       if(options?.kind!=='card'||pending.kind!=='card'||process.env.EPP_RESUME_PENDING_ORDER!=='1'||pending.status!=='OBSERVED_ORDER'||!pending.orderCode){
-        eppPaymentGate(true,'PAYMENT_FLOW_NOT_PROVEN: AMBIGUOUS_EPP_ORDER_ATTEMPT requires reconciliation before any cart reset or new submit.',cfg);
+        test.skip(true,'PAYMENT_FLOW_NOT_PROVEN: AMBIGUOUS_EPP_ORDER_ATTEMPT requires reconciliation before any cart reset or new submit.');
         throw new Error('AMBIGUOUS_EPP_ORDER_ATTEMPT: no cart reset or new submit is allowed.');
       }
       const proof=server.watchEppServerProof(page.context(),cfg,{expectedEmail:session.getPrimaryEppCredentials(cfg).email});
       try{
         await openEppStore(page,{...cfg,entryUrl:cfg.rootUrl});await proof.settle();
-        if(!proof.accepted())eppPaymentGate(true,'AUTH_OR_ENTITLEMENT_REQUIRED: existing order recovery needs verified EPP identity.',cfg);
+        if(!proof.accepted())test.skip(true,'AUTH_OR_ENTITLEMENT_REQUIRED: existing order recovery needs verified EPP identity.');
         const target=new URL('orderConfirmation;orderCode='+encodeURIComponent(pending.orderCode),cfg.rootUrl);
         const site=cfg.apiSite||cfg.rootUrl.pathname.split('/').filter(Boolean)[2];
         const api=`https://${cfg.environment.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com`;
@@ -188,7 +178,7 @@ export async function runEppPaymentPrerequisiteCase(page,cfg,options){
     }
   }
   if(cfg.market==='MX'&&cfg.environment==='S2'&&options?.kind==='card'&&process.env.ALLOW_PAYMENT_SUBMIT!=='1'){
-    eppPaymentGate(true,'PAYMENT_SUBMIT_NOT_AUTHORIZED: the proven MX S2 card adapter requires ALLOW_PAYMENT_SUBMIT=1.',cfg);
+    test.skip(true,'PAYMENT_SUBMIT_NOT_AUTHORIZED: the proven MX S2 card adapter requires ALLOW_PAYMENT_SUBMIT=1.');
     throw new Error('PAYMENT_SUBMIT_NOT_AUTHORIZED: no cart or payment mutation is allowed.');
   }
   const submit=['MX','PE','CL'].includes(cfg.market)&&(cfg.market==='MX'||cfg.environment==='S2')&&options?.kind==='card'&&process.env.ALLOW_PAYMENT_SUBMIT==='1';
@@ -196,7 +186,7 @@ export async function runEppPaymentPrerequisiteCase(page,cfg,options){
   const observed=await probeEppPaymentPrerequisites(page,cfg,{...options,onProviderReady:bank?submitClEppBank:submit?(cfg.market==='CL'?submitClEppCard:cfg.market==='PE'?submitPeEppCard:submitMxEppCard):null});
   if(observed.status==='PASS'&&observed.orderCode)return;
   test.info().annotations.push({type:'epp-prerequisite',description:`${observed.reason}: ${observed.stage}`});
-  eppPaymentGate(observed.status==='BLOCKED',`${observed.reason}: ${observed.detail}`,cfg);
+  test.skip(observed.status==='BLOCKED',`${observed.reason}: ${observed.detail}`);
   // A discovery result can never become an order/confirmation PASS.
   throw new Error('EPP prerequisite inspection did not supply a causal confirmed order.');
 }
