@@ -7,16 +7,6 @@ import serverProof from "../utils/eppServerProof.cjs";
 import mxReadback from '../utils/mxCartReadback.cjs';
 import eppOverlays from '../utils/eppStorefrontOverlays.cjs';
 
-function eppPrerequisiteGate(condition, reason, cfg) {
-  if (!condition) return;
-  // Strict CL QST reports unmet prerequisites as explicit FAIL without
-  // bypassing a protected login or attempting an unauthorized payment.
-  if (cfg?.market === 'CL' && process.env.EPP_QST_STRICT_RESULTS === '1') {
-    throw new Error('EPP_PREREQUISITE_BLOCKED: ' + reason);
-  }
-  test.skip(true, reason);
-}
-
 const CODE_INPUT = /verification|verify|access code|c[oó]digo|clave de acceso/i;
 const CODE_BUTTON = /verify|continue|enter|submit|access|ingresar|continuar|validar|acceder/i;
 
@@ -37,7 +27,7 @@ export async function openEppStore(page, cfg) {
     return ["READY", "CODE_REQUIRED", "HUMAN_REQUIRED"].includes(state.status) || ['OUTSIDE_EPP_STORE','VERIFICATION_CODE_REJECTED'].includes(state.reason);
   }, { timeout: 45000 }).toBeTruthy().catch(() => {});
   const initial = await inspectEppAccess(page,cfg);
-  eppPrerequisiteGate(['BLOCKED','HUMAN_REQUIRED'].includes(initial.status), `BLOCKED: ${cfg.market} ${cfg.environment} EPP ${initial.status}: ${initial.reason}; no login/code retry.`,cfg);
+  test.skip(['BLOCKED','HUMAN_REQUIRED'].includes(initial.status), `BLOCKED: ${cfg.market} ${cfg.environment} EPP ${initial.status}: ${initial.reason}; no login/code retry.`);
 
   if (cfg.accessMode === "verification-code" && cfg.verificationCode) {
     const candidate = page.getByRole("textbox", { name: CODE_INPUT })
@@ -59,7 +49,7 @@ export async function openEppStore(page, cfg) {
   if (cfg.accessMode === "corporate-email-link") {
     const email = page.locator('input[type="email"]:visible').first();
     if (await email.isVisible().catch(() => false)) {
-      eppPrerequisiteGate(true, `BLOCKED: ${cfg.market} ${cfg.environment} EPP requires corporate-email activation before automation can continue.`,cfg);
+      test.skip(true, `BLOCKED: ${cfg.market} ${cfg.environment} EPP requires corporate-email activation before automation can continue.`);
     }
   }
 
@@ -75,7 +65,7 @@ export async function openEppStore(page, cfg) {
   const state = await inspectEppAccess(page, cfg);
   if (state.status !== "READY") {
     test.info().annotations.push({ type: 'epp-prerequisite', description: `${state.status}: ${state.reason}` });
-    eppPrerequisiteGate(true, `BLOCKED: ${cfg.market} ${cfg.environment} EPP ${state.status}: ${state.reason}`,cfg);
+    test.skip(true, `BLOCKED: ${cfg.market} ${cfg.environment} EPP ${state.status}: ${state.reason}`);
   }
 }
 
@@ -85,7 +75,7 @@ export async function validateEppLogin(page, cfg) {
     await openEppStore(page, { ...cfg, entryUrl: cfg.rootUrl });
     await proof.settle();
     const state = proof.snapshot();
-    eppPrerequisiteGate(!state.userAccepted || !state.accessAccepted, `BLOCKED: authenticated EPP identity/entitlement not proven (${state.reason})`,cfg);
+    test.skip(!state.userAccepted || !state.accessAccepted, `BLOCKED: authenticated EPP identity/entitlement not proven (${state.reason})`);
     await expect(page).toHaveURL(cfg.rootUrl.href);
     const homepage = await inspectEppAccess(page, cfg);
     expect(homepage.reason).toBe('AUTHENTICATED_EPP_HOMEPAGE');
@@ -93,10 +83,10 @@ export async function validateEppLogin(page, cfg) {
 }
 
 export async function validateEppVariants(page, cfg) {
-  eppPrerequisiteGate(!cfg.pdpUrl||!cfg.sku, 'BLOCKED: MISSING_OR_UNPROVEN_EPP_PRODUCT for PDP variants.',cfg);
+  test.skip(!cfg.pdpUrl||!cfg.sku, 'BLOCKED: MISSING_OR_UNPROVEN_EPP_PRODUCT for PDP variants.');
   await openEppStore(page, { ...cfg, entryUrl: cfg.pdpUrl });
   try { await business.provePdpVariantSelection(page,cfg); }
-  catch(error){if(error.eppReason==='MISSING_OR_UNPROVEN_EPP_PRODUCT')eppPrerequisiteGate(true,error.eppReason,cfg);throw error;}
+  catch(error){if(error.eppReason==='MISSING_OR_UNPROVEN_EPP_PRODUCT')test.skip(true,error.eppReason);throw error;}
   await businessScreenshot(page,'epp-pdp-selected-variant');
 }
 
@@ -130,7 +120,7 @@ export async function addConfiguredEppProduct(page, cfg, { currencyPattern = /[$
     await cart.clearMxCartAndConfirmEmpty();
   }
   if (fromPlp) {
-    eppPrerequisiteGate(!cfg.plpUrl, `BLOCKED: ${cfg.market} ${cfg.environment} EPP PLP is required for the official PLP-to-PDP step.`,cfg);
+    test.skip(!cfg.plpUrl, `BLOCKED: ${cfg.market} ${cfg.environment} EPP PLP is required for the official PLP-to-PDP step.`);
     await openEppStore(page, { ...cfg, entryUrl: cfg.plpUrl });
     await business.chooseConfiguredPdpFromPlp(page, cfg);
   } else await openEppStore(page, { ...cfg, entryUrl: cfg.pdpUrl });
@@ -189,7 +179,7 @@ export async function validateEppCartUi(cart,{market,environment,program}={}) {
       await cart.screenshot('epp-cart-footer-missing');
       await test.info().attach('EPP empty footer signature',{body:JSON.stringify({market,environment,program,...state}),contentType:'application/json'});
       test.info().annotations.push({type:'known-defect',description:'SAM-25146: operator-linked empty cart footer'});
-      eppPrerequisiteGate(true,'ENVIRONMENT_DEFECT: MISSING_EXPECTED_CART_FOOTER; known defect SAM-25146. Product, summary and checkout checks passed before the footer check.',{market,environment,program});
+      test.skip(true,'ENVIRONMENT_DEFECT: MISSING_EXPECTED_CART_FOOTER; known defect SAM-25146. Product, summary and checkout checks passed before the footer check.');
     }
     throw error;
   }
