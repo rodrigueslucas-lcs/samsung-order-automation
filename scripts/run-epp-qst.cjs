@@ -25,7 +25,7 @@ function buildRun(market, args = [], sourceEnv = process.env, {readData = requir
   if (args.some(arg => arg !== "--list")) throw new Error("Unsupported EPP runner argument.");
   const runId = `${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}`;
   const output = path.resolve(__dirname, "..", "test-results", "epp", code.toLowerCase(), config.environment.toLowerCase(), runId);
-  const env = { ...sourceEnv, TEST_MARKET: code, TEST_STORE: "EPP", TEST_SUITE: "QST", ENVIRONMENT: config.environment,
+  const env = { ...sourceEnv, ...(code === "CL" ? { EPP_QST_STRICT_RESULTS: "1" } : {}), TEST_MARKET: code, TEST_STORE: "EPP", TEST_SUITE: "QST", ENVIRONMENT: config.environment,
     EPP_OUTPUT_DIR: path.join(output, "playwright"), PLAYWRIGHT_HTML_OUTPUT_DIR: path.join(output, "html"),
     PLAYWRIGHT_JSON_OUTPUT_FILE: path.join(output, "results.json"), ALLURE_RESULTS_DIR: path.join(output, "allure"), SMB_EVIDENCE_DIR: path.join(output, "evidence") };
   for (const other of ["MX", "PE", "CO", "CL"]) if (other !== code) delete env[`${other}_QST_TARGET_IDS`];
