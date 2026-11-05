@@ -14,6 +14,14 @@ import clPaymentCart from './cl/paymentCart.cjs';
 import {validateExistingEppCardOrder} from './eppCardConfirmation';
 import {submitClEppBank} from './eppClBankPayment';
 
+function enforceEppPayment(condition, reason, cfg) {
+  if (!condition) return;
+  // A CL S2 QST precondition is a reported failure, not a silent skip.
+  // Never retry ambiguous submissions or bypass identity/provider checks.
+  if (cfg?.market === 'CL' && cfg.environment === 'S2') throw new Error(reason);
+  test.skip(true, reason);
+}
+
 // Discovery alone cannot pass a payment case. A proven market adapter may
 // continue only under the explicit payment-submit opt-in below.
 export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProviderReady=null}={}) {
@@ -150,18 +158,18 @@ export async function runEppPaymentPrerequisiteCase(page,cfg,options){
       independentClTransfer=true;
     }
     if(process.env.EPP_RESUME_PENDING_ORDER==='1'&&!pending){
-      test.skip(true,'PAYMENT_FLOW_NOT_PROVEN: no pending EPP attempt exists for read-only recovery.');
+      enforceEppPayment(true,'PAYMENT_FLOW_NOT_PROVEN: no pending EPP attempt exists for read-only recovery.',cfg);
       throw new Error('No pending EPP attempt; read-only recovery cannot reset a cart.');
     }
     if(pending&&!independentClTransfer){
       if(options?.kind!=='card'||pending.kind!=='card'||process.env.EPP_RESUME_PENDING_ORDER!=='1'||pending.status!=='OBSERVED_ORDER'||!pending.orderCode){
-        test.skip(true,'PAYMENT_FLOW_NOT_PROVEN: AMBIGUOUS_EPP_ORDER_ATTEMPT requires reconciliation before any cart reset or new submit.');
+        enforceEppPayment(true,'PAYMENT_FLOW_NOT_PROVEN: AMBIGUOUS_EPP_ORDER_ATTEMPT requires reconciliation before any cart reset or new submit.',cfg);
         throw new Error('AMBIGUOUS_EPP_ORDER_ATTEMPT: no cart reset or new submit is allowed.');
       }
       const proof=server.watchEppServerProof(page.context(),cfg,{expectedEmail:session.getPrimaryEppCredentials(cfg).email});
       try{
         await openEppStore(page,{...cfg,entryUrl:cfg.rootUrl});await proof.settle();
-        if(!proof.accepted())test.skip(true,'AUTH_OR_ENTITLEMENT_REQUIRED: existing order recovery needs verified EPP identity.');
+        if(!proof.accepted())enforceEppPayment(true,'AUTH_OR_ENTITLEMENT_REQUIRED: existing order recovery needs verified EPP identity.',cfg);
         const target=new URL('orderConfirmation;orderCode='+encodeURIComponent(pending.orderCode),cfg.rootUrl);
         const site=cfg.apiSite||cfg.rootUrl.pathname.split('/').filter(Boolean)[2];
         const api=`https://${cfg.environment.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com`;
@@ -178,7 +186,7 @@ export async function runEppPaymentPrerequisiteCase(page,cfg,options){
     }
   }
   if(cfg.market==='MX'&&cfg.environment==='S2'&&options?.kind==='card'&&process.env.ALLOW_PAYMENT_SUBMIT!=='1'){
-    test.skip(true,'PAYMENT_SUBMIT_NOT_AUTHORIZED: the proven MX S2 card adapter requires ALLOW_PAYMENT_SUBMIT=1.');
+    enforceEppPayment(true,'PAYMENT_SUBMIT_NOT_AUTHORIZED: the proven MX S2 card adapter requires ALLOW_PAYMENT_SUBMIT=1.',cfg);
     throw new Error('PAYMENT_SUBMIT_NOT_AUTHORIZED: no cart or payment mutation is allowed.');
   }
   const submit=['MX','PE','CL'].includes(cfg.market)&&(cfg.market==='MX'||cfg.environment==='S2')&&options?.kind==='card'&&process.env.ALLOW_PAYMENT_SUBMIT==='1';
@@ -186,7 +194,7 @@ export async function runEppPaymentPrerequisiteCase(page,cfg,options){
   const observed=await probeEppPaymentPrerequisites(page,cfg,{...options,onProviderReady:bank?submitClEppBank:submit?(cfg.market==='CL'?submitClEppCard:cfg.market==='PE'?submitPeEppCard:submitMxEppCard):null});
   if(observed.status==='PASS'&&observed.orderCode)return;
   test.info().annotations.push({type:'epp-prerequisite',description:`${observed.reason}: ${observed.stage}`});
-  test.skip(observed.status==='BLOCKED',`${observed.reason}: ${observed.detail}`);
+  enforceEppPayment(observed.status==='BLOCKED',`${observed.reason}: ${observed.detail}`,cfg);
   // A discovery result can never become an order/confirmation PASS.
   throw new Error('EPP prerequisite inspection did not supply a causal confirmed order.');
 }
