@@ -13,3 +13,22 @@ test('repair changes only resource URL, preserving CSP/auth/jobs',async()=>{cons
 test('nonlocal resolution is rejected before a configuration write',async()=>{const f=fixture({alien:true});await assert.rejects(repairResourceOrigin({env,apply:true},f.dependencies),/this machine/);assert.ok(!f.calls.some(c=>c.options.method==='POST'));});
 test('missing admin permission is explicit; no weaker workaround',async()=>{const f=fixture({denied:true});await assert.rejects(repairResourceOrigin({env,apply:true},f.dependencies),e=>e.code==='JENKINS_ADMIN_REQUIRED');});
 test('already stable origin is idempotent',async()=>{const f=fixture({current:true});assert.equal((await repairResourceOrigin({env,apply:true},f.dependencies)).changed,false);assert.equal(f.calls.length,1);});
+
+test('resource CLI exposes a safe stage when local IPv6 selection fails',async()=>{
+ const {main}=require('../../scripts/auth-operations-resource.cjs');
+ const outputs=[];
+ let repairCalled=false;
+ const status=await main({argv:['--apply'],select:()=>{const e=new Error('PowerShell command failed with private diagnostics');e.status=2;throw e;},repair:async()=>{repairCalled=true;},error:s=>outputs.push(s),log:()=>{}});
+ assert.equal(status,1);
+ assert.equal(repairCalled,false);
+ assert.match(outputs[0],/SELECT_LOCAL_IP · LOCAL_IPV6_NOT_AVAILABLE/);
+ assert.doesNotMatch(outputs[0],/private diagnostics/);
+});
+test('resource CLI reports only whitelisted Jenkins failure codes',async()=>{
+ const {main}=require('../../scripts/auth-operations-resource.cjs');
+ const errors=[];
+ const status=await main({argv:['--apply'],select:()=> '2001:db8::2',repair:async()=>{throw new Error('Resource and credential-bearing Jenkins origins must stay distinct. token=sensitive');},error:s=>errors.push(s),log:()=>{}});
+ assert.equal(status,1);
+ assert.match(errors[0],/CHECK_JENKINS_RESOURCE · RESOURCE_ORIGIN_NOT_ISOLATED/);
+ assert.doesNotMatch(errors[0],/sensitive/);
+});
