@@ -7,7 +7,7 @@ const { getEppConfig } = eppConfigModule;
 const cfg = () => getEppConfig("CL");
 
 function requireProductConfig(current) {
-  test.skip(!current.pdpUrl || !current.sku, "CL EPP access is configured from the official data; CL_EPP_QST_PDP_URL and CL_EPP_QST_SKU are still required for product/cart execution because no CL EPP SKU was supplied.");
+  if (!current.pdpUrl || !current.sku) throw new Error("CL EPP product fixture unavailable in this run: check the existing ignored runtime-data.json or CL_EPP_QST_PDP_URL/CL_EPP_QST_SKU. No SKIP.");
 }
 
 test.describe("CL QST - EPP Official P1", () => {
