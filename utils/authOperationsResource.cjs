@@ -17,17 +17,24 @@ async function repairResourceOrigin({apply=false,env=process.env,resourceAddress
   const location=response.headers.get('location');
   if(response.status!==302||!location)throw new Error('Jenkins isolated resource redirect was not observed.');
   const previous=new URL(location).origin;
+  const api=new URL(config.JENKINS_URL);
+  // On a local Jenkins, use a different but stable loopback hostname. A
+  // public IPv6 may rotate, whereas localhost and 127.0.0.1 stay local.
+  const loopbackPeer=api.hostname==='localhost'?'127.0.0.1':api.hostname==='127.0.0.1'?'localhost':null;
   const name=(hostname()+'.local').toLowerCase();
   if(!/^[a-zA-Z0-9-]+\.local$/.test(name))throw new Error('Invalid machine DNS name.');
   const local=new Set(Object.values(interfaces()).flat().filter(Boolean).map(a=>a.address.split('%')[0].toLowerCase()));
   if(resourceAddress){if(!/^[a-fA-F0-9:]+$/.test(resourceAddress)||!local.has(resourceAddress.toLowerCase()))throw new Error('Resource address is not assigned to this machine.');}
-  else {const answers=await lookup(name,{all:true});if(!answers.length||answers.some(a=>!local.has(a.address.split('%')[0].toLowerCase())))throw new Error('Resource hostname does not resolve exclusively to this machine.');}
-  const api=new URL(config.JENKINS_URL);
-  const target=api.protocol+'//'+(resourceAddress?'['+resourceAddress+']':name)+(api.port?':'+api.port:'');
+  else if(!loopbackPeer){const answers=await lookup(name,{all:true});if(!answers.length||answers.some(a=>!local.has(a.address.split('%')[0].toLowerCase())))throw new Error('Resource hostname does not resolve exclusively to this machine.');}
+  const resourceHost=resourceAddress?'['+resourceAddress+']':loopbackPeer||name;
+  const target=api.protocol+'//'+resourceHost+(api.port?':'+api.port:'');
   if(target===api.origin)throw new Error('Resource and credential-bearing Jenkins origins must stay distinct.');
-  if(previous===target)return {changed:false,origin:target};
+  // Jenkins's Resource Root intentionally serves ONLY static files. After
+  // configuration, /login normally returns 404 on that host. Before the
+  // switch, the same host may return 200, so accept either with Jenkins proof.
   const reachable=await request(target+'/login',{redirect:'manual',signal:AbortSignal.timeout(10000)});
-  if(!reachable.ok||!reachable.headers.get('x-jenkins'))throw new Error('Stable resource hostname did not reach this Jenkins.');
+  if(![200,404].includes(reachable.status)||!reachable.headers.get('x-jenkins'))throw new Error('Stable resource hostname did not reach this Jenkins.');
+  if(previous===target)return {changed:false,origin:target};
   if(!apply)return {changed:false,needsRepair:true,previous,origin:target};
   const crumbResponse=await request(config.JENKINS_URL+'/crumbIssuer/api/json',{headers,redirect:'manual'});
   if(!crumbResponse.ok)throw new Error('Jenkins crumb unavailable.');
