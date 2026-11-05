@@ -27,9 +27,11 @@ function safeFailure(error,phase){
   return phase==='SELECT_LOCAL_IP'?'LOCAL_IP_SELECTION_UNPROVEN':'JENKINS_RESOURCE_REPAIR_UNPROVEN';
 }
 
-async function main({argv=process.argv.slice(2),select=stableResourceAddress,repair=repairResourceOrigin,log=console.log,error=console.error}={}){
+async function main({argv=process.argv.slice(2),select=()=>null,repair=repairResourceOrigin,log=console.log,error=console.error}={}){
   if(argv.some(a=>a!=='--apply'))throw new Error('Unsupported resource-repair option.');
   let resourceAddress;
+  // Stable localhost <-> 127.0.0.1 isolation is the default. The selector
+  // remains injectable for explicit diagnostics, never needed for normal use.
   try{resourceAddress=select();}
   catch(e){error('[auth:operations:resource] SELECT_LOCAL_IP · '+safeFailure(e,'SELECT_LOCAL_IP'));return 1;}
   try{
