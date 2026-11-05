@@ -48,8 +48,8 @@ async function repairResourceOrigin({apply=false,env=process.env,resourceAddress
   // On a local Jenkins, use a different but stable loopback hostname. A
   // public IPv6 may rotate, whereas localhost and 127.0.0.1 stay local.
   const loopbackPeer=api.hostname==='localhost'?'127.0.0.1':api.hostname==='127.0.0.1'?'localhost':null;
-  const name=(hostname()+'.local').toLowerCase();
-  if(!/^[a-zA-Z0-9-]+\.local$/.test(name))throw new Error('Invalid machine DNS name.');
+  const name=loopbackPeer||resourceAddress?null:(hostname()+'.local').toLowerCase();
+  if(name&&!/^[a-zA-Z0-9-]+\.local$/.test(name))throw new Error('Invalid machine DNS name.');
   const local=new Set(Object.values(interfaces()).flat().filter(Boolean).map(a=>a.address.split('%')[0].toLowerCase()));
   if(resourceAddress){if(!/^[a-fA-F0-9:]+$/.test(resourceAddress)||!local.has(resourceAddress.toLowerCase()))throw new Error('Resource address is not assigned to this machine.');}
   else if(!loopbackPeer){const answers=await lookup(name,{all:true});if(!answers.length||answers.some(a=>!local.has(a.address.split('%')[0].toLowerCase())))throw new Error('Resource hostname does not resolve exclusively to this machine.');}
