@@ -156,7 +156,8 @@ async function refreshAll({ markets, environment, slot, env = process.env } = {}
   for (const result of settled) {
     const icon = result.status === 'READY' ? 'READY' : result.status === 'HUMAN_REQUIRED' ? 'HUMAN' : result.status === 'BUSY' ? 'BUSY' : 'FAIL';
     const seconds = Math.max(0, Math.round(result.elapsedMs / 1000));
-    log(` ${result.market.toUpperCase().padEnd(2)}  ${icon.padEnd(5)} · ${seconds}s${result.error ? ` · ${result.error}` : ''}`);
+    const reason=require('./authVerificationResult.cjs').VERIFICATION_ISSUES.includes(result.reason)?result.reason:null;
+    log(` ${result.market.toUpperCase().padEnd(2)}  ${icon.padEnd(5)} · ${seconds}s${reason?' · '+reason:''}${result.error ? ` · ${result.error}` : ''}`);
   }
   const ready = settled.filter((result) => result.status === 'READY').length;
   const human = settled.filter((result) => result.status === 'HUMAN_REQUIRED').length;

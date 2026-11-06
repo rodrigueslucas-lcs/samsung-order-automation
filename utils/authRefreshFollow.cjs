@@ -1,6 +1,7 @@
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const {leaseDirectory}=require('./authMarketLease.cjs');
 const {dataDirectory,cleanCycle}=require('./authOperationsStore.cjs');
+const {VERIFICATION_ISSUES}=require('./authVerificationResult.cjs');
 
 // Follow only a running cycle correlated with a live, local market lease.
 // This observer never takes a lease, opens a browser or restarts a login.
@@ -34,7 +35,9 @@ async function followActiveRecovery(market,environment,slot,env=process.env,{fin
   const primaryPending=slot==='second'&&cycle.identities.some(i=>i.slot==='primary'&&(i.status==='HUMAN_REQUIRED'||i.status==='REFRESHING'||i.status==='NEEDS_REFRESH'));
   const phase=primaryPending?'WAITING_FIRST':identity?.status||'WAITING_EXISTING_CYCLE';
   human=phase==='HUMAN_REQUIRED'||primaryPending&&cycle.identities.some(i=>i.slot==='primary'&&i.status==='HUMAN_REQUIRED');
-  if(phase!==last){last=phase;log(`[${market.toUpperCase()}] ${slot.toUpperCase()} ${phase}${phase==='WAITING_FIRST'?' · complete the existing FIRST windows; SECOND remains queued.':phase==='HUMAN_REQUIRED'?' · complete the existing dedicated window.':''}`);}
+  const reason=VERIFICATION_ISSUES.includes(identity?.reason)?identity.reason:null;
+  if(phase!==last){last=phase;log(`[${market.toUpperCase()}] ${slot.toUpperCase()} ${phase}${reason?' · '+reason:''}${phase==='WAITING_FIRST'?' · complete the existing FIRST windows; SECOND remains queued.':phase==='HUMAN_REQUIRED'?' · complete the existing dedicated window.':''}`);}
+  if(['FAILED','UNPROVEN','TRANSIENT_ERROR'].includes(identity?.status)&&!primaryPending)return{market,environment,slot,status:'FAILED',code:1,signal:null,elapsedMs:now()-started,followedExisting:true,...(reason?{reason}:{})};
   const bundle=cycle.finalized.find(b=>b.market===market);
   if(['HEALTHY','RECOVERED'].includes(identity?.status)&&bundle?.status==='READY'&&(env.JENKINS_AUTH_PUBLISH!=='1'||bundle.synchronized===true))return{market,environment,slot,status:'READY',code:0,signal:null,elapsedMs:now()-started,followedExisting:true};
   if(cycle.state!=='RUNNING')return{market,environment,slot,status:human?'HUMAN_REQUIRED':'FAILED',code:human?2:1,signal:null,elapsedMs:now()-started,followedExisting:true};

@@ -96,7 +96,8 @@ async function recoverIdentity({ market, environment, slot, env = process.env },
   const onOutput = chunk => { if (!informed && /CAPTCHA\/MFA requires human completion|manual mode|Complete login\/CAPTCHA|Complete Samsung Account login\/CAPTCHA/.test(chunk)) { informed = true; log(`[keepalive:${market}] ${slot}: complete human verification in the dedicated Chrome window.`); try { onEvent({ market, slot, status:'HUMAN_REQUIRED' }); } catch {} } };
   const result = await runScript(`scripts/auth-refresh-${market}.cjs`, runtimeEnv, { timeoutMs: 900000, stdout: onOutput, stderr: onOutput });
   const status = result.code === 0 && !result.timedOut && !result.signal ? 'RECOVERED' : result.code === 2 ? 'HUMAN_REQUIRED' : result.code === 3 ? 'BUSY' : 'FAILED';
-  return { market, environment, slot, status, code: result.code, ...(status==='HUMAN_REQUIRED'||(informed&&status!=='RECOVERED')?{humanPending:true,passwordAttempted:result.handoff?.passwordAttempted??true,emailPhase:result.handoff?.emailPhase||'NONE'}:{}) };
+  const reason=VERIFICATION_ISSUES.includes(result.diagnostic)?result.diagnostic:result.diagnostic==='TimeoutError'?'VERIFICATION_TIMEOUT':null;
+  return { market, environment, slot, status, code: result.code, ...(reason?{reason}:{}), ...(status==='HUMAN_REQUIRED'||(informed&&status!=='RECOVERED')?{humanPending:true,passwordAttempted:result.handoff?.passwordAttempted??true,emailPhase:result.handoff?.emailPhase||'NONE'}:{}) };
 }
 async function resumeIdentity({market,environment,slot,env=process.env,passwordAttempted=true,emailPhase='NONE'},{runScript=runNodeScript,verify=verifyIdentity,captureBrowser=require('./authBrowserLifecycle.cjs').captureAuthBrowser,browserClosed=require('./authBrowserLifecycle.cjs').authBrowserClosed,acquire=acquireRefreshLock}={}) {
   let release,owned,keep=false,childInvoked=false;

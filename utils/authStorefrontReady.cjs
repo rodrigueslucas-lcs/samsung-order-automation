@@ -97,7 +97,21 @@ async function prepareAuthStorefront(page, {
       const url = new URL(target);
       if (attempt) url.searchParams.set('_qa_auth_reload', String(Date.now()));
       report(`${label}${attempt ? ' · recovering a blank document once' : ''}`);
-      const response = await navigate(page, url.href, { waitUntil: 'commit', timeout: 30000 });
+      let response;
+      try { response = await navigate(page, url.href, { waitUntil: 'commit', timeout: 30000 }); }
+      catch(error) {
+        // A slow commit can time out after the requested document became
+        // current. Inspect that same document's marker; do not replay login.
+        const landed=current();
+        if(error.name!=='TimeoutError'||page.isClosed())throw error;
+        if(landed.origin!==url.origin||landed.pathname!==url.pathname){
+          if(attempt)throw error;
+          await healthCheck(page.context().request,{market:market.toUpperCase(),environment:home.hostname.startsWith('stg2.')?'S2':'S1'});
+          report(`${label} · staging API reachable; retrying only the timed-out storefront GET once`);
+          continue;
+        }
+        report(`${label} · navigation timed out; checking the current document before any retry`);
+      }
       if (current().origin !== home.origin) throw new Error(`${market.toUpperCase()} ${label} left the expected staging origin.`);
       if (response && !response.ok()) throw new Error(`${market.toUpperCase()} ${label} returned HTTP ${response.status()}; login was not submitted.`);
       try {

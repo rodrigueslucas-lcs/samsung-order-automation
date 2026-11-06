@@ -181,3 +181,7 @@ for (const signedIn of [false, true]) test(`header menu trigger sharing login an
     }
   } finally { await s.close(); }
 });
+
+test('late same-document navigation timeout still proves bootstrap/home without replay',async()=>{const s=await fixture('co','S2');try{let calls=0;const navigate=s.options.navigate;await prepareAuthStorefront(s.page,{...s.options,navigate:async(...args)=>{await navigate(...args);calls++;throw Object.assign(new Error('synthetic late commit'),{name:'TimeoutError'});}});assert.equal(calls,2);assert.deepEqual(s.counts(),{setups:1,homes:1});}finally{await s.close();}});
+
+test('precommit timeout retries only the safe staging GET once after health check',async()=>{const s=await fixture('co','S2');try{const navigate=s.options.navigate;let calls=0,health=0;await prepareAuthStorefront(s.page,{...s.options,healthCheck:async()=>health++,navigate:async(...args)=>{if(++calls===1)throw Object.assign(new Error('synthetic no commit'),{name:'TimeoutError'});return navigate(...args);}});assert.equal(health,1);assert.equal(calls,3);assert.deepEqual(s.counts(),{setups:1,homes:1});}finally{await s.close();}});

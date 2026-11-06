@@ -57,6 +57,7 @@ function writeSummary(summary) {
       signal: result.signal,
       elapsedMs: result.elapsedMs,
       error: result.error || null,
+      ...(require('../utils/authVerificationResult.cjs').VERIFICATION_ISSUES.includes(result.reason)?{reason:result.reason}:{}),
     })),
   };
   fs.writeFileSync(output, `${JSON.stringify(payload, null, 2)}\n`);
