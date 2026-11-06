@@ -9,6 +9,16 @@ export function classifyClEppAddressState({newChecked,streetFields,visibleStreet
   return null;
 }
 
+export async function selectClEppReceipt(shipping){
+  const receipt=shipping.getByRole('checkbox',{name:/^Boleta$/i});
+  await expect(receipt).toBeVisible();
+  if(!await receipt.isChecked())await receipt.check();
+  await expect(receipt).toBeChecked();
+  for(const name of ['companyId','companyName','commercializeTxt']){
+    await expect(shipping.locator(`input[name="${name}"]:visible`)).toHaveCount(0);
+  }
+}
+
 export async function completeClEppCheckout(page,cfg,capture=async()=>{}){
   if(cfg.market!=='CL')throw new Error('CL EPP checkout cannot target another market.');
   assertions.assertStoreRoute(page.url(),cfg,/^checkout\//);
@@ -27,6 +37,7 @@ export async function completeClEppCheckout(page,cfg,capture=async()=>{}){
   }
   const selectedSaved=shipping.getByRole('radio',{name:approvedCommune,checked:true});
   if(await selectedSaved.waitFor({state:'visible',timeout:10000}).then(()=>true,()=>false)){
+    await selectClEppReceipt(shipping);
     await continueClRegisteredDeliveryToPayment(page,{diagnose:true,storefront:cfg});
     assertions.assertStoreRoute(page.url(),cfg,/^checkout\//);
     return null;
@@ -55,6 +66,7 @@ export async function completeClEppCheckout(page,cfg,capture=async()=>{}){
   await shipping.locator('input[name="line1"]:visible').first().fill(address.number);
   const save=shipping.locator('input[name="saveInAddressBook"]:visible').first();
   if(await save.count()){if(await save.isChecked())await save.uncheck({force:true});await expect(save).not.toBeChecked();}
+  await selectClEppReceipt(shipping);
   await continueClRegisteredDeliveryToPayment(page,{addressReady:true,diagnose:true,storefront:cfg});
   assertions.assertStoreRoute(page.url(),cfg,/^checkout\//);
   return null;

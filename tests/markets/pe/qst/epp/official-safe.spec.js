@@ -1,4 +1,5 @@
 import { test, expect } from "../../../../../utils/eppTestFixtures";
+import business from '../../../../../utils/eppBusinessAssertions.cjs';
 import eppConfigModule from "../../../../../config/markets/epp";
 import {runEppPaymentPrerequisiteCase} from '../../../../../flows/eppPaymentPrerequisites';
 import { addConfiguredEppProduct, validateEppLogin, validateEppCheckout, validateEppContact, openEppStore, validateEppCartUi } from "../../../../../flows/eppStorefront";
@@ -44,7 +45,8 @@ test.describe("PE QST - Official EPP", () => {
       const current = cfg();
       requireProductConfig(current);
       const cart = await addConfiguredEppProduct(page, current, { currencyPattern: /S\/\s*[\d,.]+/ });
-      test.skip(await page.getByRole('button',{name:/^Samsung Checkout Express$/i}).isVisible()&&await page.getByRole('button',{name:/^Checkout como invitado$/i}).isVisible(),
+      const registered=current.environment==='S2'?await business.waitForPeRegisteredCheckout(page,cart.continueButton):!(await page.getByRole('button',{name:/^Samsung Checkout Express$/i}).isVisible()&&await page.getByRole('button',{name:/^Checkout como invitado$/i}).isVisible());
+      test.skip(!registered,
         'BLOCKED: AUTH_OR_ENTITLEMENT_REQUIRED — PE EPP cart offers login/guest checkout; registered checkout cannot use a guest substitute.');
       await cart.validateCheckoutButton();
       await cart.proceedToAuthenticatedCheckout();
@@ -53,7 +55,7 @@ test.describe("PE QST - Official EPP", () => {
   });
 
   test("SAM-25138 @destructive @qst @pe @epp @registered - Payment using credit card with reg user", async ({page}, testInfo) => {
-    await test.step("Complete PE EPP card checkout or reconcile the existing causal order", async () => {
+    await test.step("Create a new PE EPP card order and validate its causal confirmation", async () => {
       await runEppPaymentPrerequisiteCase(page,cfg(),{kind:'card'});
     });
   });

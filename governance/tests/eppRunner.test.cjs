@@ -86,3 +86,11 @@ test('CL S2 strict checkout gates do not enable payments by default',()=>{
  const defaultRun=buildRun('CL',[],{CL_QST_ENVIRONMENT:'S2'},{readData:()=>null});
  assert.notEqual(defaultRun.env.ALLOW_PAYMENT_SUBMIT,'1');
 });
+
+test('runtime BUSY is explicit and does not expose sensitive exception details',()=>{
+ const {classifyRunFailure}=require('../../scripts/run-epp-qst.cjs');
+ assert.equal(classifyRunFailure({code:'AUTH_BUSY',message:'private token fixture'}).exitCode,73);
+ assert.match(classifyRunFailure({code:'AUTH_BUSY'}).message,/BUSY/);
+ assert.equal(classifyRunFailure({message:'private token fixture'}).exitCode,1);
+ assert.ok(!JSON.stringify(classifyRunFailure({code:'AUTH_BUSY',message:'private token fixture'})).includes('private'));
+});

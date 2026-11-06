@@ -10,9 +10,9 @@ function fixture({headings=0,links=0,productFailure=false}={}){
  const cart={sku:'QA',currencyPattern:/\$/,page:{locator:()=>node,getByRole:()=>footer},validateCartPage:async()=>calls.push('cart'),validateProductInCart:async()=>calls.push('product'),validateOrderSummary:async()=>calls.push('summary'),validateCheckoutButton:async()=>calls.push('checkout'),screenshot:async()=>calls.push('screenshot')};
  return{calls,annotations,run:cfg=>run(cart,cfg)};
 }
-test('only the observed empty CL S2 alianzas footer is quarantined after all cart business checks',async()=>{
- const f=fixture();await assert.rejects(f.run({market:'CL',environment:'S2',program:'alianzas'}),/known-footer/);
- assert.deepEqual(f.calls,['cart','product','summary','checkout','screenshot','signature','quarantine']);
+test('observed empty CL S2 footer retains its explicit failure and known defect evidence',async()=>{
+ const f=fixture();await assert.rejects(f.run({market:'CL',environment:'S2',program:'alianzas'}),/MISSING_EXPECTED_CART_FOOTER/);
+ assert.deepEqual(f.calls,['cart','product','summary','checkout','screenshot','signature']);
  assert.equal(f.annotations[0].type,'known-defect');assert.match(f.annotations[0].description,/SAM-25146/);
 });
 test('PE empty footer is quarantined only for the reproduced S2 VIP programme',async()=>{
@@ -27,3 +27,5 @@ test('partial footer, another market/programme and product errors remain failure
   const f=fixture(options);await assert.rejects(f.run(cfg),/footer mismatch|product failure/);assert.ok(!f.calls.includes('quarantine'));
  }
 });
+
+test('CO own-program empty footer maps only the observed SAM25146 signature',async()=>{const f=fixture();await assert.rejects(f.run({market:'CO',environment:'S2',program:'co_epp_agre'}),/known-footer/);assert.ok(f.calls.includes('quarantine'));const other=fixture();await assert.rejects(other.run({market:'CO',environment:'S2',program:'alianzas_co'}),/footer mismatch/);assert.ok(!other.calls.includes('quarantine'));});

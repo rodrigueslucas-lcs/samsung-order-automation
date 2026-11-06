@@ -66,6 +66,16 @@ async function proveEppAccess(page, config) {
   return observeEppAccess(page, config);
 }
 
+// Explicit identity validation may succeed on an empty CMS homepage, but
+// commerce scenarios must still require their actual product/cart controls.
+function withEppIdentityProof(state,{url,rootUrl,proof}){
+  const current=new URL(url),root=new URL(rootUrl);
+  if(state.reason==='COMMERCE_CONTENT_NOT_RENDERED'&&current.origin===root.origin&&current.pathname===root.pathname&&proof?.userAccepted===true&&proof?.accessAccepted===true){
+    return {status:'READY',reason:'SERVER_AUTHENTICATED_EPP_HOME',storefrontRendered:false};
+  }
+  return state;
+}
+
 function eppAccountLoginAction(page) {
   // Same observed sign-in component, different configured market labels.
   // Exclude the separate account-creation CTA and wait for real text/hydration.
@@ -82,4 +92,4 @@ function configuredEppAuthEntry(config,{url,loginVisible,profileVisible,codeVisi
   return target;
 }
 
-module.exports = { classifyEppAccess, observeEppAccess, proveEppAccess, findEppVerifiedContinue, eppAccountLoginAction, configuredEppAuthEntry };
+module.exports = { classifyEppAccess, observeEppAccess, proveEppAccess, withEppIdentityProof, findEppVerifiedContinue, eppAccountLoginAction, configuredEppAuthEntry };

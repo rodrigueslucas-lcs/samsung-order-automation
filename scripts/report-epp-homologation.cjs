@@ -54,15 +54,27 @@ function extractResults(document) {
           if (!last) continue;
           const annotation = (item.annotations || []).find(a => a.type === 'skip');
           const skipped = last.status === 'skipped';
-          results.push({ tc, runtime: skipped ? 'PREREQUISITE_CHECK' : 'TARGETED_RUNTIME',
-            result: last.status === 'passed' ? 'PASS' : skipped ? 'BLOCKED' : last.status === 'interrupted' ? 'NOT_RUN' : 'FAIL',
-            notes: skipped ? prerequisiteReason(annotation?.description) : last.status === 'passed' ? 'EXPECTED_BEHAVIOR_PROVEN' : /getByRole\('contentinfo'\).*getByRole\('heading'[\s\S]*(?:Shop|Tienda)/.test(last.error?.message||'') ? 'MISSING_EXPECTED_CART_FOOTER' : 'INSPECT_IGNORED_PLAYWRIGHT_REPORT' });
+          const recovery=(item.annotations||[]).some(a=>a.type==='epp-execution-mode'&&a.description==='RECOVERY_ONLY');
+          const failureReason=prerequisiteReason(last.error?.message||'');
+          const footer=/MISSING_EXPECTED_CART_FOOTER/.test(last.error?.message||'')||/getByRole\('contentinfo'\).*getByRole\('heading'[\s\S]*(?:Shop|Tienda)/.test(last.error?.message||'');
+          results.push({ tc, runtime: recovery?'RECOVERY_ONLY':skipped ? 'PREREQUISITE_CHECK' : 'TARGETED_RUNTIME',
+            result: last.status === 'passed' ? recovery?'NOT_RUN':'PASS' : skipped ? 'BLOCKED' : last.status === 'interrupted' ? 'NOT_RUN' : 'FAIL',
+            notes: recovery&&last.status==='passed'?'READ_ONLY_RECOVERY_NOT_FUNCTIONAL_HOMOLOGATION':skipped ? prerequisiteReason(annotation?.description) : last.status === 'passed' ? 'EXPECTED_BEHAVIOR_PROVEN' : footer ? 'MISSING_EXPECTED_CART_FOOTER' : failureReason==='AMBIGUOUS_EPP_ORDER_ATTEMPT'?failureReason:/^(?:Error: )?CURRENT_RUN_ORDER_REQUIRED:/.test(last.error?.message||'')?'CURRENT_RUN_ORDER_REQUIRED':'INSPECT_IGNORED_PLAYWRIGHT_REPORT' });
         }
       }
       visit(suite.suites);
     }
   }
   visit(document.suites);
+  // A confirmation dependency cannot execute after an explicitly blocked payment.
+  // Preserve real payment failures and missing/unexecuted payment evidence as FAIL.
+  for(const row of results){
+    const dependencies=row.tc==='SAM-25140'?['SAM-25138']:row.tc==='SAM-24866'?['SAM-24864','SAM-24865']:[];
+    const payments=results.filter(item=>dependencies.includes(item.tc));
+    if(row.result==='FAIL'&&row.notes==='CURRENT_RUN_ORDER_REQUIRED'&&payments.length&&payments.every(item=>item.result==='BLOCKED')){
+      row.result='BLOCKED';row.runtime='PREREQUISITE_CHECK';row.notes=payments[0].notes;
+    }
+  }
   return results;
 }
 function mergeObservation(previous, current) {
@@ -92,7 +104,7 @@ function report() {
         const key = `${market}:${environment}:${result.tc}`;
         const metadata=JSON.parse(fs.readFileSync(file,'utf8')).config?.metadata?.epp;
         const program=metadata?.market===market&&metadata?.environment===environment&&/^[a-z][a-z0-9_]{1,60}$/.test(metadata.program||'')?metadata.program:'NOT_RECORDED';
-        observed.set(key,mergeObservation(observed.get(key),{...result,program,evidence:path.relative(root,file).replace(/\\/g,'/')}));
+        observed.set(key,mergeObservation(observed.get(key),{...result,program,runId:metadata?.runId||null,evidence:path.relative(root,file).replace(/\\/g,'/')}));
       }
     }
   }

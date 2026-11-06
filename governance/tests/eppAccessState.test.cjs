@@ -2,6 +2,18 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { classifyEppAccess, observeEppAccess } = require("../../utils/eppAccessState.cjs");
 const {configuredEppAuthEntry}=require('../../utils/eppAccessState.cjs');
+const {withEppIdentityProof}=require('../../utils/eppAccessState.cjs');
+test('missing CMS/header is separate from positively proven identity and entitlement',()=>{
+ const root='https://stg2.shop.samsung.com/cl/multistore/alianzas/alianzas/';
+ const state={status:'BLOCKED',reason:'COMMERCE_CONTENT_NOT_RENDERED'};
+ const valid={userAccepted:true,accessAccepted:true};
+ assert.equal(withEppIdentityProof(state,{url:root,rootUrl:root,proof:valid}).reason,'SERVER_AUTHENTICATED_EPP_HOME');
+ for(const proof of [{userAccepted:false,accessAccepted:true},{userAccepted:true,accessAccepted:false},{}])assert.equal(withEppIdentityProof(state,{url:root,rootUrl:root,proof}),state);
+ for(const url of [root+'registration',root+'p/QA','https://www.samsung.com/cl/'])assert.equal(withEppIdentityProof(state,{url,rootUrl:root,proof:valid}),state);
+ for(const reason of ['ACCESS_GATE_VISIBLE','CORPORATE_ACTIVATION_REQUIRED','VERIFICATION_CODE_REJECTED']){
+  const gate={status:'BLOCKED',reason};assert.equal(withEppIdentityProof(gate,{url:root,rootUrl:root,proof:valid}),gate);
+ }
+});
 test('configured EPP auth entry only resumes an empty programme homepage',()=>{
  const rootUrl=new URL('https://stg2.shop.samsung.com/cl/multistore/alianzas/alianzas/');
  const cfg={rootUrl,authEntryUrl:new URL('auth/multistore',rootUrl)};

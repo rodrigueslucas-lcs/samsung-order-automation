@@ -6,12 +6,12 @@ import server from '../utils/eppServerProof.cjs';
 
 // Read the same causal card order; this flow has no cart mutation or submit.
 export async function validateExistingEppCardOrder(page,cfg,record,{allowObservedOrder=false}={}){
- const observed=allowObservedOrder&&['CL','CO'].includes(cfg.market)&&record.status==='OBSERVED_ORDER';
+ const observed=allowObservedOrder&&(['CL','CO'].includes(cfg.market)||cfg.market==='PE'&&cfg.environment==='S2'&&cfg.program==='pe_membership_vip')&&record.status==='OBSERVED_ORDER';
  const clTransfer=cfg.market==='CL'&&record.kind==='transfer'&&record.providerConfirmationSubmitted===true&&(observed||record.status==='CONFIRMED');
  if(record.market!==cfg.market||record.environment!==cfg.environment||(!observed&&record.status!=='CONFIRMED')||(record.kind!=='card'&&!clTransfer))throw new Error('EPP confirmation must use its own confirmed causal card record or an explicitly reconciled CL observed order.');
  const proof=server.watchEppServerProof(page.context(),cfg,{expectedEmail:session.getPrimaryEppCredentials(cfg).email});
  try{
-  await openEppStore(page,{...cfg,entryUrl:cfg.rootUrl});await proof.settle();
+  await openEppStore(page,{...cfg,entryUrl:cfg.pdpUrl||cfg.rootUrl},{identityProof:proof});await proof.settle();
   if(!proof.accepted()){test.skip(true,'AUTH_OR_ENTITLEMENT_REQUIRED: causal confirmation requires accepted programme identity.');throw new Error('EPP confirmation identity not proven; no submit.');}
   const code=record.orderCode;
   if(!new RegExp(`^${cfg.market}\\d{6}-\\d{8}(?:_\\d+)?$`).test(code))throw new Error('Invalid causal order number.');

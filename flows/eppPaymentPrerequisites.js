@@ -14,6 +14,11 @@ import clPaymentCart from './cl/paymentCart.cjs';
 import {validateExistingEppCardOrder} from './eppCardConfirmation';
 import {submitClEppBank} from './eppClBankPayment';
 import coCheckout from './co/eppCheckout.cjs';
+import causalReadback from '../utils/eppCausalOrderReadback.cjs';
+
+// Worker-local, current-campaign prerequisites only; never historical order evidence.
+const campaignPrerequisites=new Map();
+const campaignKey=(cfg,runId)=>[cfg.market,cfg.environment,cfg.program,runId].join(':');
 
 function enforceEppPayment(condition, reason, cfg) {
   if (!condition) return;
@@ -57,6 +62,7 @@ export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProvi
       if(!observedCartResponse)throw new Error('CL EPP cart request was not observed; no blind reload or payment.');
       const prepared=await clPaymentCart.prepareClPaymentCart(page,{...cfg,storefront:cfg},{observedResponse:observedCartResponse});
       await clPaymentCart.normalizeClPaymentQuantity(page,cart,{readBack:prepared?.readCart});
+      reconciliation=await causalReadback.createEppReadbackFromCartResponse(page,cfg,observedCartResponse);
     }
     await cart.proceedToAuthenticatedCheckout();
     assertions.assertStoreRoute(page.url(),cfg,/^checkout\//);
@@ -104,115 +110,59 @@ export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProvi
 }
 
 export async function runEppPaymentPrerequisiteCase(page,cfg,options){
-  // This case includes a fresh cart, Contact, Delivery and provider discovery;
-  // keep their bounded stage waits inside one explicit end-to-end budget.
   test.setTimeout(420000);
-  if(cfg.market==='CO'&&options?.kind==='card'){
-    // A repeat official run reads its confirmed causal order, never pays again.
-    const pending=attempts.pendingEppOrderAttempt(cfg,'card');
-    if(pending){
-      if(process.env.EPP_RESUME_PENDING_ORDER==='1'&&pending.status==='OBSERVED_ORDER'&&pending.orderCode){
-        await validateExistingEppCardOrder(page,cfg,pending,{allowObservedOrder:true});
-        await test.info().attach('CO card frontend acceptance',{body:JSON.stringify({market:'CO',environment:cfg.environment,program:cfg.program,orderCode:pending.orderCode,criteria:'CAUSAL_ORDER_AND_PUBLIC_CONFIRMATION',readOnly:true,submitCount:0,paymentSettlementAsserted:false,originalSubmitEvidencePreserved:true}),contentType:'application/json'});
-        return;
-      }
-      throw new Error('AMBIGUOUS_EPP_ORDER_ATTEMPT: reconcile existing CO payment before any cart mutation or submit.');
-    }
-    const confirmed=attempts.latestConfirmedEppOrder(cfg,'card');
-    if(confirmed){await validateExistingEppCardOrder(page,cfg,confirmed);return;}
-  }
-  if(cfg.market==='PE'&&options?.kind==='card'&&!options.confirmationOnly&&!attempts.pendingEppOrderAttempt(cfg,'card')&&!attempts.pendingEppOrderAttempt(cfg,'cash')){
-    const confirmed=attempts.latestConfirmedEppOrder(cfg,'card');
-    // Revalidate the already proven PE card order before considering a new
-    // checkout. A newer unresolved initiation must retain its existing guard.
-    if(confirmed){await validateExistingEppCardOrder(page,cfg,confirmed);return;}
-  }
-  if(['PE','CL'].includes(cfg.market)&&options?.confirmationOnly){
-    const confirmed=attempts.latestConfirmedEppOrder(cfg,'card');
-    if(confirmed){await validateExistingEppCardOrder(page,cfg,confirmed);return;}
-    // Confirmation is a read-only UI contract. A reconciled causal CL order
-    // can prove it without declaring the rejected payment successful or
-    // releasing its durable marker for another financial submit.
-    if(cfg.market==='CL'){
-      const observed=attempts.pendingEppOrderAttempt(cfg,'card');
-      if(observed?.status==='OBSERVED_ORDER'){
-        await validateExistingEppCardOrder(page,cfg,observed,{allowObservedOrder:true});return;
-      }
-    }
-  }
-  if(cfg.market==='CL'&&options?.kind==='card'){
-    // CL's operator-defined acceptance is causal order creation + public
-    // confirmation, not a later settlement status. Reconcile the prior card
-    // order read-only; preserve its marker and original submit diagnostics.
-    const card=attempts.pendingEppOrderAttempt(cfg,'card');
-    if(card?.status==='OBSERVED_ORDER'||process.env.EPP_RESUME_PENDING_ORDER==='1'){
-    if(!card||card.status!=='OBSERVED_ORDER'||!card.orderCode)throw new Error('CL card frontend recovery requires its own reconciled order; no new submit.');
-    await validateExistingEppCardOrder(page,cfg,card,{allowObservedOrder:true});
-    await test.info().attach('CL card frontend acceptance',{body:JSON.stringify({market:'CL',environment:cfg.environment,program:cfg.program,orderCode:card.orderCode,criteria:'CAUSAL_ORDER_AND_PUBLIC_CONFIRMATION',readOnly:true,submitCount:0,paymentSettlementAsserted:false,originalSubmitEvidencePreserved:true}),contentType:'application/json'});
+  const kinds=cfg.market==='CL'?['card','transfer']:['card','cash'];
+  const pendingRecords=kinds.map(kind=>attempts.pendingEppOrderAttempt(cfg,kind)).filter(Boolean);
+  const runId=process.env.EPP_RUN_ID;
+  // Explicit read-only recovery is never a normal payment homologation.
+  if(process.env.EPP_RESUME_PENDING_ORDER==='1'){
+    const pending=pendingRecords.find(record=>record.kind===options?.kind);
+    if(!pending||pending.status!=='OBSERVED_ORDER'||!pending.orderCode||pending.kind==='transfer'&&pending.providerConfirmationSubmitted!==true)throw new Error('AMBIGUOUS_EPP_ORDER_ATTEMPT: recovery requires its own reconciled causal order; no cart mutation or submit.');
+    await validateExistingEppCardOrder(page,cfg,pending,{allowObservedOrder:true});
+    attempts.confirmPendingEppOrder(cfg,pending.kind,pending.orderCode);
+    test.info().annotations.push({type:'epp-execution-mode',description:'RECOVERY_ONLY'});
     return;
+  }
+  if(options?.confirmationOnly){
+    const current=attempts.confirmedEppOrderForRun(cfg,runId);
+    if(current){await validateExistingEppCardOrder(page,cfg,current);return;}
+    const observed=pendingRecords.find(record=>record.runId===runId&&record.status==='OBSERVED_ORDER'&&record.orderCode);
+    if(observed){
+      if(observed.kind==='transfer'&&observed.providerConfirmationSubmitted!==true)throw new Error('AMBIGUOUS_EPP_ORDER_ATTEMPT: bank confirmation stage is incomplete.');
+      await validateExistingEppCardOrder(page,cfg,observed,{allowObservedOrder:true});
+      attempts.confirmPendingEppOrder(cfg,observed.kind,observed.orderCode);return;
     }
-  }
-  if(cfg.market==='CL'&&options?.kind==='transfer'){
-    const confirmed=attempts.latestConfirmedEppOrder(cfg,'transfer');
-    if(confirmed){await validateExistingEppCardOrder(page,cfg,confirmed);return;}
-  }
-  if(process.env.EPP_RESUME_PENDING_ORDER==='1'&&cfg.market==='CL'&&options?.kind==='transfer'){
-    const transfer=attempts.pendingEppOrderAttempt(cfg,'transfer');
-    if(!transfer||transfer.status!=='OBSERVED_ORDER'||transfer.providerConfirmationSubmitted!==true)throw new Error('CL bank recovery requires its own observed order and submitted Flow confirmation; no payment retry.');
-    await validateExistingEppCardOrder(page,cfg,transfer,{allowObservedOrder:true});
-    attempts.confirmPendingEppOrder(cfg,'transfer',transfer.orderCode);return;
-  }
-  if(process.env.EPP_RESUME_PENDING_ORDER==='1'&&(!['MX','PE'].includes(cfg.market)||options?.kind!=='card'))throw new Error('Read-only EPP order recovery is restricted to the proven MX/PE card adapters.');
-  if(['MX','PE','CL'].includes(cfg.market)){
-    const pendingRecords=(cfg.market==='CL'?['card','transfer']:['card','cash']).map(kind=>attempts.pendingEppOrderAttempt(cfg,kind)).filter(Boolean);
-    const pending=pendingRecords[0];
-    // A different official bank case is not a card resubmit. Permit it only
-    // after the sole previous card attempt has a reconciled causal order and
-    // its own API/UI confirmation is revalidated. Keep the card marker intact;
-    // a second transfer marker or an unidentified attempt still blocks all.
-    let independentClTransfer=false;
-    if(cfg.market==='CL'&&options?.kind==='transfer'&&pendingRecords.length===1&&pending.kind==='card'&&pending.status==='OBSERVED_ORDER'&&pending.orderCode){
-      await validateExistingEppCardOrder(page,cfg,pending,{allowObservedOrder:true});
-      independentClTransfer=true;
+    const upstream=campaignPrerequisites.get(campaignKey(cfg,runId));
+    if(upstream){
+      const reason=upstream.reason+': this campaign payment was blocked before order creation; confirmation cannot execute.';
+      enforceEppPayment(true,reason,cfg);throw new Error(reason);
     }
-    if(process.env.EPP_RESUME_PENDING_ORDER==='1'&&!pending){
-      enforceEppPayment(true,'PAYMENT_FLOW_NOT_PROVEN: no pending EPP attempt exists for read-only recovery.',cfg);
-      throw new Error('No pending EPP attempt; read-only recovery cannot reset a cart.');
-    }
-    if(pending&&!independentClTransfer){
-      if(options?.kind!=='card'||pending.kind!=='card'||process.env.EPP_RESUME_PENDING_ORDER!=='1'||pending.status!=='OBSERVED_ORDER'||!pending.orderCode){
-        enforceEppPayment(true,'PAYMENT_FLOW_NOT_PROVEN: AMBIGUOUS_EPP_ORDER_ATTEMPT requires reconciliation before any cart reset or new submit.',cfg);
-        throw new Error('AMBIGUOUS_EPP_ORDER_ATTEMPT: no cart reset or new submit is allowed.');
-      }
-      const proof=server.watchEppServerProof(page.context(),cfg,{expectedEmail:session.getPrimaryEppCredentials(cfg).email});
-      try{
-        await openEppStore(page,{...cfg,entryUrl:cfg.rootUrl});await proof.settle();
-        if(!proof.accepted())enforceEppPayment(true,'AUTH_OR_ENTITLEMENT_REQUIRED: existing order recovery needs verified EPP identity.',cfg);
-        const target=new URL('orderConfirmation;orderCode='+encodeURIComponent(pending.orderCode),cfg.rootUrl);
-        const site=cfg.apiSite||cfg.rootUrl.pathname.split('/').filter(Boolean)[2];
-        const api=`https://${cfg.environment.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com`;
-        const readback=page.waitForResponse(response=>{const u=new URL(response.url());return response.request().method()==='GET'&&u.origin===api&&u.pathname===`/tokocommercewebservices/v2/${site}/users/current/orders/${pending.orderCode}`;},{timeout:120000});
-        const [response]=await Promise.all([readback,page.goto(target.href,{waitUntil:'commit',timeout:60000})]);
-        if(!response.ok())throw new Error(`EPP causal order readback returned HTTP ${response.status()}; no submit was repeated.`);
-        const order=await response.json();
-        if(order.code!==pending.orderCode.replace(/_\d+$/,''))throw new Error('EPP readback did not identify the public number of the causal order.');
-        await validateMxEppConfirmation(page,cfg,pending.orderCode);
-        attempts.confirmPendingEppOrder(cfg,'card',pending.orderCode);
-        await test.info().attach('EPP causal order recovery',{body:JSON.stringify({market:cfg.market,environment:cfg.environment,orderCode:pending.orderCode,readOnlyRecovery:true,confirmationValidated:true}),contentType:'application/json'});
-        return;
-      }finally{proof.stop();}
-    }
+    const targets=String(process.env[`${cfg.market}_QST_TARGET_IDS`]||process.env.P1_TARGET_IDS||'').split(/[\s,;]+/).filter(Boolean);
+    if(targets.length!==1)throw new Error('CURRENT_RUN_ORDER_REQUIRED: this campaign has no causal confirmed order; confirmation cannot substitute another payment after failed payment cases.');
+    // A standalone confirmation target creates one order only when authorized.
   }
-  if(cfg.market==='MX'&&cfg.environment==='S2'&&options?.kind==='card'&&process.env.ALLOW_PAYMENT_SUBMIT!=='1'){
-    enforceEppPayment(true,'PAYMENT_SUBMIT_NOT_AUTHORIZED: the proven MX S2 card adapter requires ALLOW_PAYMENT_SUBMIT=1.',cfg);
-    throw new Error('PAYMENT_SUBMIT_NOT_AUTHORIZED: no cart or payment mutation is allowed.');
+  if(process.env.ALLOW_PAYMENT_SUBMIT!=='1'){
+    enforceEppPayment(true,'PAYMENT_SUBMIT_NOT_AUTHORIZED: normal EPP payment requires a new causal order; historical confirmation is not a substitute.',cfg);
+    throw new Error('PAYMENT_SUBMIT_NOT_AUTHORIZED: no cart mutation or financial action is allowed.');
   }
-  const submit=['MX','PE','CL','CO'].includes(cfg.market)&&(cfg.market==='MX'||cfg.environment==='S2')&&options?.kind==='card'&&process.env.ALLOW_PAYMENT_SUBMIT==='1';
-  const bank=cfg.market==='CL'&&cfg.environment==='S2'&&options?.kind==='transfer'&&process.env.ALLOW_PAYMENT_SUBMIT==='1';
-  const observed=await probeEppPaymentPrerequisites(page,cfg,{...options,onProviderReady:bank?submitClEppBank:submit?(cfg.market==='CO'?submitCoEppCard:cfg.market==='CL'?submitClEppCard:cfg.market==='PE'?submitPeEppCard:submitMxEppCard):null});
+  if(!runId||!/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(runId))throw new Error('CURRENT_RUN_ORDER_REQUIRED: use the isolated local EPP market runner.');
+  // Identified old attempts are independently reconciled and archived before
+  // a fresh checkout; unidentified submits are never cleared or blindly retried.
+  if(pendingRecords.some(pending=>pending.status!=='OBSERVED_ORDER'||!pending.orderCode||pending.kind==='transfer'&&pending.providerConfirmationSubmitted!==true)){
+    const reason='AMBIGUOUS_EPP_ORDER_ATTEMPT: reconcile the existing initiation before any cart reset or new submit.';
+    enforceEppPayment(true,reason,cfg);
+    throw new Error(reason); // Fail closed even if an embedded runner does not terminate on skip.
+  }
+  for(const pending of pendingRecords){
+    await validateExistingEppCardOrder(page,cfg,pending,{allowObservedOrder:true});
+    attempts.confirmPendingEppOrder(cfg,pending.kind,pending.orderCode);
+  }
+  const submit=['MX','PE','CL','CO'].includes(cfg.market)&&(cfg.market==='MX'||cfg.environment==='S2')&&options?.kind==='card';
+  const bank=cfg.market==='CL'&&cfg.environment==='S2'&&options?.kind==='transfer';
+  const observed=await probeEppPaymentPrerequisites(page,cfg,{...options,onProviderReady:bank?submitClEppBank:submit?(cfg.market==='CO'?((...args)=>submitCoEppCard(...args,validateExistingEppCardOrder)):cfg.market==='CL'?submitClEppCard:cfg.market==='PE'?submitPeEppCard:submitMxEppCard):null});
   if(observed.status==='PASS'&&observed.orderCode)return;
+  if(observed.status==='BLOCKED')campaignPrerequisites.set(campaignKey(cfg,runId),{reason:observed.reason});
   test.info().annotations.push({type:'epp-prerequisite',description:`${observed.reason}: ${observed.stage}`});
   enforceEppPayment(observed.status==='BLOCKED',`${observed.reason}: ${observed.detail}`,cfg);
-  // A discovery result can never become an order/confirmation PASS.
-  throw new Error('EPP prerequisite inspection did not supply a causal confirmed order.');
+  throw new Error('EPP prerequisite inspection did not supply a new causal confirmed order.');
 }

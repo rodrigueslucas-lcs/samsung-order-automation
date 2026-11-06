@@ -66,7 +66,7 @@ function getEppPrograms(market, environment='S2') {
   const legacy=EPP_ACCESS[code][env],root=inferMultistoreRoot(new URL(legacy.storefrontUrl));
   const legacyId=root.pathname.split('/').filter(Boolean)[2];
   const make=(id,priority,extra={})=>Object.freeze({id,canonicalUrl:new URL(`/${code.toLowerCase()}/multistore/${id}/${id}/`,root).href,registrationUrl:null,requiresRetirees:null,callbackBehavior:'UNPROVEN',priority,knownStatus:'UNPROVEN',allowAutomaticRetry:true,notes:'Independent identity, entitlement and storefront proof required.',...extra});
-  const old=make(legacyId,10,{canonicalUrl:root.href,legacy:true,...(code==='CO'&&env==='S2'?{priority:0,knownStatus:'OBSERVED_FUNCTIONAL',allowAutomaticRetry:true,callbackBehavior:'STAGING_RETURN_VERIFIED',requiresRetirees:true,identityEntryPath:'/co/'}:{}),...(code==='PE'&&env==='S2'?{priority:99,knownStatus:'VERIFICATION_CODE_REJECTED',allowAutomaticRetry:false}:{}),...(code==='CL'?{knownStatus:'OBSERVED_FUNCTIONAL'}:{})});
+  const old=make(legacyId,10,{canonicalUrl:root.href,legacy:true,...(code==='CO'&&env==='S2'?{priority:0,knownStatus:'OBSERVED_FUNCTIONAL',allowAutomaticRetry:true,callbackBehavior:'STAGING_RETURN_VERIFIED',requiresRetirees:true,identityEntryPath:'/co/'}:{}),...(code==='PE'&&env==='S2'?{priority:99,knownStatus:'VERIFICATION_CODE_REJECTED',allowAutomaticRetry:false}:{}),...(code==='CL'?{knownStatus:'OBSERVED_FUNCTIONAL',...(env==='S2'?{identityEntryPath:'/cl/'}:{})}:{})});
   const programs=[old];
   if(code==='CL')programs.push(
     make('colaboradores',20,{allowAutomaticRetry:false,notes:'Documented CL internal EPP; independent access proof required before execution.'}),

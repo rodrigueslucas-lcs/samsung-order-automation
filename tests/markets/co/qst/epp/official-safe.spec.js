@@ -35,7 +35,7 @@ test.describe("CO QST - Official EPP", () => {
       const current = cfg();
       requireProductConfig(current);
       const cart = await addConfiguredEppProduct(page, current, { currencyPattern: /\$\s*[\d.,]+/ });
-      await validateEppCartUi(cart);
+      await validateEppCartUi(cart,current);
     });
   });
 
@@ -65,7 +65,7 @@ test.describe("CO QST - Official EPP", () => {
     });
   });
 
-  test("SAM-24953 @preflight @destructive @qst @co @epp @registered - Payment using credit card with reg user", async ({page}, testInfo) => {
+  test("SAM-24953 @destructive @qst @co @epp @registered - Payment using credit card with reg user", async ({page}, testInfo) => {
     await test.step("Inspect authenticated EPP cart, checkout and payment prerequisites", async () => {
       await runEppPaymentPrerequisiteCase(page,cfg(),{kind:'card'});
     });

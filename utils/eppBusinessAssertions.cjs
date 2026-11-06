@@ -62,7 +62,10 @@ async function provePdpVariantSelection(page, config, {timeout=30000}={}) {
   const before=assertStoreRoute(page.url(),config,/^p\//);
   const beforeSku=decodeURIComponent(before.pathname.split('/').filter(Boolean).at(-1));
   await expect(page.getByRole('main').getByText(beforeSku,{exact:true}).first()).toBeVisible();
-  const controls=page.locator('main button.bttn, main [role="radio"]').filter({visible:true});
+  // Purchase/gallery actions can share .bttn with variant controls. Never
+  // mutate the cart while proving a variant selection.
+  const controls=page.locator('main button.bttn, main [role="radio"]').filter({visible:true})
+    .filter({hasNotText:/^(?:Agregar al carrito|A[nñ]adir al carrito|Comprar(?: ahora)?|Add to cart|Buy(?: now)?|Preventa|Previous|Next|A[nñ]adir a la lista de deseos)$/i});
   let choice;
   for(let i=0;i<await controls.count();i++) {
     const item=controls.nth(i), classes=await item.getAttribute('class')||'';
@@ -145,11 +148,25 @@ async function proveTooltipAboveBackToTop(page) {
   expect(result.tooltipOnTop, 'Official EPP expected result requires Back to Top behind the visible tooltip: '+JSON.stringify(result)).toBe(true);
 }
 
+async function waitForEppContactEmail(page,config,{timeout=30000}={}){
+  const email=page.locator('input[name="email"], input[formcontrolname="email"]').filter({visible:true}).first();
+  try{await expect(email).toBeVisible({timeout});}
+  catch(error){
+    const panel=page.getByRole('region',{name:/^1\.\s*Detalles del cliente$/i});
+    const skeleton=config.market==='CO'&&config.environment==='S2'&&config.program==='co_epp_agre'&&new URL(page.url()).searchParams.get('step')==='CHECKOUT_STEP_CONTACT_INFO'&&await panel.count()===1&&await panel.locator('input').count()===0&&await page.getByRole('alert').filter({visible:true}).count()===0;
+    if(!skeleton)throw error;
+    // No field has been filled/submitted. Recover only this empty GET view.
+    await page.reload({waitUntil:'domcontentloaded',timeout:60000});
+    assertStoreRoute(page.url(),config,/^checkout\//);
+    await expect(email).toBeVisible({timeout});
+  }
+  return email;
+}
+
 async function completeContact(page, config, customer) {
   assertStoreRoute(page.url(), config, /^checkout\//);
   const field = name => page.locator(`input[name="${name}"], input[formcontrolname="${name}"]`).filter({ visible: true }).first();
-  const email = field('email');
-  await expect(email).toBeVisible({timeout:30000});
+  const email = await waitForEppContactEmail(page,config);
   if (config.market === 'MX') expect(await email.inputValue(), 'Registered MX contact must prefill email').toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
   else if (!(await email.inputValue())) {
     if (!customer.email) throw new Error('EPP contact fixture requires an email.');
@@ -182,4 +199,16 @@ async function completeContact(page, config, customer) {
   assertStoreRoute(page.url(), config, /^checkout\//);
 }
 
-module.exports = { getEppCartTextPatterns, assertStoreRoute, proveCheckout, proveFilterEffect, provePdpVariantSelection, chooseConfiguredPdpFromPlp, proveTooltipAboveBackToTop, completeContact };
+
+async function waitForPeRegisteredCheckout(page,continueButton,{timeout=15000}={}){
+ const express=page.getByRole('button',{name:/^Samsung Checkout Express$/i});
+ const guest=page.getByRole('button',{name:/^Checkout como invitado$/i});
+ let registered=false;
+ await expect.poll(async()=>{
+  registered=await continueButton.isVisible();
+  return registered||(await express.isVisible()&&await guest.isVisible());
+ },{timeout}).toBe(true);
+ return registered;
+}
+
+module.exports = { waitForPeRegisteredCheckout, getEppCartTextPatterns, assertStoreRoute, proveCheckout, proveFilterEffect, provePdpVariantSelection, chooseConfiguredPdpFromPlp, proveTooltipAboveBackToTop, waitForEppContactEmail, completeContact };

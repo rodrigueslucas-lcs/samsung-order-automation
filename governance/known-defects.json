@@ -336,6 +336,20 @@
       "priority": "Critical",
       "rootCause": "Environment Issue",
       "notes": "Operator reproduced pymesmx cash failure in two browsers: Mercado Pago returns to CHECKOUT_STEP_PAYMENT with Lo sentimos, su transacción no fue exitosa. This link applies only to SAM-25046 MX EPP S2 and the cash-specific signature. Existing ambiguous cash initiation remains protected; no submit is retried."
+    },
+    {
+      "market": "CO",
+      "environment": "S2",
+      "store": "EPP",
+      "samId": "SAM-24931",
+      "jira": "SAM-25146",
+      "url": "https://jira.secext.samsung.net/browse/SAM-25146",
+      "title": "QST STG1 SMB CO/PE BS and EPP Footer Section Missing on PDP/Checkout/Cart Page",
+      "classification": "KNOWN_DEFECT",
+      "status": "OPEN",
+      "priority": "Medium",
+      "rootCause": "Storefront Issue",
+      "notes": "CO S2 co_epp_agre runtime 2026-11-06 proved empty contentinfo after product, summary and checkout checks. Operator supplied SAM-25146 for CO/PE BS and EPP; quarantine requires MISSING_EXPECTED_CART_FOOTER with zero headings/links, never a generic timeout."
     }
   ]
 }

@@ -26,7 +26,7 @@ function buildRun(market, args = [], sourceEnv = process.env, {readData = requir
   const runId = `${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}`;
   const output = path.resolve(__dirname, "..", "test-results", "epp", code.toLowerCase(), config.environment.toLowerCase(), runId);
   const env = { ...sourceEnv, TEST_MARKET: code, TEST_STORE: "EPP", TEST_SUITE: "QST", ENVIRONMENT: config.environment,
-    EPP_OUTPUT_DIR: path.join(output, "playwright"), PLAYWRIGHT_HTML_OUTPUT_DIR: path.join(output, "html"),
+    EPP_RUN_ID: runId, EPP_OUTPUT_DIR: path.join(output, "playwright"), PLAYWRIGHT_HTML_OUTPUT_DIR: path.join(output, "html"),
     PLAYWRIGHT_JSON_OUTPUT_FILE: path.join(output, "results.json"), ALLURE_RESULTS_DIR: path.join(output, "allure"), SMB_EVIDENCE_DIR: path.join(output, "evidence") };
   for (const other of ["MX", "PE", "CO", "CL"]) if (other !== code) delete env[`${other}_QST_TARGET_IDS`];
   const selector = `tests/markets/${code.toLowerCase()}/qst/epp/`;
@@ -47,11 +47,14 @@ function executeRun(run, { acquire = acquireEppLease, spawn = spawnSync } = {}) 
   } finally { lease?.release(); }
 }
 
+function classifyRunFailure(error){
+  return error?.code==='AUTH_BUSY'?{message:'[epp-qst] BUSY: the EPP market lane has an active or unverified owner; no test or payment was started.',exitCode:73}:{message:'[epp-qst] Invalid EPP configuration, target or launch. No runtime secrets are printed.',exitCode:1};
+}
 if (require.main === module) {
   try {
     const run = buildRun(process.argv[2], process.argv.slice(3));
     console.log(`[epp-qst] ${run.env.TEST_MARKET} ${run.env.ENVIRONMENT} · EPP · ${run.ids.length} official TCs · isolated context · retries 0`);
     process.exitCode = executeRun(run);
-  } catch { console.error("[epp-qst] Invalid EPP configuration, target or launch. No runtime secrets are printed."); process.exitCode = 1; }
+  } catch(error) { const failure=classifyRunFailure(error);console.error(failure.message);process.exitCode=failure.exitCode; }
 }
-module.exports = { buildRun, executeRun };
+module.exports = { buildRun, executeRun, classifyRunFailure };

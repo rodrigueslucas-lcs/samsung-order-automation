@@ -250,3 +250,5 @@ test('mixed failures and blockers count mapped defects once per KPI group and di
     }
   }
 });
+
+test('CO S2 EPP cart footer links SAM24931 only on exact empty-footer evidence',()=>{const current={market:'CO',environment:'S2',store:'EPP',tests:[{samId:'SAM-24931',status:'SKIPPED-BLOCKED',blockedReason:'MISSING_EXPECTED_CART_FOOTER'}]};assert.equal(activeKnownDefects(current,registry)[0].defect.jira,'SAM-25146');assert.equal(activeKnownDefects({...current,tests:[{samId:'SAM-24931',status:'FAIL',error:'TimeoutError'}]},registry).length,0);});

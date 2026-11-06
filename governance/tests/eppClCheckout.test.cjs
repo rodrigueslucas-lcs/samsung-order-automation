@@ -36,8 +36,8 @@ test('CL Delivery selects legal terms by accessible label across EPP and Base St
 
 test('CL preserves a visible selected saved destination in the approved commune',async()=>{
  const calls=[],address={region:'QA Region',commune:'QA Commune',street:'QA Street',number:'1'};
- const shipping={getByRole:(role,options)=>{assert.equal(role,'radio');if(options.name.test('Mis direcciones'))return{waitFor:async()=>{},isChecked:async()=>true};assert.equal(options.checked,true);assert.ok(options.name.test('1, QA Street, QA Commune, QA Region'));return{waitFor:async()=>{}};}};
- const run=vm.runInNewContext(source+'\ncompleteClEppCheckout;',{RegExp,expect:()=>({toBeChecked:async()=>{}}),assertions:{assertStoreRoute(){}},runtime:{getEppRuntimeData:()=>({delivery:address}),getEppContact:()=>({})},completeClRegisteredContact:async()=>calls.push('contact'),continueClRegisteredDeliveryToPayment:async()=>calls.push('saved-delivery')});
+ const shipping={locator:()=>({}),getByRole:(role,options)=>{if(role==='checkbox')return{isChecked:async()=>true};assert.equal(role,'radio');if(options.name.test('Mis direcciones'))return{waitFor:async()=>{},isChecked:async()=>true};assert.equal(options.checked,true);assert.ok(options.name.test('1, QA Street, QA Commune, QA Region'));return{waitFor:async()=>{}};}};
+ const run=vm.runInNewContext(source+'\ncompleteClEppCheckout;',{RegExp,expect:()=>({toBeVisible:async()=>{},toHaveCount:async()=>{},toBeChecked:async()=>{}}),assertions:{assertStoreRoute(){}},runtime:{getEppRuntimeData:()=>({delivery:address}),getEppContact:()=>({})},completeClRegisteredContact:async()=>calls.push('contact'),continueClRegisteredDeliveryToPayment:async()=>calls.push('saved-delivery')});
  await run({url:()=>'?step=CHECKOUT_STEP_DELIVERY',locator:()=>shipping},{market:'CL'});
  assert.deepEqual(calls,['contact','saved-delivery']);
 });
@@ -66,3 +66,5 @@ test('CL S2 EPP chooses the operator-proven standard 2-4 service instead of firs
  await run(page,{addressReady:true,storefront:{market:'CL',environment:'S2',rootUrl:new URL('https://stg2.shop.samsung.com/cl/multistore/alianzas/alianzas/')}});
  assert.deepEqual(calls,['filter','filter','shipping','continue']);
 });
+
+test('EPP receipt selects Boleta once and waits for invoice fields to disappear',async()=>{let checked=false,clicks=0;const selectors=[];const receipt={isChecked:async()=>checked,check:async()=>{checked=true;clicks++;}};const shipping={getByRole:(role,opts)=>{assert.equal(role,'checkbox');assert.ok(opts.name.test('Boleta'));return receipt;},locator:selector=>{selectors.push(selector);return {};}};const run=vm.runInNewContext(source+'\nselectClEppReceipt;',{expect:()=>({toBeVisible:async()=>{},toBeChecked:async()=>assert.ok(checked),toHaveCount:async n=>assert.equal(n,0)})});await run(shipping);await run(shipping);assert.equal(clicks,1);assert.equal(selectors.length,6);});

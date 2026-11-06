@@ -50,19 +50,19 @@ test.describe("CL QST - EPP Official P1", () => {
   });
 
   test("SAM-24864 @destructive @qst @cl @epp @registered - Payment using credit / Debit card with reg user", async ({page}) => {
-    await test.step("Create or reconcile the causal CL EPP card order and validate public confirmation", async () => {
+    await test.step("Create a new CL EPP card order and validate its public confirmation", async () => {
       await runEppPaymentPrerequisiteCase(page,cfg(),{kind:'card'});
     });
   });
 
   test("SAM-24865 @destructive @qst @cl @epp - Payment using Direct Bank Transfer", async ({page}) => {
-    await test.step("Complete or recover CL EPP bank transfer and validate its causal confirmation", async () => {
+    await test.step("Create a new CL EPP bank order and validate its causal confirmation", async () => {
       await runEppPaymentPrerequisiteCase(page,cfg(),{kind:'transfer'});
     });
   });
 
   test("SAM-24866 @destructive @qst @cl @epp - Order confirmation screen", async ({page}) => {
-    await test.step("Validate the causal CL EPP order confirmation without another submit", async () => {
+    await test.step("Validate this campaign's causal CL EPP order confirmation without another submit", async () => {
       await runEppPaymentPrerequisiteCase(page,cfg(),{kind:'card',confirmationOnly:true});
     });
   });

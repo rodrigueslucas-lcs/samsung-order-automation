@@ -20,7 +20,7 @@ function enforceEppQst(condition, reason, cfg) {
 const CODE_INPUT = /verification|verify|access code|c[oó]digo|clave de acceso/i;
 const CODE_BUTTON = /verify|continue|enter|submit|access|ingresar|continuar|validar|acceder/i;
 
-export async function openEppStore(page, cfg) {
+export async function openEppStore(page, cfg, {identityProof=null}={}) {
   await eppOverlays.installEppOverlayDismissal(page,cfg);
   const entry = new URL(cfg.entryUrl);
   if (entry.origin !== cfg.rootUrl.origin || !entry.pathname.startsWith(cfg.rootUrl.pathname) || entry.username || entry.password) {
@@ -30,13 +30,20 @@ export async function openEppStore(page, cfg) {
   await expect(page.getByText(/You can access pages now/i).first()).toBeVisible({ timeout: 15000 });
   await page.goto(cfg.entryUrl.href, { waitUntil: "commit", timeout: 60000 });
 
+  const inspect=async()=>{
+    const state=await inspectEppAccess(page,cfg);
+    if(!identityProof)return state;
+    await identityProof.settle();
+    return accessState.withEppIdentityProof(state,{url:page.url(),rootUrl:cfg.rootUrl.href,proof:identityProof.snapshot()});
+  };
+
   // Hydration, not DOMContentLoaded, determines whether the gate/content exists.
   await expect.poll(async () => {
     await eppOverlays.dismissEppNotificationTutorial(page,cfg);
-    const state = await inspectEppAccess(page, cfg);
+    const state = await inspect();
     return ["READY", "CODE_REQUIRED", "HUMAN_REQUIRED"].includes(state.status) || ['OUTSIDE_EPP_STORE','VERIFICATION_CODE_REJECTED'].includes(state.reason);
   }, { timeout: 45000 }).toBeTruthy().catch(() => {});
-  const initial = await inspectEppAccess(page,cfg);
+  const initial = await inspect();
   enforceEppQst(['BLOCKED','HUMAN_REQUIRED'].includes(initial.status), `BLOCKED: ${cfg.market} ${cfg.environment} EPP ${initial.status}: ${initial.reason}; no login/code retry.`,cfg);
 
   if (cfg.accessMode === "verification-code" && cfg.verificationCode) {
@@ -70,9 +77,9 @@ export async function openEppStore(page, cfg) {
       confirmationAttempted = true;
       await confirmation.click();
     }
-    return (await inspectEppAccess(page, cfg)).status;
+    return (await inspect()).status;
   }, { timeout: 30000 }).toBe("READY").catch(() => {});
-  const state = await inspectEppAccess(page, cfg);
+  const state = await inspect();
   if (state.status !== "READY") {
     test.info().annotations.push({ type: 'epp-prerequisite', description: `${state.status}: ${state.reason}` });
     enforceEppQst(true, `BLOCKED: ${cfg.market} ${cfg.environment} EPP ${state.status}: ${state.reason}`,cfg);
@@ -82,13 +89,22 @@ export async function openEppStore(page, cfg) {
 export async function validateEppLogin(page, cfg) {
   const proof = serverProof.watchEppServerProof(page.context(), cfg);
   try {
-    await openEppStore(page, { ...cfg, entryUrl: cfg.rootUrl });
+    let emptyHomepage=false;
+    try{await openEppStore(page, { ...cfg, entryUrl: cfg.rootUrl }, {identityProof:proof});}
+    catch(error){
+      if(!String(error.message).includes('COMMERCE_CONTENT_NOT_RENDERED')||!cfg.pdpUrl)throw error;
+      // The exact programme PDP may initialize the account service that the
+      // empty CMS home omitted. It still must prove both identity and access.
+      emptyHomepage=true;
+      await openEppStore(page,{...cfg,entryUrl:cfg.pdpUrl},{identityProof:proof});
+    }
     await proof.settle();
     const state = proof.snapshot();
     enforceEppQst(!state.userAccepted || !state.accessAccepted, `BLOCKED: authenticated EPP identity/entitlement not proven (${state.reason})`,cfg);
-    await expect(page).toHaveURL(cfg.rootUrl.href);
-    const homepage = await inspectEppAccess(page, cfg);
-    expect(homepage.reason).toBe('AUTHENTICATED_EPP_HOMEPAGE');
+    await expect(page).toHaveURL(emptyHomepage?cfg.pdpUrl.href:cfg.rootUrl.href);
+    const homepage = accessState.withEppIdentityProof(await inspectEppAccess(page,cfg),{url:page.url(),rootUrl:cfg.rootUrl.href,proof:state});
+    expect(emptyHomepage?['MULTISTORE_CONTENT_PROVEN']:['AUTHENTICATED_EPP_HOMEPAGE','SERVER_AUTHENTICATED_EPP_HOME']).toContain(homepage.reason);
+    await test.info().attach('EPP independent login proof',{body:JSON.stringify({market:cfg.market,environment:cfg.environment,program:cfg.program,identity:state.userAccepted,entitlement:state.accessAccepted,homepageReason:homepage.reason,emptyHomepage,storefrontRendered:!emptyHomepage&&homepage.storefrontRendered!==false}),contentType:'application/json'});
   } finally { proof.stop(); }
 }
 
@@ -195,7 +211,7 @@ export async function validateEppCartUi(cart,{market,environment,program}={}) {
     for(const name of headings)await expect(footer.getByRole('heading',{name})).toBeVisible({timeout:market==='CL'?15000:5000});
   }catch(error){
     const state={footers:await footer.count(),headings:await footer.getByRole('heading').filter({visible:true}).count(),links:await footer.getByRole('link').filter({visible:true}).count()};
-    const observedProgramme=(market==='CL'&&program==='alianzas')||(market==='PE'&&program==='pe_membership_vip');
+    const observedProgramme=(market==='CL'&&program==='alianzas')||(market==='PE'&&program==='pe_membership_vip')||(market==='CO'&&program==='co_epp_agre');
     if(observedProgramme&&environment==='S2'&&state.footers<=1&&state.headings===0&&state.links===0){
       await cart.screenshot('epp-cart-footer-missing');
       await test.info().attach('EPP empty footer signature',{body:JSON.stringify({market,environment,program,...state}),contentType:'application/json'});

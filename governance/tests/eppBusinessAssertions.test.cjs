@@ -8,12 +8,12 @@ const config = { market: 'MX', environment: 'S2', rootUrl: new URL('https://stg2
 let browser;
 test.before(async () => { browser = await chromium.launch({ headless: true }); });
 test.after(async () => { await browser?.close(); });
-async function fixture(html, action, suffix = 'cart') {
+async function fixture(html, action, suffix = 'cart', root = config.rootUrl) {
   const context = await browser.newContext();
   try {
     const page = await context.newPage();
     await page.route('**/*', route => route.fulfill({ contentType: 'text/html; charset=utf-8', body: html }));
-    await page.goto(new URL(suffix, config.rootUrl).href);
+    await page.goto(new URL(suffix, root).href);
     return await action(page);
   } finally { await context.close(); }
 }
@@ -124,3 +124,11 @@ test('CO cart summary uses rendered product-count subtotal while other markets r
 test('missing tooltip mass is distinct from a missing or incorrectly stacked Back to Top',async()=>{
  await fixture('<button style="position:fixed;bottom:10px">Back to top</button>',page=>assert.rejects(proveTooltipAboveBackToTop(page),e=>e.code==='EPP_TOOLTIP_TRIGGER_NOT_AVAILABLE'));
 });
+
+test('variant selection never clicks a purchase action sharing the variant CSS class',async()=>{await fixture(`<main><p id="sku">QA-A</p><button class="bttn" onclick="window.cartTouched=true">Agregar al carrito</button><button class="bttn selected">Blue</button><button class="bttn" onclick="history.pushState({},'', 'QA-B');document.querySelector('#sku').textContent='QA-B';document.querySelector('.selected').classList.remove('selected');this.classList.add('selected')">Black</button></main>`,async page=>{const result=await provePdpVariantSelection(page,config);assert.equal(result.sku,'QA-B');assert.equal(await page.evaluate(()=>Boolean(window.cartTouched)),false);},'p/QA-A');});
+
+test('CO empty contact skeleton gets one GET recovery before any field submission',async()=>{const cfg={market:'CO',environment:'S2',program:'co_epp_agre',rootUrl:new URL('https://stg2.shop.samsung.com/co/multistore/co_epp_agre/co_epp_agre/')};await fixture(`<main><section role="region" aria-label="1. Detalles del cliente"><input name="email"></section></main><script>const n=Number(sessionStorage.count||0)+1;sessionStorage.count=n;if(n===1)document.querySelector('section').replaceChildren();</script>`,async page=>{const email=await require('../../utils/eppBusinessAssertions.cjs').waitForEppContactEmail(page,cfg,{timeout:100});assert.equal(await email.count(),1);assert.equal(await page.evaluate(()=>sessionStorage.count),'2');},'checkout/one?step=CHECKOUT_STEP_CONTACT_INFO',cfg.rootUrl);});
+
+test('PE waits for delayed login choices and never clicks guest checkout as a registered substitute',async()=>{await fixture('<div id="choices"></div><script>setTimeout(()=>{document.querySelector("#choices").innerHTML="<button>Samsung Checkout Express</button><button>Checkout como invitado</button>"},300)</script>',async page=>{assert.equal(await require('../../utils/eppBusinessAssertions.cjs').waitForPeRegisteredCheckout(page,page.getByRole('button',{name:'Continuar',exact:true})),false);});});
+test('PE registered Continue is available without requiring guest choices',async()=>{await fixture('<button>Continuar</button>',async page=>{assert.equal(await require('../../utils/eppBusinessAssertions.cjs').waitForPeRegisteredCheckout(page,page.getByRole('button',{name:'Continuar',exact:true})),true);});});
+test('PE incomplete or hidden login choices do not invent an authentication block',async()=>{await fixture('<button>Samsung Checkout Express</button><button hidden>Checkout como invitado</button>',async page=>{await assert.rejects(require('../../utils/eppBusinessAssertions.cjs').waitForPeRegisteredCheckout(page,page.getByRole('button',{name:'Continuar',exact:true}),{timeout:300}));});});
