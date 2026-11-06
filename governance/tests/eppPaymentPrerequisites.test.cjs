@@ -18,6 +18,10 @@ test('non-MX checkout without local contact mass reports its concrete data prere
 test('even a returning skip stub cannot turn prerequisite discovery into payment PASS',async()=>{await assert.rejects(fixture({accepted:false}).wrapper(),/causal confirmed order/);});
 
 test('an unresolved attempt prevents a fresh cart or submit before any store action',async()=>{const f=fixture({pending:{kind:'card',status:'SUBMITTING'}});await assert.rejects(f.wrapper(),/AMBIGUOUS_EPP_ORDER_ATTEMPT/);assert.deepEqual(f.calls,[]);});
+test('CO unresolved card attempt blocks before any cart mutation or second submit',async()=>{
+ const f=fixture({market:'CO',pending:{kind:'card',status:'SUBMITTING'}});
+ await assert.rejects(f.wrapper(),/AMBIGUOUS_EPP_ORDER_ATTEMPT/);assert.deepEqual(f.calls,[]);
+});
 
 test('read-only recovery with no pending attempt cannot reset or add to a cart',async()=>{const f=fixture({resume:true});await assert.rejects(f.wrapper(),/No pending EPP attempt/);assert.deepEqual(f.calls,[]);});
 
@@ -33,7 +37,7 @@ test('CL independent bank case requires causal card confirmation and never relea
   validateExistingEppCardOrder:async(_,cfg,record,options)=>{assert.equal(cfg.market,'CL');assert.equal(record,card);assert.equal(options.allowObservedOrder,true);calls.push('read-only-confirmation');if(verifyFails)throw Error('unproven');},submitClEppBank(){throw Error('No direct bank invocation allowed');},
   test:{setTimeout(){},skip(){},info:()=>({annotations:[]})},
  });
- await assert.rejects(run({}, {market:'CL',environment:'S2'}, {kind:'transfer'}),/causal confirmed order/);
+ await assert.rejects(run({}, {market:'CL',environment:'S2'}, {kind:'transfer'}),/DATA: synthetic/);
  assert.deepEqual(calls,['read-only-confirmation','bank-prerequisites']);assert.equal(card.status,'OBSERVED_ORDER');
  calls.length=0;transfer={kind:'transfer',status:'SUBMITTING'};
  await assert.rejects(run({}, {market:'CL',environment:'S2'}, {kind:'transfer'}),/AMBIGUOUS/);assert.deepEqual(calls,[]);

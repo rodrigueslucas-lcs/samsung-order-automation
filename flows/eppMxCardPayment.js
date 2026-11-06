@@ -2,6 +2,7 @@ import {expect,test} from '@playwright/test';
 import PaymentPage from '../pages/PaymentPage';
 import MarketPaymentPage from '../pages/MarketPaymentPage';
 import clTestCard from '../utils/clTestCard.cjs';
+import coTestCard from '../utils/coTestCard';
 import assertions from '../utils/eppBusinessAssertions.cjs';
 import runtime from '../utils/eppRuntimeData.cjs';
 import guards from '../utils/destructiveGuards';
@@ -14,7 +15,7 @@ export async function validateMxEppConfirmation(page,cfg,orderCode){
  if(!routeCode||decodeURIComponent(routeCode)!==orderCode)throw new Error('EPP confirmation URL does not identify the causal order.');
  const publicCode=orderCode.replace(/_\d+$/,'');
  await expect(page.getByText(publicCode,{exact:true}).first()).toBeVisible({timeout:120000});
- await expect(page.getByText(/recibimos tu orden.*exitosa|gracias por tu compra|pedido confirmado|orden confirmada|pedido.*validaci[oó]n|order confirmed/i).first()).toBeVisible({timeout:30000});
+ await expect(page.getByText(/recibimos tu (?:orden|pedido).*exitos[ao]|gracias por tu compra|pedido confirmado|orden confirmada|pedido.*validaci[oó]n|order confirmed/i).first()).toBeVisible({timeout:30000});
 }
 
 // Reuses the established MX Mercado Pago secure-fields implementation. Only
@@ -31,14 +32,18 @@ export async function submitClEppCard(page,cfg,capture,reconciliation){
  if(cfg.market!=='CL')throw new Error('CL EPP adapter cannot target another market.');
  return submitEppMercadoCard(page,cfg,capture,reconciliation);
 }
+export async function submitCoEppCard(page,cfg,capture,reconciliation){
+ if(cfg.market!=='CO'||cfg.environment!=='S2'||cfg.program!=='co_epp_agre')throw new Error('CO EPP card adapter requires its proven S2 programme.');
+ return submitEppMercadoCard(page,cfg,capture,reconciliation);
+}
 async function submitEppMercadoCard(page,cfg,capture,reconciliation=null){
  const origins={S1:'https://stg.shop.samsung.com',S2:'https://stg2.shop.samsung.com'};
- if(!['MX','PE','CL'].includes(cfg.market)||!origins[cfg.environment]||cfg.rootUrl.origin!==origins[cfg.environment]||(['PE','CL'].includes(cfg.market)&&cfg.environment!=='S2'))return{status:'BLOCKED',reason:'PAYMENT_FLOW_NOT_PROVEN',stage:'PROVIDER',detail:'This adapter requires an approved staging market/environment and a runtime-verified Mercado Pago contract.'};
+ if(!['MX','PE','CL','CO'].includes(cfg.market)||!origins[cfg.environment]||cfg.rootUrl.origin!==origins[cfg.environment]||(['PE','CL','CO'].includes(cfg.market)&&cfg.environment!=='S2'))return{status:'BLOCKED',reason:'PAYMENT_FLOW_NOT_PROVEN',stage:'PROVIDER',detail:'This adapter requires an approved staging market/environment and a runtime-verified Mercado Pago contract.'};
  assertions.assertStoreRoute(page.url(),cfg,/^checkout\//);
  guards.requirePaymentSubmitOptIn();
- const card=cfg.market==='CL'?clTestCard.getClTestCard():runtime.getEppRuntimeData(cfg)?.payment?.card;
+ const card=cfg.market==='CL'?clTestCard.getClTestCard():cfg.market==='CO'?coTestCard.getCoTestCard({...process.env,CO_QST_ENVIRONMENT:cfg.environment}):runtime.getEppRuntimeData(cfg)?.payment?.card;
  if(!card||!['number','holderName','expiry','cvv','document'].every(k=>typeof card[k]==='string'&&card[k]))return{status:'BLOCKED',reason:'PAYMENT_FLOW_NOT_PROVEN',stage:'DATA',detail:'Approved same-market/provider card fixture is unavailable in ignored EPP runtime data.'};
- const payment=cfg.market==='CL'?new MarketPaymentPage(page,{market:'CL'}):new PaymentPage(page);payment.screenshot=capture;
+ const payment=['CL','CO'].includes(cfg.market)?new MarketPaymentPage(page,{market:cfg.market}):new PaymentPage(page);payment.screenshot=capture;
  if(cfg.market==='MX')payment.creditCardOption=cfg.environment==='S2'?page.getByRole('button',{name:/^Tarjeta de D[eé]bito/i}).filter({visible:true}).first():page.getByRole('button',{name:/^Tarjeta de (?:Cr[eé]dito|D[eé]bito)/i}).filter({visible:true});
  await payment.selectCreditCard();
  for(const name of ['cardNumber','expirationDate','securityCode']){

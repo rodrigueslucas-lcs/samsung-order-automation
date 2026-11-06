@@ -17,3 +17,12 @@ test('SECOND defaults only to MX/CO and cannot open before a proven FIRST phase'
 test('EPP defaults to S2 FIRST and never refreshes/publishes implicitly',()=>{assert.deepEqual(parseArgs([]),{environment:'S2',markets:['MX','PE','CO','CL'],slot:'primary',allowRefresh:false,publish:false,repairDashboard:false});assert.throws(()=>parseArgs(['--slot=third']),/Invalid/);assert.equal(parseArgs(['--slot=second']).slot,'second');});
 test('active Jenkins market build prevents EPP verify/refresh entirely',async()=>{let called=false;const result=await main({argv:['--allow-refresh'],env:{},activity:async()=>({idle:false}),cycle:async()=>{called=true;},log(){},save(){}});assert.equal(result,3);assert.equal(called,false);});
 test('EPP task reuses hidden launcher/logon/15-minute/IgnoreNew without changing Base Store task',()=>{const args={userSid:'S-1-5-21-123',start:new Date('2026-10-28T12:00:00Z')};const epp=buildEppTaskXml(args),base=buildTaskXml(args);assert.match(epp,/auth-epp-keepalive-once.cjs/);assert.match(epp,/PT15M/);assert.match(epp,/LogonTrigger/);assert.match(epp,/InteractiveToken/);assert.match(epp,/IgnoreNew/);assert.match(epp,/wscript.exe/);assert.doesNotMatch(epp,/Password|HighestAvailable/);assert.doesNotMatch(base,/auth-epp-keepalive/);});
+
+test('targeted checks never replace the regional scheduler report',async()=>{
+ for(const slot of ['primary','second']){
+  let saved;await main({argv:['--markets=CO','--slot='+slot],env:{},activity:async()=>({idle:true}),cycle:async()=>({ok:true,identities:[]}),log(){},save(file){saved=file;}});
+  assert.ok(saved.endsWith('epp-last-cycle-s2-'+slot+'-co.json'));
+ }
+ let saved;await main({argv:[],env:{},activity:async()=>({idle:true}),cycle:async()=>({ok:true,identities:[]}),log(){},save(file){saved=file;}});
+ assert.ok(saved.endsWith('epp-last-cycle-s2-primary.json'));
+});

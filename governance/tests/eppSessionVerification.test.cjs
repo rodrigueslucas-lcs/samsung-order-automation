@@ -90,3 +90,12 @@ test('verifier cleanup terminates only its exact owned process and waits for its
  await terminateOwnedVerifier({process:()=>child,kill:()=>assert.fail('already exited')},50);
  assert.deepEqual(calls,['SIGKILL']);
 });
+
+test('corporate gate with definitive anonymous identity permits identity recovery, not corporate activation replay',async()=>{
+ const {verify}=verifierFixture(null,true,{status:'HUMAN_REQUIRED',reason:'CORPORATE_ACTIVATION_REQUIRED'},{userAccepted:false,accessAccepted:true,reason:'SERVER_IDENTITY_NOT_PROVEN'});
+ await assert.rejects(verify({rootUrl:new URL('https://stg2.shop.samsung.com/co/multistore/co_epp_agre/co_epp_agre/')},{storageState:{},sessionStorage:{}}),e=>e.eppReason==='SERVER_IDENTITY_NOT_PROVEN'&&e.exitCode===79);
+});
+for(const identity of [{userAccepted:true,accessAccepted:true,reason:'SERVER_ACCEPTED'},{userAccepted:false,accessAccepted:false,reason:'SERVER_PROOF_PENDING'}])test('corporate gate cannot authorize login from '+identity.reason,async()=>{
+ const {verify}=verifierFixture(null,true,{status:'HUMAN_REQUIRED',reason:'CORPORATE_ACTIVATION_REQUIRED'},identity);
+ await assert.rejects(verify({rootUrl:new URL('https://stg2.shop.samsung.com/co/multistore/co_epp_agre/co_epp_agre/')},{storageState:{},sessionStorage:{}}),e=>e.eppReason==='CORPORATE_ACTIVATION_REQUIRED'&&e.exitCode===78);
+});

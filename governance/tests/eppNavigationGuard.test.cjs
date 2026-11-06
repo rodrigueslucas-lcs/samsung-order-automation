@@ -88,3 +88,13 @@ test('CL Flow return permits only its observed same-programme staging callback w
  assert.ok(blockedEppRequest({...cfg,market:'PE'},req));
  assert.equal(blockedEppRequest(cfg,{...req,url:'https://www.samsung.com/shop/'}).reason,'PRODUCTION_NAVIGATION_BLOCKED');
 });
+
+test('CO card return is restricted to the observed S2 programme callback and payment opt-in',()=>{
+ const cfg=getEppConfig('CO',{ENVIRONMENT:'S2',CO_EPP_PROGRAM:'co_epp_agre'});
+ const url='https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/co_epp_agre/carts/CO261104-12345678_261105134323053/paymentmodes/co-mercadoCC/response';
+ const req={url,document:true,top:true,allowCoCard:true};
+ for(const method of ['GET','POST'])assert.equal(blockedEppRequest(cfg,{...req,method}),null);
+ for(const changed of [{allowCoCard:false},{method:'DELETE'},{url:url.replace('/co_epp_agre/','/co/')},{url:url.replace('s2-smb-api','s1-smb-api')},{url:url.replace('co-mercadoCC','co-flowKhipu')},{url:url.replace('CO261104-12345678_261105134323053','invalid')}])assert.ok(blockedEppRequest(cfg,{...req,...changed}));
+ assert.ok(blockedEppRequest({...cfg,market:'CL'},req));
+ assert.equal(blockedEppRequest(cfg,{...req,url:'https://www.samsung.com/shop/'}).reason,'PRODUCTION_NAVIGATION_BLOCKED');
+});

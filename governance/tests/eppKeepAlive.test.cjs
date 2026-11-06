@@ -28,7 +28,7 @@ for(const reason of ['PRODUCTION_NAVIGATION_BLOCKED','VERIFICATION_CODE_REJECTED
 test('known external checkpoint is verified but never relogs while invalid',async()=>{const f=fixture(['INVALID']);f.state={blockedReason:'VERIFICATION_CODE_REJECTED'};assert.equal((await maintainIdentity(cfg,{allowRefresh:true},f.d)).reason,'VERIFICATION_CODE_REJECTED');assert.ok(!f.calls.includes('refresh'));});
 test('a now-healthy session clears a prior external blocker without login',async()=>{const f=fixture();f.state={blockedReason:'VERIFICATION_CODE_REJECTED'};assert.equal((await maintainIdentity(cfg,{},f.d)).status,'KEEP_ALIVE_OK');assert.equal(f.state.blockedReason,null);});
 test('CAPTCHA persists HUMAN_REQUIRED and only resumes an existing browser next time',async()=>{const f=fixture(['INVALID']);f.d.capture=async()=>({readEppSnapshot:async()=>null,dispose:async()=>{},closeVerified:async()=>assert.fail('human browser must stay open')});f.d.refresh=async(_cfg,_env,options)=>{f.calls.push(options.resumeOnly?'resume':'refresh');options.onHuman();return{status:'HUMAN_REQUIRED'};};assert.equal((await maintainIdentity(cfg,{allowRefresh:true},f.d)).status,'HUMAN_REQUIRED');assert.equal(f.state.human,true);assert.equal((await maintainIdentity(cfg,{allowRefresh:true},f.d)).status,'HUMAN_REQUIRED');assert.equal(f.calls.filter(c=>c==='refresh').length,1);assert.equal(f.calls.filter(c=>c==='resume').length,1);});
-test('missing retained browser never restarts a human login',async()=>{const f=fixture(['INVALID']);f.state={human:true};const r=await maintainIdentity(cfg,{allowRefresh:true},f.d);assert.equal(r.reason,'EPP_HANDOFF_BROWSER_MISSING');assert.ok(!f.calls.includes('refresh'));});
+test('missing retained browser permits one fresh recovery only after two definite invalid checks',async()=>{const f=fixture(['INVALID','INVALID','HEALTHY']);f.state={human:true};const r=await maintainIdentity(cfg,{allowRefresh:true},f.d);assert.equal(r.status,'REFRESHED');assert.equal(f.calls.filter(c=>c==='refresh').length,1);assert.ok(!f.calls.includes('resume'));assert.equal(f.calls.filter(c=>c==='verify').length,3);});
 
 test('an existing audited human window may resume after an inconclusive context check without starting login',async()=>{const f=fixture(['UNPROVEN','HEALTHY']);f.state={human:true};f.d.capture=async()=>({readEppSnapshot:async()=>null,dispose:async()=>{},closeVerified:async()=>{}});assert.equal((await maintainIdentity(cfg,{allowRefresh:true},f.d)).status,'REFRESHED');assert.ok(f.calls.includes('resume'));assert.ok(!f.calls.includes('refresh'));});
 
@@ -44,10 +44,10 @@ test('EPP SECOND has distinct files, profile and metadata; Base Store slot alias
 test('EPP bundle cannot be installed as Base Store or another slot/programme',()=>{const b=makeBundle(cfg,snapshot());assert.throws(()=>sessionContentHash(b),/Invalid session bundle/);assert.throws(()=>validateBundle({...cfg,authSlot:'second'},b),/mismatch/);assert.throws(()=>validateBundle({...cfg,environment:'S1'},b),/mismatch/);assert.throws(()=>makeBundle(cfg,{...snapshot(),proof:{userAccepted:false,accessAccepted:true}}),/Unproven/);assert.deepEqual(validateBundle(cfg,b).storageState,snapshot().storageState);});
 test('hash ignores cookie ordering, not cookie or store/slot contents',()=>{const s=snapshot();s.storageState.cookies.push({...s.storageState.cookies[0],name:'other'});const a=makeBundle(cfg,s);s.storageState.cookies.reverse();assert.equal(contentHash(a),contentHash(makeBundle(cfg,s)));assert.notEqual(contentHash(a),contentHash(makeBundle({...cfg,authSlot:'second'},s)));});
 
-test('one pending human EPP gate prevents another visible refresh in the regional cycle',async()=>{const f=fixture(['INVALID']);f.d.read=()=>({});f.d.save=()=>{};f.d.refresh=async()=>{f.calls.push('refresh');return{status:'HUMAN_REQUIRED'};};const result=await runCycle({markets:['MX','CO','CL'],allowRefresh:true},f.d);assert.equal(f.calls.filter(c=>c==='refresh').length,1);assert.equal(result.identities[0].status,'HUMAN_REQUIRED');assert.ok(result.identities.slice(1).every(r=>r.reason==='EPP_INTERACTIVE_GATE_PENDING'));});
+test('one pending human EPP gate prevents another visible refresh in the regional cycle',async()=>{const f=fixture(['INVALID']);f.d.read=()=>({});f.d.save=()=>{};f.d.refresh=async()=>{f.calls.push('refresh');return{status:'HUMAN_REQUIRED'};};const result=await runCycle({markets:['MX','CO','CL'],allowRefresh:true},f.d);assert.equal(f.calls.filter(c=>c==='refresh').length,1);assert.equal(result.identities[0].status,'HUMAN_REQUIRED');assert.equal(result.identities.find(r=>r.market==='CO').reason,'EPP_INTERACTIVE_GATE_PENDING');assert.equal(result.identities.find(r=>r.market==='CL').reason,'EPP_INTERACTIVE_GATE_PENDING');});
 
 test('CO S2 restricted programme verifies a real existing session without starting login',async()=>{
-  const restricted=getEppConfig('CO',{ENVIRONMENT:'S2',CO_EPP_PROGRAM:'co_epp_agre'});
+  const actual=getEppConfig('CO',{ENVIRONMENT:'S2',CO_EPP_PROGRAM:'co_epp_agre'}),restricted={...actual,programPolicy:{...actual.programPolicy,allowAutomaticRetry:false,knownStatus:'BLOCKED_CALLBACK_TO_PRODUCTION'}};
   assert.equal(restricted.programPolicy.allowAutomaticRetry,false);
   const f=fixture(['HEALTHY']);
   const r=await maintainIdentity(restricted,{allowRefresh:true,publish:false},f.d);
@@ -58,7 +58,7 @@ test('CO S2 restricted programme verifies a real existing session without starti
   assert.ok(f.calls.includes('persist'));
 });
 test('CO S2 restricted programme remains blocked after read-only verification fails',async()=>{
-  const restricted=getEppConfig('CO',{ENVIRONMENT:'S2',CO_EPP_PROGRAM:'co_epp_agre'});
+  const actual=getEppConfig('CO',{ENVIRONMENT:'S2',CO_EPP_PROGRAM:'co_epp_agre'}),restricted={...actual,programPolicy:{...actual.programPolicy,allowAutomaticRetry:false,knownStatus:'BLOCKED_CALLBACK_TO_PRODUCTION'}};
   const f=fixture([{status:'INVALID',reason:'SERVER_IDENTITY_NOT_PROVEN'}]);
   const r=await maintainIdentity(restricted,{allowRefresh:true,publish:true},f.d);
   assert.equal(r.status,'BLOCKED');
@@ -87,4 +87,44 @@ test('a verified MX profile removes its obsolete security checkpoint without a l
   assert.equal(r.status,'KEEP_ALIVE_OK');
   assert.equal(f.state.blockedReason,null);
   assert.ok(!f.calls.includes('refresh'));
+});
+
+test('S2 keepalive uses the same operational programmes as regional refresh',async()=>{
+ const f=fixture(),seen={};f.d.acquire=c=>{seen[c.market]=c.program;return{env:{},release(){}};};
+ await runCycle({environment:'S2',markets:['MX','PE','CO','CL'],env:{}},f.d);
+ assert.deepEqual(seen,{MX:'pymesmx',PE:'pe_membership_vip',CO:'co_epp_agre',CL:'alianzas'});
+ const explicit=fixture();explicit.d.acquire=c=>{assert.equal(c.program,'alianzas_co');return{env:{},release(){}};};
+ await runCycle({environment:'S2',markets:['CO'],env:{CO_EPP_PROGRAM:'alianzas_co'}},explicit.d);
+});
+test('current native corporate gate overrides stale invalid bundle without login replay',async()=>{
+ const f=fixture(['INVALID',{status:'BLOCKED',reason:'CORPORATE_ACTIVATION_REQUIRED',proof:{userAccepted:true,accessAccepted:true}}]);
+ let closed=false;f.d.capture=async()=>({readEppSnapshot:async()=>snapshot(),closeVerified:async()=>{closed=true;},dispose:async()=>{}});
+ const r=await maintainIdentity(cfg,{allowRefresh:true,publish:true},f.d);
+ assert.equal(r.status,'BLOCKED');assert.equal(r.reason,'CORPORATE_ACTIVATION_REQUIRED');assert.equal(r.proof.userAccepted,true);assert.equal(closed,false);
+ for(const forbidden of ['refresh','persist','package','publish'])assert.ok(!f.calls.includes(forbidden));
+});
+test('native transient failure cannot restart an audited human login',async()=>{
+ const f=fixture(['INVALID',{status:'UNPROVEN',reason:'SERVER_UNAVAILABLE'}]);
+ f.d.capture=async()=>({readEppSnapshot:async()=>snapshot(),dispose:async()=>{}});
+ const r=await maintainIdentity(cfg,{allowRefresh:true},f.d);
+ assert.equal(r.status,'UNPROVEN');assert.equal(r.reason,'SERVER_UNAVAILABLE');assert.ok(!f.calls.includes('refresh'));
+});
+
+test('restricted programme preserves current gate and proof instead of reporting only old callback policy',async()=>{
+ const actual=getEppConfig('CO',{ENVIRONMENT:'S2',CO_EPP_PROGRAM:'co_epp_agre'}),restricted={...actual,programPolicy:{...actual.programPolicy,allowAutomaticRetry:false,knownStatus:'BLOCKED_CALLBACK_TO_PRODUCTION'}};
+ const f=fixture([{status:'BLOCKED',reason:'CORPORATE_ACTIVATION_REQUIRED',proof:{userAccepted:true,accessAccepted:true}}]);
+ const r=await maintainIdentity(restricted,{allowRefresh:true},f.d);
+ assert.equal(r.reason,'CORPORATE_ACTIVATION_REQUIRED');assert.equal(r.blockerSource,'CURRENT');assert.equal(r.programPolicyReason,'BLOCKED_CALLBACK_TO_PRODUCTION');assert.equal(r.proof.userAccepted,true);assert.equal(r.loginAttempts,0);
+});
+
+test('missing human browser with inconclusive health cannot start login',async()=>{
+ const f=fixture(['UNPROVEN']);f.state={human:true};
+ const r=await maintainIdentity(cfg,{allowRefresh:true},f.d);
+ assert.equal(r.status,'HUMAN_REQUIRED');assert.ok(!f.calls.includes('refresh'));assert.ok(!f.calls.includes('resume'));
+});
+test('missing human browser still requires allow-refresh and never ignores security blocker',async()=>{
+ const f=fixture(['INVALID']);f.state={human:true};
+ assert.equal((await maintainIdentity(cfg,{allowRefresh:false},f.d)).status,'HUMAN_REQUIRED');assert.ok(!f.calls.includes('refresh'));
+ f.state={human:true,blockedReason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED'};
+ assert.equal((await maintainIdentity(cfg,{allowRefresh:true},f.d)).reason,'SAMSUNG_ACCOUNT_SECURITY_BLOCKED');assert.ok(!f.calls.includes('refresh'));
 });

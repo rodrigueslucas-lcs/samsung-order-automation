@@ -154,9 +154,20 @@ export async function addConfiguredEppProduct(page, cfg, { currencyPattern = /[$
     ...business.getEppCartTextPatterns(cfg.market),
     totalPattern: /^Total(?: con IVA)?$/i,
     footerAccountPattern: /Cuenta|Account/i,
-    checkoutButtonPattern: /^Continuar$|^Finalizar Compra$|^Checkout$/i,
+    checkoutButtonPattern: cfg.market==='CO'?/^Continuar con la compra$|^Continuar$|^Checkout$/i:/^Continuar$|^Finalizar Compra$|^Checkout$/i,
   });
   cart.screenshot = name => businessScreenshot(page, name);
+  if(cfg.market==='CO'){
+    business.assertStoreRoute(page.url(),cfg,/^cart\/?$/);
+    const quantity=page.getByRole('textbox',{name:'Quantity',exact:true});
+    await expect(quantity).toHaveCount(1);
+    const initial=Number(await quantity.inputValue());
+    if(!Number.isInteger(initial)||initial<1||initial>10)throw new Error('CO EPP cart quantity is outside its controlled QA limit.');
+    for(let value=initial;value>1;value--){
+      await page.getByRole('button',{name:'-',exact:true}).click();
+      await expect(quantity).toHaveValue(String(value-1),{timeout:30000});
+    }
+  }
   return cart;
 }
 

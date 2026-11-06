@@ -38,6 +38,19 @@ async function prepareEppCookie(page,config){
   await ready.waitFor({timeout:15000});
 }
 
+async function recoverActivatedEppLanding(page,config){
+  if(!isEppPage(page,config))return false;
+  const url=new URL(page.url());
+  if(url.pathname!==config.rootUrl.pathname+'multistore-register-success')return false;
+  const confirmation=await findEppVerifiedContinue(page);
+  if(confirmation)return false;
+  // This is the observed completed activation landing, not a rejected gate.
+  // Resume the same programme after staging setup; do not replay activation.
+  await prepareEppCookie(page,config);
+  await page.goto(config.rootUrl.href,{waitUntil:'commit',timeout:60000});
+  return true;
+}
+
 async function reuseNativeEppSession(config,{capture=require('../utils/authBrowserLifecycle.cjs').captureAuthBrowser,verify=verifyEppSnapshot,persist=persistVerifiedEppSession,credentials=getPrimaryEppCredentials}={}) {
   const files=getEppSessionPaths(config);
   const owned=await capture({market:config.market.toLowerCase(),environment:config.environment,slot:config.authSlot||'primary'},{profilesRoot:path.dirname(files.profile)});
@@ -67,9 +80,16 @@ function readHandoff(files) {
   catch { throw Object.assign(new Error("EPP handoff ownership/state requires manual review."), { exitCode: 79, eppReason: "HANDOFF_STATE_UNKNOWN" }); }
 }
 
+function manualProgrammeRevalidation(config, args = [], env = process.env) {
+  return args.includes('--revalidate-observed-program') && env.EPP_AUTH_MAINTENANCE !== '1' &&
+    config.market === 'CO' && config.environment === 'S2' && config.authSlot === 'primary' &&
+    config.program === 'co_epp_agre' && config.rootUrl.href === 'https://stg2.shop.samsung.com/co/multistore/co_epp_agre/co_epp_agre/' &&
+    config.programPolicy?.knownStatus === 'BLOCKED_CALLBACK_TO_PRODUCTION';
+}
+
 async function refresh(market, environment) {
   const config = getEppConfig(market, { ...process.env, ENVIRONMENT: environment, [`${String(market).toUpperCase()}_QST_ENVIRONMENT`]:environment });
-  if(config.programPolicy?.allowAutomaticRetry===false&&(process.env.EPP_AUTH_MAINTENANCE==='1'||config.programPolicy.knownStatus!=='AUTHENTICATED_STOREFRONT_ENTITLEMENT_UNKNOWN'))throw Object.assign(new Error('Programme is excluded from automatic login; independent investigation required.'),{exitCode:78,eppReason:config.programPolicy.knownStatus});
+  if(config.programPolicy?.allowAutomaticRetry===false&&(process.env.EPP_AUTH_MAINTENANCE==='1'||config.programPolicy.knownStatus!=='AUTHENTICATED_STOREFRONT_ENTITLEMENT_UNKNOWN')&&!manualProgrammeRevalidation(config,process.argv.slice(4)))throw Object.assign(new Error('Programme is excluded from automatic login; independent investigation required.'),{exitCode:78,eppReason:config.programPolicy.knownStatus});
   const resumeOnly = process.env.EPP_AUTH_RESUME_ONLY === '1';
   const interactiveTimeout = Number(process.env.EPP_AUTH_INTERACTIVE_TIMEOUT_MS || 600000);
   if (!Number.isFinite(interactiveTimeout) || interactiveTimeout < 1000 || interactiveTimeout > 600000) throw new Error('Invalid EPP interactive timeout.');
@@ -219,6 +239,7 @@ async function refresh(market, environment) {
     stage = "EPP_ACCESS";
     page = context.pages().find(candidate => isEppPage(candidate, config)) || context.pages().find(candidate => { try { return new URL(candidate.url()).origin === config.rootUrl.origin; } catch { return false; } }) || page;
     if (!isEppPage(page, config)) await page.goto(config.rootUrl.href, { waitUntil: "domcontentloaded", timeout: 60000 });
+    if(await recoverActivatedEppLanding(page,config))report('completed activation landing returned to canonical programme; no registration replay');
     if(callbackStatus)report('callback BROKEN_400 · canonical programme recovery once; login is not repeated');
     const email = page.locator('input[type="email"]:visible').first();
     const code = page.getByRole("textbox", { name: /verification|access code|c[oó]digo|clave de acceso/i }).or(page.getByPlaceholder(/verification|access code|c[oó]digo|clave de acceso/i)).filter({ visible: true }).first();
@@ -304,4 +325,4 @@ if (require.main === module) refresh(process.argv[2], process.argv[3] || "S2").c
   console.error(`[auth:epp] ${status} · ${error.eppStage || "PRECONDITIONS"} · ${error.eppReason || code} · browser preserved when intervention is needed; no raw provider error or credential printed.`);
   process.exitCode = error.exitCode || 1;
 });
-module.exports = { refresh, observe, isEppPage, needsEppBootstrap, prepareEppCookie, assertEppAuthContinuation, reuseNativeEppSession };
+module.exports = { refresh, observe, isEppPage, needsEppBootstrap, prepareEppCookie, recoverActivatedEppLanding, assertEppAuthContinuation, reuseNativeEppSession, manualProgrammeRevalidation };

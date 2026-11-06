@@ -66,6 +66,13 @@ async function verifyEppSnapshot(config, snapshot, { expectedEmail, timeout = 60
       // A definitive programme gate is not a rejected Samsung credential.
       // Repeating login cannot activate a corporate programme or fix its code.
       if(['CORPORATE_ACTIVATION_REQUIRED','VERIFICATION_CODE_REJECTED'].includes(ui.reason)) {
+        const identity=proof.snapshot();
+        if(ui.reason==='CORPORATE_ACTIVATION_REQUIRED'&&identity.accessAccepted&&
+          ['SERVER_AUTH_REJECTED','SERVER_IDENTITY_NOT_PROVEN'].includes(identity.reason)){
+          throw Object.assign(new Error('Programme gate is shown without an accepted Samsung identity.'),{
+            exitCode:79,eppReason:identity.reason,eppProof:identity,
+          });
+        }
         throw Object.assign(new Error('EPP programme prerequisite requires external resolution.'),{
           exitCode:78,eppReason:ui.reason,eppProof:proof.snapshot(),
         });

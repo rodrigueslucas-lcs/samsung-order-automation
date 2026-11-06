@@ -663,3 +663,48 @@ CO alianzas_co: after independent FIRST verification passed, headed SAM-24930 re
 Five PASS and one known defect; this consolidates targeted runs, not a new full campaign. Evidence: test-results/epp/pe/s2/2026-11-04T20-24-02-500Z-138992/results.json (four PASS; initial raw footer FAIL preserved) and test-results/epp/pe/s2/2026-11-04T20-35-58-516Z-145420/results.json (exact footer signature, known-defect annotation and blocked skip). Original STG1 Jira title is retained; the PE S2 mapping is supported by the independently observed empty-footer signature and restricted to pe_membership_vip. Partial footer differences, product failures and timeouts are never quarantined.
 
 Focused validation: 31/31 checkout/order/footer/reporting tests and 33/33 shared login/handoff tests passed; official scope and business-step gates passed. Runtime logs also include .agent/tmp/pe-s2-vip-renewed-targets.log, pe-s2-footer-known-runtime.log, pe-s2-epp-fresh-recovery.log, co-s2-epp-fresh-recovery.log and co-s2-rt53-current-add.log. No secrets or runtime state are tracked.
+
+## EPP keep-alive programme alignment — 2026-11-05
+
+S2 regional maintenance now selects the same operational programmes as `auth:refresh:epp:all`: MX pymesmx, PE pe_membership_vip, CO co_epp_agre, CL alianzas. An explicit programme override still wins; S1 routing and FIRST/SECOND isolation are unchanged. Programme selection is not entitlement proof. The historical CO S2 restriction was retired only after the independent staging proof recorded below; Production guards remain active.
+
+A current native browser result of BLOCKED or UNPROVEN is no longer discarded in favour of a stale invalid exported snapshot. This avoids an unnecessary login replay when the actual remaining prerequisite is corporate activation or when a native verification has a transient error. Only independently verified identity, programme access and storefront allow capture/package/publication and automatic window closure.
+
+Targeted keep-alive runs write market-scoped reports instead of replacing the regional scheduler report. A CO-only diagnostic cannot erase MX/PE/CL observations or satisfy the FIRST phase required before SECOND.
+
+CO runtime after the operator's CAPTCHA proved automatic password entry and submit. Registered identity and programme access were observed, but the storefront still required corporate verification. The supplied programme activation link was opened once in the owned profile; its staging SystemParking return was recovered once with cookie bootstrap before the canonical programme. This did not establish a durable independently verified commerce session. No CO payment/order was submitted. The link/token is not recorded in repository files.
+
+Validation: 54 focused keep-alive/programme/CLI/refresh-all tests passed; official business-step and repository architecture gates passed. Full operational session health is a separate runtime result; CAPTCHA/MFA and programme activation remain external gates, not guarantees that a session will stay authenticated forever.
+
+Further recovery fixes: a definitive anonymous `users/current` response alongside accepted programme access is classified as identity recovery even if the corporate gate is visible. A genuinely authenticated corporate gate and pending/network proof still cannot trigger login. An audited handoff whose browser no longer exists can recover once only after two definitive invalid checks and explicit allow-refresh, retaining security/external blockers and existing live windows. The expanded focused suite passed 71 tests. CO corporate activation reached multistore-register-success in the dedicated profile; the subsequent independent check still proved anonymous identity, so Samsung login recovery is awaiting its manual CAPTCHA. No new activation email or business submit was repeated.
+
+### CO S2 recovery and official targeted results — 2026-11-05
+
+The interim activation/anonymous observations above were superseded by new runtime evidence. The native QA profile had remained on `multistore-register-success`; recovery now bootstraps the staging cookie and returns once to the canonical **same programme**, without replaying registration. Independent verification proved authenticated `users/current`, accepted programme access and storefront for `co_epp_agre`. The verified bundle was exported, packaged and published; owned visible windows closed.
+
+A later CO-only keep-alive, with refresh disabled, returned `KEEP_ALIVE_OK / SESSION_REUSED`. No Samsung login or CAPTCHA was opened. Its bundle hash changed and Jenkins publication was acknowledged. Unchanged-hash suppression is covered by focused tests; an unchanged-hash runtime publication claim is not made. This CO proof does not establish runtime health for other programmes/markets or guarantee that server sessions never expire.
+
+| TC | Current S2 result | Evidence / remaining prerequisite |
+|---|---|---|
+| SAM-24929 | PASS | Actual PDP variants/selectors, QN85QN85DBKXZL |
+| SAM-24930 | PASS | Actual PDP Add to Cart |
+| SAM-24931 | PASS | Product, quantity, product-count summary and footer; CO localization fixed |
+| SAM-24942 | PASS | Hydrated contact form, document/person selection, actual Delivery transition |
+| SAM-24952 | BLOCKED / MASS_REQUIRED | Back to Top exists, but this cart has no tooltip trigger for the official behind-tooltip stacking scenario. Supply an eligible programme SKU/service; no footer-defect mapping or PASS is inferred. |
+| SAM-24953 | HUMAN_REQUIRED / CONSENT | Saved address and standard shipping persisted successfully. Registered FIRST email is read-only; Delivery requires marketing opt-in. Existing approval covered only the disposable QA recipient. Explicit FIRST approval is pending. No payment submitted; provider/card adapter remains unproven. |
+
+CO safe reruns normalize the one configured product to quantity 1 using bounded UI decrements; they do not clear other executions' artifacts or repeat a financial action. No CO order was created in this round.
+
+Runtime references (local ignored evidence): `.agent/tmp/co-s2-safe-after-activation.log`, `.agent/tmp/co-s2-cart-contact-corrected.log`, `test-results/epp/co/s2/2026-11-05T12-05-20-101Z-46924/results.json`, `.agent/tmp/co-epp-keepalive-verified-publish.log`, `.agent/tmp/co-epp-keepalive-reuse.log`. Focused validation: 89 auth/checkout/report tests and 21 real-DOM business-assertion tests passed. The wider refactor gate still reports unrelated dashboard expectation failures; no global green-gate claim is made.
+
+### CO S2 card completion — 2026-11-05
+
+The operator explicitly authorized the required marketing checkbox for the registered FIRST account for this staging execution. Delivery and Payment then rendered normally. The existing CO Base Store `MarketPaymentPage` and CO S2 test-card provider were reused after verifying Mercado Pago secure-field origins; card persistence remained disabled.
+
+Exactly one Place Order was executed. It created causal internal order `CO261104-78818651_261105134323053`, public number **CO261104-78818651**. The first capture timed out because the navigation guard blocked the observed same-programme staging `co-mercadoCC/response` callback. The guard now permits only CO S2/co_epp_agre, an order-shaped CO identifier, the exact card callback and GET/POST under payment opt-in. Other programmes/environments, unrelated callbacks and Production remain blocked. No financial submit was repeated.
+
+Read-only OCC lookup proved the causal order, configured SKU and quantity 1. The first UI check also found a localization defect in automation: CO says `Recibimos tu pedido de manera exitosa`, while the shared assertion accepted only `orden`. The assertion now accepts both exact success variants. After independently verified session recovery, the official targeted SAM-24953 passed in 43.0 seconds with `ALLOW_PAYMENT_SUBMIT=0 EPP_RESUME_PENDING_ORDER=1`. It verified the public number and confirmation of the existing causal order. This is frontend order/confirmation acceptance under the same operator criterion as CL; settlement is not asserted. The original marker and submit failure evidence are preserved.
+
+Current CO S2 coverage: **5 PASS / 1 BLOCKED (MASS_REQUIRED)** across six official cases. SAM-24952 still lacks the cart tooltip required by its official stacking scenario; the Back to Top control itself is present. No other CO case is awaiting corporate activation, product data or card consent in this validated result.
+
+Evidence: `.agent/tmp/co-card-single-submit-runtime.log`, `.agent/tmp/co-card-official-causal-confirmation.log`, and the associated isolated CO results directories. Validation: 38 focused payment/confirmation tests and nine navigation-guard tests passed; the CO card success test also checks the actual `pedido` wording. Earlier transient failed observations remain available; they are not relabeled PASS.

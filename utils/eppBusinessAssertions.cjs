@@ -1,6 +1,11 @@
 const { expect } = require('@playwright/test');
 
 function getEppCartTextPatterns(market) {
+  if(market==='CO')return {
+    cartPageTitlePattern:/Tienes\s+\d+\s+Producto(?:\(s\)|s)?\s+en\s+tu\s+carrito/i,
+    orderSummaryPattern:/^(?:Resumen|Resumen de la orden|Resumen de tu pedido)$/i,
+    summaryProductPattern:/\b\d+\s+Producto(?:\(s\)|s)?\b/i,
+  };
   return market==='CL' ? {
     cartPageTitlePattern:/Tienes\s+\d+\s+productos?\s+en\s+tu\s+carro/i,
     orderSummaryPattern:/^Resumen$/i,
@@ -101,6 +106,7 @@ async function proveTooltipAboveBackToTop(page) {
   if (!(await tooltip.isVisible())) {
     const trigger = page.getByRole('img', { name: 'service-item-title-tooltip', exact: true })
       .or(page.locator('[aria-describedby], [mattooltip], [ng-reflect-message]')).filter({ visible: true }).last();
+    if(await trigger.count()===0)throw Object.assign(new Error('The cart has no tooltip trigger for the official stacking scenario.'),{code:'EPP_TOOLTIP_TRIGGER_NOT_AVAILABLE'});
     await expect(trigger).toBeVisible();
     await trigger.hover();
   }
@@ -143,7 +149,7 @@ async function completeContact(page, config, customer) {
   assertStoreRoute(page.url(), config, /^checkout\//);
   const field = name => page.locator(`input[name="${name}"], input[formcontrolname="${name}"]`).filter({ visible: true }).first();
   const email = field('email');
-  await expect(email).toBeVisible();
+  await expect(email).toBeVisible({timeout:30000});
   if (config.market === 'MX') expect(await email.inputValue(), 'Registered MX contact must prefill email').toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
   else if (!(await email.inputValue())) {
     if (!customer.email) throw new Error('EPP contact fixture requires an email.');
@@ -159,6 +165,8 @@ async function completeContact(page, config, customer) {
     await page.getByRole('combobox', { name: /Tipo de documento/i }).click();
     await page.getByRole('option', { name: customer.documentType, exact: true }).click();
     await field('vatNumber').fill(customer.documentNumber);
+    const naturalPerson=page.getByRole('checkbox',{name:'Persona Natural',exact:true});
+    if(await naturalPerson.isVisible())await naturalPerson.check();
   }
   const groups = page.getByRole('radiogroup').filter({ visible: true });
   for (let i = 0; i < await groups.count(); i++) {
@@ -167,7 +175,7 @@ async function completeContact(page, config, customer) {
   }
   const terms = page.getByRole('checkbox', { name: /t[eé]rminos|privacidad/i }).filter({ visible: true });
   for (let i = 0; i < await terms.count(); i++) await terms.nth(i).check();
-  const next = page.getByRole('button', { name: /^Continuar$|Continuar al m[eé]todo de entrega|Continue to Delivery/i }).filter({ visible: true }).first();
+  const next = page.getByRole('button', { name: /^Continuar$|Continuar al m[eé]todo de entrega|Continuar con el m[eé]todo de env[ií]o|Continue to Delivery/i }).filter({ visible: true }).first();
   await expect(next).toBeEnabled();
   await next.click();
   await expect.poll(() => new URL(page.url()).searchParams.get('step'), { timeout: 30000 }).toBe('CHECKOUT_STEP_DELIVERY');

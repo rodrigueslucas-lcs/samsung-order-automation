@@ -25,3 +25,17 @@ test('reconciled CL order can prove confirmation only, retaining rejected-paymen
  await assert.rejects(run(page,{...cfg,market:'PE'},{...record,market:'PE'},{allowObservedOrder:true}),/own confirmed/);
 });
 
+test('reconciled CO order can prove confirmation only, retaining rejected-payment state',async()=>{
+ const cfg={market:'CO',environment:'S2',program:'co_epp_agre',rootUrl:new URL('https://stg2.shop.samsung.com/co/multistore/co_epp_agre/co_epp_agre/')};
+ const code='CO261104-12345678_261104120000',record={market:'CO',environment:'S2',kind:'card',status:'OBSERVED_ORDER',orderCode:code},calls=[];
+ let apiCode='CO261104-12345678';
+ const page={context:()=>({}),waitForResponse:async predicate=>{const r={url:()=>`https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/co_epp_agre/users/current/orders/${code}`,request:()=>({method:()=> 'GET'}),ok:()=>true,json:async()=>({code:apiCode})};assert.ok(predicate(r));calls.push('GET');return r;},goto:async()=>calls.push('confirmation')};
+ const run=vm.runInNewContext(source+'\nvalidateExistingEppCardOrder;',{URL,RegExp,session:{getPrimaryEppCredentials:()=>({})},server:{watchEppServerProof:()=>({settle:async()=>{},accepted:()=>true,stop(){}})},openEppStore:async()=>{},validateMxEppConfirmation:async()=>calls.push('UI'),test:{info:()=>({attach:async(_,attachment)=>{const proof=JSON.parse(attachment.body);assert.equal(proof.submitCount,0);assert.equal(proof.paymentAcceptanceProven,false);}})}});
+ await assert.rejects(run(page,cfg,record),/own confirmed/);
+ await run(page,cfg,record,{allowObservedOrder:true});
+ assert.deepEqual(calls,['GET','confirmation','UI']);assert.equal(record.status,'OBSERVED_ORDER');
+ apiCode=code;await run(page,cfg,record,{allowObservedOrder:true});
+ apiCode='CO261104-12345678_261104999999';await assert.rejects(run(page,cfg,record,{allowObservedOrder:true}),/causal public order/);
+ apiCode='CO261104-87654321';await assert.rejects(run(page,cfg,record,{allowObservedOrder:true}),/causal public order/);
+ await assert.rejects(run(page,{...cfg,market:'PE'},{...record,market:'PE'},{allowObservedOrder:true}),/own confirmed/);
+});

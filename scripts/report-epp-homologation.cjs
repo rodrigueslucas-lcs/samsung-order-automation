@@ -6,6 +6,7 @@ const markets = ['MX','CO','PE','CL'];
 function prerequisiteReason(description = '') {
   const additional=['PRODUCTION_NAVIGATION_BLOCKED','BLOCKED_CALLBACK_TO_PRODUCTION','PROGRAM_CONTEXT_NOT_PROVEN','SESSION_NOT_PROVEN','EPP_IDENTITY_REQUIRED','SAMSUNG_ACCOUNT_SECURITY_BLOCKED','HUMAN_REQUIRED'];
   const precise=additional.find(reason=>description.includes(reason));if(precise)return precise;
+  if(description.startsWith('MASS_REQUIRED:'))return 'MASS_REQUIRED';
   const exact=['AMBIGUOUS_EPP_ORDER_ATTEMPT','MISSING_OR_UNPROVEN_EPP_PLP','MISSING_OR_UNPROVEN_EPP_PRODUCT','MISSING_EPP_CONTACT_DATA','VERIFICATION_CODE_REJECTED','CORPORATE_ACTIVATION_REQUIRED','AUTH_OR_ENTITLEMENT_REQUIRED','EPP_COMMERCE_NOT_RENDERED','PAYMENT_FLOW_NOT_PROVEN','PAYMENT_SUBMIT_NOT_AUTHORIZED','PROVIDER_NOT_AVAILABLE','PAYMENT_DATA_REJECTED','ENVIRONMENT_DEFECT'];
   const classified=exact.find(reason=>description.includes(reason));if(classified)return classified;
   const rules = [
@@ -35,7 +36,7 @@ function classifyObservation(row){
   const reason=row.notes||'';
   if(/HUMAN_REQUIRED/.test(reason))return{classification:'HUMAN_REQUIRED',manualAction:'Complete the current dedicated verification challenge'};
   if(/AUTH_OR_ENTITLEMENT|IDENTITY_REQUIRED|SESSION_NOT_PROVEN|CORPORATE_ACTIVATION|SECURITY_BLOCKED/.test(reason))return{classification:'ACCESS_REQUIRED',manualAction:'Prove the isolated programme identity and entitlement; do not reuse Base Store proof'};
-  if(/MISSING_OR_UNPROVEN_EPP_(PLP|PRODUCT)|MISSING_EPP_CONTACT_DATA|VERIFICATION_CODE_REJECTED|PAYMENT_DATA_REJECTED/.test(reason))return{classification:'MASS_REQUIRED',manualAction:'Provide or prove eligible programme-specific data'};
+  if(/MASS_REQUIRED|MISSING_OR_UNPROVEN_EPP_(PLP|PRODUCT)|MISSING_EPP_CONTACT_DATA|VERIFICATION_CODE_REJECTED|PAYMENT_DATA_REJECTED/.test(reason))return{classification:'MASS_REQUIRED',manualAction:'Provide or prove eligible programme-specific data'};
   if(/MISSING_EXPECTED_CART_FOOTER|ENVIRONMENT_DEFECT/.test(reason))return{classification:'APPLICATION_BUG',manualAction:'Samsung must review the recorded UI defect; no Jira ID inferred'};
   if(/PRODUCTION|ENVIRONMENT_BLOCKER/.test(reason))return{classification:'ENVIRONMENT_BLOCKER',manualAction:'Correct staging routing or availability; Production remains blocked'};
   if(/AMBIGUOUS_EPP_ORDER_ATTEMPT/.test(reason))return{classification:'ACCESS_REQUIRED',manualAction:'Reconcile the existing provider initiation before any new submit'};

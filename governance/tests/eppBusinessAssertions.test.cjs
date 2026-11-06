@@ -24,13 +24,36 @@ test('CL EPP cart text accepts actual template padding and nonbreaking spaces',a
     assert.equal(await page.getByRole('heading',{name:patterns.orderSummaryPattern}).isVisible(),true);
   });
 });
-test('CL cart labels do not change other EPP market contracts',()=>{
-  for(const market of ['MX','PE','CO']){
+test('CL and CO cart labels do not change MX/PE contracts',()=>{
+  for(const market of ['MX','PE']){
     const patterns=getEppCartTextPatterns(market);
     assert.equal(patterns.cartPageTitlePattern.test('Tienes 1 producto en tu carrito'),true);
     assert.equal(patterns.orderSummaryPattern.test('Resumen de la orden'),true);
     assert.equal(patterns.orderSummaryPattern.test('Resumen'),false);
   }
+});
+
+test('CO EPP uses its observed cart count and summary without changing CL labels',async()=>{
+  await fixture('<p>Tienes 1 Producto(s) en tu carrito</p><h2>Resumen</h2>',async page=>{
+    const patterns=getEppCartTextPatterns('CO');
+    assert.equal(await page.getByText(patterns.cartPageTitlePattern).isVisible(),true);
+    assert.equal(await page.getByRole('heading',{name:patterns.orderSummaryPattern}).isVisible(),true);
+    assert.equal(patterns.cartPageTitlePattern.test('Tienes 1 producto en tu carrito'),true);
+    assert.equal(patterns.cartPageTitlePattern.test('Tienes 1 producto en tu carro'),false);
+  });
+});
+
+test('CO contact accepts the rendered shipping CTA and natural person without company opt-in',async()=>{
+  const co={market:'CO',rootUrl:new URL('https://stg2.shop.samsung.com/co/multistore/co_epp_agre/co_epp_agre/')};
+  const context=await browser.newContext();
+  try{
+    const page=await context.newPage();
+    const html='<input name="email"><input name="firstName"><input name="lastName"><input name="phone"><button role="combobox" aria-label="Tipo de documento" onclick="document.querySelector(\'#passport\').hidden=false">Documento</button><button id="passport" role="option" hidden>Número de pasaporte</button><input name="vatNumber"><label><input type="checkbox">Persona Natural</label><label><input type="checkbox">Compra (Empresa)</label><button onclick="if(document.querySelector(\'input[type=checkbox]\').checked&&!document.querySelectorAll(\'input[type=checkbox]\')[1].checked)location.search=\'?step=CHECKOUT_STEP_DELIVERY\'">Continuar con el método de envío</button>';
+    await page.route('**/*',r=>r.fulfill({contentType:'text/html; charset=utf-8',body:html}));
+    await page.goto(new URL('checkout/one?step=CHECKOUT_STEP_CONTACT_INFO',co.rootUrl).href);
+    await completeContact(page,co,{email:'fixture@example.test',firstName:'Cliente',lastName:'Prueba',phone:'3001234567',documentType:'Número de pasaporte',documentNumber:'AB1234567'});
+    assert.equal(new URL(page.url()).searchParams.get('step'),'CHECKOUT_STEP_DELIVERY');
+  }finally{await context.close();}
 });
 test('EPP rejects Production, Base Store, other programme and account as checkout proof', () => {
   for (const url of ['https://www.samsung.com/shop/', 'https://stg2.shop.samsung.com/mx/checkout/one', 'https://stg2.shop.samsung.com/mx/multistore/other/other/checkout/one', 'https://account.samsung.com/']) assert.throws(() => assertStoreRoute(url, config, /^checkout\//));
@@ -91,4 +114,13 @@ test('missing contact data is scoped to exact environment and market', () => {
   const io = { existsSync: () => true, readFileSync: () => JSON.stringify({ S1:{ MX:{ contact:{ firstName:'QA',lastName:'Fixture',phone:'5555555555' } } } }) };
   assert.equal(getEppContact(config, io), null);
   assert.ok(getEppContact({ ...config, environment:'S1' }, io));
+});
+
+test('CO cart summary uses rendered product-count subtotal while other markets retain Subtotal',()=>{
+ const co=getEppCartTextPatterns('CO');assert.equal(co.summaryProductPattern.test('Resumen 2 Productos $25.999.800'),true);assert.equal(co.summaryProductPattern.test('Resumen Total $25.999.800'),false);
+ for(const market of ['MX','PE','CL'])assert.equal(getEppCartTextPatterns(market).summaryProductPattern,undefined);
+});
+
+test('missing tooltip mass is distinct from a missing or incorrectly stacked Back to Top',async()=>{
+ await fixture('<button style="position:fixed;bottom:10px">Back to top</button>',page=>assert.rejects(proveTooltipAboveBackToTop(page),e=>e.code==='EPP_TOOLTIP_TRIGGER_NOT_AVAILABLE'));
 });

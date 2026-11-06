@@ -2,14 +2,9 @@
 // Reuses the existing guarded maintenance flow (Jenkins idle, leases, verify-first,
 // CAPTCHA handoff, programme policy, staging-only navigation, publish).
 const {main:keepAliveMain}=require('./auth-epp-keepalive-once.cjs');
-const {getEppConfig}=require('../config/markets/epp.js');
+const {getEppConfig,S2_OPERATIONAL_PROGRAMMES}=require('../config/markets/epp.js');
 
-const PRIMARY_PROGRAMMES=Object.freeze({
-  MX:'pymesmx',
-  PE:'pe_membership_vip',
-  CO:'co_epp_agre',
-  CL:'alianzas',
-});
+const PRIMARY_PROGRAMMES=S2_OPERATIONAL_PROGRAMMES;
 const MARKETS=Object.keys(PRIMARY_PROGRAMMES);
 
 function buildEnvironment(source=process.env){

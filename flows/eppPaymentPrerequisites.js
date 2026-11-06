@@ -5,7 +5,7 @@ import session from '../utils/eppSession.cjs';
 import server from '../utils/eppServerProof.cjs';
 import runtime from '../utils/eppRuntimeData.cjs';
 import assertions from '../utils/eppBusinessAssertions.cjs';
-import {submitMxEppCard,submitPeEppCard,submitClEppCard,validateMxEppConfirmation} from './eppMxCardPayment';
+import {submitMxEppCard,submitPeEppCard,submitClEppCard,submitCoEppCard,validateMxEppConfirmation} from './eppMxCardPayment';
 import attempts from '../utils/eppOrderAttempt.cjs';
 import {watchMxEppCashDetails,inspectMxEppCash} from './eppMxCashPrerequisites';
 import {completeClEppCheckout} from './eppClCheckout';
@@ -13,6 +13,7 @@ import {completePeEppCheckout,normalizeEppPaymentCart} from './eppPeCheckout';
 import clPaymentCart from './cl/paymentCart.cjs';
 import {validateExistingEppCardOrder} from './eppCardConfirmation';
 import {submitClEppBank} from './eppClBankPayment';
+import coCheckout from './co/eppCheckout.cjs';
 
 function enforceEppPayment(condition, reason, cfg) {
   if (!condition) return;
@@ -75,6 +76,9 @@ export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProvi
         if(!proof.accepted())return blocked('AUTH_OR_ENTITLEMENT_REQUIRED','EPP identity/entitlement was not retained at CL Delivery.','AUTH');
         return prerequisite;
       }
+    }else if(cfg.market==='CO'){
+      const prerequisite=await coCheckout.completeCoEppCheckout(page,cfg,capture);
+      if(prerequisite)return prerequisite;
     }else if(cfg.market==='PE'){
       const prerequisite=await completePeEppCheckout(page,cfg,capture);
       if(prerequisite)return prerequisite;
@@ -103,6 +107,20 @@ export async function runEppPaymentPrerequisiteCase(page,cfg,options){
   // This case includes a fresh cart, Contact, Delivery and provider discovery;
   // keep their bounded stage waits inside one explicit end-to-end budget.
   test.setTimeout(420000);
+  if(cfg.market==='CO'&&options?.kind==='card'){
+    // A repeat official run reads its confirmed causal order, never pays again.
+    const pending=attempts.pendingEppOrderAttempt(cfg,'card');
+    if(pending){
+      if(process.env.EPP_RESUME_PENDING_ORDER==='1'&&pending.status==='OBSERVED_ORDER'&&pending.orderCode){
+        await validateExistingEppCardOrder(page,cfg,pending,{allowObservedOrder:true});
+        await test.info().attach('CO card frontend acceptance',{body:JSON.stringify({market:'CO',environment:cfg.environment,program:cfg.program,orderCode:pending.orderCode,criteria:'CAUSAL_ORDER_AND_PUBLIC_CONFIRMATION',readOnly:true,submitCount:0,paymentSettlementAsserted:false,originalSubmitEvidencePreserved:true}),contentType:'application/json'});
+        return;
+      }
+      throw new Error('AMBIGUOUS_EPP_ORDER_ATTEMPT: reconcile existing CO payment before any cart mutation or submit.');
+    }
+    const confirmed=attempts.latestConfirmedEppOrder(cfg,'card');
+    if(confirmed){await validateExistingEppCardOrder(page,cfg,confirmed);return;}
+  }
   if(cfg.market==='PE'&&options?.kind==='card'&&!options.confirmationOnly&&!attempts.pendingEppOrderAttempt(cfg,'card')&&!attempts.pendingEppOrderAttempt(cfg,'cash')){
     const confirmed=attempts.latestConfirmedEppOrder(cfg,'card');
     // Revalidate the already proven PE card order before considering a new
@@ -189,9 +207,9 @@ export async function runEppPaymentPrerequisiteCase(page,cfg,options){
     enforceEppPayment(true,'PAYMENT_SUBMIT_NOT_AUTHORIZED: the proven MX S2 card adapter requires ALLOW_PAYMENT_SUBMIT=1.',cfg);
     throw new Error('PAYMENT_SUBMIT_NOT_AUTHORIZED: no cart or payment mutation is allowed.');
   }
-  const submit=['MX','PE','CL'].includes(cfg.market)&&(cfg.market==='MX'||cfg.environment==='S2')&&options?.kind==='card'&&process.env.ALLOW_PAYMENT_SUBMIT==='1';
+  const submit=['MX','PE','CL','CO'].includes(cfg.market)&&(cfg.market==='MX'||cfg.environment==='S2')&&options?.kind==='card'&&process.env.ALLOW_PAYMENT_SUBMIT==='1';
   const bank=cfg.market==='CL'&&cfg.environment==='S2'&&options?.kind==='transfer'&&process.env.ALLOW_PAYMENT_SUBMIT==='1';
-  const observed=await probeEppPaymentPrerequisites(page,cfg,{...options,onProviderReady:bank?submitClEppBank:submit?(cfg.market==='CL'?submitClEppCard:cfg.market==='PE'?submitPeEppCard:submitMxEppCard):null});
+  const observed=await probeEppPaymentPrerequisites(page,cfg,{...options,onProviderReady:bank?submitClEppBank:submit?(cfg.market==='CO'?submitCoEppCard:cfg.market==='CL'?submitClEppCard:cfg.market==='PE'?submitPeEppCard:submitMxEppCard):null});
   if(observed.status==='PASS'&&observed.orderCode)return;
   test.info().annotations.push({type:'epp-prerequisite',description:`${observed.reason}: ${observed.stage}`});
   enforceEppPayment(observed.status==='BLOCKED',`${observed.reason}: ${observed.detail}`,cfg);

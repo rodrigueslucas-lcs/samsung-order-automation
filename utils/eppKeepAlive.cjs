@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const {getEppConfig} = require('../config/markets/epp');
+const {getEppConfig,S2_OPERATIONAL_PROGRAMMES} = require('../config/markets/epp');
 const sessions = require('./eppSession.cjs');
 const {verifyEppSnapshot} = require('./eppSessionVerification.cjs');
 const {captureAuthBrowser} = require('./authBrowserLifecycle.cjs');
@@ -83,7 +83,11 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
     if(outcome.status!=='HEALTHY'||checkpoint.human) {
       owned=await d.capture(config);
       const native=await owned?.readEppSnapshot(config.rootUrl.href);
-      if(native){const inspected=await d.verify(config,native);if(inspected.status==='HEALTHY'){outcome=inspected;recovered=true;nativeVerified=true;}}
+      if(native){const inspected=await d.verify(config,native);if(inspected.status==='HEALTHY'){outcome=inspected;recovered=true;nativeVerified=true;}else if(inspected.status!=='INVALID'){
+        // A current programme gate or inconclusive native check cannot justify
+        // replaying login based on an older rejected exported snapshot.
+        outcome=inspected;
+      }}
     }
     if(outcome.status==='INVALID'&&!checkpoint.blockedReason) {
       const second=await d.verify(config,existing);
@@ -92,15 +96,17 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
     if(outcome.status!=='HEALTHY') {
       // Never initiate Account login for restricted programmes. Still report
       // the observed verifier result to distinguish policy from live evidence.
-      if(policyReason)return finish('BLOCKED',policyReason,{blockerSource:'PROGRAM_POLICY',currentReason:outcome.reason||'SESSION_NOT_VERIFIED',loginAttempts:0,session:base.session});
+      if(policyReason)return finish('BLOCKED',outcome.status==='BLOCKED'?outcome.reason:policyReason,{blockerSource:outcome.status==='BLOCKED'?'CURRENT':'PROGRAM_POLICY',currentReason:outcome.reason||'SESSION_NOT_VERIFIED',programPolicyReason:policyReason,proof:outcome.proof,loginAttempts:0,session:base.session});
       if(outcome.status==='BLOCKED') {d.save(config,{...checkpoint,blockedReason:outcome.reason});return finish('BLOCKED',outcome.reason,{proof:outcome.proof});}
       if(checkpoint.blockedReason)return finish('BLOCKED',checkpoint.blockedReason,{proof:outcome.proof,blockerSource:'CHECKPOINT',currentReason:outcome.reason,blockerObservedAt:checkpoint.blockerObservedAt});
       // Resume an audited existing human handoff only; never start a new login
       // because a network/context check was inconclusive.
       if(outcome.status!=='INVALID'&&!(checkpoint.human&&owned&&allowRefresh))return finish(checkpoint.human?'HUMAN_REQUIRED':'UNPROVEN',checkpoint.human?'EPP_HUMAN_PENDING':outcome.reason,{proof:outcome.proof});
       if(!allowRefresh||config.programPolicy?.allowAutomaticRetry===false)return finish(checkpoint.human?'HUMAN_REQUIRED':'BLOCKED',checkpoint.human?'EPP_HUMAN_PENDING':'EPP_AUTH_RECOVERY_REQUIRED',{proof:outcome.proof});
-      if(checkpoint.human&&!owned)return finish('HUMAN_REQUIRED','EPP_HANDOFF_BROWSER_MISSING');
-      const recovery=await d.refresh(config,runtimeEnv,{resumeOnly:!!checkpoint.human,onHuman:()=>{checkpoint={...checkpoint,human:true};d.save(config,checkpoint);}});
+      if(checkpoint.human&&!owned&&outcome.status!=='INVALID')return finish('HUMAN_REQUIRED','EPP_HANDOFF_BROWSER_MISSING');
+      // With no retained browser, two definitive invalid checks authorize one
+      // fresh recovery. An old handoff must not prevent recovery forever.
+      const recovery=await d.refresh(config,runtimeEnv,{resumeOnly:!!(checkpoint.human&&owned),onHuman:()=>{checkpoint={...checkpoint,human:true};d.save(config,checkpoint);}});
       if(recovery.status!=='REFRESHED') {
         if(recovery.status==='HUMAN_REQUIRED')d.save(config,{...checkpoint,human:true});
         if(recovery.status==='BLOCKED')d.save(config,{...checkpoint,blockedReason:recovery.reason});
@@ -129,7 +135,9 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
 async function runCycle({environment='S2',markets=['MX','PE','CO','CL'],slot='primary',...options}={},dependencies={}) {
   const lane=limitConcurrency(options.allowRefresh?1:2),results=[];let humanPending=false;
   await Promise.all(markets.map(market=>lane(async()=>{
-    try {const config=getEppConfig(market,{...options.env,ENVIRONMENT:environment,EPP_AUTH_SLOT:slot});
+    try {const scoped={...options.env,ENVIRONMENT:environment,EPP_AUTH_SLOT:slot};
+      if(environment==='S2'&&!scoped[`${market}_EPP_PROGRAM`]&&!scoped.EPP_PROGRAM)scoped[`${market}_EPP_PROGRAM`]=S2_OPERATIONAL_PROGRAMMES[market];
+      const config=getEppConfig(market,scoped);
       const result=await maintainIdentity(config,humanPending?{...options,allowRefresh:false}:options,dependencies);
       if(humanPending&&result.reason==='EPP_AUTH_RECOVERY_REQUIRED')result.reason='EPP_INTERACTIVE_GATE_PENDING';
       results.push(result);if(result.status==='HUMAN_REQUIRED')humanPending=true;

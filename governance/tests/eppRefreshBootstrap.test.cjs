@@ -30,3 +30,13 @@ test('late committed setup can complete without retrying navigation; an unproven
  assert.equal(calls,1);
  }
 });
+
+test('completed CO activation landing resumes cookie then canonical programme without replaying email',async()=>{
+ const {recoverActivatedEppLanding}=require('../../scripts/auth-refresh-epp.cjs');
+ const cfg=getEppConfig('CO',{ENVIRONMENT:'S2',CO_EPP_PROGRAM:'co_epp_agre'}),calls=[];let url=new URL('multistore-register-success',cfg.rootUrl).href;
+ const element={isVisible:async()=>false,waitFor:async()=>{}};
+ const p={url:()=>url,isClosed:()=>false,getByText:()=>({filter:()=>({first:()=>element})}),goto:async target=>{calls.push(target);url=target;}};
+ assert.equal(await recoverActivatedEppLanding(p,cfg),true);
+ assert.deepEqual(calls,['https://stg2.shop.samsung.com/getcookie.html',cfg.rootUrl.href]);
+ for(const value of [cfg.rootUrl.href,new URL('registration',cfg.rootUrl).href,'https://www.samsung.com/co/'])assert.equal(await recoverActivatedEppLanding({...p,url:()=>value},cfg),false);
+});
