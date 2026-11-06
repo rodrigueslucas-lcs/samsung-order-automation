@@ -28,10 +28,10 @@ test('cycle storage preserves only allowlisted reasons and drops account/session
  const value=cleanCycle(cycle([{market:'mx',slot:'primary',status:'TRANSIENT_ERROR',reason:'STOREFRONT_MAINTENANCE',cookie:'secret-cookie-token'},{market:'pe',slot:'primary',status:'UNPROVEN',reason:'secret-cookie-token'}]));
  assert.equal(value.identities[0].reason,'STOREFRONT_MAINTENANCE');assert.ok(!('reason'in value.identities[1]));assert.ok(!JSON.stringify(value).includes('secret-cookie-token'));
 });
-test('unverified session has a prominent warning even while scheduler is running',()=>{
+test('unverified session stays non-healthy in its explicit table row while scheduler runs',()=>{
  const identities=rows();identities[0]={...identities[0],status:'TRANSIENT_ERROR',reason:'STOREFRONT_MAINTENANCE'};
  const m=model(identities);assert.equal(m.sessions[0].reason,'STOREFRONT_MAINTENANCE');const html=render(m);
- assert.match(html,/AUTHENTICATION NOT CONFIRMED/);assert.match(html,/Staging maintenance blocks verification/);assert.match(html,/absence of a browser window does not prove authentication/);assert.ok(!html.includes('MANUAL ACTION REQUIRED'));
+ assert.notEqual(m.sessions[0].health,'HEALTHY');const row=html.match(/<tr data-identity="mx:primary">[\s\S]*?<\/tr>/)?.[0];assert.ok(row);assert.doesNotMatch(row,/>HEALTHY</);assert.match(row,/TRANSIENT ERROR/);assert.match(html,/Last verified is the last successful check/);assert.ok(!html.includes('MANUAL ACTION REQUIRED'));
 });
 test('six proven healthy identities clear the unconfirmed banner; real human gates keep their own warning',()=>{
  assert.ok(!render(model(rows())).includes('AUTHENTICATION NOT CONFIRMED'));
