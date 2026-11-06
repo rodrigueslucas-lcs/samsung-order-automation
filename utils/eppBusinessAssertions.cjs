@@ -152,8 +152,9 @@ async function waitForEppContactEmail(page,config,{timeout=30000}={}){
   const email=page.locator('input[name="email"], input[formcontrolname="email"]').filter({visible:true}).first();
   try{await expect(email).toBeVisible({timeout});}
   catch(error){
-    const panel=page.getByRole('region',{name:/^1\.\s*Detalles del cliente$/i});
-    const skeleton=config.market==='CO'&&config.environment==='S2'&&config.program==='co_epp_agre'&&new URL(page.url()).searchParams.get('step')==='CHECKOUT_STEP_CONTACT_INFO'&&await panel.count()===1&&await panel.locator('input').count()===0&&await page.getByRole('alert').filter({visible:true}).count()===0;
+    const panel=page.getByRole('region',{name:config.market==='MX'?/^1\.\s*Información de contacto$/i:/^1\.\s*Detalles del cliente$/i});
+    const observedProgramme=config.market==='CO'&&config.program==='co_epp_agre'||config.market==='MX'&&config.program==='pymesmx';
+    const skeleton=observedProgramme&&config.environment==='S2'&&new URL(page.url()).searchParams.get('step')==='CHECKOUT_STEP_CONTACT_INFO'&&await panel.count()===1&&await panel.locator('input').count()===0&&await page.getByRole('alert').filter({visible:true}).count()===0;
     if(!skeleton)throw error;
     // No field has been filled/submitted. Recover only this empty GET view.
     await page.reload({waitUntil:'domcontentloaded',timeout:60000});

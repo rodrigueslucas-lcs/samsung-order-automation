@@ -820,3 +820,17 @@ Final validation after the lazy-form fix: authorized repo:refactor:gate PASS (12
 - Operator completed CO FIRST verification. Independent identity/access passed, updated bundle published, owned browser closed. Regional read-only cycle at 2026-11-06T20:50:04.848Z proved four KEEP_ALIVE_OK identities (MX pymesmx, PE pe_membership_vip, CO co_epp_agre, CL alianzas). No new financial submit or EPP Jenkins job was introduced.
 
 Functional completion remains subject to the unresolved MX cash and CL bank initiations, footer SAM-25146 and suitable CO tooltip mass/reproduction. Issue association is not a false PASS or proof of an unmatched signature. Local payment commands can still be blocked by durable unresolved initiation guards.
+
+## Current operator reproduction — 2026-11-06
+
+Supersedes earlier current-round counts, without removing historical evidence. The operator's full batch was 12 PASS / 7 FAIL / 7 BLOCKED. After corrective targeted headed runs, latest current-round observations are MX 5 PASS/2 BLOCKED; CL 3 PASS/4 FAIL; PE 5 PASS/1 BLOCKED; CO 4 PASS/2 BLOCKED: total 17 PASS, 4 FAIL, 5 BLOCKED, zero NOT_RUN. This is not a new full integrated four-market campaign and not 26/26 homologation.
+
+MX setup/PDP/contact and CO pickup billing automation faults were corrected and reexecuted through public npm runners. CO SAM-24953 created and validated new order CO261106-78840076; no pending CO card marker remains.
+
+Remaining prerequisites:
+- MX original cash initiation still requires authoritative provider reference/final outcome; SAM-25046 remains associated with RT-779284. Do not remove the unresolved marker to unblock another submit.
+- CL unresolved transfer from 2026-11-06T16:52:43.527Z requires gateway/backend reconciliation. Its unknown timeout is not evidence of the SAM-25161 HTTP403 signature. Current card/bank and same-campaign confirmation cannot be promoted using historical orders.
+- Footer SAM-25146 remains reproduced in CL, PE and CO current cart checks; CL is raw FAIL, PE/CO are narrowly classified known-defect BLOCKED.
+- CO SAM-24952 remains MASS_REQUIRED: supply an authorized EPP product/service with an actual cart tooltip trigger, expected text and steps. RT-746043 is associated; absent trigger does not prove stacking failure.
+
+Current auth allowed all four headed safe reruns without a new login. This does not guarantee future session validity or resolve functional dependencies. Details/evidence and the corrected non-cumulative totals are in EPP_LOCAL_STABILIZATION.md and ignored operator-headed-round reporting.

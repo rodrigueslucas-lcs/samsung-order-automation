@@ -50,11 +50,27 @@ function executeRun(run, { acquire = acquireEppLease, spawn = spawnSync } = {}) 
 function classifyRunFailure(error){
   return error?.code==='AUTH_BUSY'?{message:'[epp-qst] BUSY: the EPP market lane has an active or unverified owner; no test or payment was started.',exitCode:73}:{message:'[epp-qst] Invalid EPP configuration, target or launch. No runtime secrets are printed.',exitCode:1};
 }
+function summarizeRun(run,{io=fs,log=console.log}={}){
+  if(run.command.includes('--list'))return [];
+  const file=path.join(run.output,'results.json');
+  if(!io.existsSync(file))return [];
+  try{
+    const document=JSON.parse(io.readFileSync(file,'utf8'));
+    const rows=require('./report-epp-homologation.cjs').extractResults(document),scope=document.config?.metadata?.epp;
+    const registry=require('../governance/known-defects.json').defects;
+    for(const row of rows){
+      const related=row.result==='PASS'?[]:registry.filter(d=>d.store==='EPP'&&d.market===scope?.market&&d.environment===scope?.environment&&d.samId===row.tc).map(d=>d.jira);
+      log(`[epp-result] ${row.tc} · ${row.result} · ${row.notes}${related.length?' · associated issue: '+related.join(', '):''}`);
+    }
+    return rows;
+  }catch{log('[epp-result] Runtime summary unavailable; original execution exit code is preserved.');return [];}
+}
 if (require.main === module) {
   try {
     const run = buildRun(process.argv[2], process.argv.slice(3));
     console.log(`[epp-qst] ${run.env.TEST_MARKET} ${run.env.ENVIRONMENT} · EPP · ${run.ids.length} official TCs · isolated context · retries 0`);
     process.exitCode = executeRun(run);
+    summarizeRun(run);
   } catch(error) { const failure=classifyRunFailure(error);console.error(failure.message);process.exitCode=failure.exitCode; }
 }
-module.exports = { buildRun, executeRun, classifyRunFailure };
+module.exports = { buildRun, executeRun, classifyRunFailure, summarizeRun };

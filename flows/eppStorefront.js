@@ -20,6 +20,16 @@ function enforceEppQst(condition, reason, cfg) {
 const CODE_INPUT = /verification|verify|access code|c[oó]digo|clave de acceso/i;
 const CODE_BUTTON = /verify|continue|enter|submit|access|ingresar|continuar|validar|acceder/i;
 
+export async function recoverEppPdpContent(page,cfg,state,inspect){
+  const current=new URL(page.url());
+  if(cfg.environment!=='S2'||state.reason!=='COMMERCE_CONTENT_NOT_RENDERED'||!cfg.pdpUrl||current.href!==cfg.pdpUrl.href)return state;
+  // Only this already requested PDP GET may be recovered. No access gate,
+  // cart mutation, identity submission or payment is replayed here.
+  await page.reload({waitUntil:'domcontentloaded',timeout:60000});
+  await expect.poll(async()=> (await inspect()).reason!=='COMMERCE_CONTENT_NOT_RENDERED',{timeout:30000}).toBeTruthy().catch(()=>{});
+  return inspect();
+}
+
 export async function openEppStore(page, cfg, {identityProof=null}={}) {
   await eppOverlays.installEppOverlayDismissal(page,cfg);
   const entry = new URL(cfg.entryUrl);
@@ -43,7 +53,11 @@ export async function openEppStore(page, cfg, {identityProof=null}={}) {
     const state = await inspect();
     return ["READY", "CODE_REQUIRED", "HUMAN_REQUIRED"].includes(state.status) || ['OUTSIDE_EPP_STORE','VERIFICATION_CODE_REJECTED'].includes(state.reason);
   }, { timeout: 45000 }).toBeTruthy().catch(() => {});
-  const initial = await inspect();
+  const initial = await recoverEppPdpContent(page,cfg,await inspect(),inspect);
+  if(cfg.environment==='S2'&&initial.reason==='COMMERCE_CONTENT_NOT_RENDERED'){
+    await businessScreenshot(page,'epp-commerce-not-rendered');
+    throw new Error('EPP_COMMERCE_RENDER_FAILED: expected storefront content did not render after bounded GET recovery; this is not a prerequisite skip.');
+  }
   enforceEppQst(['BLOCKED','HUMAN_REQUIRED'].includes(initial.status), `BLOCKED: ${cfg.market} ${cfg.environment} EPP ${initial.status}: ${initial.reason}; no login/code retry.`,cfg);
 
   if (cfg.accessMode === "verification-code" && cfg.verificationCode) {
@@ -135,7 +149,7 @@ export async function inspectEppAccess(page, cfg) {
   return accessState.proveEppAccess(page, cfg);
 }
 
-export async function addConfiguredEppProduct(page, cfg, { currencyPattern = /[$S/]\s*[\d.,]+/, fromPlp = false, resetMxCart = false } = {}) {
+export async function addConfiguredEppProduct(page, cfg, { currencyPattern = /[$S/]\s*[\d.,]+/, fromPlp = false, resetMxCart = cfg.market==='MX' } = {}) {
   if (!cfg.pdpUrl || !cfg.sku) {
     throw new Error(`${cfg.market} ${cfg.environment} EPP needs ${cfg.market}_EPP_QST_PDP_URL and ${cfg.market}_EPP_QST_SKU for product/cart scenarios.`);
   }
@@ -173,18 +187,21 @@ export async function addConfiguredEppProduct(page, cfg, { currencyPattern = /[$
     checkoutButtonPattern: cfg.market==='CO'?/^Continuar con la compra$|^Continuar$|^Checkout$/i:/^Continuar$|^Finalizar Compra$|^Checkout$/i,
   });
   cart.screenshot = name => businessScreenshot(page, name);
-  if(cfg.market==='CO'){
+  if(cfg.market==='CO'||cfg.environment==='S2'&&['PE','CL'].includes(cfg.market))await normalizeEppCartQuantity(cart,cfg);
+  return cart;
+}
+
+export async function normalizeEppCartQuantity(cart,cfg){
+    const page=cart.page;
     business.assertStoreRoute(page.url(),cfg,/^cart\/?$/);
     const quantity=page.getByRole('textbox',{name:'Quantity',exact:true});
-    await expect(quantity).toHaveCount(1);
+    await expect(quantity).toHaveCount(1,{timeout:30000});
     const initial=Number(await quantity.inputValue());
-    if(!Number.isInteger(initial)||initial<1||initial>10)throw new Error('CO EPP cart quantity is outside its controlled QA limit.');
+    if(!Number.isInteger(initial)||initial<1||initial>10)throw new Error(`${cfg.market} EPP cart quantity is outside its controlled QA limit.`);
     for(let value=initial;value>1;value--){
       await page.getByRole('button',{name:'-',exact:true}).click();
       await expect(quantity).toHaveValue(String(value-1),{timeout:30000});
     }
-  }
-  return cart;
 }
 
 export async function validateEppCartUi(cart,{market,environment,program}={}) {

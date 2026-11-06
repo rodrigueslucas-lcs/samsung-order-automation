@@ -212,7 +212,7 @@ Specific request to Samsung/India for SAM-24952: provide a currently approved, p
 Final restricted confirmation regression also verifies that missing order route identity (including orders/null-style behavior) and another public order stay failed. Only the proven CO internal/public alias can use its own scoped API/UI reader. Additional negative regressions26/26 PASS after the broad gate1205/1205; no fallback payment or generic URL acceptance added.
 
 Operator is away. No new login was started after that instruction. CL dedicated FIRST challenge remains owned by the existing keep-alive and must be completed/revalidated on return; PE Account security denial needs official review, not a CAPTCHA bypass. Autonomous work and QA cart cleanup are complete; full local homologation is still prevented by these access gates and the documented external cash/footer/tooltip prerequisites.
-## Latest operator-return validation — 2026-11-06
+## Latest operator-return validation — 2026-11-06 (superseded by operator reproduction below)
 
 Supersedes earlier current-round counts and CL/PE access status below. Dedicated CL/PE FIRST sessions independently returned READY; their login browsers closed. Full headless CL and PE campaigns ran, without Base Store/SECOND changes.
 
@@ -228,3 +228,37 @@ All 26 entered runtime; 20 PASS. New frontend-confirmed card orders: CL `CL26103
 CL bank component mount wait was corrected from the default five seconds to a bounded 60 seconds before any financial marker. Three focused bank tests and 25 payment/campaign regression tests passed. The real recheck advanced to a single submit but timed out without an observable order. Its marker is preserved; read-only own-programme history returned 200 but did not resolve it. No resubmit or false PASS. See EPP_EXTERNAL_DEPENDENCIES.md for exact evidence and requested gateway reconciliation. CL footer remains FAIL; PE footer remains known-defect BLOCKED, both SAM-25146.
 
 Final authorized integrated rerun PASS: repo:refactor:gate, including1206/1206 governance tests, official scope/steps/architecture, reporting/discovery and runtime/reporting integrity. Focused payment25/25 PASS; prior Base Store regression43/43 PASS. Initial sandbox-only gate could not spawn its browser (EPERM); the authorized rerun passed. git diff --check PASS; staged files0; no commit/push, all WIP retained.
+
+## Operator reproduction and automation corrections — 2026-11-06
+
+This section supersedes all earlier current-round totals. Historical PASS across separate campaigns is not proof that one full local campaign reproduces those results. The operator's four full campaigns after 21:00 UTC produced 12 PASS, 7 FAIL and 7 BLOCKED. The previously communicated 21/26 was not a reproducible campaign result.
+
+After targeted headed reruns through the public market npm runners, the latest observation per official TC within this same operator round is:
+
+| Market | PASS | FAIL | BLOCKED | NOT_RUN |
+|---|---:|---:|---:|---:|
+| MX | 5 | 0 | 2 | 0 |
+| CL | 3 | 4 | 0 | 0 |
+| PE | 5 | 0 | 1 | 0 |
+| CO | 4 | 0 | 2 | 0 |
+| Total | 17 | 4 | 5 | 0 |
+
+These are 26 attempted cases assembled from the operator campaigns and corrective targeted reruns, not one new full four-market campaign. Evidence: ignored test-results/epp/homologation/operator-headed-round.json and operator-headed-round.md. Historical evidence is retained separately.
+
+Automation causes and corrections:
+- MX setup accumulated five units across tests, eventually invalidating Add responses. Every normal MX setup now clears the controlled cart through existing UI/API proof before one Add. CO quantity normalization is preserved; PE/CL S2 also normalize repeated setup quantity through visible controls.
+- S2 PDP could initially return an empty commerce view. One read-only reload is allowed only for the exact configured PDP and exact missing-commerce signature. Persistent missing commerce now fails explicitly instead of becoming an unexplained skip.
+- MX contact could mount headings but an empty Contact region. A single read-only reload is restricted to that proven S2 pymesmx skeleton, without alerts or visible inputs.
+- CO pickup exposed a hidden disabled sameAsShipping control. Checkout now proves the visible selected saved billing address instead of attempting to check that inapplicable control.
+- Runners print each current TC result and typed reason, including associated issue references for non-PASS. They do not rewrite raw results or exit codes.
+
+Real headed corrective runs:
+- MX 2026-11-06T21-15-23-298Z-35252: SAM-25020/21/22/34/44, 5 PASS, zero skips.
+- PE 2026-11-06T21-22-12-723Z-16756: 3 safe PASS, one exact footer BLOCKED.
+- CO 2026-11-06T21-25-47-251Z-11144: 3 safe PASS, footer and missing-tooltip fixture BLOCKED.
+- CL 2026-11-06T21-30-10-180Z-40204: 3 safe PASS, exact footer FAIL.
+- CO 2026-11-06T21-39-43-384Z-61832: SAM-24953 PASS, new order CO261106-78840076, confirmationValidated=true. One financial attempt; no settlement claim.
+
+No MX/CL payment replay was performed. Their durable unresolved cash/transfer markers remain intact. CL card/bank precondition failures and missing current-campaign confirmation remain visible; historical PASS cannot replace them. Known defect associations remain RT-779284, SAM-25161, SAM-25146 and RT-746043, with narrow causal matching.
+
+Validation: 87/87 focused regression tests PASS, zero skips, including mocked browser billing, deterministic cart, PDP recovery, contact, runner, payment prerequisites and known-defect reporting. The initial sandbox attempt could not launch Chromium (spawn EPERM); the authorized identical rerun passed. Official scope, steps and architecture gates PASS. Base Store source was not modified; prior Base Store regression evidence is not presented as a new runtime campaign. Local full homologation remains incomplete.

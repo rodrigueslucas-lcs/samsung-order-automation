@@ -131,4 +131,11 @@ test('CO empty contact skeleton gets one GET recovery before any field submissio
 
 test('PE waits for delayed login choices and never clicks guest checkout as a registered substitute',async()=>{await fixture('<div id="choices"></div><script>setTimeout(()=>{document.querySelector("#choices").innerHTML="<button>Samsung Checkout Express</button><button>Checkout como invitado</button>"},300)</script>',async page=>{assert.equal(await require('../../utils/eppBusinessAssertions.cjs').waitForPeRegisteredCheckout(page,page.getByRole('button',{name:'Continuar',exact:true})),false);});});
 test('PE registered Continue is available without requiring guest choices',async()=>{await fixture('<button>Continuar</button>',async page=>{assert.equal(await require('../../utils/eppBusinessAssertions.cjs').waitForPeRegisteredCheckout(page,page.getByRole('button',{name:'Continuar',exact:true})),true);});});
+
+test('MX exact empty contact skeleton recovers its GET once without bypassing Contact',async()=>{
+ const cfg={market:'MX',environment:'S2',program:'pymesmx',rootUrl:new URL('https://stg2.shop.samsung.com/mx/multistore/pymesmx/pymesmx/')};
+ await fixture('<section role="region" aria-label="1. Información de contacto"><input name="email"></section><script>sessionStorage.n=Number(sessionStorage.n||0)+1;if(sessionStorage.n==="1")document.querySelector("section").replaceChildren();</script>',async page=>{
+  const email=await require('../../utils/eppBusinessAssertions.cjs').waitForEppContactEmail(page,cfg,{timeout:100});assert.equal(await email.count(),1);assert.equal(await page.evaluate(()=>sessionStorage.n),'2');
+ },'checkout/one?step=CHECKOUT_STEP_CONTACT_INFO',cfg.rootUrl);
+});
 test('PE incomplete or hidden login choices do not invent an authentication block',async()=>{await fixture('<button>Samsung Checkout Express</button><button hidden>Checkout como invitado</button>',async page=>{await assert.rejects(require('../../utils/eppBusinessAssertions.cjs').waitForPeRegisteredCheckout(page,page.getByRole('button',{name:'Continuar',exact:true}),{timeout:300}));});});

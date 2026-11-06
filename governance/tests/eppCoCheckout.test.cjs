@@ -7,7 +7,16 @@ test('CO checkout rejects Production, Base Store, other programmes and S1 before
  for(const url of ['https://www.samsung.com/co/checkout/one','https://stg2.shop.samsung.com/co/checkout/one','https://stg2.shop.samsung.com/co/multistore/alianzas_co/alianzas_co/checkout/one'])assert.throws(()=>assertCoEppCheckout(page(url),cfg),/left/);
  assert.throws(()=>assertCoEppCheckout({}, {...cfg,environment:'S1'}),/proven/);
 });
-function consentFixture(){const checked=new Set(),calls=[];return{calls,checked,page:{locator:selector=>{const name=selector.match(/name="([^"]+)"/)[1];return{count:async()=>1,getAttribute:async()=>name==='marketingOptIn'?'':null,isChecked:async()=>checked.has(name),check:async()=>{checked.add(name);calls.push(name);}};}}};}
+function consentFixture(){const checked=new Set(),calls=[];return{calls,checked,page:{locator:selector=>{const name=selector.match(/name="([^"]+)"/)[1];return{count:async()=>1,getAttribute:async()=>name==='marketingOptIn'?'':null,isVisible:async()=>true,isEnabled:async()=>true,isChecked:async()=>checked.has(name),check:async()=>{checked.add(name);calls.push(name);}};}}};}
+
+test('CO pickup validates its saved billing address without clicking the disabled shipping-copy field',async()=>{
+ const {chromium}=require('@playwright/test'),browser=await chromium.launch({headless:true});
+ try{const page=await browser.newPage();await page.setContent('<input name="sameAsShipping" type="checkbox" disabled hidden><app-billing-address-v2><input type="radio" aria-label="Dirección guardada" checked><input type="radio" aria-label="QA street, QA city" checked id="saved"></app-billing-address-v2>');
+  await require('../../flows/co/eppCheckout.cjs').ensureCoEppBilling(page);assert.equal(await page.locator('[name=sameAsShipping]').isChecked(),false);
+  await page.locator('#saved').uncheck().catch(()=>{});await page.evaluate(()=>document.querySelector('#saved').checked=false);
+  await assert.rejects(require('../../flows/co/eppCheckout.cjs').ensureCoEppBilling(page));
+ }finally{await browser.close();}
+});
 test('approval for disposable email does not silently subscribe FIRST',async()=>{
  const f=consentFixture();const result=await acceptCoEppCheckoutTerms(f.page,{qaRecipient:false,env:{}});
  assert.equal(result.reason,'HUMAN_REQUIRED');assert.deepEqual(f.calls,[]);

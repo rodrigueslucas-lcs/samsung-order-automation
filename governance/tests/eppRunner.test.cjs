@@ -2,6 +2,21 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { buildRun, executeRun } = require("../../scripts/run-epp-qst.cjs");
 const { buildMatrix } = require("../../scripts/discover-epp-access.cjs");
+
+test('normal runtime prints typed current-run PASS/BLOCKED reasons without raw secrets; discovery never reads results',()=>{
+ const {summarizeRun}=require('../../scripts/run-epp-qst.cjs'),lines=[];
+ const document={suites:[{specs:[{title:'SAM-25020 test',tests:[{annotations:[{type:'skip',description:'AUTH_OR_ENTITLEMENT_REQUIRED private-token-fixture'}],results:[{status:'skipped'}]}]},{title:'SAM-25021 test',tests:[{results:[{status:'passed'}]}]}]}]};
+ const rows=summarizeRun({command:[],output:'fixture'},{io:{existsSync:()=>true,readFileSync:()=>JSON.stringify(document)},log:s=>lines.push(s)});
+ assert.equal(rows.length,2);assert.match(lines[0],/SAM-25020 · BLOCKED · AUTH_OR_ENTITLEMENT_REQUIRED/);assert.match(lines[1],/SAM-25021 · PASS/);assert.ok(!lines.join('').includes('private-token'));
+ assert.deepEqual(summarizeRun({command:['--list']},{io:{existsSync:()=>assert.fail('discovery cannot inspect runtime')},log:()=>assert.fail('unexpected log')}),[]);
+});
+test('terminal summary displays the associated Jira without relabeling an unmatched prerequisite as PASS or known defect',()=>{
+ const {summarizeRun}=require('../../scripts/run-epp-qst.cjs'),lines=[];
+ const document={config:{metadata:{epp:{market:'CO',environment:'S2'}}},suites:[{specs:[{title:'SAM-24952 test',tests:[{annotations:[{type:'skip',description:'MASS_REQUIRED: no tooltip trigger'}],results:[{status:'skipped'}]}]}]}]};
+ const rows=summarizeRun({command:[],output:'fixture'},{io:{existsSync:()=>true,readFileSync:()=>JSON.stringify(document)},log:s=>lines.push(s)});
+ assert.equal(rows[0].result,'BLOCKED');assert.match(lines[0],/associated issue: RT-746043/);assert.doesNotMatch(lines[0],/PASS|KNOWN_DEFECT/);
+});
+
 test("EPP list discovery acquires no identity lock", () => {
   assert.equal(executeRun(buildRun("PE", ["--list"], {}), {
     acquire: () => { throw new Error("must not acquire"); }, spawn: () => ({ status: 0 }),

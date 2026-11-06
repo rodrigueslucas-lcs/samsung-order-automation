@@ -54,12 +54,25 @@ async function selectCoEppPickupDelivery(page,cfg){
   if(!chosen)throw new Error('CO EPP pickup has no enabled appointment; no payment submitted.');
 }
 
+async function ensureCoEppBilling(page){
+  const same=page.locator('input[name="sameAsShipping"]');
+  if(!await same.count()||await same.isChecked())return;
+  if(await same.isVisible()&&await same.isEnabled()){await same.check();return;}
+  // Pickup has no shipping address to copy. The observed billing component
+  // must already prove a selected saved address; hidden fields stay untouched.
+  const billing=page.locator('app-billing-address-v2');
+  await expect(billing).toBeVisible();
+  await expect(billing.getByRole('radio',{name:/^Dirección guardada$/i})).toBeChecked();
+  await expect(billing.getByRole('radio',{name:/,/,checked:true})).toHaveCount(1);
+}
+
 async function acceptCoEppCheckoutTerms(page,{qaRecipient=false,env=process.env}={}){
   const marketing=page.locator('input[name="marketingOptIn"]');
   if(await marketing.count()&&await marketing.getAttribute('required')!==null&&!await marketing.isChecked()&&!qaRecipient&&env.CO_EPP_ALLOW_PRIMARY_MARKETING!=='1'){
     return {status:'BLOCKED',reason:'HUMAN_REQUIRED',stage:'CONSENT',detail:'The registered FIRST recipient requires explicit marketing opt-in approval; prior disposable-email approval does not cover this account.'};
   }
-  for(const name of ['sameAsShipping','termsAndCondition','privacyPolicy','termsAndConditionDeliveryInstallation']){
+  await ensureCoEppBilling(page);
+  for(const name of ['termsAndCondition','privacyPolicy','termsAndConditionDeliveryInstallation']){
     const box=page.locator(`input[name="${name}"]`);
     if(await box.count()&&!await box.isChecked())await box.check();
   }
@@ -90,4 +103,4 @@ async function completeCoEppCheckout(page,cfg,capture=async()=>{}){
   await capture('co-epp-payment-reached');
   return null;
 }
-module.exports={assertCoEppCheckout,selectCoEppStandardDelivery,selectCoEppPickupDelivery,acceptCoEppCheckoutTerms,completeCoEppCheckout};
+module.exports={assertCoEppCheckout,selectCoEppStandardDelivery,selectCoEppPickupDelivery,ensureCoEppBilling,acceptCoEppCheckoutTerms,completeCoEppCheckout};
