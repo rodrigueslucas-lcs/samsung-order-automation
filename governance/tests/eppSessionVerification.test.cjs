@@ -4,6 +4,21 @@ const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 
+test('identity entry recovers only its observed staging parking return, including late commit timeout',async()=>{
+ const {prepareEppIdentityEntry}=require('../../utils/eppSessionVerification.cjs');
+ for(const timedOut of [false,true]){
+  const calls=[];let url='about:blank';
+  const page={url:()=>url,goto:async target=>{calls.push(target);url=calls.length===1?'https://stg2.shop.samsung.com/onlinestore/co/SystemParking.html':target;if(calls.length===1&&timedOut)throw Object.assign(Error('late commit'),{name:'TimeoutError'});},getByText:()=>({filter:()=>({first:()=>({waitFor:async()=>calls.push('cookie-ready')})})})};
+  await prepareEppIdentityEntry(page,{identityEntryUrl:new URL('https://stg2.shop.samsung.com/co/')});
+  assert.deepEqual(calls,['https://stg2.shop.samsung.com/co/','https://stg2.shop.samsung.com/getcookie.html','cookie-ready','https://stg2.shop.samsung.com/co/']);
+ }
+});
+test('identity entry never treats an unrelated navigation timeout as parking recovery',async()=>{
+ const {prepareEppIdentityEntry}=require('../../utils/eppSessionVerification.cjs');let calls=0;
+ const page={url:()=> 'about:blank',goto:async()=>{calls++;throw Object.assign(Error('network'),{name:'TimeoutError'});}};
+ await assert.rejects(prepareEppIdentityEntry(page,{identityEntryUrl:new URL('https://stg2.shop.samsung.com/co/')}),/network/);assert.equal(calls,1);
+});
+
 function verifierFixture(blocked=null, healthy=false, uiOverride=null, serverOverride=null, accessError=null) {
   const calls=[];
   const page={url:()=> 'about:blank',isClosed:()=>false,waitForTimeout:async()=>new Promise(r=>setTimeout(r,1)),goto:async url=>{if(!healthy)throw Object.assign(new Error('synthetic navigation unavailable'),{name:'TimeoutError'});calls.push(new URL(url).pathname);},getByText:()=>({first:()=>({waitFor:async()=>calls.push('cookie-ready')})}),evaluate:async()=>({})};

@@ -5,7 +5,7 @@ const { spawn } = require("node:child_process");
 const { chromium } = require("@playwright/test");
 const { getEppConfig } = require("../config/markets/epp");
 const { getEppSessionPaths, getPrimaryEppCredentials, persistVerifiedEppSession, captureEppPageState, acquireEppLease, eppLoginResumeOptions } = require("../utils/eppSession.cjs");
-const { verifyEppSnapshot, recoverEppParkingReturn } = require("../utils/eppSessionVerification.cjs");
+const { verifyEppSnapshot, recoverEppParkingReturn, prepareEppIdentityEntry } = require("../utils/eppSessionVerification.cjs");
 const { connectAuthBrowser } = require("../utils/authDedicatedBrowser.cjs");
 const { prepareAuthBrowserWindow } = require("../utils/authBrowserWindow.cjs");
 const { authProfileControl, openAuthProfile } = require("../utils/authStorefrontReady.cjs");
@@ -176,7 +176,7 @@ async function refresh(market, environment) {
         // Observed common Samsung identity entry, inside this isolated EPP
         // profile. No Base Store state is imported or accepted as EPP proof.
         stage='SAMSUNG_IDENTITY_ENTRY';
-        await page.goto(config.identityEntryUrl.href,{waitUntil:'commit',timeout:30000});
+        await prepareEppIdentityEntry(page,config);
         await authProfileControl(page).waitFor({state:'visible',timeout:30000});
         const identity=await openAuthProfile(page,{market:config.market.toLowerCase(),prepareWindow:async()=>{}});
         if(identity.state==='signed-out')loginAction=identity.login;

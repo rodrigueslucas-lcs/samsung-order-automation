@@ -89,9 +89,18 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
         outcome=inspected;
       }}
     }
-    if(outcome.status==='INVALID'&&!checkpoint.blockedReason) {
+    const priorCorporateGate=checkpoint.blockedReason==='CORPORATE_ACTIVATION_REQUIRED';
+    let confirmedInvalid=false;
+    if(outcome.status==='INVALID'&&(!checkpoint.blockedReason||priorCorporateGate)) {
       const second=await d.verify(config,existing);
+      confirmedInvalid=second.status==='INVALID'&&second.reason===outcome.reason&&AUTH_INVALID.has(second.reason);
       outcome=second.status==='INVALID'&&second.reason===outcome.reason?second:second.status==='HEALTHY'?second:{status:second.status==='BLOCKED'?'BLOCKED':'UNPROVEN',reason:second.reason||'EPP_VERIFY_DISAGREEMENT'};
+    }
+    // A corporate gate saved during an older identity is not evidence of a
+    // current entitlement denial. Two matching rejected identity checks may
+    // authorize ONE official login; maintenance still cannot request activation.
+    if(priorCorporateGate&&confirmedInvalid&&allowRefresh&&!policyReason){
+      checkpoint={...checkpoint,blockedReason:null};d.save(config,checkpoint);
     }
     if(outcome.status!=='HEALTHY') {
       // Never initiate Account login for restricted programmes. Still report

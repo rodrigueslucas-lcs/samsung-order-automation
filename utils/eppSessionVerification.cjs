@@ -32,6 +32,17 @@ async function recoverEppParkingReturn(page,config){
   return true;
 }
 
+async function prepareEppIdentityEntry(page,config){
+  const scoped={...config,rootUrl:config.identityEntryUrl};
+  let recovered=false;
+  try{await page.goto(config.identityEntryUrl.href,{waitUntil:'commit',timeout:30000});}
+  catch(error){
+    if(error.name!=='TimeoutError'||!(await recoverEppParkingReturn(page,scoped)))throw error;
+    recovered=true;
+  }
+  if(!recovered)await recoverEppParkingReturn(page,scoped);
+}
+
 async function verifyEppSnapshot(config, snapshot, { expectedEmail, timeout = 60000, configureContext = async () => {}, overallTimeoutMs=Math.max(timeout*3+15000,45000), cleanupTimeoutMs=15000 } = {}) {
   if(![overallTimeoutMs,cleanupTimeoutMs].every(n=>Number.isFinite(n)&&n>0))throw new Error('Invalid EPP verification deadline.');
   // Own the verifier's process explicitly so a stalled CDP disconnect cannot
@@ -134,4 +145,4 @@ async function verifyEppSnapshot(config, snapshot, { expectedEmail, timeout = 60
   }
 }
 
-module.exports = { verifyEppSnapshot, recoverEppParkingReturn, terminateOwnedVerifier };
+module.exports = { verifyEppSnapshot, recoverEppParkingReturn, prepareEppIdentityEntry, terminateOwnedVerifier };

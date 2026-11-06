@@ -27,6 +27,20 @@ test('a network or disagreeing result never authorizes login',async()=>{for(cons
 for(const reason of ['PRODUCTION_NAVIGATION_BLOCKED','VERIFICATION_CODE_REJECTED','EPP_ENTITLEMENT_NOT_PROVEN'])test(reason+' remains blocked without refresh or bundle replacement',async()=>{const f=fixture([{status:'BLOCKED',reason}]);const r=await maintainIdentity(cfg,{allowRefresh:true},f.d);assert.equal(r.reason,reason);assert.equal(f.state.blockedReason,reason);assert.ok(!f.calls.includes('refresh'));assert.ok(!f.calls.includes('package'));});
 test('known external checkpoint is verified but never relogs while invalid',async()=>{const f=fixture(['INVALID']);f.state={blockedReason:'VERIFICATION_CODE_REJECTED'};assert.equal((await maintainIdentity(cfg,{allowRefresh:true},f.d)).reason,'VERIFICATION_CODE_REJECTED');assert.ok(!f.calls.includes('refresh'));});
 test('a now-healthy session clears a prior external blocker without login',async()=>{const f=fixture();f.state={blockedReason:'VERIFICATION_CODE_REJECTED'};assert.equal((await maintainIdentity(cfg,{},f.d)).status,'KEEP_ALIVE_OK');assert.equal(f.state.blockedReason,null);});
+
+test('old corporate activation checkpoint permits one recovery only after two matching invalid identity checks',async()=>{
+ const f=fixture(['INVALID','INVALID','HEALTHY']);f.state={blockedReason:'CORPORATE_ACTIVATION_REQUIRED'};
+ const r=await maintainIdentity(cfg,{allowRefresh:true},f.d);
+ assert.equal(r.status,'REFRESHED');assert.equal(f.calls.filter(x=>x==='refresh').length,1);
+ assert.equal(f.calls.filter(x=>x==='verify').length,3);assert.equal(f.state.blockedReason,null);
+});
+test('corporate checkpoint cannot turn network ambiguity or a current entitlement gate into login',async()=>{
+ for(const next of [{status:'UNPROVEN',reason:'NETWORK_ERROR'},{status:'BLOCKED',reason:'CORPORATE_ACTIVATION_REQUIRED'}]){
+  const f=fixture(['INVALID',next]);f.state={blockedReason:'CORPORATE_ACTIVATION_REQUIRED'};
+  await maintainIdentity(cfg,{allowRefresh:true},f.d);assert.ok(!f.calls.includes('refresh'));
+  assert.equal(f.state.blockedReason,'CORPORATE_ACTIVATION_REQUIRED');
+ }
+});
 test('CAPTCHA persists HUMAN_REQUIRED and only resumes an existing browser next time',async()=>{const f=fixture(['INVALID']);f.d.capture=async()=>({readEppSnapshot:async()=>null,dispose:async()=>{},closeVerified:async()=>assert.fail('human browser must stay open')});f.d.refresh=async(_cfg,_env,options)=>{f.calls.push(options.resumeOnly?'resume':'refresh');options.onHuman();return{status:'HUMAN_REQUIRED'};};assert.equal((await maintainIdentity(cfg,{allowRefresh:true},f.d)).status,'HUMAN_REQUIRED');assert.equal(f.state.human,true);assert.equal((await maintainIdentity(cfg,{allowRefresh:true},f.d)).status,'HUMAN_REQUIRED');assert.equal(f.calls.filter(c=>c==='refresh').length,1);assert.equal(f.calls.filter(c=>c==='resume').length,1);});
 test('missing retained browser permits one fresh recovery only after two definite invalid checks',async()=>{const f=fixture(['INVALID','INVALID','HEALTHY']);f.state={human:true};const r=await maintainIdentity(cfg,{allowRefresh:true},f.d);assert.equal(r.status,'REFRESHED');assert.equal(f.calls.filter(c=>c==='refresh').length,1);assert.ok(!f.calls.includes('resume'));assert.equal(f.calls.filter(c=>c==='verify').length,3);});
 

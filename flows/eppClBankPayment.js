@@ -16,10 +16,14 @@ export async function submitClEppBank(page,cfg,capture){
  // The outer Payment accordion also contains the logo. Its header is Pago,
  // hence only the leaf provider panel satisfies the exact heading above.
  await expect(panel).toHaveCount(1);
- const header=panel.locator('mat-expansion-panel-header');
+ const header=panel.locator(':scope > mat-expansion-panel-header');
  if(await header.getAttribute('aria-expanded')!=='true')await header.click();
  await expect(header).toHaveAttribute('aria-expanded','true');
- const button=panel.getByRole('button',{name:/^[¡!]?Pagar ahora!?.*$/i}).filter({visible:true});
+ const form=panel.locator('app-payment-mode-flow-khipu');
+ // Khipu's component itself is lazy: the expanded panel can still contain
+ // only "Espera un momento" before Angular mounts the form.
+ await expect(form).toHaveCount(1,{timeout:60000});
+ const button=form.getByRole('button',{name:/^[¡!]?Pagar ahora!?.*$/i}).filter({visible:true});
  // The expanded header precedes the native lazy bank form ("Espera un
  // momento"). Do not create a financial marker while it is still loading.
  await expect(button).toBeVisible({timeout:60000});
@@ -27,9 +31,19 @@ export async function submitClEppBank(page,cfg,capture){
  const payment=new MarketPaymentPage(page,{market:'CL'});payment.screenshot=capture;payment.placeOrderButton=button;
  const site=cfg.apiSite||cfg.rootUrl.pathname.split('/').filter(Boolean)[2];
  const attempt=attempts.beginEppOrderAttempt(cfg,'transfer');
+ let forbidden=false;
+ const observeForbidden=response=>{
+  const url=new URL(response.url());
+  if(response.status()===403&&response.request().method()==='POST'&&url.origin==='https://s2-smb-api-cdn.ecom-stg.samsung.com'&&new RegExp(`^/tokocommercewebservices/v2/${site}/users/[^/]+/carts/[^/]+/paymentmodes/cl-(?:flow-)?khipu/submitOrder$`).test(url.pathname))forbidden=true;
+ };
+ page.on('response',observeForbidden);
  let result;
  try{result=await payment.placeOrderAndCapture({submitResponsePathPattern:new RegExp(`^/tokocommercewebservices/v2/${site}/users/[^/]+/carts/[^/]+/paymentmodes/cl-[^/]+/submitOrder$`),orderResponsePathPattern:new RegExp(`^/tokocommercewebservices/v2/${site}/users/[^/]+/orders/CL\\d{6}-\\d{8}(?:_\\d+)?$`)});}
- catch{throw new Error('CL_EPP_BANK_SINGLE_SUBMIT_UNCONFIRMED: marker preserved; reconcile before another submit.');}
+ catch{
+  if(forbidden){await capture('epp-cl-bank-forbidden-403');throw new Error('CL_EPP_BANK_FORBIDDEN_403: bank submit returned HTTP 403; marker preserved, no retry.');}
+  throw new Error('CL_EPP_BANK_SINGLE_SUBMIT_UNCONFIRMED: marker preserved; reconcile before another submit.');
+ }
+ finally{page.off('response',observeForbidden);}
  attempt.observe(result.orderCode);
  await page.waitForURL(url=>url.hostname==='sandbox.flow.cl'||url.origin===cfg.rootUrl.origin&&/orderConfirmation/.test(url.pathname),{timeout:60000});
  if(new URL(page.url()).hostname==='sandbox.flow.cl')await completeClFlowSandbox(page,{orderCode:result.orderCode,storefrontOrigin:cfg.rootUrl.origin,onConfirmationSubmitted:()=>attempts.recordClFlowConfirmationSubmitted(cfg,result.orderCode)});

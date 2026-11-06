@@ -2,6 +2,22 @@
   "schemaVersion": 1,
   "defects": [
     {
+      "market": "CO", "environment": "S2", "store": "EPP", "samId": "SAM-24952",
+      "jira": "RT-746043", "url": "https://jira.secext.samsung.net/browse/RT-746043",
+      "title": "Back to Top / tooltip stacking defect",
+      "classification": "KNOWN_DEFECT", "status": "OPEN", "priority": "Major",
+      "rootCause": "Storefront Issue",
+      "notes": "Operator explicitly linked the EPP tooltip scenario to RT-746043. Active quarantine requires a visible tooltip proven behind Back to Top. Missing tooltip trigger/mass, auth, and generic timeouts remain separate prerequisites/failures."
+    },
+    {
+      "market": "CL", "environment": "S2", "store": "EPP", "samId": "SAM-24865",
+      "jira": "SAM-25161", "url": "https://jira.secext.samsung.net/browse/SAM-25161",
+      "title": "QST STG1 SMB EPP CL: Getting 403 Forbidden error when using Bank transfer payment method",
+      "classification": "KNOWN_DEFECT", "status": "OPEN", "priority": "Medium",
+      "rootCause": "Payment",
+      "notes": "Operator supplied SAM-25161 and authorized the S2 association. Only a causally observed bank payment HTTP 403 activates quarantine. A timeout, unidentified submit, lazy-form failure or historical association alone does not prove this defect. Original STG1 ticket title retained."
+    },
+    {
       "market": "MX",
       "environment": "S2",
       "store": "BASE_STORE",
