@@ -1,6 +1,6 @@
 // EPP is Chromium-only. Fetch interception checks every HTTP redirect hop,
 // without proxying auth requests, rewriting callbacks or exposing cookies.
-function blockedEppRequest(config, {url: value, method='GET', document=false, top=false,allowEmailVerification=false,allowClSandbox=false,allowCoCard=false}) {
+function blockedEppRequest(config, {url: value, method='GET', document=false, top=false,allowEmailVerification=false,allowClSandbox=false,allowCoCard=false,allowPeCard=false}) {
   const url = new URL(value);
   const api = `https://${config.environment === 'S1' ? 's1' : 's2'}-smb-api-cdn.ecom-stg.samsung.com`;
   const production = ['samsung.com','www.samsung.com','shop.samsung.com'].includes(url.hostname) ||
@@ -14,14 +14,16 @@ function blockedEppRequest(config, {url: value, method='GET', document=false, to
     flowRoute?.[1]===site;
   const coRoute=url.pathname.match(/^\/tokocommercewebservices\/v2\/([^/]+)\/carts\/(CO\d{6}-\d{8}(?:_\d+)?)\/paymentmodes\/co-mercadoCC\/response$/);
   const coReturn=allowCoCard&&config.market==='CO'&&config.environment==='S2'&&site==='co_epp_agre'&&url.origin===api&&['GET','POST'].includes(method)&&coRoute?.[1]===site;
-  const allowed = paymentSandbox || flowReturn || coReturn || url.origin === config.rootUrl.origin || url.origin === 'https://account.samsung.com' ||
+  const peRoute=url.pathname.match(/^\/tokocommercewebservices\/v2\/([^/]+)\/carts\/(PE\d{6}-\d{8}(?:_\d+)?)\/paymentmodes\/pe-mercadoCC\/response$/);
+  const peReturn=allowPeCard&&config.market==='PE'&&config.environment==='S2'&&config.program==='pe_membership_vip'&&site===config.program&&url.origin===api&&['GET','POST'].includes(method)&&peRoute?.[1]===site;
+  const allowed = paymentSandbox || flowReturn || coReturn || peReturn || url.origin === config.rootUrl.origin || url.origin === 'https://account.samsung.com' ||
     (url.origin === api && (/^\/tokocommercewebservices\/v2\/[^/]+\/login\/return\/?$/.test(url.pathname)||verification));
   const reason = document && production ? 'PRODUCTION_NAVIGATION_BLOCKED' :
     document && top && !allowed ? 'UNAPPROVED_NAVIGATION_BLOCKED' :
     commerceWrite && ![config.rootUrl.origin,api].includes(url.origin) ? 'UNAPPROVED_COMMERCE_WRITE_BLOCKED' : null;
   return reason ? {reason,host:url.hostname} : null;
 }
-async function installEppNavigationGuard(context, config,{allowEmailVerification=false,allowClSandbox=false,allowCoCard=false}={}) {
+async function installEppNavigationGuard(context, config,{allowEmailVerification=false,allowClSandbox=false,allowCoCard=false,allowPeCard=false}={}) {
   let last = null;
   const sessions = new Map();
   const protectPage = page => {
@@ -29,7 +31,7 @@ async function installEppNavigationGuard(context, config,{allowEmailVerification
       const session = await context.newCDPSession(page);
       const {frameTree} = await session.send('Page.getFrameTree');
       session.on('Fetch.requestPaused', async event => {
-        const blocked = blockedEppRequest(config,{...event.request,document:event.resourceType==='Document',top:event.frameId===frameTree.frame.id,allowEmailVerification,allowClSandbox,allowCoCard});
+        const blocked = blockedEppRequest(config,{...event.request,document:event.resourceType==='Document',top:event.frameId===frameTree.frame.id,allowEmailVerification,allowClSandbox,allowCoCard,allowPeCard});
         try {
           if (blocked) {
             last={...blocked,path:safeNavigationPath(event.request.url)};

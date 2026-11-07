@@ -29,7 +29,7 @@ export const test = base.extend({
       const config = configuration(testInfo);
       const market = config.market;
       const session = eppSession.loadEppSession(config);
-      const guard = await navigationGuard.installEppNavigationGuard(context,config,{allowClSandbox:config.market==='CL'&&config.environment==='S2'&&process.env.ALLOW_PAYMENT_SUBMIT==='1',allowCoCard:config.market==='CO'&&config.environment==='S2'&&process.env.ALLOW_PAYMENT_SUBMIT==='1'});
+      const guard = await navigationGuard.installEppNavigationGuard(context,config,{allowClSandbox:config.market==='CL'&&config.environment==='S2'&&process.env.ALLOW_PAYMENT_SUBMIT==='1',allowCoCard:config.market==='CO'&&config.environment==='S2'&&process.env.ALLOW_PAYMENT_SUBMIT==='1',allowPeCard:config.market==='PE'&&config.environment==='S2'&&process.env.ALLOW_PAYMENT_SUBMIT==='1'});
       await eppSession.installEppSessionStorage(context, config, session.sessionStorage);
       const proof = serverProof.watchEppServerProof(context, config);
       const id = testInfo.title.match(/SAM-\d+/)?.[0];

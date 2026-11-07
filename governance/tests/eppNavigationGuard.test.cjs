@@ -98,3 +98,14 @@ test('CO card return is restricted to the observed S2 programme callback and pay
  assert.ok(blockedEppRequest({...cfg,market:'CL'},req));
  assert.equal(blockedEppRequest(cfg,{...req,url:'https://www.samsung.com/shop/'}).reason,'PRODUCTION_NAVIGATION_BLOCKED');
 });
+
+test('PE card return permits only the observed S2 membership callback with payment opt-in',()=>{
+ const cfg=getEppConfig('PE',{ENVIRONMENT:'S2',PE_EPP_PROGRAM:'pe_membership_vip'});
+ const url='https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/pe_membership_vip/carts/PE261107-12345678_261107173639474/paymentmodes/pe-mercadoCC/response';
+ const req={url,document:true,top:true,allowPeCard:true};
+ for(const method of ['GET','POST'])assert.equal(blockedEppRequest(cfg,{...req,method}),null);
+ for(const changed of [{allowPeCard:false},{method:'DELETE'},{url:url.replace('/pe_membership_vip/','/pe/')},{url:url.replace('/pe_membership_vip/','/pe_centelec/')},{url:url.replace('s2-smb-api','s1-smb-api')},{url:url.replace('pe-mercadoCC','pe-safetypay')},{url:url.replace('PE261107-12345678_261107173639474','invalid')},{url:url.replace('/response','/submitOrder')},{url:url.replace('https://s2-smb-api-cdn.ecom-stg.samsung.com','https://s2-smb-api-cdn.ecom-stg.samsung.com.evil.example')}])assert.ok(blockedEppRequest(cfg,{...req,...changed}));
+ for(const changed of [{market:'CO'},{environment:'S1'},{program:'pe_centelec'},{apiSite:'pe'}])assert.ok(blockedEppRequest({...cfg,...changed},req));
+ for(const code of ['PE261107-12345678','PE261107-12345678_261107173639474'])assert.equal(blockedEppRequest(cfg,{...req,url:url.replace('PE261107-12345678_261107173639474',code)}),null);
+ for(const url of ['https://www.samsung.com/shop/','https://shop.samsung.com/pe/'])assert.equal(blockedEppRequest(cfg,{...req,url}).reason,'PRODUCTION_NAVIGATION_BLOCKED');
+});
