@@ -305,3 +305,16 @@ PE pe_membership_vip full run2026-11-07T02-21-08-978Z-36988:
 
 Validation of the CO fix:63 focused contact/checkout/payment regressions PASS and8 final scoped-transition tests PASS (including delayed body, deadline, errors and wrong scope). Integrated gate result is recorded in the local evidence log. New source/tests are restricted to EPP assertions and CO transition governance. Runtime artifacts, credentials and auth state remain ignored.
 Final integrated validation of this CO fix: repo:refactor:gate PASS, including1238/1238 governance tests, Executive reporting4/4 and runtime/reporting37/37, with official scope/steps/architecture/discovery checks. git diff --check PASS; no secrets or runtime artifacts staged. PE remains HUMAN_REQUIRED and is not counted as healthy or as a fresh payment PASS.
+
+## PE session recovery and payment normalization — 2026-11-07 UTC
+
+Supersedes the previous PE auth blocker: the operator completed CAPTCHA; automatic password/submit and independent identity/entitlement verification completed READY, then the owned refresh browser closed.
+
+Original full PE run 2026-11-07T04-37-00-372Z-73632 remains 3 PASS / 2 FAIL / 1 BLOCKED. Payment failed before any submit: generic cart setup optimistically decremented quantity, then the payment normalizer read the server before that write persisted. Payment now delegates normalization solely to the existing authoritative PE helper, which proves server persistence after each mutation. Default safe setup and other markets remain unchanged.
+
+Official headed targeted run 2026-11-07T04-46-28-040Z-72768: SAM-25138 PASS (3.3m), SAM-25140 PASS (29.2s), 2/2 PASS. New public order PE261106-78840554 (API identifier includes internal suffix), confirmationValidated=true; confirmation read the same campaign order with submitCount=0. No pending PE/CO attempt markers remain. This proves frontend order creation/confirmation, not settlement. Footer SAM-25146 remains BLOCKED; latest PE observations are 5 PASS / 1 BLOCKED across separate runs, not a retrospectively green full campaign. MX cash and CL bank attempts were not replayed.
+
+Focused normalization/payment regressions: 40/40 PASS, no skips. Official scope, business steps and architecture gates PASS. Integrated gate result is recorded below after completion. No auth/session/payment artifacts are part of the source delivery.
+
+Final validation: authorized governance 1240/1240 PASS, zero skips; Executive reporting 4/4 PASS. Initial sandbox governance failure was retained (Windows subprocess restrictions); authorized hidden-launch reproduction passed 4/4. Runtime/reporting final result is in the evidence log. Base Store sources were unchanged; no new Base Store runtime campaign was claimed.
+Runtime/reporting integrity: 37/37 PASS. Combined authorized checks completed with exit 0.

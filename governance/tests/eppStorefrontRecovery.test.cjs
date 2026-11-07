@@ -22,6 +22,16 @@ test('repeated MX setup starts with five old units and proves one fresh Add per 
  await assert.rejects(add(page,{...cfg,market:'PE'},{resetMxCart:true}),/cannot target another market/);
 });
 
+test('PE payment can delegate normalization while safe cart setup keeps its default behavior',async()=>{
+ const calls=[],page={url:()=> 'https://stg2.shop.samsung.com/pe/multistore/qa/qa/cart'};
+ class CartPage{constructor(page){this.page=page;}}
+ class ProductPage{async addConfiguredPdpToCart(){calls.push('add');}}
+ const add=vm.runInNewContext(source+'\nopenEppStore=async()=>{};normalizeEppCartQuantity=async()=>calls.push("optimistic-normalize");addConfiguredEppProduct;',{URL,calls,CartPage,ProductPage,business:{assertStoreRoute(){},getEppCartTextPatterns:()=>({})}});
+ const cfg={market:'PE',environment:'S2',sku:'QA',pdpUrl:new URL('https://stg2.shop.samsung.com/pe/multistore/qa/qa/p/QA'),cartUrl:new URL(page.url())};
+ await add(page,cfg,{normalizeQuantity:false});assert.deepEqual(calls,['add']);
+ await add(page,cfg);assert.deepEqual(calls,['add','add','optimistic-normalize']);
+});
+
 for(const market of ['PE','CO','CL'])test(market+' repeated cart setup retains one controlled quantity instead of accumulating to the Add limit',async()=>{
  let quantity=5,decreases=0;const input={inputValue:async()=>String(quantity)};
  const page={url:()=> 'https://stg2.shop.samsung.com/'+market.toLowerCase()+'/multistore/qa/qa/cart',getByRole:role=>role==='textbox'?input:{click:async()=>{quantity--;decreases++;}}};

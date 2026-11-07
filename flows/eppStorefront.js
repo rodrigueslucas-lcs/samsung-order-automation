@@ -157,7 +157,7 @@ export async function inspectEppAccess(page, cfg) {
   return accessState.proveEppAccess(page, cfg);
 }
 
-export async function addConfiguredEppProduct(page, cfg, { currencyPattern = /[$S/]\s*[\d.,]+/, fromPlp = false, resetMxCart = cfg.market==='MX' } = {}) {
+export async function addConfiguredEppProduct(page, cfg, { currencyPattern = /[$S/]\s*[\d.,]+/, fromPlp = false, resetMxCart = cfg.market==='MX', normalizeQuantity = true } = {}) {
   if (!cfg.pdpUrl || !cfg.sku) {
     throw new Error(`${cfg.market} ${cfg.environment} EPP needs ${cfg.market}_EPP_QST_PDP_URL and ${cfg.market}_EPP_QST_SKU for product/cart scenarios.`);
   }
@@ -195,7 +195,7 @@ export async function addConfiguredEppProduct(page, cfg, { currencyPattern = /[$
     checkoutButtonPattern: cfg.market==='CO'?/^Continuar con la compra$|^Continuar$|^Checkout$/i:/^Continuar$|^Finalizar Compra$|^Checkout$/i,
   });
   cart.screenshot = name => businessScreenshot(page, name);
-  if(cfg.market==='CO'||cfg.environment==='S2'&&['PE','CL'].includes(cfg.market))await normalizeEppCartQuantity(cart,cfg);
+  if(normalizeQuantity&&(cfg.market==='CO'||cfg.environment==='S2'&&['PE','CL'].includes(cfg.market)))await normalizeEppCartQuantity(cart,cfg);
   return cart;
 }
 

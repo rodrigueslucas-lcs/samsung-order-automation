@@ -57,7 +57,10 @@ export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProvi
     await openEppStore(page,{...cfg,entryUrl:cfg.pdpUrl||cfg.rootUrl});await proof.settle();
     if(!proof.accepted())return blocked('AUTH_OR_ENTITLEMENT_REQUIRED','Independent EPP registered access was not accepted.','AUTH');
     if(!cfg.pdpUrl||!cfg.sku)return blocked('MISSING_OR_UNPROVEN_EPP_PRODUCT','An eligible programme PDP/SKU is required.','PRODUCT');
-    const cart=await addConfiguredEppProduct(page,cfg,{resetMxCart:cfg.market==='MX'&&cfg.environment==='S2'});
+    // PE payment owns normalization below, including server persistence after
+    // each click. Do not run optimistic UI normalization first and race its
+    // pending write against the authoritative readback.
+    const cart=await addConfiguredEppProduct(page,cfg,{resetMxCart:cfg.market==='MX'&&cfg.environment==='S2',normalizeQuantity:cfg.market!=='PE'});
     if(cfg.market==='MX'&&cfg.environment==='S1'){
       if(!observedCartResponse)throw new Error('MX EPP cart evidence not observed; no unproven checkout.');
       cart.observedCartResponse=observedCartResponse;
