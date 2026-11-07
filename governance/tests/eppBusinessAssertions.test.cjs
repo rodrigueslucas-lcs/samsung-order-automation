@@ -139,3 +139,27 @@ test('MX exact empty contact skeleton recovers its GET once without bypassing Co
  },'checkout/one?step=CHECKOUT_STEP_CONTACT_INFO',cfg.rootUrl);
 });
 test('PE incomplete or hidden login choices do not invent an authentication block',async()=>{await fixture('<button>Samsung Checkout Express</button><button hidden>Checkout como invitado</button>',async page=>{await assert.rejects(require('../../utils/eppBusinessAssertions.cjs').waitForPeRegisteredCheckout(page,page.getByRole('button',{name:'Continuar',exact:true}),{timeout:300}));});});
+
+test('MX resumed Delivery reopens canonical Contact and proves fields before continuing',async()=>{
+ const cfg={...config,program:'pymesmx'};
+ const html=`<div role="tab" aria-disabled="true">1. Información de contacto QA Fixture Editar</div><section id="form"><input name="email" value="synthetic@example.invalid"><input name="firstName"><input name="lastName"><input name="phone"><button onclick="submitContact()">Continuar</button></section><section role="region" aria-label="2. Método de Entrega" id="delivery" hidden>Delivery</section><script>async function submitContact(){sessionStorage.submits=Number(sessionStorage.submits||0)+1;await fetch('https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/pymesmx/users/current/carts/current/checkout/update',{method:'POST'});history.pushState({},'', '?step=CHECKOUT_STEP_DELIVERY');document.querySelector('#form').hidden=true;document.querySelector('#delivery').hidden=false;}if(new URL(location.href).searchParams.get('step')==='CHECKOUT_STEP_DELIVERY')document.querySelector('#form').remove();</script>`;
+ await fixture(html,async page=>{
+  let contactGets=0;page.on('request',r=>{if(r.isNavigationRequest()&&new URL(r.url()).searchParams.get('step')==='CHECKOUT_STEP_CONTACT_INFO')contactGets++;});
+  await require('../../utils/eppBusinessAssertions.cjs').waitForEppContactEmail(page,cfg,{timeout:100});
+  let updates=0;await page.route('**/checkout/update',async route=>{updates++;await new Promise(resolve=>setTimeout(resolve,100));await route.fulfill({contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:'{}'});});
+  await completeContact(page,cfg,{firstName:'QA',lastName:'Fixture',phone:'5555555555'});
+  assert.equal(updates,1);
+  assert.equal(contactGets,1);assert.equal(await page.evaluate(()=>sessionStorage.submits),'1');
+  assert.equal(new URL(page.url()).searchParams.get('step'),'CHECKOUT_STEP_DELIVERY');
+ },'checkout/one?step=CHECKOUT_STEP_DELIVERY');
+});
+
+for(const variant of ['other-programme','missing-summary','missing-form'])test(`MX Contact recovery rejects ${variant}`,async()=>{
+ const cfg={...config,program:variant==='other-programme'?'other':'pymesmx'};
+ const summary=variant==='missing-summary'?'':'<div role="tab">1. Información de contacto QA Fixture Editar</div>';
+ await fixture(summary,async page=>{
+  let contactGets=0;page.on('request',r=>{if(r.isNavigationRequest())contactGets++;});
+  await assert.rejects(require('../../utils/eppBusinessAssertions.cjs').waitForEppContactEmail(page,cfg,{timeout:100}));
+  assert.equal(contactGets,variant==='missing-form'?1:0);
+ },'checkout/one?step=CHECKOUT_STEP_DELIVERY');
+});

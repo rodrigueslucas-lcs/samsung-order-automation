@@ -1,4 +1,5 @@
 const { expect } = require('@playwright/test');
+const { continueMxContactToDelivery } = require('./mxContactTransition.cjs');
 
 function getEppCartTextPatterns(market) {
   if(market==='CO')return {
@@ -152,6 +153,19 @@ async function waitForEppContactEmail(page,config,{timeout=30000}={}){
   const email=page.locator('input[name="email"], input[formcontrolname="email"]').filter({visible:true}).first();
   try{await expect(email).toBeVisible({timeout});}
   catch(error){
+    const savedMxContact=config.market==='MX'&&config.environment==='S2'&&config.program==='pymesmx'
+      &&new URL(page.url()).searchParams.get('step')==='CHECKOUT_STEP_DELIVERY'
+      &&await page.getByRole('tab',{name:/^1\.\s*Información de contacto\b/i}).filter({visible:true}).count()===1;
+    if(savedMxContact){
+      // Registered checkout may resume Delivery with Contact already collapsed.
+      // Reopen the canonical Contact GET, then prove/fill the real form below.
+      // Never substitute a saved summary for the official field assertions.
+      assertStoreRoute(page.url(),config,/^checkout\//);
+      await page.goto(new URL('checkout/one?step=CHECKOUT_STEP_CONTACT_INFO',config.rootUrl).href,{waitUntil:'domcontentloaded',timeout:60000});
+      assertStoreRoute(page.url(),config,/^checkout\//);
+      await expect(email).toBeVisible({timeout});
+      return email;
+    }
     const panel=page.getByRole('region',{name:config.market==='MX'?/^1\.\s*Información de contacto$/i:/^1\.\s*Detalles del cliente$/i});
     const observedProgramme=config.market==='CO'&&config.program==='co_epp_agre'||config.market==='MX'&&config.program==='pymesmx';
     const skeleton=observedProgramme&&config.environment==='S2'&&new URL(page.url()).searchParams.get('step')==='CHECKOUT_STEP_CONTACT_INFO'&&await panel.count()===1&&await panel.locator('input').count()===0&&await page.getByRole('alert').filter({visible:true}).count()===0;
@@ -196,6 +210,7 @@ async function completeContact(page, config, customer) {
   const next = page.getByRole('button', { name: /^Continuar$|Continuar al m[eé]todo de entrega|Continuar con el m[eé]todo de env[ií]o|Continue to Delivery/i }).filter({ visible: true }).first();
   await expect(next).toBeEnabled();
   if(config.market==='CO'&&config.environment==='S2'&&config.program==='co_epp_agre')await continueCoEppContactToDelivery(page,next,config);
+  else if(config.market==='MX'&&config.environment==='S2'&&config.program==='pymesmx')await continueMxContactToDelivery(page,next,{storefront:config});
   else{
     await next.click();
     await expect.poll(() => new URL(page.url()).searchParams.get('step'), { timeout: 30000 }).toBe('CHECKOUT_STEP_DELIVERY');
