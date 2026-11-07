@@ -842,3 +842,9 @@ CL own-programme read-only reconciliation again accepted identity/access and ret
 The CL footer is now consistently quarantined with current exact SAM-25146 evidence; it remains a product defect, not PASS. RT-779284, SAM-25161 and RT-746043 associations retain their causal signature restrictions. Required external outcomes remain: authoritative MX cash / CL transfer reconciliation; Samsung footer correction; a proven CO cart tooltip fixture. Latest matrix statuses no longer count historical PASS as today's success.
 
 Final no-submit prerequisite validation: official CL SAM-24864/65/66 and MX SAM-25045/46 report BLOCKED before business mutation; the original actual-submit failures remain in their own reports. Both unresolved markers are byte-identical before/after these checks. Latest26 S2 observations are17 PASS/9 BLOCKED/0 FAIL; this is an aggregation of separate real runs, not proof of a new full campaign. No new payment order was created. Application bugs, CO tooltip mass and authoritative financial reconciliation still prevent complete homologation.
+
+## Authorized financial rerun — 2026-11-07 UTC
+
+CO created and confirmed new order CO261106-78840592 in its full campaign. Contact exposed a real automation timing failure; a scoped single-click response/body wait was implemented and the official Contact target passed afterward. The original full campaign failure remains retained; latest CO observations4 PASS/2 BLOCKED still depend on footer correction and a real cart-tooltip fixture.
+
+PE current auth is not healthy: full campaign1 PASS/5 BLOCKED, independent verification HUMAN_REQUIRED/SERVER_IDENTITY_NOT_PROVEN. One legitimate FIRST renewal reached CAPTCHA but timed out without human completion; a fresh manual challenge is required when the operator returns. No new PE order or payment was submitted. Historical PE payment PASS does not override this latest access blocker. MX cash/CL bank reconciliation and their markers remain untouched.

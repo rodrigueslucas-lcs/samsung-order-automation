@@ -195,9 +195,34 @@ async function completeContact(page, config, customer) {
   for (let i = 0; i < await terms.count(); i++) await terms.nth(i).check();
   const next = page.getByRole('button', { name: /^Continuar$|Continuar al m[eé]todo de entrega|Continuar con el m[eé]todo de env[ií]o|Continue to Delivery/i }).filter({ visible: true }).first();
   await expect(next).toBeEnabled();
-  await next.click();
-  await expect.poll(() => new URL(page.url()).searchParams.get('step'), { timeout: 30000 }).toBe('CHECKOUT_STEP_DELIVERY');
+  if(config.market==='CO'&&config.environment==='S2'&&config.program==='co_epp_agre')await continueCoEppContactToDelivery(page,next,config);
+  else{
+    await next.click();
+    await expect.poll(() => new URL(page.url()).searchParams.get('step'), { timeout: 30000 }).toBe('CHECKOUT_STEP_DELIVERY');
+  }
   assertStoreRoute(page.url(), config, /^checkout\//);
+}
+
+async function continueCoEppContactToDelivery(page,next,config,{timeout=120000,now=Date.now}={}){
+ const current=assertStoreRoute(page.url(),config,/^checkout\/one$/);
+ const expected='https://stg2.shop.samsung.com/co/multistore/co_epp_agre/co_epp_agre/checkout/one';
+ if(config.market!=='CO'||config.environment!=='S2'||config.program!=='co_epp_agre'||current.origin+current.pathname!==expected||current.searchParams.get('step')!=='CHECKOUT_STEP_CONTACT_INFO')throw new Error('CO EPP contact transition requires its exact S2 programme Contact route.');
+ const deadline=now()+timeout,remaining=()=>Math.max(1,deadline-now());
+ const updated=page.waitForResponse(response=>{
+  const url=new URL(response.url());
+  return response.request().method()==='POST'&&url.origin==='https://s2-smb-api-cdn.ecom-stg.samsung.com'&&url.pathname==='/tokocommercewebservices/v2/co_epp_agre/users/current/carts/current/checkout/update';
+ },{timeout:remaining()});
+ updated.catch(()=>{});
+ await next.click({timeout:Math.min(15000,remaining())});
+ const response=await updated;
+ if(!response.ok())throw new Error(`CO EPP Contact returned HTTP ${response.status()}; no second submit.`);
+ let timer;
+ try{
+  const failure=await Promise.race([response.finished(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('CO EPP Contact body deadline exceeded; no second submit.')),remaining());})]);
+  if(failure)throw new Error('CO EPP Contact response was interrupted; no second submit.');
+ }finally{clearTimeout(timer);}
+ await page.waitForURL(url=>url.origin===current.origin&&url.pathname===current.pathname&&url.searchParams.get('step')==='CHECKOUT_STEP_DELIVERY',{waitUntil:'commit',timeout:remaining()});
+ await page.getByRole('tab',{name:/^Entrega$|^Recoge$/i}).first().waitFor({state:'visible',timeout:remaining()});
 }
 
 
@@ -212,4 +237,4 @@ async function waitForPeRegisteredCheckout(page,continueButton,{timeout=15000}={
  return registered;
 }
 
-module.exports = { waitForPeRegisteredCheckout, getEppCartTextPatterns, assertStoreRoute, proveCheckout, proveFilterEffect, provePdpVariantSelection, chooseConfiguredPdpFromPlp, proveTooltipAboveBackToTop, waitForEppContactEmail, completeContact };
+module.exports = { continueCoEppContactToDelivery, waitForPeRegisteredCheckout, getEppCartTextPatterns, assertStoreRoute, proveCheckout, proveFilterEffect, provePdpVariantSelection, chooseConfiguredPdpFromPlp, proveTooltipAboveBackToTop, waitForEppContactEmail, completeContact };

@@ -285,3 +285,23 @@ Final follow-up runtime outcome:
 - Official CL targets SAM-24864/65/66 and MX targets SAM-25045/46 were rechecked with ALLOW_PAYMENT_SUBMIT=0: concrete prerequisite/known-defect BLOCKED; no submit. SHA256 comparison proved both unresolved marker files unchanged.
 - Latest observation across26 S2 official TCs: MX5 PASS/2 BLOCKED, CL3 PASS/4 BLOCKED, PE5 PASS/1 BLOCKED, CO4 PASS/2 BLOCKED:17 PASS,0 FAIL,9 BLOCKED. The three PE/CO payment/confirmation PASS observations come from the earlier real campaign; they were not reexecuted in this no-submit follow-up. This is not26/26 PASS and not one integrated campaign.
 - Integrated gate1225 governance PASS preceded the final narrowly scoped prerequisite/capture refinements. Affected financial/reconciliation48 PASS, final follow-up42 PASS and official/steps gates PASS after those refinements. Original failed reports remain retained; no historical PASS is counted in place of a newer BLOCKED.
+
+## Explicitly authorized PE/CO financial campaign — 2026-11-07 UTC
+
+The operator explicitly approved a new campaign with fresh orders only in PE/CO, preserving unresolved MX/CL initiations. Exact-programme precheck found no pending PE/CO payment markers. Both campaigns used the public npm runners in headed S2 mode with ALLOW_PAYMENT_SUBMIT=1, no target filter and zero Playwright retries. No EPP Jenkins build was introduced.
+
+CO co_epp_agre full run2026-11-07T02-28-14-644Z-17616:
+- New SAM-24953 card order CO261106-78840592, same-order confirmationValidated=true. Frontend/order creation proof is recorded; financial settlement is not claimed. No second CO card submit was performed.
+- Original full-run outcome:3 PASS /1 FAIL /2 BLOCKED. Footer SAM-25146 and missing tooltip fixture associated with RT-746043 remained blocked.
+- SAM-24942 Contact failed after its30-second URL poll while the native button still showed a progressbar. The failure is retained in the original report.
+- A safe diagnostic observed one own-programme POST /tokocommercewebservices/v2/co_epp_agre/users/current/carts/current/checkout/update, HTTP200, complete body and actual Delivery route, without a financial submit or repeated click. The observed diagnostic response took about2.2seconds; the original slower pending transition was not relabelled as an application defect.
+- The exact CO S2 Contact transition now listens before one click, waits for its actual acknowledged response/body under a120-second total deadline, then proves the same staging Delivery URL and visible Entrega/Recoge controls. HTTP errors, body interruption/deadline and foreign routes fail without replay. Other markets and Base Store are unchanged.
+- Official targeted SAM-24942 run2026-11-07T02-40-52-874Z-66980 PASS in53seconds, ALLOW_PAYMENT_SUBMIT=0. Latest CO observations are4 PASS/2 BLOCKED; the original full campaign is still3 PASS/1 FAIL/2 BLOCKED, not retrospectively green.
+
+PE pe_membership_vip full run2026-11-07T02-21-08-978Z-36988:
+-1 PASS/5 BLOCKED. Add to Cart passed; registered checkout/payment/confirmation could not prove identity. No PE payment or new order was submitted.
+- Independent auth-verify-epp PE S2 confirmed HUMAN_REQUIRED / SERVER_IDENTITY_NOT_PROVEN. This supersedes earlier healthy observations; Add to Cart alone is not authenticated EPP proof.
+- One official EPP FIRST renewal filled email and advanced to a genuine CAPTCHA. The human gate was not completed within the10-minute handoff window; the browser was preserved, no login retry loop and no invalid bundle publication. Operator availability is required for a fresh challenge before payment can continue. No Base Store or SECOND renewal was started.
+
+Validation of the CO fix:63 focused contact/checkout/payment regressions PASS and8 final scoped-transition tests PASS (including delayed body, deadline, errors and wrong scope). Integrated gate result is recorded in the local evidence log. New source/tests are restricted to EPP assertions and CO transition governance. Runtime artifacts, credentials and auth state remain ignored.
+Final integrated validation of this CO fix: repo:refactor:gate PASS, including1238/1238 governance tests, Executive reporting4/4 and runtime/reporting37/37, with official scope/steps/architecture/discovery checks. git diff --check PASS; no secrets or runtime artifacts staged. PE remains HUMAN_REQUIRED and is not counted as healthy or as a fresh payment PASS.
