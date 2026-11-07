@@ -186,3 +186,9 @@ For access from another device on the LAN, keep the credential-bearing publisher
 An unresolved retained FIRST browser also defers visible SECOND recovery, including when the FIRST worker exited with FAILED before reporting a human gate. Silent verification failures without a retained interactive browser still remain isolated by market.
 
 Login readiness: a credential field that appears between asynchronous visibility checks must be filled before its submit branch can run. The profile menu trigger may share data-an-la=login with the real sign-in action; only the sign-in action is eligible. Official /iam/error authorization pages fail promptly and are discarded only by a subsequent fresh refresh, preserving live CAPTCHA/MFA pages and the dedicated Chrome.
+
+## EPP maintenance exit codes
+
+The EPP one-shot uses the same coordination codes in S1 and S2: `0` for a successful cycle, `2` for human intervention, `3` when occupied leases defer otherwise healthy maintenance, and `1` for failures or unproven results. BUSY remains BUSY in the report and never becomes HEALTHY. A failure mixed with BUSY still returns `1`; human intervention takes precedence with `2`.
+
+Runtime audit on 2026-11-07: the automatic S2 EPP cycle started at 18:47 local and completed at 18:49 with four independently verified programmes, reused sessions and exit `0`. A controlled PE lease conflict returned `3` without starting refresh or publishing, and preserved the regional report. The Base Store cycle independently reported six healthy identities. These observations do not guarantee future session validity: CAPTCHA/MFA and genuine expiry retain their existing recovery rules. Financial submission status is separate from identity health; maintenance did not alter the pending PE payment marker.

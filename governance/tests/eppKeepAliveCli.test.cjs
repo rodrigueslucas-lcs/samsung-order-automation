@@ -26,3 +26,19 @@ test('targeted checks never replace the regional scheduler report',async()=>{
  let saved;await main({argv:[],env:{},activity:async()=>({idle:true}),cycle:async()=>({ok:true,identities:[]}),log(){},save(file){saved=file;}});
  assert.ok(saved.endsWith('epp-last-cycle-s2-primary.json'));
 });
+
+for(const environment of ['S1','S2'])for(const scenario of [
+ {name:'healthy',statuses:['KEEP_ALIVE_OK','REFRESHED','KEEP_ALIVE_OK','KEEP_ALIVE_OK'],code:0},
+ {name:'healthy and occupied',statuses:['KEEP_ALIVE_OK','BUSY','REFRESHED','KEEP_ALIVE_OK'],code:3},
+ {name:'all occupied',statuses:['BUSY','BUSY','BUSY','BUSY'],code:3},
+ {name:'occupied with network uncertainty',statuses:['BUSY','UNPROVEN','KEEP_ALIVE_OK','KEEP_ALIVE_OK'],code:1},
+ {name:'occupied with external blocker',statuses:['BUSY','BLOCKED','KEEP_ALIVE_OK','KEEP_ALIVE_OK'],code:1},
+ {name:'occupied with publication failure',statuses:['BUSY','PUBLISH_FAILED','KEEP_ALIVE_OK','KEEP_ALIVE_OK'],code:1},
+ {name:'occupied with human intervention',statuses:['BUSY','HUMAN_REQUIRED','KEEP_ALIVE_OK','KEEP_ALIVE_OK'],code:2},
+])test(`${environment} cycle exit distinguishes ${scenario.name}`,async()=>{
+ const identities=scenario.statuses.map((status,index)=>({market:['MX','PE','CO','CL'][index],environment,slot:'primary',status}));
+ const summary={environment,store:'EPP',identities,ok:scenario.statuses.every(status=>['KEEP_ALIVE_OK','REFRESHED'].includes(status))};let saved;
+ const code=await main({argv:['--environment='+environment],env:{},activity:async()=>({idle:true}),cycle:async options=>{assert.equal(options.allowRefresh,false);assert.equal(options.publish,false);return summary;},save:(_file,value)=>{saved=value;},log(){}});
+ assert.equal(code,scenario.code);assert.equal(saved.ok,summary.ok);assert.deepEqual(saved.identities,identities);
+ if(scenario.statuses.includes('BUSY'))assert.equal(saved.ok,false);
+});

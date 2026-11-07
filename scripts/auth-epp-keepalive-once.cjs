@@ -36,7 +36,12 @@ async function main({argv=process.argv.slice(2),env=process.env,cycle=runCycle,a
   const regional=args.markets.length===regionalMarkets.length&&regionalMarkets.every(market=>args.markets.includes(market));
   const scope=regional?'':`-${[...args.markets].sort().join('-').toLowerCase()}`;
   save(path.join(dir,`epp-last-cycle-${args.environment.toLowerCase()}-${args.slot}${scope}.json`),{generatedAt:new Date().toISOString(),...summary});
-  return summary.ok?0:summary.identities.some(r=>r.status==='HUMAN_REQUIRED')?2:1;
+  if(summary.ok)return 0;
+  if(summary.identities.some(r=>r.status==='HUMAN_REQUIRED'))return 2;
+  // A market lease deliberately defers maintenance; it is not an auth failure.
+  // Preserve actual failures when BUSY is mixed with any unproven/error state.
+  if(summary.identities.length&&summary.identities.some(r=>r.status==='BUSY')&&summary.identities.every(r=>['KEEP_ALIVE_OK','REFRESHED','BUSY'].includes(r.status)))return 3;
+  return 1;
 }
 if(require.main===module)main().then(code=>{process.exitCode=code;}).catch(()=>{console.error('[EPP] UNPROVEN · maintenance did not complete; no session declared healthy');process.exitCode=1;});
 module.exports={parseArgs,main,firstPhaseReady};
