@@ -89,17 +89,17 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
         outcome=inspected;
       }}
     }
-    const priorCorporateGate=checkpoint.blockedReason==='CORPORATE_ACTIVATION_REQUIRED';
+    const priorRecoverableGate=['CORPORATE_ACTIVATION_REQUIRED','COMMERCE_CONTENT_NOT_RENDERED','EPP_COMMERCE_NOT_RENDERED'].includes(checkpoint.blockedReason);
     let confirmedInvalid=false;
-    if(outcome.status==='INVALID'&&(!checkpoint.blockedReason||priorCorporateGate)) {
+    if(outcome.status==='INVALID'&&(!checkpoint.blockedReason||priorRecoverableGate)) {
       const second=await d.verify(config,existing);
       confirmedInvalid=second.status==='INVALID'&&second.reason===outcome.reason&&AUTH_INVALID.has(second.reason);
       outcome=second.status==='INVALID'&&second.reason===outcome.reason?second:second.status==='HEALTHY'?second:{status:second.status==='BLOCKED'?'BLOCKED':'UNPROVEN',reason:second.reason||'EPP_VERIFY_DISAGREEMENT'};
     }
-    // A corporate gate saved during an older identity is not evidence of a
-    // current entitlement denial. Two matching rejected identity checks may
+    // A corporate/render gate saved during an older identity is not evidence
+    // of a current entitlement/render denial. Two matching invalid checks may
     // authorize ONE official login; maintenance still cannot request activation.
-    if(priorCorporateGate&&confirmedInvalid&&allowRefresh&&!policyReason){
+    if(priorRecoverableGate&&confirmedInvalid&&allowRefresh&&!policyReason){
       checkpoint={...checkpoint,blockedReason:null};d.save(config,checkpoint);
     }
     if(outcome.status!=='HEALTHY') {
