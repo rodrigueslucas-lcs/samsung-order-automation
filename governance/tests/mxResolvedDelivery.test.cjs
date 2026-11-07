@@ -55,3 +55,17 @@ test('failed Marketplace acknowledgement never clicks Continue',async()=>{
 test('Base Store still requires its existing delivery ETA contract',async()=>{
  const f=marketplaceFixture({epp:false});await assert.rejects(f.run(),/legacy ETA required/);assert.deepEqual(f.calls,[]);
 });
+
+function regionalFixture({duplicate=false,epp=true}={}){
+ const calls=[],checkout=Object.create(vm.runInNewContext(source+'\nMxCheckoutPage;',{BasePage:class{},contactTransition:{continueMxDeliveryToPayment:async()=>calls.push('acknowledged-continue')},URL}).prototype);
+ checkout.storefront=epp?{market:'MX',environment:'S2',program:'pymesmx',rootUrl:new URL('https://stg2.shop.samsung.com/mx/multistore/pymesmx/pymesmx/')}:null;
+ const empty={count:async()=>0,filter(){return this;}};
+ const regional={filter(){return this;},first(){return this;},count:async()=>duplicate?2:1,waitFor:async()=>{},innerText:async()=> 'Entrega Estándar Tooltip Valido para Región Metropolitana GRATIS'};
+ const button={first(){return this;},filter(){return this;},waitFor:async()=>{},count:async()=>1,scrollIntoViewIfNeeded:async()=>{},isEnabled:async()=>true,click:async()=>{}};
+ const eta={filter(){return this;},first(){return this;},waitFor:async()=>{throw Error('missing ETA');}};
+ checkout.page={url:()=> 'https://stg2.shop.samsung.com/mx/multistore/pymesmx/pymesmx/checkout/one?step=CHECKOUT_STEP_DELIVERY',locator:()=>empty,getByText:()=>eta,getByRole:role=>role==='listitem'?regional:role==='region'?{getByText:()=>({filter(){return this;},first(){return this;},waitFor:async()=>calls.push('active-region')})}:role==='button'?button:empty};
+ return{calls,run:()=>checkout.selectDeliveryAndContinue()};
+}
+test('pymesmx S2 applied regional Standard advances without nonexistent ETA and proves its active region',async()=>{const f=regionalFixture();await f.run();assert.deepEqual(f.calls,['active-region','acknowledged-continue']);});
+test('duplicate applied regional options cannot advance',async()=>{const f=regionalFixture({duplicate:true});await assert.rejects(f.run(),/exactly one/);assert.deepEqual(f.calls,[]);});
+test('Base Store still requires ETA even when a regional Standard label exists',async()=>{const f=regionalFixture({epp:false});await assert.rejects(f.run(),/missing ETA/);assert.deepEqual(f.calls,[]);});

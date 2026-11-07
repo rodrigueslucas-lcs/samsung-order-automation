@@ -318,3 +318,21 @@ Focused normalization/payment regressions: 40/40 PASS, no skips. Official scope,
 
 Final validation: authorized governance 1240/1240 PASS, zero skips; Executive reporting 4/4 PASS. Initial sandbox governance failure was retained (Windows subprocess restrictions); authorized hidden-launch reproduction passed 4/4. Runtime/reporting final result is in the evidence log. Base Store sources were unchanged; no new Base Store runtime campaign was claimed.
 Runtime/reporting integrity: 37/37 PASS. Combined authorized checks completed with exit 0.
+
+## Independent card cases — 2026-11-07
+
+The operator explicitly authorized new MX/CL card orders independently of Cash/bank transfer. The previous programme-wide pending guard incorrectly prevented those distinct official card cases. In the proven S2 programmes pymesmx/alianzas, ALLOW_PAYMENT_SUBMIT=1 now permits a normal new card checkout while preserving the other-method record unchanged. No additional operator flag is required. A pending card still blocks another card; Cash/bank, other scopes, recovery-only and unproven standalone confirmation remain guarded. Confirmation consumes only its own campaign order.
+
+MX run 2026-11-07T15-36-20-156Z-71508 submitted once and reached success UI with public order MX261028-78781440, but the original immediate confirmation-route comparison failed. A read-only reconciliation proved own-programme OCC HTTP200, exact public code, approved SKU SM-F741BLBJLTM quantity1 and the same success page; the corrected validator then passed and only that card record was archived. Cash was neither replayed nor cleared. The original failed run remains retained. MX confirmation now waits for the causal matrix route, permits only a public/internal alias for the same public order in pymesmx, rejects conflicting internal suffixes/other public orders, and accepts the bounded public number in the observed labelled UI. Other-market confirmation behavior stays unchanged.
+
+CL run 2026-11-07T15-54-37-303Z-70516: SAM-24864 PASS and SAM-24866 PASS (2/2, headed, 2.6min). New card order CL261107-78844307; confirmationValidated=true and same-campaign confirmation submitCount=0. Transfer record remains byte-identical; this is no bank-transfer PASS.
+
+MX standard-command run 2026-11-07T16-00-12-256Z-69120 failed before payment at bounded PDP content loading. No card marker/submit existed, and a single targeted trace-enabled recheck followed. Its final outcome is recorded below, without rewriting that original failed report.
+
+A subsequent MX pre-submit run 2026-11-07T16-03-36-242Z-61016 exposed a second automation assumption: pymesmx rendered one applied Entrega Estándar / Valido para Región Metropolitana option without the legacy ETA copy. The Page Object now recognizes only that exact MX S2 programme/layout, requires a unique option and the active Delivery region, and retains acknowledged Continue-to-Payment. Base Store, other programmes and S1 still require their previous contract; duplicates do not advance. No payment was submitted in either pre-submit failure.
+
+Final focused EPP/MX delivery and contact regression: 378/378 PASS, zero skips. Official scope and business-step gates PASS. Executive reporting4/4 and runtime/reporting37/37 PASS. The new region-specific tests also preserve the Base Store ETA contract. No Base Store browser campaign or financial settlement is claimed.
+
+Final normal MX runtime: SAM-25045 PASS, headed, ALLOW_PAYMENT_SUBMIT=1, no extra card flag, zero retries, 3.9min test /4.3min campaign. New order MX261105-78827246, confirmationValidated=true. The earlier order MX261028-78781440 was conclusively reconciled before this separate validation order; neither was a Cash replay. CL card/confirmation remain PASS for CL261107-78844307. Actual final run IDs and raw reports are retained in the ignored matrix/evidence log.
+
+Latest S2 observations across distinct runs now total20 PASS /6 BLOCKED /0 FAIL /0 NOT_RUN: MX6/1, CL5/2, PE5/1, CO4/2 (PASS/BLOCKED). This is not26/26 or one four-market campaign. Remaining external cases are MX Cash RT-779284; CL transfer association SAM-25161 with unresolved initiation retained; footer SAM-25146 in CL/PE/CO; CO cart-tooltip fixture associated with RT-746043. No extra flag is needed to isolate normal authorized card cases. Same-method ambiguous attempts still cannot be replayed.

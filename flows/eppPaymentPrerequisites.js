@@ -122,7 +122,14 @@ export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProvi
 export async function runEppPaymentPrerequisiteCase(page,cfg,options){
   test.setTimeout(420000);
   const kinds=cfg.market==='CL'?['card','transfer']:['card','cash'];
-  const pendingRecords=kinds.map(kind=>attempts.pendingEppOrderAttempt(cfg,kind)).filter(Boolean);
+  const allPendingRecords=kinds.map(kind=>attempts.pendingEppOrderAttempt(cfg,kind)).filter(Boolean);
+  // Explicit operator authorization for a NEW card checkout is not a retry or
+  // reconciliation of an earlier cash initiation. Preserve that record intact.
+  // The same-method guard remains mandatory, including for this opt-in.
+  const independentKind=cfg.market==='MX'&&cfg.program==='pymesmx'?'cash':cfg.market==='CL'&&cfg.program==='alianzas'?'transfer':null;
+  const independentCard=process.env.ALLOW_PAYMENT_SUBMIT==='1'&&cfg.environment==='S2'&&independentKind&&options?.kind==='card'&&!options?.confirmationOnly&&process.env.EPP_RESUME_PENDING_ORDER!=='1';
+  const pendingRecords=allPendingRecords.filter(record=>!(independentCard&&record.kind===independentKind));
+  if(independentCard&&allPendingRecords.some(record=>record.kind===independentKind))test.info().annotations.push({type:'epp-independent-order',description:'Operator-authorized new card checkout; existing '+independentKind+' initiation remains unresolved and unchanged. No other-method submit or reconciliation.'});
   const runId=process.env.EPP_RUN_ID;
   // Explicit read-only recovery is never a normal payment homologation.
   if(process.env.EPP_RESUME_PENDING_ORDER==='1'){

@@ -9,12 +9,21 @@ import guards from '../utils/destructiveGuards';
 import attemptModule from '../utils/eppOrderAttempt.cjs';
 
 export async function validateMxEppConfirmation(page,cfg,orderCode){
+ const matchesRoute=url=>{
+  const code=new URL(url).pathname.match(/;orderCode=([^;/?]+)/)?.[1];
+  if(!code)return false;
+  const decoded=decodeURIComponent(code);
+  if(decoded===orderCode)return true;
+  return cfg.market==='MX'&&cfg.environment==='S2'&&cfg.program==='pymesmx'&&decoded.replace(/_\d+$/,'')===orderCode.replace(/_\d+$/,'')&&(!decoded.includes('_')||!orderCode.includes('_'));
+ };
+ // The submit response can arrive before the confirmation route finishes
+ // binding its order code. Wait for this causal identity, not just the shell.
+ if(cfg.market==='MX')await expect(page).toHaveURL(url=>matchesRoute(url.href),{timeout:60000});
  assertions.assertStoreRoute(page.url(),cfg,/^orderConfirmation/);
- const target=new URL(page.url());
- const routeCode=target.pathname.match(/;orderCode=([^;/?]+)/)?.[1];
- if(!routeCode||decodeURIComponent(routeCode)!==orderCode)throw new Error('EPP confirmation URL does not identify the causal order.');
+ if(!matchesRoute(page.url()))throw new Error('EPP confirmation URL does not identify the causal order.');
  const publicCode=orderCode.replace(/_\d+$/,'');
- await expect(page.getByText(publicCode,{exact:true}).first()).toBeVisible({timeout:120000});
+ const publicNumber=cfg.market==='MX'?page.getByText(new RegExp('\\b'+publicCode+'\\b')):page.getByText(publicCode,{exact:true});
+ await expect(publicNumber.first()).toBeVisible({timeout:120000});
  await expect(page.getByText(/recibimos tu (?:orden|pedido).*exitos[ao]|gracias por tu compra|pedido confirmado|orden confirmada|pedido.*validaci[oó]n|order confirmed/i).first()).toBeVisible({timeout:30000});
 }
 

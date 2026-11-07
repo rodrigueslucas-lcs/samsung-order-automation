@@ -258,9 +258,18 @@ export default class MxCheckoutPage extends BasePage {
     const marketplaceStandard = this.storefront
       ? this.page.locator('label').filter({hasText:/^Standard Delivery Marketplace\b/i}).filter({visible:true})
       : null;
-    if (!marketplaceStandard || !(await marketplaceStandard.count())) {
+    // Observed pymesmx S2 applies one regional Standard option without a radio
+    // or ETA. Prove that exact rendered option and its active region below;
+    // the acknowledged Continue still proves the server accepted delivery.
+    const appliedEppStandard=this.storefront?.market==='MX'&&this.storefront.environment==='S2'&&this.storefront.program==='pymesmx'
+      ? this.page.getByRole('listitem').filter({hasText:/^\s*Entrega Est[aá]ndar[\s\S]*V[aá]lido para Regi[oó]n Metropolitana/i}).filter({visible:true})
+      : null;
+    const appliedEppCount=appliedEppStandard?await appliedEppStandard.count():0;
+    const marketplaceCount=marketplaceStandard?await marketplaceStandard.count():0;
+    if(appliedEppCount>1)throw new Error('EPP regional Standard delivery requires exactly one applied option.');
+    if (!marketplaceCount&&!appliedEppCount) {
       await deliveryEta.waitFor({ state: "visible", timeout: 60000 });
-    } else if (await marketplaceStandard.count() !== 1) {
+    } else if (marketplaceCount>1) {
       throw new Error('EPP Marketplace delivery requires exactly one Standard delivery card.');
     }
     const legacyCardCount = await legacyStandardDeliveryCards.count();
@@ -324,7 +333,7 @@ export default class MxCheckoutPage extends BasePage {
       // S2 can expose a single already-applied delivery mode (for example
       // "Pre Venta") without a radio/label. Prove the mode is both present in
       // the delivery list and its active delivery region before continuing.
-      const deliveryOptions = this.page
+      const deliveryOptions = appliedEppCount?appliedEppStandard:this.page
         .getByRole("listitem")
         .filter({ hasText: /(?:Pre Venta|Entrega Est[aá]ndar)[\s\S]*(?:Recibir[aá]s|Enviaremos)/i })
         .filter({ visible: true });

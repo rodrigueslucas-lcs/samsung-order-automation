@@ -852,3 +852,9 @@ PE current auth is not healthy: full campaign1 PASS/5 BLOCKED, independent verif
 ## PE current outcome — 2026-11-07 UTC
 
 PE pe_membership_vip no longer requires the previous CAPTCHA handoff: independent identity/entitlement passed after operator verification. Fresh headed card SAM-25138 and causal confirmation SAM-25140 passed in run 2026-11-07T04-46-28-040Z-72768 with new order PE261106-78840554. The prior cart-quantity race was automation and was corrected using one server-persisted normalizer. Latest PE: 5 PASS / 1 BLOCKED (footer SAM-25146), aggregated across separate runs. No new PE access/payment-data dependency was observed. MX cash/CL bank reconciliation, missing footer and CO tooltip fixture remain external dependencies; historical failed runs are preserved.
+
+## Card isolation supersedes the previous cross-method blockers — 2026-11-07
+
+Normal authorized MX pymesmx and CL alianzas card cases are separate from Cash/bank. They no longer inherit the other method's unresolved record; records remain byte-identical and same-method guards remain enforced. Fresh headed official targets passed: MX SAM-25045 (order MX261105-78827246, confirmationValidated=true); CL SAM-24864 and SAM-24866 (order CL261107-78844307, confirmation in the same campaign with zero additional submits). The earlier MX card order MX261028-78781440 was independently reconciled by own-programme API/UI, not blindly replayed.
+
+Current remaining six BLOCKED cases: MX25046 Cash/RT-779284; CL24865 bank/SAM-25161 association and unresolved outcome; CL24841, PE25114 and CO24931 missing footer/SAM-25146; CO24952 missing cart-tooltip fixture/RT-746043 association. Current latest functional observations across separate S2 runs:20 PASS,6 BLOCKED,0 FAIL,0 NOT_RUN. No EPP Jenkins jobs were introduced.
