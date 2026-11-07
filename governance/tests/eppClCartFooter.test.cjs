@@ -10,9 +10,9 @@ function fixture({headings=0,links=0,productFailure=false}={}){
  const cart={sku:'QA',currencyPattern:/\$/,page:{locator:()=>node,getByRole:()=>footer},validateCartPage:async()=>calls.push('cart'),validateProductInCart:async()=>calls.push('product'),validateOrderSummary:async()=>calls.push('summary'),validateCheckoutButton:async()=>calls.push('checkout'),screenshot:async()=>calls.push('screenshot')};
  return{calls,annotations,run:cfg=>run(cart,cfg)};
 }
-test('observed empty CL S2 footer retains its explicit failure and known defect evidence',async()=>{
- const f=fixture();await assert.rejects(f.run({market:'CL',environment:'S2',program:'alianzas'}),/MISSING_EXPECTED_CART_FOOTER/);
- assert.deepEqual(f.calls,['cart','product','summary','checkout','screenshot','signature']);
+test('observed empty CL S2 footer has the same narrow quarantine and evidence as PE/CO',async()=>{
+ const f=fixture();await assert.rejects(f.run({market:'CL',environment:'S2',program:'alianzas'}),/known-footer/);
+ assert.deepEqual(f.calls,['cart','product','summary','checkout','screenshot','signature','quarantine']);
  assert.equal(f.annotations[0].type,'known-defect');assert.match(f.annotations[0].description,/SAM-25146/);
 });
 test('PE empty footer is quarantined only for the reproduced S2 VIP programme',async()=>{

@@ -262,3 +262,26 @@ Real headed corrective runs:
 No MX/CL payment replay was performed. Their durable unresolved cash/transfer markers remain intact. CL card/bank precondition failures and missing current-campaign confirmation remain visible; historical PASS cannot replace them. Known defect associations remain RT-779284, SAM-25161, SAM-25146 and RT-746043, with narrow causal matching.
 
 Validation: 87/87 focused regression tests PASS, zero skips, including mocked browser billing, deterministic cart, PDP recovery, contact, runner, payment prerequisites and known-defect reporting. The initial sandbox attempt could not launch Chromium (spawn EPERM); the authorized identical rerun passed. Official scope, steps and architecture gates PASS. Base Store source was not modified; prior Base Store regression evidence is not presented as a new runtime campaign. Local full homologation remains incomplete.
+
+## Final reproducibility follow-up — 2026-11-06 local / 2026-11-07 UTC
+
+The matrix now uses the latest functional observation as its main status, even when an earlier execution passed. Historical PASS remains independently available in historicalPass and the Markdown evidence column. RECOVERY_ONLY cannot replace a previous functional verdict. The JSON and console explicitly identify this as aggregation across separate runs, not one approved full campaign.
+
+The CL empty-footer signature now uses the same narrow known-defect quarantine as PE/CO: only the configured S2 programme, zero visible footer headings and links, after product/summary/checkout assertions passed. Partial footer, another programme, auth or product failure still fails. This is classification of SAM-25146, not a repaired application footer or a PASS.
+
+A fresh headed SAM-25020 reached the business validation but failed solely with Page.captureScreenshot: Unable to capture screenshot. Its business screenshot helper now attempts one masked viewport capture only for that exact full-page compositor error. A closed page, timeout, unrelated error or failed fallback still fails. No navigation, Add or payment is replayed. This recovery has four regression cases; runtime recheck is recorded in the final evidence log.
+
+A suspected CL bank order-pattern defect was checked through the full inheritance chain and rejected: MarketPaymentPage already supplies the CL market profile. No redundant pattern override or claimed payment fix was retained.
+
+Read-only CL reconciliation again proved authenticated identity/access and history HTTP200, but did not identify the old transfer outcome. MX identity/access passed; its read-only history request timed out. Neither result authorizes removing an unresolved marker or replaying payment. The attempted broad financial campaign was rejected by automatic approval review; the unaffected official safe cases continued with ALLOW_PAYMENT_SUBMIT=0. No new financial order was submitted in this follow-up.
+
+Validation: repo:refactor:gate PASS, including1225 governance tests, Executive reporting4 and runtime/reporting37, plus architecture, official scope and discovery. Separate focused capture/report/footer/recovery28 PASS. Actual market-safe campaign results and the MX capture recheck are retained under test-results/epp and referenced in the local evidence log. These checks do not establish 26/26 local homologation.
+
+Final follow-up runtime outcome:
+- MX safe: four PASS in the five-case headed run; SAM-25020 initially failed only at full-page capture, then passed in the corrected official headed target (54.9s). All five safe TCs now have latest PASS.
+- CL safe: three PASS, one exact SAM-25146 BLOCKED. PE safe: three PASS, one exact SAM-25146 BLOCKED. CO safe: three PASS, two BLOCKED (SAM-25146 and missing cart-tooltip fixture associated with RT-746043).
+- Combined safe coverage: 18 distinct official cases, latest14 PASS /4 BLOCKED, zero FAIL after the corrective recheck. This includes targeted reruns, not one full campaign.
+- Existing uncertain financial initiation is now consistently classified as a prerequisite BEFORE any cart/action. The case which actually submitted and failed remains unchanged in its original report. Same-campaign confirmation inherits that precondition instead of inventing a second failure or using an old order.
+- Official CL targets SAM-24864/65/66 and MX targets SAM-25045/46 were rechecked with ALLOW_PAYMENT_SUBMIT=0: concrete prerequisite/known-defect BLOCKED; no submit. SHA256 comparison proved both unresolved marker files unchanged.
+- Latest observation across26 S2 official TCs: MX5 PASS/2 BLOCKED, CL3 PASS/4 BLOCKED, PE5 PASS/1 BLOCKED, CO4 PASS/2 BLOCKED:17 PASS,0 FAIL,9 BLOCKED. The three PE/CO payment/confirmation PASS observations come from the earlier real campaign; they were not reexecuted in this no-submit follow-up. This is not26/26 PASS and not one integrated campaign.
+- Integrated gate1225 governance PASS preceded the final narrowly scoped prerequisite/capture refinements. Affected financial/reconciliation48 PASS, final follow-up42 PASS and official/steps gates PASS after those refinements. Original failed reports remain retained; no historical PASS is counted in place of a newer BLOCKED.

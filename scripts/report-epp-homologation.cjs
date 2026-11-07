@@ -78,12 +78,12 @@ function extractResults(document) {
   return results;
 }
 function mergeObservation(previous, current) {
-  if (previous?.result === 'PASS' && ['BLOCKED','HUMAN_REQUIRED','NOT_RUN'].includes(current.result)) {
-    return { ...previous, runtime: 'HISTORICAL_TARGETED_RUNTIME',
-      notes: `HISTORICAL_PASS_CURRENT_${current.notes}`,
-      latestAttempt: { runtime: current.runtime, result: current.result, notes: current.notes } };
-  }
-  return current;
+  // A read-only reconciliation is not another functional execution.
+  if(previous&&current.runtime==='RECOVERY_ONLY')return{...previous,latestRecovery:current};
+  const historicalPass=previous?.result==='PASS'?{...previous,historicalPass:undefined}:previous?.historicalPass;
+  // Preserve history as history, never as today's status/count. An old PASS
+  // cannot conceal the operator's current blocked or failed campaign.
+  return historicalPass?{...current,historicalPass}:current;
 }
 function buildRows(scope, observed = new Map()) {
   return scope.flatMap(item => ['S1','S2'].map(environment => {
@@ -111,10 +111,11 @@ function report() {
   const rows = buildRows(inventory(), observed).map(row=>({...row,...classifyObservation(row)}));
   const output = path.join(root,'test-results/epp/homologation');
   fs.mkdirSync(output,{recursive:true});
-  fs.writeFileSync(path.join(output,'matrix.json'),JSON.stringify({ generatedAt:new Date().toISOString(), rows },null,2));
-  const text = ['| TC | Market | Env | Program | Status | Classification | Result/blocker | Evidence | Manual action |','|---|---|---|---|---|---|---|---|---|',...rows.map(r => `| ${r.tc} | ${r.market} | ${r.environment} | ${r.program||'NOT_RECORDED'} | ${r.result} | ${r.classification} | ${r.notes} | ${r.evidence||'NONE'} | ${r.manualAction} |`)].join('\n');
-  fs.writeFileSync(path.join(output,'matrix.md'),text+'\n');
+  fs.writeFileSync(path.join(output,'matrix.json'),JSON.stringify({ generatedAt:new Date().toISOString(), aggregation:'LATEST_FUNCTIONAL_OBSERVATION_PER_TC',singleCampaign:false,rows },null,2));
+  const text = ['| TC | Market | Env | Program | Latest status | Classification | Result/blocker | Latest evidence | Historical PASS evidence | Manual action |','|---|---|---|---|---|---|---|---|---|---|',...rows.map(r => `| ${r.tc} | ${r.market} | ${r.environment} | ${r.program||'NOT_RECORDED'} | ${r.result} | ${r.classification} | ${r.notes} | ${r.evidence||'NONE'} | ${r.historicalPass?.evidence||'NONE'} | ${r.manualAction} |`)].join('\n');
+  fs.writeFileSync(path.join(output,'matrix.md'),'Latest functional observation per TC across separate runs; this is not a single-campaign result. Historical PASS evidence is listed separately.\n\n'+text+'\n');
   console.log(`[epp-homologation] ${rows.length} market/environment TC rows · PASS ${rows.filter(r=>r.result==='PASS').length} · FAIL ${rows.filter(r=>r.result==='FAIL').length} · BLOCKED ${rows.filter(r=>r.result==='BLOCKED').length} · NOT_RUN ${rows.filter(r=>r.result==='NOT_RUN').length}`);
+  console.log('[epp-homologation] Latest functional observation per TC across separate runs; not a single-campaign result. Historical PASS does not override current status.');
   console.log(`[epp-homologation] ${path.relative(root,path.join(output,'matrix.md'))}`);
   return rows;
 }

@@ -834,3 +834,11 @@ Remaining prerequisites:
 - CO SAM-24952 remains MASS_REQUIRED: supply an authorized EPP product/service with an actual cart tooltip trigger, expected text and steps. RT-746043 is associated; absent trigger does not prove stacking failure.
 
 Current auth allowed all four headed safe reruns without a new login. This does not guarantee future session validity or resolve functional dependencies. Details/evidence and the corrected non-cumulative totals are in EPP_LOCAL_STABILIZATION.md and ignored operator-headed-round reporting.
+
+## Follow-up dependency confirmation — 2026-11-07 UTC
+
+CL own-programme read-only reconciliation again accepted identity/access and returned order history HTTP200, without a causal result for the unresolved bank attempt. MX identity/access was accepted but its history GET timed out; this is a transient read failure, not proof of expiry/rejection. Both initiation markers remain intact. No new financial submit occurred.
+
+The CL footer is now consistently quarantined with current exact SAM-25146 evidence; it remains a product defect, not PASS. RT-779284, SAM-25161 and RT-746043 associations retain their causal signature restrictions. Required external outcomes remain: authoritative MX cash / CL transfer reconciliation; Samsung footer correction; a proven CO cart tooltip fixture. Latest matrix statuses no longer count historical PASS as today's success.
+
+Final no-submit prerequisite validation: official CL SAM-24864/65/66 and MX SAM-25045/46 report BLOCKED before business mutation; the original actual-submit failures remain in their own reports. Both unresolved markers are byte-identical before/after these checks. Latest26 S2 observations are17 PASS/9 BLOCKED/0 FAIL; this is an aggregation of separate real runs, not proof of a new full campaign. No new payment order was created. Application bugs, CO tooltip mass and authoritative financial reconciliation still prevent complete homologation.

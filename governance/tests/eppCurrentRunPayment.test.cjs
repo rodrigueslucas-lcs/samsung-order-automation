@@ -20,4 +20,16 @@ test('an unidentified pending submit cannot be cleared for a new payment',async(
  const f=fixture('CL',{pending:{kind:'card',status:'SUBMITTING'}});await assert.rejects(f.run(),/AMBIGUOUS_EPP_ORDER_ATTEMPT/);assert.deepEqual(f.calls,[]);
 });
 
+test('old CL transfer blocks card and confirmation before any action, preserving the original failure',async()=>{
+ const old={market:'CL',environment:'S2',kind:'transfer',status:'SUBMITTING',runId:'previous-run'},calls=[];
+ const env={EPP_RUN_ID:'new-run',ALLOW_PAYMENT_SUBMIT:'1',CL_QST_TARGET_IDS:'SAM-24864,SAM-24865,SAM-24866'};
+ const run=vm.runInNewContext(source+'\nrunEppPaymentPrerequisiteCase;',{process:{env},attempts:{pendingEppOrderAttempt:(_,kind)=>kind==='transfer'?old:null,confirmedEppOrderForRun:()=>null},test:{setTimeout(){},skip:(_,reason)=>{calls.push(reason);throw Object.assign(Error(reason),{blocked:true});}},probeEppPaymentPrerequisites:()=>assert.fail('must not open checkout')});
+ const cfg={market:'CL',environment:'S2',program:'alianzas'};
+ for(const authorized of ['0','1']){
+  env.ALLOW_PAYMENT_SUBMIT=authorized;
+  for(const options of [{kind:'card'},{kind:'transfer'},{kind:'card',confirmationOnly:true}])await assert.rejects(run({},cfg,options),e=>e.blocked&&e.message.startsWith('AMBIGUOUS_EPP_ORDER_ATTEMPT:'));
+ }
+ assert.equal(calls.length,6);assert.equal(old.status,'SUBMITTING');assert.equal(old.runId,'previous-run');
+});
+
 test('confirmation inherits only its own campaign explicit payment prerequisite and never submits',async()=>{const calls=[],env={ALLOW_PAYMENT_SUBMIT:'1',EPP_RUN_ID:'campaign-a',PE_QST_TARGET_IDS:'SAM-25138,SAM-25140'},cfg={market:'PE',environment:'S2',program:'pe_membership_vip'};const source=require('fs').readFileSync('flows/eppPaymentPrerequisites.js','utf8').replace(/^import .*;\r?\n/gm,'').replace(/export async function/g,'async function');const run=require('vm').runInNewContext(source+'\nprobeEppPaymentPrerequisites=async()=>{calls.push("probe");return{status:"BLOCKED",reason:"AUTH_OR_ENTITLEMENT_REQUIRED",stage:"AUTH",detail:"Identity not accepted"};};runEppPaymentPrerequisiteCase;',{calls,process:{env},attempts:{pendingEppOrderAttempt:()=>null,confirmedEppOrderForRun:()=>null},submitPeEppCard(){throw Error('unexpected submit');},test:{setTimeout(){},info:()=>({annotations:[]}),skip:(_value,reason)=>{throw Object.assign(Error(reason),{skipped:true});}}});await assert.rejects(run({},cfg,{kind:'card'}),e=>e.skipped&&/AUTH_OR_ENTITLEMENT_REQUIRED/.test(e.message));await assert.rejects(run({},cfg,{kind:'card',confirmationOnly:true}),e=>e.skipped&&/campaign payment was blocked/.test(e.message));assert.deepEqual(calls,['probe']);env.EPP_RUN_ID='campaign-b';await assert.rejects(run({},cfg,{kind:'card',confirmationOnly:true}),/CURRENT_RUN_ORDER_REQUIRED/);assert.deepEqual(calls,['probe']);});

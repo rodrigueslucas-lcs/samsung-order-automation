@@ -52,17 +52,27 @@ test('matrix preserves actionable blocker categories without copying sensitive d
   assert.equal(prerequisiteReason('BLOCKED_NOT_IMPLEMENTED: card flow'),'PAYMENT_ADAPTER_NOT_IMPLEMENTED');
   assert.equal(prerequisiteReason('unrecognized sensitive fixture data'),'PREREQUISITE_NOT_MET');
 });
-test('a prerequisite block cannot erase a proven PASS, and remains visible as current state', () => {
+test('latest status drives counts while historical PASS remains independently visible', () => {
   const pass = { tc:'SAM-25022', result:'PASS', runtime:'TARGETED_RUNTIME', notes:'EXPECTED_BEHAVIOR_PROVEN' };
   const block = { tc:'SAM-25022', result:'BLOCKED', runtime:'PREREQUISITE_CHECK', notes:'AUTH_OR_ENTITLEMENT_REQUIRED' };
   const merged = mergeObservation(pass,block);
-  assert.equal(merged.result,'PASS');
-  assert.equal(merged.runtime,'HISTORICAL_TARGETED_RUNTIME');
-  assert.equal(merged.latestAttempt.result,'BLOCKED');
-  assert.match(merged.notes,/CURRENT_AUTH_OR_ENTITLEMENT_REQUIRED/);
+  assert.equal(merged.result,'BLOCKED');
+  assert.equal(merged.runtime,'PREREQUISITE_CHECK');
+  assert.equal(merged.historicalPass.result,'PASS');
+  assert.equal(merged.notes,'AUTH_OR_ENTITLEMENT_REQUIRED');
   const fail = { tc:'SAM-25022', result:'FAIL', runtime:'TARGETED_RUNTIME', notes:'INSPECT_IGNORED_PLAYWRIGHT_REPORT' };
-  assert.deepEqual(mergeObservation(pass,fail),fail);
+  assert.equal(mergeObservation(pass,fail).result,'FAIL');
+  assert.equal(mergeObservation(pass,fail).historicalPass.result,'PASS');
+  assert.equal(mergeObservation(merged,fail).historicalPass.result,'PASS');
   assert.deepEqual(mergeObservation(fail,pass),pass);
+});
+
+test('read-only recovery cannot replace the latest functional verdict',()=>{
+ const failed={tc:'SAM-24865',result:'FAIL',runtime:'TARGETED_RUNTIME',notes:'AMBIGUOUS_EPP_ORDER_ATTEMPT'};
+ const recovery={tc:'SAM-24865',result:'NOT_RUN',runtime:'RECOVERY_ONLY',notes:'READ_ONLY_RECOVERY_NOT_FUNCTIONAL_HOMOLOGATION'};
+ const merged=mergeObservation(failed,recovery);
+ assert.equal(merged.result,'FAIL');assert.equal(merged.latestRecovery.runtime,'RECOVERY_ONLY');
+ assert.deepEqual(mergeObservation(undefined,recovery),recovery);
 });
 
 test('ambiguous financial initiation keeps FAIL while exposing only its safe reconciliation reason',()=>{const rows=extractResults({suites:[{specs:[{title:'SAM-25045 Card',tests:[{results:[{status:'failed',error:{message:'AMBIGUOUS_EPP_ORDER_ATTEMPT: private details must not be copied'}}]}]}]}]});assert.equal(rows[0].result,'FAIL');assert.equal(rows[0].notes,'AMBIGUOUS_EPP_ORDER_ATTEMPT');assert.equal(classifyObservation(rows[0]).classification,'ACCESS_REQUIRED');assert.ok(!JSON.stringify(rows).includes('private details'));});

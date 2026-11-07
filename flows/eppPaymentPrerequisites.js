@@ -22,6 +22,13 @@ const campaignKey=(cfg,runId)=>[cfg.market,cfg.environment,cfg.program,runId].jo
 
 function enforceEppPayment(condition, reason, cfg) {
   if (!condition) return;
+  // An unresolved earlier initiation prevents this case from executing at
+  // all. Report that prerequisite consistently, without rewriting the failed
+  // case which actually submitted it or releasing its durable marker.
+  if(reason.startsWith('AMBIGUOUS_EPP_ORDER_ATTEMPT:')){
+    test.skip(true,reason);
+    throw new Error(reason); // Fail closed if an embedded skip stub returns.
+  }
   // A CL S2 QST precondition is a reported failure, not a silent skip.
   // Never retry ambiguous submissions or bypass identity/provider checks.
   if (cfg?.market === 'CL' && cfg.environment === 'S2') throw new Error(reason);
@@ -141,18 +148,19 @@ export async function runEppPaymentPrerequisiteCase(page,cfg,options){
     if(targets.length!==1)throw new Error('CURRENT_RUN_ORDER_REQUIRED: this campaign has no causal confirmed order; confirmation cannot substitute another payment after failed payment cases.');
     // A standalone confirmation target creates one order only when authorized.
   }
+  // Identified old attempts are independently reconciled and archived before
+  // a fresh checkout; unidentified submits are never cleared or blindly retried.
+  if(pendingRecords.some(pending=>pending.status!=='OBSERVED_ORDER'||!pending.orderCode||pending.kind==='transfer'&&pending.providerConfirmationSubmitted!==true)){
+    const reason='AMBIGUOUS_EPP_ORDER_ATTEMPT: reconcile the existing initiation before any cart reset or new submit.';
+    campaignPrerequisites.set(campaignKey(cfg,runId),{reason:'AMBIGUOUS_EPP_ORDER_ATTEMPT'});
+    enforceEppPayment(true,reason,cfg);
+    throw new Error(reason); // Fail closed even if an embedded runner does not terminate on skip.
+  }
   if(process.env.ALLOW_PAYMENT_SUBMIT!=='1'){
     enforceEppPayment(true,'PAYMENT_SUBMIT_NOT_AUTHORIZED: normal EPP payment requires a new causal order; historical confirmation is not a substitute.',cfg);
     throw new Error('PAYMENT_SUBMIT_NOT_AUTHORIZED: no cart mutation or financial action is allowed.');
   }
   if(!runId||!/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(runId))throw new Error('CURRENT_RUN_ORDER_REQUIRED: use the isolated local EPP market runner.');
-  // Identified old attempts are independently reconciled and archived before
-  // a fresh checkout; unidentified submits are never cleared or blindly retried.
-  if(pendingRecords.some(pending=>pending.status!=='OBSERVED_ORDER'||!pending.orderCode||pending.kind==='transfer'&&pending.providerConfirmationSubmitted!==true)){
-    const reason='AMBIGUOUS_EPP_ORDER_ATTEMPT: reconcile the existing initiation before any cart reset or new submit.';
-    enforceEppPayment(true,reason,cfg);
-    throw new Error(reason); // Fail closed even if an embedded runner does not terminate on skip.
-  }
   for(const pending of pendingRecords){
     await validateExistingEppCardOrder(page,cfg,pending,{allowObservedOrder:true});
     attempts.confirmPendingEppOrder(cfg,pending.kind,pending.orderCode);
