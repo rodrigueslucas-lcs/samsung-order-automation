@@ -1,4 +1,4 @@
-/* Presentation only: no requests, storage, auth operations or schedule changes. */
+/* Read-only presentation: same-document report refresh only; no auth, storage or schedule changes. */
 (function(root){
   const V3_STYLES=`
     .ready-chip{box-shadow:inset 0 0 0 1px #0b7a5b14,0 1px 4px #08745618;font-weight:850;background:#e3f7ee!important;border-color:#a9dac5!important;color:#05684d!important}
@@ -109,8 +109,39 @@
     const anchor=human||document.querySelector('.executive-grid');
     if(anchor&&schedule&&anchor.nextElementSibling!==schedule)anchor.after(schedule);
   }
-  if(typeof module==='object'&&module.exports)module.exports={countdown,freshness,humanizeStatus};
+  // Signed Jenkins resource URLs expire. Never navigate an embedded report to
+  // a private canonical origin: Chrome blocks that public-to-local iframe hop.
+  function protectEmbeddedRefresh(root,cleanup=()=>{}){
+    if(!root.location||root.top===root.self)return;
+    const meta=root.document.querySelector('meta[http-equiv="refresh"]');
+    if(!meta)return;
+    meta.remove();
+    let pending=false;
+    const check=async()=>{
+      if(pending)return;pending=true;
+      try{
+        const response=await root.fetch(root.location.href,{redirect:'error',cache:'no-store',credentials:'same-origin',signal:root.AbortSignal?.timeout(10000)});
+        if(!response.ok)throw Error('Report unavailable');
+        const html=await response.text();
+        if(html.length>2097152||!html.includes('<title>Samsung SMB · Auth Operations</title>'))throw Error('Not a dashboard');
+        // Updating the existing document avoids a destructive iframe navigation.
+        root.clearInterval(timer);cleanup();
+        root.document.open();root.document.write(html);root.document.close();
+      }catch{
+        let notice=root.document.getElementById('report-refresh-unavailable');
+        if(!notice){notice=root.document.createElement('section');notice.id='report-refresh-unavailable';notice.className='alert amber-alert';notice.setAttribute('role','status');notice.textContent='Live update unavailable. Last verified dashboard retained. ';
+          const destination=root.document.body.dataset.liveDashboard;
+          if(destination){const link=root.document.createElement('a');link.href=destination;link.target='_top';link.textContent='Open live dashboard';notice.append(link);}
+          root.document.body.prepend(notice);
+        }
+      }finally{pending=false;}
+    };
+    const timer=root.setInterval(check,45000);
+  }
+  if(typeof module==='object'&&module.exports)module.exports={countdown,freshness,humanizeStatus,protectEmbeddedRefresh};
   if(!root.document)return;
+  let presentationTimer;
+  protectEmbeddedRefresh(root,()=>{if(presentationTimer)root.clearInterval(presentationTimer);});
   injectV3Styles(root.document);
   const nodes=[...root.document.querySelectorAll('[data-next-check]')];
   const stamps=[...root.document.querySelectorAll('[data-generated-at]')];
@@ -119,7 +150,7 @@
   polishSummary(root.document);
   polishHumanActions(root.document);
   moveSchedule(root.document);
-  update();if(nodes.length||stamps.length)root.setInterval(update,1000);
+  update();if(nodes.length||stamps.length)presentationTimer=root.setInterval(update,1000);
   const market=root.document.querySelector('[data-event-market-filter]'),type=root.document.querySelector('[data-event-type-filter]');
   const events=[...root.document.querySelectorAll('[data-event-market]')];
   const empty=root.document.getElementById?.('event-filter-empty');

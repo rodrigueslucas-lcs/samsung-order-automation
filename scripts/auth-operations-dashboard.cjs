@@ -77,9 +77,9 @@ async function main({argv=process.argv.slice(2),env=process.env,read=readCycles,
   const mirror=args.environment==='S2'?configuredReport(args.sourceRoot):null;
   if(mirror){
     // Current job-level report only. Historical build reports are never changed.
-    // Reload the same signed report document; never nest a cross-origin iframe.
+    // Refresh only the signed report document; preserve the last good UI on expiry.
     for(const file of ['styles.css','countdown.js'])await atomicText(path.join(mirror,file),fs.readFileSync(path.join(args.output,file),'utf8'));
-    await atomicText(path.join(mirror,'index.html'),render(model));
+    await atomicText(path.join(mirror,'index.html'),render(model,{refreshOrigin}));
   }
   log(`[auth:operations] ${args.environment}: Base Store rows=${model.sessions.length}; EPP rows=${model.epp.sessions.length}; scheduler=${model.scheduler.status}; Base Store human gates=${model.attention.length}. Read-only; no auth operation ran.`);
   return model;
