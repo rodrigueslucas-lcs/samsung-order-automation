@@ -29,3 +29,4 @@ test('single command delegates to existing guarded refresh/publish logic once',a
   ]);
   assert.equal(calls[0].env.CO_EPP_PROGRAM,'co_epp_agre');
 });
+for(const [code,label] of [[0,'READY 4/4'],[1,'NOT_READY'],[2,'HUMAN_REQUIRED'],[3,'BUSY']])test('regional summary honestly reports exit '+code,async()=>{const lines=[];assert.equal(await main({run:async()=>code,log:line=>lines.push(line)}),code);assert.ok(lines.at(-1).includes(label));if(code!==0)assert.ok(!lines.at(-1).includes('READY 4/4'));});

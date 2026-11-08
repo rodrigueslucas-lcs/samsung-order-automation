@@ -24,10 +24,12 @@ async function main({run=keepAliveMain,env=process.env,log=console.log}={}){
   const scoped=buildEnvironment(env);
   log('[auth:refresh:epp:all] S2 · MX pymesmx · PE pe_membership_vip · CO co_epp_agre · CL alianzas');
   log('[auth:refresh:epp:all] Verify first; recover only when authorized; publish only proven sessions.');
-  return run({
+  const code=await run({
     argv:['--environment=S2','--markets=MX,PE,CO,CL','--slot=primary','--allow-refresh','--publish'],
     env:scoped,
   });
+  log('[auth:refresh:epp:all] '+(code===0?'READY 4/4 · verified and finalized':code===2?'HUMAN_REQUIRED · complete the existing dedicated window':code===3?'BUSY · maintenance deferred; no duplicate login started':'NOT_READY · inspect the per-market reason above; no healthy result was assumed'));
+  return code;
 }
 
 if(require.main===module){
