@@ -299,6 +299,7 @@ async function refresh(market, environment) {
     success = true;
     report("READY · independent EPP verify passed; state exported; closing owned browser");
   } catch (error) {
+    if(error.code==='AUTH_SECURITY_BLOCKED'){error.eppReason='SAMSUNG_ACCOUNT_SECURITY_BLOCKED';error.exitCode=78;}
     if (guard?.lastBlocked()) {
       const denied=guard.lastBlocked();
       report(`navigation denied: ${denied.reason} ${denied.host}${denied.path}`);

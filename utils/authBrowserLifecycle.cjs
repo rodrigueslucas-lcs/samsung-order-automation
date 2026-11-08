@@ -70,3 +70,25 @@ function authBrowserClosed({market,environment,slot}, {platform=process.platform
   } catch {return false;}
 }
 module.exports = { captureAuthBrowser, authBrowserClosed };
+
+// Read only the exact dedicated browser's target inventory. No CDP attachment,
+// navigation, credentials, process control or browser-close operation.
+async function authBrowserSecurityGate({market,environment,slot},{profilesRoot=path.resolve('playwright/profiles'),read=fs.readFileSync,request=fetch}={}) {
+  if(!['mx','pe','co','cl'].includes(market)||!['S1','S2'].includes(environment)||!['primary','second'].includes(slot))throw Error('Invalid auth browser identity.');
+  try {
+    const profile=environment.toLowerCase()+'-'+market+'-'+(slot==='second'?'second':'qa');
+    const [port,browserPath]=read(path.join(profilesRoot,profile,'DevToolsActivePort'),'utf8').trim().split(/\r?\n/);
+    if(!/^\d+$/.test(port)||Number(port)<1||Number(port)>65535||!/^\/devtools\/browser\/[a-zA-Z0-9-]+$/.test(browserPath||''))return null;
+    const origin='http://127.0.0.1:'+port;
+    const version=await request(origin+'/json/version',{redirect:'error',signal:AbortSignal.timeout(3000)});
+    if(!version.ok)return null;
+    const endpoint=new URL((await version.json()).webSocketDebuggerUrl);
+    if(endpoint.protocol!=='ws:'||endpoint.hostname!=='127.0.0.1'||endpoint.port!==port||endpoint.pathname!==browserPath)return null;
+    const response=await request(origin+'/json/list',{redirect:'error',signal:AbortSignal.timeout(3000)});
+    if(!response.ok)return null;
+    const targets=await response.json();if(!Array.isArray(targets))return null;
+    if(targets.some(target=>{try{const u=new URL(target.url);return target.type==='page'&&u.origin==='https://account.samsung.com'&&/^\/iam\/blocked(?:\/|$)/i.test(u.pathname);}catch{return false;}}))return {reason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED'};
+  }catch{}
+  return null;
+}
+module.exports.authBrowserSecurityGate=authBrowserSecurityGate;

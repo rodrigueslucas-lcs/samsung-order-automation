@@ -55,6 +55,10 @@ async function completeAccountLogin(page, { market, hostname, credentials, timeo
       if (url.hostname !== hostname && !url.hostname.endsWith('.ecom-stg.samsung.com')) throw new Error('Samsung Account reached an unexpected host; no credentials were submitted there.');
       await pause(250); continue;
     }
+    if (/^\/iam\/blocked(?:\/|$)/i.test(url.pathname)) {
+      const error = new Error('SAMSUNG_ACCOUNT_SECURITY_BLOCKED: Samsung Account denied access. Review the official security page; no credential action was repeated.');
+      error.code = 'AUTH_SECURITY_BLOCKED';error.exitCode = 78;throw error;
+    }
     if (/^\/iam\/error(?:\/|$)/i.test(url.pathname)) {
       const error = new Error('Samsung Account rejected the current authorization. No credential step will be repeated on this error page; start a fresh authorized refresh.');
       error.code = 'AUTH_PROVIDER_ERROR';

@@ -32,7 +32,7 @@ function runNodeScript(script, env, { spawnChild = spawn, timeoutMs = 240000, st
   return new Promise((resolve, reject) => {
     const args = env.AUTH_MARKET_LEASE ? ['scripts/auth-leased-child.cjs', script] : [script];
     const child = spawnChild(process.execPath, args, { env, stdio: ['ignore','pipe','pipe'], windowsHide: true });
-    let audit, handoff, lineBuffer = '', diagnostic = null, structuredIssue = false;
+    let audit, handoff, lineBuffer = '', errorTail = '', diagnostic = null, structuredIssue = false;
     let timedOut = false;
     const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); }, timeoutMs);
     // Output is consumed but never retained in returned results/checkpoints.
@@ -51,8 +51,10 @@ function runNodeScript(script, env, { spawnChild = spawn, timeoutMs = 240000, st
     });
     child.stderr?.on('data', chunk => {
       const text = String(chunk);
+      errorTail=(errorTail+text).slice(-4096);
       if (structuredIssue) { stderr(text); return; }
-      if (text.includes('[auth:lease]')) diagnostic = 'CHILD_LEASE_ENTRY';
+      if (errorTail.includes('SAMSUNG_ACCOUNT_SECURITY_BLOCKED')) { diagnostic = 'SAMSUNG_ACCOUNT_SECURITY_BLOCKED'; structuredIssue = true; }
+      else if (text.includes('[auth:lease]')) diagnostic = 'CHILD_LEASE_ENTRY';
       else if (/AUTH RECOVERY REQUIRED/.test(text)) diagnostic = 'AUTH_RECOVERY_REQUIRED';
       else if (/profile menu did not open|authenticated logout control was not rendered/.test(text)) diagnostic = 'AUTH_NOT_PROVEN';
       else if (/net::ERR_|ECONNRESET|ECONNREFUSED|ENOTFOUND/.test(text)) diagnostic = 'NETWORK_ERROR';
@@ -87,22 +89,26 @@ async function verifyIdentity({ market, environment, slot, env = process.env, at
     return { market, environment, slot, status, attempts: outcomes.length, code: outcomes.at(-1), verifyCodes: outcomes, diagnostics, audits, ...(reason ? { reason } : {}) };
   } finally { release(); }
 }
-async function recoverIdentity({ market, environment, slot, env = process.env }, { runScript = runNodeScript, log = console.log, onEvent = () => {} } = {}) {
+async function recoverIdentity({ market, environment, slot, env = process.env }, { runScript = runNodeScript, log = console.log, onEvent = () => {}, securityGate=require('./authBrowserLifecycle.cjs').authBrowserSecurityGate } = {}) {
   const runtimeEnv = identityEnv(market, environment, slot, env);
+  const security=await securityGate({market,environment,slot});
+  if(security?.reason==='SAMSUNG_ACCOUNT_SECURITY_BLOCKED')return {market,environment,slot,status:'HUMAN_REQUIRED',reason:security.reason,code:78,humanPending:true,passwordAttempted:true,emailPhase:'NONE'};
   delete runtimeEnv.AUTH_KEEPALIVE; // Refresh has its own fresh verify and normal interactive contract.
   runtimeEnv[`${market.toUpperCase()}_AUTH_INTERACTIVE_TIMEOUT_MS`] = String(Math.min(600000, Number(env.AUTH_KEEPALIVE_INTERACTIVE_TIMEOUT_MS || 600000)));
   log(`[keepalive:${market}] ${environment} ${slot} REFRESH (two positively invalid checks)`);
   let informed = false;
   const onOutput = chunk => { if (!informed && /CAPTCHA\/MFA requires human completion|manual mode|Complete login\/CAPTCHA|Complete Samsung Account login\/CAPTCHA/.test(chunk)) { informed = true; log(`[keepalive:${market}] ${slot}: complete human verification in the dedicated Chrome window.`); try { onEvent({ market, slot, status:'HUMAN_REQUIRED' }); } catch {} } };
   const result = await runScript(`scripts/auth-refresh-${market}.cjs`, runtimeEnv, { timeoutMs: 900000, stdout: onOutput, stderr: onOutput });
-  const status = result.code === 0 && !result.timedOut && !result.signal ? 'RECOVERED' : result.code === 2 ? 'HUMAN_REQUIRED' : result.code === 3 ? 'BUSY' : 'FAILED';
+  const status = result.diagnostic==='SAMSUNG_ACCOUNT_SECURITY_BLOCKED'?'HUMAN_REQUIRED':result.code === 0 && !result.timedOut && !result.signal ? 'RECOVERED' : result.code === 2 ? 'HUMAN_REQUIRED' : result.code === 3 ? 'BUSY' : 'FAILED';
   const reason=VERIFICATION_ISSUES.includes(result.diagnostic)?result.diagnostic:result.diagnostic==='TimeoutError'?'VERIFICATION_TIMEOUT':null;
   return { market, environment, slot, status, code: result.code, ...(reason?{reason}:{}), ...(status==='HUMAN_REQUIRED'||(informed&&status!=='RECOVERED')?{humanPending:true,passwordAttempted:result.handoff?.passwordAttempted??true,emailPhase:result.handoff?.emailPhase||'NONE'}:{}) };
 }
-async function resumeIdentity({market,environment,slot,env=process.env,passwordAttempted=true,emailPhase='NONE'},{runScript=runNodeScript,verify=verifyIdentity,captureBrowser=require('./authBrowserLifecycle.cjs').captureAuthBrowser,browserClosed=require('./authBrowserLifecycle.cjs').authBrowserClosed,acquire=acquireRefreshLock}={}) {
+async function resumeIdentity({market,environment,slot,env=process.env,passwordAttempted=true,emailPhase='NONE'},{runScript=runNodeScript,verify=verifyIdentity,captureBrowser=require('./authBrowserLifecycle.cjs').captureAuthBrowser,browserClosed=require('./authBrowserLifecycle.cjs').authBrowserClosed,acquire=acquireRefreshLock,securityGate=require('./authBrowserLifecycle.cjs').authBrowserSecurityGate}={}) {
   let release,owned,keep=false,childInvoked=false;
   const base={market,environment,slot};
   try {
+    const security=await securityGate(base);
+    if(security?.reason==='SAMSUNG_ACCOUNT_SECURITY_BLOCKED')return {...base,status:'HUMAN_REQUIRED',reason:security.reason,humanPending:true,passwordAttempted};
     try {release=acquire(market,environment,slot);}catch{return{...base,status:'BUSY'};}
     owned=await captureBrowser(base);
     if(!owned)return{...base,status:await browserClosed(base)?'HANDOFF_CLOSED':'HUMAN_REQUIRED',passwordAttempted};
