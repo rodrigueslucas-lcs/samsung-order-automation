@@ -371,3 +371,16 @@ A separate local WIP reuses CO's existing own-programme API/UI reconciliation fo
 Final normal validation 2026-11-07T21-16-02-087Z-71128 did not pass: the payment returned businessCode601; SAM-25138 FAIL and dependent SAM-25140 FAIL/CURRENT_RUN_ORDER_REQUIRED. Read-only complete history (searchPageData.pagination.numberOfPages=1, totalNumberOfResults=12) and exact API200 identify PE261107-78844866_261107211827127, same approved SKU quantity1, still TEMPORARY. The SUBMITTING marker remains intact; no retry, cancellation, fake confirmation or finance-status mutation was performed. This is not an auth blocker and no new CAPTCHA is required. Samsung/provider must clarify the601 rejection and disposition of this temporary attempt before another financial submit. No Jira ID was invented.
 
 Validation: scoped navigation guard10/10 PASS, including actual Chromium interception of Production redirects. Current local code including the separately retained alias WIP:387/387 EPP/MX contract tests PASS, zero skips; official scope/business-step gates and diff check PASS. This does not turn the last real PE card campaign into PASS. No EPP Jenkins job was created.
+
+## PE S2 closeout — 2026-11-08
+
+This section supersedes the earlier pending-601/alias WIP status without deleting its historical evidence. Read-only reconciliation proved PE261107-78844866_261107211827127 through own-programme API200, SKU RB45DG6300B1PE quantity1, original creation time and visible confirmation; zero payment submits. Its pending marker was archived after proof.
+
+Frontend acceptance is causal order creation plus public number and actual confirmation, not financial settlement. A 601 alone cannot pass or fail that frontend contract. The PE/S2/pe_membership_vip adapter now allows GET-only reconciliation after this response, retaining diagnostics, and reuses the existing scoped API/UI alias validation. Missing causal order, missing success UI, conflicting aliases and other programmes still fail. No blind submit retry was introduced.
+
+Audit caught an intermediate run returning the old public number PE261107-78844866. That result is NOT evidence of a new order. Normal submit now rejects any pre-existing public/internal alias from its baseline; history reconciliation also requires a valid recent creation timestamp, because first appearance in history alone cannot prove creation.
+
+Normal targeted campaign 2026-11-08T22-49-06-466Z-28168: SAM-25138 PASS and SAM-25140 PASS, 2/2 in 4.1 minutes, new order PE261108-78846441. Confirmation used that campaign's own order. No MX Cash or CL Bank Transfer attempt was changed or replayed. Relevant known defects remain mapped and are not converted to PASS.
+
+Validation: 408 EPP regression tests PASS, zero failures/skips; official scope and business-step gates PASS. Report remains latest-observation aggregation across runs, not a single four-market campaign or 26/26 PASS. No EPP Jenkins jobs were created.
+Independent GET-only follow-up also proved PE261108-78846441 API200, expected SKU/quantity, creation time matching the new run and visible confirmation (1 PASS, 55 seconds, zero submit requests). Base Store payment/history contracts: 41/41 PASS. Current S2 matrix: MX6PASS/1known-defect, CL5/2, PE5/1, CO4/2; 20PASS/6BLOCKED total, zero FAIL, across separate runs.

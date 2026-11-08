@@ -33,9 +33,9 @@ export async function submitMxEppCard(page,cfg,capture,reconciliation){
  if(cfg.market!=='MX')throw new Error('MX EPP adapter cannot target another market.');
  return submitEppMercadoCard(page,cfg,capture,reconciliation);
 }
-export async function submitPeEppCard(page,cfg,capture,reconciliation){
+export async function submitPeEppCard(page,cfg,capture,reconciliation,confirmObserved=null){
  if(cfg.market!=='PE')throw new Error('PE EPP adapter cannot target another market.');
- return submitEppMercadoCard(page,cfg,capture,reconciliation);
+ return submitEppMercadoCard(page,cfg,capture,reconciliation,confirmObserved);
 }
 export async function submitClEppCard(page,cfg,capture,reconciliation){
  if(cfg.market!=='CL')throw new Error('CL EPP adapter cannot target another market.');
@@ -86,11 +86,11 @@ async function submitEppMercadoCard(page,cfg,capture,reconciliation=null,confirm
    network=rows.map(row=>{const path=new URL(row.endpoint).pathname;return{method:row.method,status:row.status,path:path.startsWith('/tokocommercewebservices/v2/')?path.replace(/\/users\/[^/]+/,'/users/[identity]').replace(/\/carts\/[^/]+/,'/carts/[cart]'):'[provider endpoint]'};});
   }catch{}
   await test.info().attach('EPP single submit diagnostic',{body:JSON.stringify({market:cfg.market,environment:cfg.environment,program:cfg.program,outcome,businessCode,network,submitCount:1}),contentType:'application/json'});
-  // CL's official acceptance is causal order creation + visible confirmation,
+  // CL/PE's frontend acceptance is causal order creation + visible confirmation,
   // not settlement. Preserve the 601 evidence; only a new programme/SKU-bound
   // order AND the success UI below can satisfy that frontend contract.
-  const clFrontendOrder=cfg.market==='CL'&&cfg.environment==='S2'&&cfg.program==='alianzas';
-  if(reconciliation&&(!businessCode||clFrontendOrder)){
+  const frontendOrder=cfg.environment==='S2'&&(cfg.market==='CL'&&cfg.program==='alianzas'||cfg.market==='PE'&&cfg.program==='pe_membership_vip'&&businessCode==='601');
+  if(reconciliation&&(!businessCode||frontendOrder)){
    const reconciled=await reconciliation.afterSubmit(baseline);
    if(reconciled){
     attempt.observe(reconciled.orderCode);
@@ -102,17 +102,19 @@ async function submitEppMercadoCard(page,cfg,capture,reconciliation=null,confirm
   throw new Error(`EPP_SINGLE_SUBMIT_UNCONFIRMED${businessCode?' businessCode='+businessCode:''}; attempt marker preserved, no retry. Raw provider details suppressed.`);
   }
  }
+ if(baseline&&[...baseline].some(code=>String(code).replace(/_\d+$/,'')===result.orderCode.replace(/_\d+$/,'')))throw new Error('EPP_EXISTING_ORDER_RETURNED: submit identified a pre-existing order; no new-order PASS or retry.');
  attempt.observe(result.orderCode);
  await expect(page).toHaveURL(/orderConfirmation|order-confirmation|confirmacion/i,{timeout:60000});
  try{await validateMxEppConfirmation(page,cfg,result.orderCode);}
  catch(error){
-  if(cfg.market!=='CO'||cfg.environment!=='S2'||cfg.program!=='co_epp_agre'||error.message!=='EPP confirmation URL does not identify the causal order.')throw error;
-  // A new CO submit can land on its internal confirmation alias while OCC
+  const observedAliasScope=cfg.environment==='S2'&&(cfg.market==='CO'&&cfg.program==='co_epp_agre'||cfg.market==='PE'&&cfg.program==='pe_membership_vip');
+  if(!observedAliasScope||error.message!=='EPP confirmation URL does not identify the causal order.')throw error;
+  // A new CO/PE submit can land on its internal confirmation alias while OCC
   // reports the public code. Reuse the scoped GET + UI reconciliation; never
   // weaken identity comparison, replay payment or accept another order.
   const route=new URL(page.url()).pathname.match(/;orderCode=([^;/?]+)/)?.[1];
   if(!route||route.replace(/_\d+$/,'')!==result.orderCode.replace(/_\d+$/,'')||route.includes('_')&&result.orderCode.includes('_'))throw error;
-  await test.info().attach('CO confirmation route reconciliation',{body:JSON.stringify({market:cfg.market,environment:cfg.environment,orderCode:result.orderCode,routeOrderCode:route&&/^CO\d{6}-\d{8}(?:_\d+)?$/.test(route)?route:null,submitCount:1}),contentType:'application/json'});
+  await test.info().attach(cfg.market+' confirmation route reconciliation',{body:JSON.stringify({market:cfg.market,environment:cfg.environment,orderCode:result.orderCode,routeOrderCode:route&&new RegExp('^'+cfg.market+'\\d{6}-\\d{8}(?:_\\d+)?$').test(route)?route:null,submitCount:1}),contentType:'application/json'});
   if(typeof confirmObserved!=='function')throw error;
   await confirmObserved(page,cfg,{market:cfg.market,environment:cfg.environment,kind:'card',status:'OBSERVED_ORDER',orderCode:result.orderCode},{allowObservedOrder:true});
  }

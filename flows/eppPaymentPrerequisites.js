@@ -177,7 +177,7 @@ export async function runEppPaymentPrerequisiteCase(page,cfg,options){
   }
   const submit=['MX','PE','CL','CO'].includes(cfg.market)&&(cfg.market==='MX'||cfg.environment==='S2')&&options?.kind==='card';
   const bank=cfg.market==='CL'&&cfg.environment==='S2'&&options?.kind==='transfer';
-  const observed=await probeEppPaymentPrerequisites(page,cfg,{...options,onProviderReady:bank?submitClEppBank:submit?(cfg.market==='CO'?((...args)=>submitCoEppCard(...args,validateExistingEppCardOrder)):cfg.market==='CL'?submitClEppCard:cfg.market==='PE'?submitPeEppCard:submitMxEppCard):null});
+  const observed=await probeEppPaymentPrerequisites(page,cfg,{...options,onProviderReady:bank?submitClEppBank:submit?(cfg.market==='CO'?((...args)=>submitCoEppCard(...args,validateExistingEppCardOrder)):cfg.market==='CL'?submitClEppCard:cfg.market==='PE'?((...args)=>submitPeEppCard(...args,validateExistingEppCardOrder)):submitMxEppCard):null});
   if(observed.status==='PASS'&&observed.orderCode)return;
   if(observed.status==='BLOCKED')campaignPrerequisites.set(campaignKey(cfg,runId),{reason:observed.reason});
   test.info().annotations.push({type:'epp-prerequisite',description:`${observed.reason}: ${observed.stage}`});
