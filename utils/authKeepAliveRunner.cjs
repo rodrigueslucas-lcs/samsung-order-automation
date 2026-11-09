@@ -175,11 +175,12 @@ async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MAR
       catch {record.checked[index]={...identity,status:'FAILED'};}
       // Cleanup is independent of session verification: a network outage must
       // not strand a positively terminal retained window or authorize login.
-      if(record.state.human?.[slot]||record.state.pendingClose?.[slot]){
+      if(record.state.human?.[slot]||record.state.pendingClose?.[slot]||record.checked[index].status==='NEEDS_REFRESH'){
         let retained;
         try{
           retained=await captureBrowser({...identity});
-          if(await retained?.closeRejected?.()){
+          if(await retained?.closeSecurityBlocked?.(()=>{record.state.securityBlocks={...record.state.securityBlocks,[slot]:{reason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED',at:new Date(now()).toISOString()}};saveState(record.market,target,record.state);})){for(const key of ['human','handoff','pendingClose']){record.state[key]={...record.state[key]};delete record.state[key][slot];}saveState(record.market,target,record.state);}
+          else if(await retained?.closeRejected?.()){
             for(const key of ['human','handoff','pendingClose']){record.state[key]={...record.state[key]};delete record.state[key][slot];}
             saveState(record.market,target,record.state);
             notify({...identity,status:'HANDOFF_ENDED',reason:'AUTHORIZATION_EXPIRED'});
@@ -189,9 +190,11 @@ async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MAR
       }
     })));
     const recoverSlot=async(slot)=>{
+      for(const record of records)for(let index=0;index<record.checked.length;index++){const identity=record.checked[index];if(identity.slot!==slot)continue;if(['HEALTHY','RECOVERED'].includes(identity.status)&&record.state?.securityBlocks?.[slot]){record.state.securityBlocks={...record.state.securityBlocks};delete record.state.securityBlocks[slot];saveState(record.market,target,record.state);}else if(record.state?.securityBlocks?.[slot]){record.checked[index]={...identity,status:'HUMAN_REQUIRED',reason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED',humanPending:false};notify(record.checked[index]);}}
+
       const waiting=records.filter(r=>!r.failed).flatMap(record=>record.checked.map((identity,index)=>({record,identity,index}))).filter(({identity})=>identity.slot===slot&&identity.status==='NEEDS_REFRESH');
       if(!waiting.length)return;
-      if(slot==='second'&&records.some(r=>r.checked.some(i=>i.slot==='primary'&&(i.status==='HUMAN_REQUIRED'||i.humanPending||((r.state?.human?.primary||r.state?.pendingClose?.primary)&&!['HEALTHY','RECOVERED'].includes(i.status)))))) {
+      if(slot==='second'&&records.some(r=>!r.state?.securityBlocks?.primary&&r.checked.some(i=>i.slot==='primary'&&(i.status==='HUMAN_REQUIRED'||i.humanPending||((r.state?.human?.primary||r.state?.pendingClose?.primary)&&!['HEALTHY','RECOVERED'].includes(i.status)))))) {
         log('[auth:keepalive] FIRST requires human verification; SECOND renewal remains deferred.');
         for(const {record,identity,index} of waiting){record.checked[index]={...identity,status:'WAITING_PRIMARY'};notify(record.checked[index]);}
         return;
@@ -200,7 +203,7 @@ async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MAR
       else log('[auth:keepalive] Starting FIRST renewal only; SECOND login windows are deferred.');
       await Promise.all(waiting.map(({record,identity,index})=>refreshLane(async()=>{
         const {market,environment,slot}=identity;
-        if(slot==='second' && records.some(r=>r.checked.some(i=>i.slot==='primary'&&(i.status==='HUMAN_REQUIRED'||i.humanPending||((r.state?.human?.primary||r.state?.pendingClose?.primary)&&!['HEALTHY','RECOVERED'].includes(i.status)))))) {record.checked[index]={market,environment,slot,status:'WAITING_PRIMARY'};notify(record.checked[index]);return;}
+        if(slot==='second' && records.some(r=>!r.state?.securityBlocks?.primary&&r.checked.some(i=>i.slot==='primary'&&(i.status==='HUMAN_REQUIRED'||i.humanPending||((r.state?.human?.primary||r.state?.pendingClose?.primary)&&!['HEALTHY','RECOVERED'].includes(i.status)))))) {record.checked[index]={market,environment,slot,status:'WAITING_PRIMARY'};notify(record.checked[index]);return;}
         if(record.state.human?.[slot]) {
           const started=now();
           let ended=false;
@@ -257,7 +260,7 @@ async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MAR
           catch {record.cleanupUnproven=true;}
           if(handle){record.resumeHandles||={};record.resumeHandles[result.slot]=handle;record.state.pendingClose={...record.state.pendingClose,[result.slot]:handle.fingerprint};}
         }
-        for(const result of record.checked){if(result.status==='HUMAN_REQUIRED'||result.humanPending){human[result.slot]=true;handoff[result.slot]={passwordAttempted:result.passwordAttempted??handoff[result.slot]?.passwordAttempted??true,emailPhase:['READY','CHALLENGE'].includes(result.emailPhase)?result.emailPhase:'NONE'};}else if(['HEALTHY','RECOVERED'].includes(result.status)){delete human[result.slot];delete handoff[result.slot];}}
+        for(const result of record.checked){if(record.state?.securityBlocks?.[result.slot]){delete human[result.slot];delete handoff[result.slot];}else if(result.status==='HUMAN_REQUIRED'||result.humanPending){human[result.slot]=true;handoff[result.slot]={passwordAttempted:result.passwordAttempted??handoff[result.slot]?.passwordAttempted??true,emailPhase:['READY','CHALLENGE'].includes(result.emailPhase)?result.emailPhase:'NONE'};}else if(['HEALTHY','RECOVERED'].includes(result.status)){delete human[result.slot];delete handoff[result.slot];}}
         record.state={...record.state,human,handoff};saveState(record.market,target,record.state);
         if(record.checked.every(r=>['HEALTHY','RECOVERED'].includes(r.status))) record.final=await finalize({market:record.market,environment:target,publish,env:record.env,state:record.state,beforeHash:record.beforeHash});
         if(record.final.status==='READY'&&record.cleanupUnproven)record.final={...record.final,status:'BROWSER_CLOSE_FAILED'};

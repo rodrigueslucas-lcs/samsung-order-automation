@@ -59,6 +59,8 @@ async function refreshAuth({ market, environment, slot = 'primary', env, publish
   runChild = runAuthChild, acquire = acquireRefreshLock, log = console.log,
   captureBrowser = require('./authBrowserLifecycle.cjs').captureAuthBrowser,
   acquireMarket = require('./authMarketLease.cjs').acquireMarketLease,
+  securityGate = require('./authBrowserLifecycle.cjs').authBrowserSecurityGate,
+  recordSecurity = require('./authBrowserLifecycle.cjs').recordAuthSecurityBlock,
 } = {}) {
   if (!['mx', 'pe', 'co', 'cl'].includes(market) || !['S1', 'S2'].includes(environment) || !['primary', 'second'].includes(slot)) {
     throw new Error('Refresh requires a supported market, S1/S2 environment and primary/second slot.');
@@ -71,6 +73,7 @@ async function refreshAuth({ market, environment, slot = 'primary', env, publish
   try {
     env = { ...env, ...releaseMarket.env };
     release = acquire(market, environment, slot);
+    if(await securityGate({market,environment,slot})){ownedBrowser=await captureBrowser({market,environment,slot});await ownedBrowser?.closeSecurityBlocked?.(()=>recordSecurity({market,environment,slot}));throw Object.assign(new Error('SAMSUNG_ACCOUNT_SECURITY_BLOCKED: recorded provider denial; no login restart.'),{code:'AUTH_SECURITY_BLOCKED'});}
     const interactiveMs = Number(env[`${market.toUpperCase()}_AUTH_INTERACTIVE_TIMEOUT_MS`] || 600000);
     if (!Number.isFinite(interactiveMs) || interactiveMs < 1000) throw new Error('Auth interactive timeout must be at least 1000ms.');
     const manual = env[`${market.toUpperCase()}_AUTH_MANUAL`] === '1';
@@ -92,6 +95,7 @@ async function refreshAuth({ market, environment, slot = 'primary', env, publish
         status = await runChild(script, env, { label, log: report, timeoutMs, interactive: true });
       }
       if (status !== 0) {
+        if(phase==='login'&&status===78){ownedBrowser=await captureBrowser({market,environment,slot});await ownedBrowser?.closeSecurityBlocked?.(()=>recordSecurity({market,environment,slot}));}
         if (status === 79) {
           const error = new Error(`${label}: Samsung Account requires human CAPTCHA/MFA. No credentials were retried and no READY was emitted.`);
           error.code = 'AUTH_HUMAN_REQUIRED'; throw error;

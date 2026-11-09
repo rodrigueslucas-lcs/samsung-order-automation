@@ -1,6 +1,6 @@
 // Close only a definitively rejected Account attempt in its owned auth context.
-async function closeRejectedAccountWindow(page){
- const rejected=value=>{try{const u=new URL(value);return u.origin==='https://account.samsung.com'&&/^\/iam\/error(?:\/|$)/i.test(u.pathname);}catch{return false;}};
+async function closeRejectedAccountWindow(page,{includeSecurityBlocked=false}={}){
+ const rejected=value=>{try{const u=new URL(value);return u.origin==='https://account.samsung.com'&&(/^\/iam\/error(?:\/|$)/i.test(u.pathname)||(includeSecurityBlocked&&/^\/iam\/blocked(?:\/|$)/i.test(u.pathname)));}catch{return false;}};
  if(!rejected(page.url()))return false;
  const context=page.context?.(),pages=context?.pages?.()||[page];
  const allowed=p=>{const value=p.url();if(rejected(value)||value==='about:blank')return true;try{const u=new URL(value);return u.protocol==='https:'&&['stg.shop.samsung.com','stg2.shop.samsung.com'].includes(u.hostname)&&u.pathname==='/getcookie.html';}catch{return false;}};

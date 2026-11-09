@@ -49,7 +49,7 @@ for (const failurePhase of [null, 'verify', 'package', 'publish']) {
     const pending = refreshAuth({ market: 'pe', environment: 'S2', env: { JENKINS_AUTH_PUBLISH: '1' }, publishScript: 'scripts/publish.cjs' }, {
       acquireMarket: () => () => {}, acquire: () => () => events.push('release'), log() {},
       async runChild(script) { const phase = script.match(/auth-(login|verify|package)/)?.[1] || 'publish'; events.push(phase); return phase === failurePhase ? 1 : 0; },
-      async captureBrowser() { events.push('capture'); return { async closeVerified() { events.push('close'); }, async dispose() { events.push('disconnect'); } }; },
+      securityGate: async()=>null, async captureBrowser() { events.push('capture'); return { async closeVerified() { events.push('close'); }, async dispose() { events.push('disconnect'); } }; },
     });
     if (failurePhase) await assert.rejects(pending); else await pending;
     assert.equal(events.includes('close'), !failurePhase);
@@ -61,7 +61,7 @@ for (const failurePhase of [null, 'verify', 'package', 'publish']) {
 test('shared PreQA2 login does not capture or close any native browser', async () => {
   await refreshAuth({ market: 'co', environment: 'S2', env: { CO_STOREFRONT_URL: 'https://p6-pre-qa2.samsung.com/co/' } }, {
     acquireMarket: () => () => {}, acquire: () => () => {}, log() {}, runChild: async () => 0,
-    captureBrowser() { throw new Error('must preserve shared Chrome'); },
+    securityGate: async()=>null, captureBrowser() { throw new Error('must preserve shared Chrome'); },
   });
 });
 
@@ -79,3 +79,5 @@ test('real Chromium terminal window is cleaned during transient verification wit
   await new Promise(resolve=>setTimeout(resolve,100));assert.equal(closed,true);console.log('TERMINAL_CYCLE_RUNTIME '+JSON.stringify({chromiumWindowClosed:true,sessionResult:result.identities[0].status,loginStarted:false,published:false}));
  }finally{await context?.close().catch(()=>{});assert.ok(path.resolve(root).startsWith(path.resolve(os.tmpdir())+path.sep));await fs.promises.rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
 });
+
+test('security-denied owned browser records its gate before closing and never closes if recording fails',async()=>{const calls=[];const context={pages:()=>[page],browser:()=>browser};const page={url:()=> 'https://account.samsung.com/iam/blocked',context:()=>context};const browser={contexts:()=>[context],newBrowserCDPSession:async()=>({send:async method=>calls.push(method)}),close:async()=>{}};const handle=await captureAuthBrowser({market:'pe',environment:'S2',slot:'primary'},{profilesRoot:'/fixture',readFile:()=> '43210\n/devtools/browser/fixture-id',chromium:{connectOverCDP:async()=>browser}});await assert.rejects(handle.closeSecurityBlocked(async()=>{throw Error('checkpoint unavailable');}));assert.deepEqual(calls,[]);assert.equal(await handle.closeSecurityBlocked(async()=>calls.push('record')),true);assert.deepEqual(calls,['record','Browser.close']);await handle.dispose();});

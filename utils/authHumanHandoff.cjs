@@ -33,6 +33,11 @@ async function resumeHumanHandoff({market,environment,slot,passwordAttempted=tru
     catch{return{status:'HUMAN_REQUIRED',passwordAttempted:attempted};}
     browser=await chromium.connectOverCDP(endpoint,{timeout:5000});
     const context=browser.contexts()[0];if(!context)return{status:'UNPROVEN',passwordAttempted:attempted};
+    const retainedPages=context.pages();
+    if(retainedPages.length&&retainedPages.every(page=>{if(page.url()==='about:blank')return true;try{const u=new URL(page.url());return u.origin===`https://${host}`&&u.pathname==='/getcookie.html';}catch{return false;}})){
+      const session=await browser.newBrowserCDPSession();await session.send('Browser.close');
+      return{status:'AUTHORIZATION_EXPIRED',passwordAttempted:attempted,emailPhase:'NONE'};
+    }
     const account=context.pages().find(page=>{try{return new URL(page.url()).hostname==='account.samsung.com';}catch{return false;}});
     if(account) {
       if(/^\/iam\/error(?:\/|$)/i.test(new URL(account.url()).pathname)){
@@ -41,6 +46,10 @@ async function resumeHumanHandoff({market,environment,slot,passwordAttempted=tru
       const passwordVisible=await account.locator('input[type="password"], #iptLgnPlnPD').filter({visible:true}).first().isVisible();
       const retainedEmail=phase!=='NONE'&&await account.locator('input#account, input[type="email"], input[name="email"], #iptLgnPlnID').filter({visible:true}).first().isVisible();
       const termsVisible=new URL(account.url()).pathname==='/iam/sign-in/status/terms';
+      if(slot==='second'&&!termsVisible&&!passwordVisible){
+        await require('./authAccountQr.cjs').openSecondAccountQr(account,{slot,log});
+        return{status:'HUMAN_REQUIRED',passwordAttempted:attempted,emailPhase:phase};
+      }
       if(!termsVisible&&(attempted||(!passwordVisible&&!retainedEmail)))return{status:'HUMAN_REQUIRED',passwordAttempted:attempted,emailPhase:phase};
       const configured=credentials({market,slot},{env,authRoot,read});
       if(!configured)return{status:'HUMAN_REQUIRED',passwordAttempted:attempted,emailPhase:phase};

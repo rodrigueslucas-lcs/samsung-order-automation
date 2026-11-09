@@ -32,6 +32,14 @@ async function captureAuthBrowser({ market, environment, slot }, {
   catch(error) { if(error.code==='ECONNREFUSED'||/ECONNREFUSED/.test(String(error.message)))return null;throw error; }
   return {
     fingerprint: require('node:crypto').createHash('sha256').update(endpoint).digest('hex'),
+    async hasAccountHandoff(){return browser.contexts()[0]?.pages().some(p=>{try{return new URL(p.url()).origin==='https://account.samsung.com';}catch{return false;}})===true;},
+    async closeSecurityBlocked(persist){
+      const page=browser.contexts()[0]?.pages().find(p=>{try{const u=new URL(p.url());return u.origin==='https://account.samsung.com'&&/^\/iam\/blocked(?:\/|$)/i.test(u.pathname);}catch{return false;}});
+      if(!page)return false;
+      if(typeof persist!=='function')throw Error('Security denial must be recorded before closing.');
+      await persist();
+      return require('./authAccountLogin.cjs').closeRejectedAccountWindow(page,{includeSecurityBlocked:true});
+    },
     async closeRejected() {
       const pages=browser.contexts()[0]?.pages()||[];
       const page=pages.find(p=>{try{const u=new URL(p.url());return u.origin==='https://account.samsung.com'&&/^\/iam\/error(?:\/|$)/i.test(u.pathname);}catch{return false;}});
@@ -83,6 +91,7 @@ module.exports = { captureAuthBrowser, authBrowserClosed };
 // navigation, credentials, process control or browser-close operation.
 async function authBrowserSecurityGate({market,environment,slot},{profilesRoot=path.resolve('playwright/profiles'),read=fs.readFileSync,request=fetch}={}) {
   if(!['mx','pe','co','cl'].includes(market)||!['S1','S2'].includes(environment)||!['primary','second'].includes(slot))throw Error('Invalid auth browser identity.');
+  try{const state=JSON.parse(read(path.resolve('playwright/.auth',`.keepalive-${market}-${environment.toLowerCase()}.json`),'utf8'));if(state.securityBlocks?.[slot]?.reason==='SAMSUNG_ACCOUNT_SECURITY_BLOCKED')return{reason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED'};}catch{}
   try {
     const profile=environment.toLowerCase()+'-'+market+'-'+(slot==='second'?'second':'qa');
     const [port,browserPath]=read(path.join(profilesRoot,profile,'DevToolsActivePort'),'utf8').trim().split(/\r?\n/);
@@ -100,3 +109,6 @@ async function authBrowserSecurityGate({market,environment,slot},{profilesRoot=p
   return null;
 }
 module.exports.authBrowserSecurityGate=authBrowserSecurityGate;
+
+function recordAuthSecurityBlock({market,environment,slot},{directory=path.resolve('playwright/.auth')}={}){if(!['mx','pe','co','cl'].includes(market)||!['S1','S2'].includes(environment)||!['primary','second'].includes(slot))throw Error('Invalid security-gate identity.');const file=path.join(directory,`.keepalive-${market}-${environment.toLowerCase()}.json`);let state={};try{state=JSON.parse(fs.readFileSync(file,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;}require('./atomicJson').writeJsonAtomically(file,{...state,securityBlocks:{...state.securityBlocks,[slot]:{reason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED',at:new Date().toISOString()}}});}
+module.exports.recordAuthSecurityBlock=recordAuthSecurityBlock;

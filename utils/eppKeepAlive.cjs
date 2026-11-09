@@ -86,6 +86,7 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
     if(!checkpoint.human&&outcome.status==='UNPROVEN'&&TRANSIENT_VERIFY.has(outcome.reason))outcome=await d.verify(config,existing);
     if(outcome.status!=='HEALTHY'||checkpoint.human||allowRefresh) {
       owned=await d.capture(config);
+      if(allowRefresh&&await owned?.closeSecurityBlocked?.(()=>{checkpoint={...checkpoint,human:false,blockedReason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED',blockerObservedAt:new Date().toISOString()};d.save(config,checkpoint);d.clearHandoff(config);})){await owned.dispose();owned=null;if(outcome.status!=='HEALTHY')return finish('BLOCKED','SAMSUNG_ACCOUNT_SECURITY_BLOCKED',{proof:outcome.proof});}
       if(allowRefresh&&await owned?.closeRejected?.()){await owned.dispose();owned=null;checkpoint={...checkpoint,human:false};d.clearHandoff(config);d.save(config,checkpoint);}
 
       const native=await owned?.readEppSnapshot(config.rootUrl.href);
@@ -95,7 +96,7 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
         outcome=inspected;
       }}
     }
-    const priorRecoverableGate=['CORPORATE_ACTIVATION_REQUIRED','COMMERCE_CONTENT_NOT_RENDERED','EPP_COMMERCE_NOT_RENDERED'].includes(checkpoint.blockedReason);
+    const priorRecoverableGate=['CORPORATE_ACTIVATION_REQUIRED','COMMERCE_CONTENT_NOT_RENDERED','EPP_COMMERCE_NOT_RENDERED','EPP_REFRESH_NOT_PROVEN','EPP_HANDOFF_NOT_READY','EPP_HANDOFF_BROWSER_MISSING','AUTHORIZATION_EXPIRED'].includes(checkpoint.blockedReason);
     let confirmedInvalid=false;
     if(outcome.status==='INVALID'&&(!checkpoint.blockedReason||priorRecoverableGate)) {
       const second=await d.verify(config,existing);
@@ -121,6 +122,7 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
       if(checkpoint.human&&!owned&&outcome.status!=='INVALID')return finish('HUMAN_REQUIRED','EPP_HANDOFF_BROWSER_MISSING');
       // With no retained browser, two definitive invalid checks authorize one
       // fresh recovery. An old handoff must not prevent recovery forever.
+      if(confirmedInvalid&&checkpoint.human&&owned?.hasAccountHandoff&&!await owned.hasAccountHandoff()){checkpoint={...checkpoint,human:false};d.save(config,checkpoint);d.clearHandoff(config);}
       const recovery=await d.refresh(config,runtimeEnv,{resumeOnly:!!(checkpoint.human&&owned),onHuman:()=>{checkpoint={...checkpoint,human:true};d.save(config,checkpoint);onProgress({...base,status:'HUMAN_REQUIRED',reason:'EPP_HUMAN_PENDING'});}});
       if(recovery.status!=='REFRESHED') {
         if(recovery.reason==='AUTHORIZATION_EXPIRED'){d.clearHandoff(config);d.save(config,{...checkpoint,human:false,blockedReason:null});}

@@ -11,6 +11,7 @@ async function scenario({ market = 'mx', environment = 'S2', slot = 'primary', s
   const env = { [`${market.toUpperCase()}_AUTH_MANUAL`]: manual ? '1' : '0', JENKINS_AUTH_PUBLISH: publish ? '1' : '0' };
   const result = refreshAuth({ market, environment, slot, env, publishScript: `publish-${market}` }, {
     log: line => output.push(line), acquireMarket: () => () => {}, acquire: () => () => released++,
+    securityGate:async()=>null,
     captureBrowser: async () => null,
     runChild: async (script, actualEnv, options) => { calls.push({ script, env: actualEnv, options }); return statuses.shift() ?? 0; },
   });
@@ -66,7 +67,7 @@ for (const market of ['mx', 'pe', 'co', 'cl']) for (const environment of ['S1', 
       process: runtime, console: { log() {}, error() {} }, require: name => {
         assert.equal(name, '../utils/authRefreshRunner.cjs');
         return { refreshAuth: options => { const work = refreshAuth(options, {
-          acquireMarket: () => () => {}, acquire: () => () => {}, log() {}, captureBrowser: async () => null, runChild: async (script, env) => { calls.push({ script, env }); return 0; },
+          acquireMarket: () => () => {}, acquire: () => () => {}, log() {}, securityGate:async()=>null, captureBrowser: async () => null, runChild: async (script, env) => { calls.push({ script, env }); return 0; },
         }); pending.push(work); return work; } };
       },
     });
@@ -103,3 +104,5 @@ test('a silent child emits progress and its watchdog bounds stalled startup', as
     await assert.rejects(runAuthChild(file, process.env, { label: 'fixture', log() {}, timeoutMs: 100, heartbeatMs: 50 }), /bounded wait/);
   } finally { fs.unlinkSync(file); fs.rmdirSync(directory); }
 });
+
+test('recorded security denial prevents all refresh children and closes only a denied owned window',async()=>{let recorded=0,closed=0;await assert.rejects(refreshAuth({market:'pe',environment:'S2',env:{}},{acquireMarket:()=>()=>{},acquire:()=>()=>{},log(){},securityGate:async()=>({reason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED'}),recordSecurity:()=>recorded++,captureBrowser:async()=>({closeSecurityBlocked:async persist=>{await persist();closed++;},dispose:async()=>{}}),runChild:()=>assert.fail('provider denial cannot replay login')}),{code:'AUTH_SECURITY_BLOCKED'});assert.equal(recorded,1);assert.equal(closed,1);});
