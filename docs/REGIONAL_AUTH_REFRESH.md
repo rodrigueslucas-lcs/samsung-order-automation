@@ -223,3 +223,15 @@ The operator's actual HTML Publisher tab again showed Chrome's public-to-private
 The generated document now has no meta refresh at all. Both embedded and top-level views refresh only their current document through the existing bounded, redirect-rejecting read-only fetch. Failure retains the last good dashboard and its explicit top-level live link. CSS/JS URLs include a hash of their contents, so a changed asset cannot silently reuse an older cached URL. Layout, authentication, keep-alive, schedules, jobs and CSP are unchanged.
 
 Validation: 75 reporting tests PASS, zero skips, including Chromium iframe updates and expired-redirect retention. Actual Jenkins signed report survived two automatic same-document requests; generation changed from 2026-11-09T11:33:17.674Z to 2026-11-09T11:35:31.352Z. Desktop and 390px mobile passed without horizontal overflow. Public files and the current job-level report mirror were updated; no historical build or auth operation changed. This does not extend Jenkins signed-link lifetime or bypass login: genuine expiry is displayed while retaining the last good view.
+
+## Terminal authorization windows and scheduler exit codes — 2026-11-09
+
+Observed CL Base Store S2 retained /iam/error/authorize (No se ha podido iniciar sesión) together with its getcookie bootstrap tab. Resume returned HUMAN_REQUIRED before reaching terminal-error handling when password submission had already been attempted. It therefore kept an unusable window indefinitely.
+
+The shared Account flow and retained-handoff reader now close only a positively identified official /iam/error attempt. The whole dedicated window is closed only when every tab is that terminal error, blank, or the staging getcookie page; another live tab restricts cleanup to the rejected page. Identity is checked again after CDP setup so a newly rendered challenge is preserved. No credential replay occurs. Base Store records the ended handoff, and EPP clears the stale handoff without publishing or marking READY. FIRST and QR/SECOND keep the same safety boundaries. Existing CAPTCHA/MFA, /iam/blocked security review, healthy storefront and foreign pages remain open.
+
+Actual owned CL S2 terminal window was closed under market/profile leases, returning AUTHORIZATION_EXPIRED with loginStarted=false; the subsequent read-only inventory retained only the separate PE Samsung security-blocked window. No task restart or new login was triggered by cleanup.
+
+Task exit code 2 now displays ACTION REQUIRED, code 3 BUSY, successful idle code 0 READY, active execution RUNNING; other technical errors retain ERROR. Existing EPP external-prerequisite review remains distinct. Unknown scheduler metadata remains UNKNOWN rather than invented success. Raw exit codes remain visible in the schedule panel. Tasks, triggers, credentials and auth acceptance were not changed.
+
+Validation: 911 integrated auth/EPP/reporting tests PASS, zero failures/skips; final race-focused validation 90 PASS. Real Jenkins desktop/mobile rendered without overflow; this validation did not claim renewed sessions or bypass the PE security denial.

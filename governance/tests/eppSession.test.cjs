@@ -87,3 +87,4 @@ test("resuming an owned EPP confirmation never requires navigating through Base 
   assert.equal(isEppPage(page("https://account.samsung.com/"), config), false);
   assert.equal(isEppPage(page(config.rootUrl.href, true), config), false);
 });
+test('terminal EPP authorization is distinct from security blocking and live challenge',()=>{assert.throws(()=>assertEppAuthContinuation({url:()=> 'https://account.samsung.com/iam/error/authorize'}),e=>e.code==='AUTH_PROVIDER_ERROR'&&e.exitCode===1);});

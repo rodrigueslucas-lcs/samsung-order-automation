@@ -142,3 +142,10 @@ test('discarding the sole rejected tab preserves the dedicated Chrome for fresh 
   let created=0;await discardRejectedAccountPages({pages:()=>pages,newPage:async()=>{created++;pages.push({isClosed:()=>false,url:()=> 'about:blank'})}});
   assert.equal(created,1);assert.equal(rejected.closed,true);
 });
+
+const {closeRejectedAccountWindow}=require('../../utils/authAccountLogin.cjs');
+for(const url of ['https://account.samsung.com/iam/blocked','https://account.samsung.com/accounts/fixture','https://foreign.example/iam/error/authorize'])test('terminal cleanup preserves nonterminal/security/foreign page '+url,async()=>{assert.equal(await closeRejectedAccountWindow({url:()=>url,close:()=>assert.fail('must remain open')}),false);});
+test('terminal cleanup closes the owned rejected window and bootstrap tab without credentials',async()=>{const calls=[];const page={url:()=> 'https://account.samsung.com/iam/error/authorize',context:()=>({pages:()=>[page,{url:()=> 'https://stg2.shop.samsung.com/getcookie.html'}],browser:()=>({newBrowserCDPSession:async()=>({send:async method=>calls.push(method)})})})};assert.equal(await closeRejectedAccountWindow(page),true);assert.deepEqual(calls,['Browser.close']);});
+test('terminal cleanup cannot close another live tab in the same context',async()=>{let closed=0;const page={url:()=> 'https://account.samsung.com/iam/error/authorize',close:async()=>closed++,context:()=>({pages:()=>[page,{url:()=> 'https://account.samsung.com/accounts/active'}],browser:()=>({newBrowserCDPSession:()=>assert.fail('live tab must survive')})})};await closeRejectedAccountWindow(page);assert.equal(closed,1);});
+
+test('cleanup rechecks terminal identity after CDP setup so a new live challenge is preserved',async()=>{let url='https://account.samsung.com/iam/error/authorize';const page={url:()=>url,context:()=>({pages:()=>[page],browser:()=>({newBrowserCDPSession:async()=>{url='https://account.samsung.com/accounts/challenge';return{send:()=>assert.fail('new challenge must remain open')};}})})};assert.equal(await closeRejectedAccountWindow(page),false);});

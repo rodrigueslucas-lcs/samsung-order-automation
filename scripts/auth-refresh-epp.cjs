@@ -9,7 +9,7 @@ const { verifyEppSnapshot, recoverEppParkingReturn, prepareEppIdentityEntry } = 
 const { connectAuthBrowser } = require("../utils/authDedicatedBrowser.cjs");
 const { prepareAuthBrowserWindow } = require("../utils/authBrowserWindow.cjs");
 const { authProfileControl, openAuthProfile } = require("../utils/authStorefrontReady.cjs");
-const { completeAccountLogin, discardRejectedAccountPages } = require("../utils/authAccountLogin.cjs");
+const { completeAccountLogin, discardRejectedAccountPages, closeRejectedAccountWindow } = require("../utils/authAccountLogin.cjs");
 const { writeJsonAtomically } = require("../utils/atomicJson");
 const { proveEppAccess: observe, findEppVerifiedContinue, eppAccountLoginAction, configuredEppAuthEntry } = require("../utils/eppAccessState.cjs");
 const { installEppNavigationGuard } = require('../utils/eppNavigationGuard.cjs');
@@ -69,6 +69,7 @@ function assertEppAuthContinuation(page, guard) {
   const blocked = guard?.lastBlocked();
   if (blocked) throw Object.assign(new Error('EPP navigation denied; no login retry.'), {exitCode:78,eppReason:blocked.reason});
   const url = new URL(page.url());
+  if(url.origin==='https://account.samsung.com'&&/^\/iam\/error(?:\/|$)/i.test(url.pathname))throw Object.assign(new Error('AUTHORIZATION_EXPIRED'),{code:'AUTH_PROVIDER_ERROR',exitCode:1});
   if (url.hostname === 'account.samsung.com' && /^\/iam\/blocked(?:\/|$)/i.test(url.pathname)) {
     throw Object.assign(new Error('Samsung Account security denied this authorization; operator review required.'), {exitCode:78,eppReason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED'});
   }
@@ -299,6 +300,7 @@ async function refresh(market, environment) {
     success = true;
     report("READY · independent EPP verify passed; state exported; closing owned browser");
   } catch (error) {
+    if(error.code==='AUTH_PROVIDER_ERROR'){for(const page of browser?.contexts?.()[0]?.pages?.()||[])await closeRejectedAccountWindow(page).catch(()=>{});error.eppReason='AUTHORIZATION_EXPIRED';error.exitCode=1;fs.rmSync(files.handoff,{force:true});}
     if(error.code==='AUTH_SECURITY_BLOCKED'){error.eppReason='SAMSUNG_ACCOUNT_SECURITY_BLOCKED';error.exitCode=78;}
     if (guard?.lastBlocked()) {
       const denied=guard.lastBlocked();

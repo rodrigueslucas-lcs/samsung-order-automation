@@ -116,6 +116,7 @@ async function resumeIdentity({market,environment,slot,env=process.env,passwordA
     childInvoked=true;
     const result=await runScript('scripts/auth-resume-human.cjs',runtime,{timeoutMs:90000});
     release();release=null;
+    if(result.code===23&&!result.timedOut&&!result.signal)return{...base,status:'HANDOFF_CLOSED',reason:'AUTHORIZATION_EXPIRED'};
     if(result.code!==0||result.timedOut||result.signal)return{...base,status:result.code===2?'HUMAN_REQUIRED':'UNPROVEN',passwordAttempted:result.handoff?.passwordAttempted??true,emailPhase:result.handoff?.emailPhase||'NONE'};
     const proof=await verify({...base,env});
     if(proof.status!=='HEALTHY'||!proof.audit?.statePersisted||proof.audit.accountPages!==0)return{...base,status:'UNPROVEN',passwordAttempted:result.handoff?.passwordAttempted??true};

@@ -121,6 +121,7 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
       // fresh recovery. An old handoff must not prevent recovery forever.
       const recovery=await d.refresh(config,runtimeEnv,{resumeOnly:!!(checkpoint.human&&owned),onHuman:()=>{checkpoint={...checkpoint,human:true};d.save(config,checkpoint);onProgress({...base,status:'HUMAN_REQUIRED',reason:'EPP_HUMAN_PENDING'});}});
       if(recovery.status!=='REFRESHED') {
+        if(recovery.reason==='AUTHORIZATION_EXPIRED'){d.clearHandoff(config);d.save(config,{...checkpoint,human:false,blockedReason:null});}
         if(recovery.status==='HUMAN_REQUIRED')d.save(config,{...checkpoint,human:true});
         if(recovery.status==='BLOCKED')d.save(config,{...checkpoint,blockedReason:recovery.reason});
         return finish(recovery.status,recovery.reason,{...(recovery.phase?{phase:recovery.phase}:{}),...(recovery.kind?{kind:recovery.kind}:{})});

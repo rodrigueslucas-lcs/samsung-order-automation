@@ -25,3 +25,5 @@ test('top scheduler labels reuse existing state semantics and compact actions st
 });
 
 test('asset URLs are content-versioned and declarative refresh cannot blank an iframe when script is unavailable',()=>{const html=render(fixture());assert.match(html,/src="countdown.js\?v=[a-f0-9]{16}"/);assert.match(html,/href="styles.css\?v=[a-f0-9]{16}"/);assert.doesNotMatch(html,/http-equiv="refresh"/);});
+
+for(const code of [0,1,2,3,267009])test('scheduler exit semantics preserve human/busy/error code '+code,()=>{const m=fixture();m.scheduler={status:'RUNNING',executing:code===267009,lastResult:code};m.eppScheduler={...m.scheduler};const html=render(m);const strip=html.match(/<div class="scheduler-status-strip">(.*?)<\/div>/s)[1];assert.match(strip,new RegExp(code===0?'READY':code===1?'ERROR':code===2?'ACTION REQUIRED':code===3?'BUSY':'RUNNING'));if([2,3,267009].includes(code))assert.doesNotMatch(strip,/ERROR/);});

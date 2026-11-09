@@ -1,3 +1,14 @@
+// Close only a definitively rejected Account attempt in its owned auth context.
+async function closeRejectedAccountWindow(page){
+ const rejected=value=>{try{const u=new URL(value);return u.origin==='https://account.samsung.com'&&/^\/iam\/error(?:\/|$)/i.test(u.pathname);}catch{return false;}};
+ if(!rejected(page.url()))return false;
+ const context=page.context?.(),pages=context?.pages?.()||[page];
+ const allowed=p=>{const value=p.url();if(rejected(value)||value==='about:blank')return true;try{const u=new URL(value);return u.protocol==='https:'&&['stg.shop.samsung.com','stg2.shop.samsung.com'].includes(u.hostname)&&u.pathname==='/getcookie.html';}catch{return false;}};
+ const safe=pages.every(allowed);
+ if(safe&&context?.browser?.()?.newBrowserCDPSession){const cdp=await context.browser().newBrowserCDPSession();if(!rejected(page.url())||!context.pages().every(allowed))return false;await cdp.send('Browser.close');return true;}
+ if(!rejected(page.url()))return false;
+ await page.close();return true;
+}
 // Submit each credential step once. A CAPTCHA/MFA or warm SSO return is a
 // handoff, never a reason to submit email/password again or claim authentication.
 async function completeAccountLogin(page, { market, hostname, credentials, timeout = 600000,
@@ -60,7 +71,8 @@ async function completeAccountLogin(page, { market, hostname, credentials, timeo
       error.code = 'AUTH_SECURITY_BLOCKED';error.exitCode = 78;throw error;
     }
     if (/^\/iam\/error(?:\/|$)/i.test(url.pathname)) {
-      const error = new Error('Samsung Account rejected the current authorization. No credential step will be repeated on this error page; start a fresh authorized refresh.');
+      await closeRejectedAccountWindow(page).catch(()=>{});
+      const error = new Error('AUTHORIZATION_EXPIRED: Samsung Account rejected the current authorization. No credential step will be repeated on this error page; start a fresh authorized refresh.');
       error.code = 'AUTH_PROVIDER_ERROR';
       error.exitCode = 78;
       throw error;
@@ -206,4 +218,4 @@ async function discardRejectedAccountPages(context) {
   }
   return rejected.length;
 }
-module.exports = { completeAccountLogin, discardRejectedAccountPages };
+module.exports = { completeAccountLogin, discardRejectedAccountPages, closeRejectedAccountWindow };

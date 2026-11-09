@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { writeJsonAtomically } = require('./atomicJson');
-const { completeAccountLogin } = require('./authAccountLogin.cjs');
+const { completeAccountLogin, closeRejectedAccountWindow } = require('./authAccountLogin.cjs');
 const { openAuthProfile } = require('./authStorefrontReady.cjs');
 const SLOTS = {mx:['primary','second'],pe:['primary'],co:['primary','second'],cl:['primary']};
 
@@ -35,6 +35,9 @@ async function resumeHumanHandoff({market,environment,slot,passwordAttempted=tru
     const context=browser.contexts()[0];if(!context)return{status:'UNPROVEN',passwordAttempted:attempted};
     const account=context.pages().find(page=>{try{return new URL(page.url()).hostname==='account.samsung.com';}catch{return false;}});
     if(account) {
+      if(/^\/iam\/error(?:\/|$)/i.test(new URL(account.url()).pathname)){
+        if(!await closeRejectedAccountWindow(account))return{status:'HUMAN_REQUIRED',passwordAttempted:attempted,emailPhase:phase};return{status:'AUTHORIZATION_EXPIRED',passwordAttempted:attempted,emailPhase:'NONE'};
+      }
       const passwordVisible=await account.locator('input[type="password"], #iptLgnPlnPD').filter({visible:true}).first().isVisible();
       const retainedEmail=phase!=='NONE'&&await account.locator('input#account, input[type="email"], input[name="email"], #iptLgnPlnID').filter({visible:true}).first().isVisible();
       const termsVisible=new URL(account.url()).pathname==='/iam/sign-in/status/terms';
