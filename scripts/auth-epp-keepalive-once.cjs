@@ -11,9 +11,11 @@ function parseArgs(args){
     else if(arg.startsWith('--slot='))result.slot=arg.slice(7);
     else if(arg==='--allow-refresh')result.allowRefresh=true;
     else if(arg==='--publish')result.publish=true;
+    else if(arg==='--retry-security-blocked')result.retrySecurityBlocked=true;
     else if(arg==='--repair-dashboard')result.repairDashboard=true;
     else if(arg!=='--scheduled')throw new Error('Unsupported EPP keep-alive option.');
   }
+  if(result.retrySecurityBlocked&&(args.includes('--scheduled')||!result.allowRefresh))throw new Error('Reviewed security recovery requires an explicit unscheduled refresh.');
   if(!['S1','S2'].includes(result.environment)||!['primary','second'].includes(result.slot)||!result.markets.length||result.markets.some(m=>!['MX','PE','CO','CL'].includes(m)))throw new Error('Invalid EPP identity scope.');
   if(result.slot==='second'&&!args.some(arg=>arg.startsWith('--markets=')))result.markets=['MX','CO'];
   return result;
@@ -37,7 +39,7 @@ async function main({argv=process.argv.slice(2),env=process.env,cycle=runCycle,a
   const scope=regional?'':`-${[...args.markets].sort().join('-').toLowerCase()}`;
   save(path.join(dir,`epp-last-cycle-${args.environment.toLowerCase()}-${args.slot}${scope}.json`),{generatedAt:new Date().toISOString(),...summary});
   if(summary.ok)return 0;
-  if(summary.identities.some(r=>r.status==='HUMAN_REQUIRED'))return 2;
+  if(summary.identities.some(r=>r.status==='HUMAN_REQUIRED'||(r.status==='BLOCKED'&&r.reason==='SAMSUNG_ACCOUNT_SECURITY_BLOCKED')))return 2;
   // A market lease deliberately defers maintenance; it is not an auth failure.
   // Preserve actual failures when BUSY is mixed with any unproven/error state.
   if(summary.identities.length&&summary.identities.some(r=>r.status==='BUSY')&&summary.identities.every(r=>['KEEP_ALIVE_OK','REFRESHED','BUSY'].includes(r.status)))return 3;

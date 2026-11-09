@@ -151,7 +151,7 @@ function limitConcurrency(maximum) {
     finally { const next = pending.shift(); if (next) next(); else active--; }
   };
 }
-async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MARKET_SLOTS), publish = true, env = process.env, onEvent = () => {} } = {}, { verify = verifyIdentity, recover = recoverIdentity, resume = resumeIdentity, captureBrowser = require('./authBrowserLifecycle.cjs').captureAuthBrowser, browserClosed = require('./authBrowserLifecycle.cjs').authBrowserClosed, finalize = packageAndPublishMarket, acquireMarket = acquireMarketLease, readState = readCheckpoint, saveState = saveCheckpoint, hash = fileHash, log = console.log, now = Date.now } = {}) {
+async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MARKET_SLOTS), publish = true, retrySecurityBlocked = false, env = process.env, onEvent = () => {} } = {}, { verify = verifyIdentity, recover = recoverIdentity, resume = resumeIdentity, captureBrowser = require('./authBrowserLifecycle.cjs').captureAuthBrowser, browserClosed = require('./authBrowserLifecycle.cjs').authBrowserClosed, finalize = packageAndPublishMarket, acquireMarket = acquireMarketLease, readState = readCheckpoint, saveState = saveCheckpoint, hash = fileHash, log = console.log, now = Date.now } = {}) {
   const target = normalizeEnvironment(environment);
   if (!Array.isArray(markets) || !markets.length || markets.some(m => !MARKET_SLOTS[m])) throw new Error('Unsupported keep-alive market scope.');
   const selected = [...new Set(markets)], verifyLane = limitConcurrency(4), refreshLane = limitConcurrency(4);
@@ -190,7 +190,35 @@ async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MAR
       }
     })));
     const recoverSlot=async(slot)=>{
-      for(const record of records)for(let index=0;index<record.checked.length;index++){const identity=record.checked[index];if(identity.slot!==slot)continue;if(['HEALTHY','RECOVERED'].includes(identity.status)&&record.state?.securityBlocks?.[slot]){record.state.securityBlocks={...record.state.securityBlocks};delete record.state.securityBlocks[slot];saveState(record.market,target,record.state);}else if(record.state?.securityBlocks?.[slot]){record.checked[index]={...identity,status:'HUMAN_REQUIRED',reason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED',humanPending:false};notify(record.checked[index]);}}
+      for(const record of records) {
+        for(let index=0;index<record.checked.length;index++) {
+          const identity=record.checked[index];
+          if(identity.slot!==slot)continue;
+          const denial=record.state?.securityBlocks?.[slot];
+          if(!denial)continue;
+          if(['HEALTHY','RECOVERED'].includes(identity.status)) {
+            record.state.securityBlocks={...record.state.securityBlocks};
+            delete record.state.securityBlocks[slot];
+          } else if(identity.status==='NEEDS_REFRESH'&&require('./authSecurityRecovery.cjs').canRetrySecurityDenial({
+            observedAt:denial.at,automaticAttemptedAt:record.state.securityReview?.[slot]?.automaticAttemptedAt,
+            operatorRequested:retrySecurityBlocked,now:now(),
+          })) {
+            record.state.securityReview={...record.state.securityReview,[slot]:{
+              ...record.state.securityReview?.[slot],at:new Date(now()).toISOString(),previousDenialAt:denial.at,
+              ...(!retrySecurityBlocked?{automaticAttemptedAt:new Date(now()).toISOString()}:{}),
+            }};
+            record.state.securityBlocks={...record.state.securityBlocks};
+            delete record.state.securityBlocks[slot];
+            for(const key of ['human','handoff','pendingClose']) {
+              record.state[key]={...record.state[key]};delete record.state[key][slot];
+            }
+          } else {
+            record.checked[index]={...identity,status:'HUMAN_REQUIRED',reason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED',humanPending:false};
+            notify(record.checked[index]);
+          }
+          saveState(record.market,target,record.state);
+        }
+      }
 
       const waiting=records.filter(r=>!r.failed).flatMap(record=>record.checked.map((identity,index)=>({record,identity,index}))).filter(({identity})=>identity.slot===slot&&identity.status==='NEEDS_REFRESH');
       if(!waiting.length)return;
@@ -232,6 +260,21 @@ async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MAR
         };
         try {notify({market,slot,status:'REFRESHING'});const started=now();record.checked[index]={...await recover({market,environment,slot,env:record.env},{onEvent:recoveryEvent}),verifyDurationMs:identity.verifyDurationMs,refreshDurationMs:Math.max(0,now()-started)};notify(record.checked[index]);
         const recovered=record.checked[index];
+        if(!['HEALTHY','RECOVERED'].includes(recovered.status)) {
+          let childDenial;
+          try { childDenial=readState(market,target)?.securityBlocks?.[slot]; }
+          catch {record.failed=true;throw Error('Child auth checkpoint could not be reconciled.');}
+          if(childDenial?.reason==='SAMSUNG_ACCOUNT_SECURITY_BLOCKED'||recovered.reason==='SAMSUNG_ACCOUNT_SECURITY_BLOCKED') {
+            record.state.securityBlocks={...record.state.securityBlocks,[slot]:childDenial||{reason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED',at:new Date(now()).toISOString()}};
+            for(const key of ['human','handoff','pendingClose']){record.state[key]={...record.state[key]};delete record.state[key][slot];}
+            record.checked[index]={...recovered,status:'HUMAN_REQUIRED',reason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED',humanPending:false};
+            saveState(market,target,record.state);
+            let denied;
+            try {denied=await captureBrowser({market,environment,slot});await denied?.closeSecurityBlocked?.(()=>saveState(market,target,record.state));}
+            finally {await denied?.dispose?.();}
+            notify(record.checked[index]);return;
+          }
+        }
         if(recovered.status==='HUMAN_REQUIRED'||recovered.humanPending){
           record.state.human={...record.state.human,[slot]:true};
           record.state.handoff={...record.state.handoff,[slot]:{passwordAttempted:recovered.passwordAttempted??record.state.handoff?.[slot]?.passwordAttempted??true,emailPhase:['READY','CHALLENGE'].includes(recovered.emailPhase)?recovered.emailPhase:'NONE'}};
@@ -260,7 +303,7 @@ async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MAR
           catch {record.cleanupUnproven=true;}
           if(handle){record.resumeHandles||={};record.resumeHandles[result.slot]=handle;record.state.pendingClose={...record.state.pendingClose,[result.slot]:handle.fingerprint};}
         }
-        for(const result of record.checked){if(record.state?.securityBlocks?.[result.slot]){delete human[result.slot];delete handoff[result.slot];}else if(result.status==='HUMAN_REQUIRED'||result.humanPending){human[result.slot]=true;handoff[result.slot]={passwordAttempted:result.passwordAttempted??handoff[result.slot]?.passwordAttempted??true,emailPhase:['READY','CHALLENGE'].includes(result.emailPhase)?result.emailPhase:'NONE'};}else if(['HEALTHY','RECOVERED'].includes(result.status)){delete human[result.slot];delete handoff[result.slot];}}
+        for(const result of record.checked){if(record.state?.securityBlocks?.[result.slot]){delete human[result.slot];delete handoff[result.slot];}else if(result.status==='HUMAN_REQUIRED'||result.humanPending){human[result.slot]=true;handoff[result.slot]={passwordAttempted:result.passwordAttempted??handoff[result.slot]?.passwordAttempted??true,emailPhase:['READY','CHALLENGE'].includes(result.emailPhase)?result.emailPhase:'NONE'};}else if(['HEALTHY','RECOVERED'].includes(result.status)){delete human[result.slot];delete handoff[result.slot];if(record.state.securityReview)delete record.state.securityReview[result.slot];}}
         record.state={...record.state,human,handoff};saveState(record.market,target,record.state);
         if(record.checked.every(r=>['HEALTHY','RECOVERED'].includes(r.status))) record.final=await finalize({market:record.market,environment:target,publish,env:record.env,state:record.state,beforeHash:record.beforeHash});
         if(record.final.status==='READY'&&record.cleanupUnproven)record.final={...record.final,status:'BROWSER_CLOSE_FAILED'};

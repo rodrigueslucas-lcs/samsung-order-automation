@@ -42,3 +42,7 @@ for(const environment of ['S1','S2'])for(const scenario of [
  assert.equal(code,scenario.code);assert.equal(saved.ok,summary.ok);assert.deepEqual(saved.identities,identities);
  if(scenario.statuses.includes('BUSY'))assert.equal(saved.ok,false);
 });
+
+test('reviewed EPP security recovery is explicit, unscheduled and requires refresh authorization',()=>{assert.equal(parseArgs(['--allow-refresh','--retry-security-blocked']).retrySecurityBlocked,true);assert.throws(()=>parseArgs(['--retry-security-blocked']),/explicit unscheduled/);assert.throws(()=>parseArgs(['--allow-refresh','--retry-security-blocked','--scheduled']),/explicit unscheduled/);});
+
+test('a proven provider security denial reports attention required instead of a technical scheduler error',async()=>{const code=await main({argv:[],env:{},activity:async()=>({idle:true}),cycle:async()=>({ok:false,identities:[{market:'CL',environment:'S2',slot:'primary',status:'BLOCKED',reason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED'}]}),save(){},log(){}});assert.equal(code,2);});

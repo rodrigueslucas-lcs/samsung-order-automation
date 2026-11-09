@@ -252,10 +252,27 @@ Read-only inspection of both installed S2 tasks confirmed Enabled, IgnoreNew, In
 
 ### Terminal provider denial and inactive handoff recovery (2026-11-09)
 
-A dedicated Samsung Account /iam/blocked window is terminal, not an actionable CAPTCHA. Authorized maintenance records SAMSUNG_ACCOUNT_SECURITY_BLOCKED before closing only that owned terminal window. Failed persistence preserves the window. The durable gate prevents credential replay after closure; a new independently verified healthy session clears the old gate. Ordinary refresh reports action required, not a technical failure. This supersedes earlier instructions in this document to preserve a security-denied window indefinitely. A Samsung security denial still requires official account/security resolution; closing the window does not authenticate the account.
+A dedicated Samsung Account /iam/blocked window is terminal, not an actionable CAPTCHA. Authorized maintenance records SAMSUNG_ACCOUNT_SECURITY_BLOCKED before closing only that owned terminal window. Failed persistence preserves the window. The durable gate prevents immediate credential replay after closure; a new independently verified healthy session clears the old gate. Ordinary refresh reports action required, not a technical failure. This supersedes earlier instructions in this document to preserve a security-denied window indefinitely. A fresh controlled recovery that is denied again requires official account/security review; closing the window does not authenticate the account.
 
 A closed security-denied FIRST does not defer other markets' SECOND indefinitely. A live FIRST CAPTCHA/MFA still defers SECOND. A retained bootstrap-only context ends its inactive handoff; only two positively invalid session checks authorize subsequent official recovery. Network uncertainty never authorizes login. EPP historical internal recovery failures can be re-evaluated after two matching invalid checks instead of becoming permanent external blockers. Actual entitlement/security/program restrictions remain distinct.
 
 Retained SECOND continuation selects the normal QR option when the provider remains on its entry screen. It does not fill FIRST credentials, regenerate an already displayed QR, or bypass verification. Mandatory terms retain their existing continuation.
 
 Validation: integrated auth/EPP regression 929 PASS, zero failures/skips with bounded file concurrency; final retained-handoff/QR regression 37 PASS. Real S2 cycle verified CL Base Store HEALTHY and published its changed bundle; occupied MX/CO lanes correctly returned BUSY. PE Base Store/EPP denied windows were absent in the subsequent owned-profile inventory. A newly denied CL EPP window was recorded and closed under its programme lease with no new login. The existing MX SECOND handoff was switched once to QR; a subsequent targeted real cycle completed MX FIRST HEALTHY / SECOND RECOVERED, published the updated bundle and exited zero. These observations do not claim six HEALTHY identities or permanent immunity to Samsung session expiration/security controls.
+
+### Bounded recovery of historical security denials
+
+A recorded denial is not proof that the provider will reject every later authorization. After 60 minutes, maintenance may make ONE automatic official recovery, only after two matching invalid identity checks. The attempt budget is persisted before login and survives a second denial. A healthy independently verified session resets the incident budget. A new transient/network error never grants recovery. There is no recurring security-login loop.
+
+An operator explicitly requesting a new investigation can use --retry-security-blocked on the existing one-shot commands. The flag is rejected together with --scheduled; EPP additionally requires --allow-refresh. It permits one official attempt after two invalid checks, does not bypass a provider gate and never weakens identity/entitlement proof. Examples:
+
+- node scripts/auth-keepalive-once.cjs --markets=pe --retry-security-blocked
+- node scripts/auth-epp-keepalive-once.cjs --markets=PE,CL --allow-refresh --publish --retry-security-blocked
+
+Real operator-reviewed PE Base Store recovery completed RECOVERED with updated Jenkins publication after the historical denial. The shared refresh test harness now injects the security probe: a real local PE checkpoint must never influence an isolated unit test.
+
+The coordinator reconciles a security marker written by its login child before finalizing its own checkpoint, preventing an older parent snapshot from erasing a fresh denial. EPP maintenance records and closes a newly denied owned window immediately after the child result, rather than leaving it until another 15-minute cycle. Such provider denials use attention-required exit code 2; network/publication failures retain their error result.
+
+EPP verification now has a bounded pool of two independent checks. Interactive recovery has a separate single lane, so an unresolved CAPTCHA cannot starve healthy-market verification. Programme leases, FIRST/SECOND separation, strict identity+entitlement proof and stable market ordering remain enforced.
+
+Final observed S2 runtime: Base Store six identities HEALTHY; EPP pymesmx, pe_membership_vip, co_epp_agre and alianzas all independently authenticated and entitled. A subsequent four-market EPP one-shot with refresh disabled returned KEEP_ALIVE_OK for all four; no Account login was opened. The post-use dedicated-browser inventory contained no auth windows. Governance baseline: 1381 PASS; final affected-contract and parallel-health validation: 200 PASS after the last lifecycle changes. This does not promise that Samsung cannot expire or deny a future authorization.

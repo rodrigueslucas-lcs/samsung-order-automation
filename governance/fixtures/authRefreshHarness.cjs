@@ -14,7 +14,7 @@ async function runRefreshFixture(market, env, statuses = [0, 0, 0]) {
       return { refreshAuth: options => {
         const result = refreshAuth(options, {
           acquireMarket: () => { const release = () => {}; release.env = {}; return release; },
-          captureBrowser: async () => null, acquire: () => () => {}, log: line => output.push(line),
+          securityGate: async()=>null, captureBrowser: async () => null, acquire: () => () => {}, log: line => output.push(line),
           runChild: async (script, env) => { calls.push({ script, env }); return statuses.shift() ?? 0; },
         });
         pending.push(result); return result;

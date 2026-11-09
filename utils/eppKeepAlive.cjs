@@ -66,7 +66,7 @@ async function refresh(config,env,{resumeOnly=false,onHuman=()=>{}}={}) {
   try { result=JSON.parse(line.slice(16)); } catch { result={status:child.code===79?'HUMAN_REQUIRED':child.code===78?'BLOCKED':'UNPROVEN',reason:'EPP_REFRESH_NOT_PROVEN'}; }
   return result;
 }
-async function maintainIdentity(config,{allowRefresh=false,publish=false,env=process.env,onProgress=()=>{}}={},dependencies={}) {
+async function maintainIdentity(config,{allowRefresh=false,publish=false,retrySecurityBlocked=false,env=process.env,onProgress=()=>{}}={},dependencies={}) {
   const d={verify,refresh,load:sessions.loadEppSession,persist:sessions.persistVerifiedEppSession,acquire:sessions.acquireEppLease,read:readCheckpoint,save:(cfg,state)=>writeJsonAtomically(checkpointPath(cfg),state),clearHandoff:cfg=>fs.rmSync(sessions.getEppSessionPaths(cfg).handoff,{force:true}),capture:cfg=>captureAuthBrowser({market:cfg.market.toLowerCase(),environment:cfg.environment,slot:cfg.authSlot||'primary'},{profilesRoot:path.dirname(sessions.getEppSessionPaths(cfg).profile)}),package:packageBundle,publish:require('./eppJenkinsBundle.cjs').publishBundle,...dependencies};
   const base={market:config.market,environment:config.environment,slot:config.authSlot||'primary',store:'EPP',program:config.rootUrl.pathname};
   let lease,owned,checkpoint;
@@ -86,7 +86,7 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
     if(!checkpoint.human&&outcome.status==='UNPROVEN'&&TRANSIENT_VERIFY.has(outcome.reason))outcome=await d.verify(config,existing);
     if(outcome.status!=='HEALTHY'||checkpoint.human||allowRefresh) {
       owned=await d.capture(config);
-      if(allowRefresh&&await owned?.closeSecurityBlocked?.(()=>{checkpoint={...checkpoint,human:false,blockedReason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED',blockerObservedAt:new Date().toISOString()};d.save(config,checkpoint);d.clearHandoff(config);})){await owned.dispose();owned=null;if(outcome.status!=='HEALTHY')return finish('BLOCKED','SAMSUNG_ACCOUNT_SECURITY_BLOCKED',{proof:outcome.proof});}
+      if(allowRefresh&&await owned?.closeSecurityBlocked?.(()=>{checkpoint={...checkpoint,human:false,blockedReason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED',blockerObservedAt:new Date().toISOString()};d.save(config,checkpoint);d.clearHandoff(config);})){await owned.dispose();owned=null;if(outcome.status!=='HEALTHY'&&!retrySecurityBlocked)return finish('BLOCKED','SAMSUNG_ACCOUNT_SECURITY_BLOCKED',{proof:outcome.proof});}
       if(allowRefresh&&await owned?.closeRejected?.()){await owned.dispose();owned=null;checkpoint={...checkpoint,human:false};d.clearHandoff(config);d.save(config,checkpoint);}
 
       const native=await owned?.readEppSnapshot(config.rootUrl.href);
@@ -96,7 +96,8 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
         outcome=inspected;
       }}
     }
-    const priorRecoverableGate=['CORPORATE_ACTIVATION_REQUIRED','COMMERCE_CONTENT_NOT_RENDERED','EPP_COMMERCE_NOT_RENDERED','EPP_REFRESH_NOT_PROVEN','EPP_HANDOFF_NOT_READY','EPP_HANDOFF_BROWSER_MISSING','AUTHORIZATION_EXPIRED'].includes(checkpoint.blockedReason);
+    const reviewSecurity=checkpoint.blockedReason==='SAMSUNG_ACCOUNT_SECURITY_BLOCKED'&&require('./authSecurityRecovery.cjs').canRetrySecurityDenial({observedAt:checkpoint.blockerObservedAt,automaticAttemptedAt:checkpoint.securityAutomaticRetryAt,operatorRequested:retrySecurityBlocked});
+    const priorRecoverableGate=reviewSecurity||['CORPORATE_ACTIVATION_REQUIRED','COMMERCE_CONTENT_NOT_RENDERED','EPP_COMMERCE_NOT_RENDERED','EPP_REFRESH_NOT_PROVEN','EPP_HANDOFF_NOT_READY','EPP_HANDOFF_BROWSER_MISSING','AUTHORIZATION_EXPIRED'].includes(checkpoint.blockedReason);
     let confirmedInvalid=false;
     if(outcome.status==='INVALID'&&(!checkpoint.blockedReason||priorRecoverableGate)) {
       const second=await d.verify(config,existing);
@@ -107,7 +108,7 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
     // of a current entitlement/render denial. Two matching invalid checks may
     // authorize ONE official login; maintenance still cannot request activation.
     if(priorRecoverableGate&&confirmedInvalid&&allowRefresh&&!policyReason){
-      checkpoint={...checkpoint,blockedReason:null};d.save(config,checkpoint);
+      checkpoint={...checkpoint,blockedReason:null,...(reviewSecurity?{securityReviewAt:new Date().toISOString(),...(!retrySecurityBlocked?{securityAutomaticRetryAt:new Date().toISOString()}:{})}:{})};d.save(config,checkpoint);
     }
     if(outcome.status!=='HEALTHY') {
       // Never initiate Account login for restricted programmes. Still report
@@ -127,7 +128,15 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
       if(recovery.status!=='REFRESHED') {
         if(recovery.reason==='AUTHORIZATION_EXPIRED'){d.clearHandoff(config);d.save(config,{...checkpoint,human:false,blockedReason:null});}
         if(recovery.status==='HUMAN_REQUIRED')d.save(config,{...checkpoint,human:true});
-        if(recovery.status==='BLOCKED')d.save(config,{...checkpoint,blockedReason:recovery.reason});
+        if(recovery.status==='BLOCKED') {
+          checkpoint={...checkpoint,blockedReason:recovery.reason,...(recovery.reason==='SAMSUNG_ACCOUNT_SECURITY_BLOCKED'?{human:false,blockerObservedAt:new Date().toISOString()}:{})};
+          d.save(config,checkpoint);
+          if(recovery.reason==='SAMSUNG_ACCOUNT_SECURITY_BLOCKED') {
+            let denied;
+            try {denied=await d.capture(config);if(await denied?.closeSecurityBlocked?.(()=>d.save(config,checkpoint)))d.clearHandoff(config);}
+            finally {await denied?.dispose?.();}
+          }
+        }
         return finish(recovery.status,recovery.reason,{...(recovery.phase?{phase:recovery.phase}:{}),...(recovery.kind?{kind:recovery.kind}:{})});
       }
       outcome=await d.verify(config,d.load(config));
@@ -143,7 +152,7 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
     if(publish&&checkpoint.publishedHash!==hash){try{await d.publish(config,file,env);published=true;}catch{return finish('PUBLISH_FAILED','EPP_BUNDLE_PUBLISH_FAILED');}}
     const humanPending=!!(checkpoint.human&&owned&&!nativeVerified);
     if(!humanPending)d.clearHandoff(config);
-    d.save(config,{...checkpoint,human:humanPending,blockedReason:null,contentHash:hash,...(published?{publishedHash:hash}:{})});
+    d.save(config,{...checkpoint,human:humanPending,blockedReason:null,securityAutomaticRetryAt:null,contentHash:hash,...(published?{publishedHash:hash}:{})});
     // Only an exact owned EPP browser, after independent proof and publication.
     if(owned&&nativeVerified)await owned.closeVerified();
     return finish(recovered?'REFRESHED':'KEEP_ALIVE_OK',null,{action:recovered?'REFRESHED':'SESSION_REUSED',proof:outcome.proof,bundleChanged:checkpoint.contentHash!==hash,published,...(humanPending?{humanPending:true}:{})});
@@ -151,17 +160,28 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
   finally {await owned?.dispose();lease?.release();}
 }
 async function runCycle({environment='S2',markets=['MX','PE','CO','CL'],slot='primary',onProgress=()=>{},...options}={},dependencies={}) {
-  const lane=limitConcurrency(options.allowRefresh?1:2),results=[];let humanPending=false;
+  // Health checks must finish even when another market waits for a CAPTCHA.
+  // Only interactive recovery is serialized; every market retains its lease.
+  const lane=limitConcurrency(4),verificationLane=limitConcurrency(2),recoveryLane=limitConcurrency(1),results=[],pendingHumans=new Set();
+  const performRefresh=dependencies.refresh||refresh;
+  const scopedDependencies={...dependencies,verify:(...args)=>verificationLane(()=>(dependencies.verify||verify)(...args)),refresh:(config,env,recoveryOptions)=>recoveryLane(async()=>{
+    if(pendingHumans.size&&!recoveryOptions.resumeOnly&&!pendingHumans.has(config.market))return{status:'UNPROVEN',reason:'EPP_INTERACTIVE_GATE_PENDING'};
+    const result=await performRefresh(config,env,{...recoveryOptions,onHuman:()=>{pendingHumans.add(config.market);recoveryOptions.onHuman();}});
+    if(['REFRESHED','BLOCKED'].includes(result.status))pendingHumans.delete(config.market);
+    else if(result.status==='HUMAN_REQUIRED')pendingHumans.add(config.market);
+    return result;
+  })};
   await Promise.all(markets.map(market=>lane(async()=>{
     try {const scoped={...options.env,ENVIRONMENT:environment,EPP_AUTH_SLOT:slot};
       if(environment==='S2'&&!scoped[`${market}_EPP_PROGRAM`]&&!scoped.EPP_PROGRAM)scoped[`${market}_EPP_PROGRAM`]=S2_OPERATIONAL_PROGRAMMES[market];
       const config=getEppConfig(market,scoped);
       onProgress({market,environment,slot,status:'VERIFYING'});
-      const result=await maintainIdentity(config,humanPending?{...options,allowRefresh:false,onProgress}:{...options,onProgress},dependencies);
-      if(humanPending&&result.reason==='EPP_AUTH_RECOVERY_REQUIRED')result.reason='EPP_INTERACTIVE_GATE_PENDING';
-      results.push(result);onProgress(result);if(result.status==='HUMAN_REQUIRED')humanPending=true;
+      const result=await maintainIdentity(config,{...options,onProgress},scopedDependencies);
+
+      results.push(result);onProgress(result);if(result.status==='HUMAN_REQUIRED')pendingHumans.add(market);
     } catch {results.push({market,environment,slot,store:'EPP',status:'BLOCKED',reason:'UNSUPPORTED_EPP_IDENTITY'});}
   })));
+  results.sort((a,b)=>markets.indexOf(a.market)-markets.indexOf(b.market));
   return {environment,store:'EPP',identities:results,ok:results.every(r=>['KEEP_ALIVE_OK','REFRESHED'].includes(r.status))};
 }
 module.exports={AUTH_INVALID,EXTERNAL,makeBundle,validateBundle,contentHash,packageBundle,bundlePath,readCheckpoint,verify,refresh,maintainIdentity,runCycle};

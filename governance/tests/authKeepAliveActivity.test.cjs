@@ -19,3 +19,5 @@ test('CLI passes the same restricted scope to activity guard and auth cycle',asy
  assert.equal(code,0);assert.deepEqual(scopes,[['cl','pe'],['cl','pe']]);
  assert.throws(()=>parseArgs(['--markets='],{}));assert.throws(()=>parseArgs(['--markets=cl,xx'],{}));
 });
+
+test('reviewed security recovery cannot be installed as a scheduled login retry',()=>{assert.equal(parseArgs(['--retry-security-blocked']).retrySecurityBlocked,true);assert.throws(()=>parseArgs(['--scheduled','--retry-security-blocked']),/cannot be scheduled/);});
