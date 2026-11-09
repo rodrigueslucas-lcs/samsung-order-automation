@@ -32,6 +32,14 @@ async function captureAuthBrowser({ market, environment, slot }, {
   catch(error) { if(error.code==='ECONNREFUSED'||/ECONNREFUSED/.test(String(error.message)))return null;throw error; }
   return {
     fingerprint: require('node:crypto').createHash('sha256').update(endpoint).digest('hex'),
+    async closeRejected() {
+      const pages=browser.contexts()[0]?.pages()||[];
+      const page=pages.find(p=>{try{const u=new URL(p.url());return u.origin==='https://account.samsung.com'&&/^\/iam\/error(?:\/|$)/i.test(u.pathname);}catch{return false;}});
+      if(!page)return false;
+      const liveOther=pages.some(p=>{try{const u=new URL(p.url());return !(u.origin==='https://account.samsung.com'&&/^\/iam\/error(?:\/|$)/i.test(u.pathname))&&p.url()!=='about:blank'&&!(u.protocol==='https:'&&['stg.shop.samsung.com','stg2.shop.samsung.com'].includes(u.hostname)&&u.pathname==='/getcookie.html');}catch{return true;}});
+      const closed=await require('./authAccountLogin.cjs').closeRejectedAccountWindow(page);
+      return closed&&!liveOther;
+    },
     async readEppSnapshot(rootValue) {
       const root = new URL(rootValue);
       if (root.protocol !== 'https:' || !['stg.shop.samsung.com','stg2.shop.samsung.com'].includes(root.hostname) || !/^\/(mx|pe|co|cl)\/multistore\//.test(root.pathname)) throw new Error('Snapshot must target a staging EPP programme.');

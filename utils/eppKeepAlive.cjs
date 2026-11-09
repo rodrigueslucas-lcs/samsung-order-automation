@@ -86,6 +86,8 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
     if(!checkpoint.human&&outcome.status==='UNPROVEN'&&TRANSIENT_VERIFY.has(outcome.reason))outcome=await d.verify(config,existing);
     if(outcome.status!=='HEALTHY'||checkpoint.human) {
       owned=await d.capture(config);
+      if(allowRefresh&&await owned?.closeRejected?.()){await owned.dispose();owned=null;checkpoint={...checkpoint,human:false};d.clearHandoff(config);d.save(config,checkpoint);}
+
       const native=await owned?.readEppSnapshot(config.rootUrl.href);
       if(native){const inspected=await d.verify(config,native);if(inspected.status==='HEALTHY'){outcome=inspected;recovered=true;nativeVerified=true;}else if(inspected.status!=='INVALID'){
         // A current programme gate or inconclusive native check cannot justify

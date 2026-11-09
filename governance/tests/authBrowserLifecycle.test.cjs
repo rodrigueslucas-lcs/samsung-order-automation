@@ -64,3 +64,5 @@ test('shared PreQA2 login does not capture or close any native browser', async (
     captureBrowser() { throw new Error('must preserve shared Chrome'); },
   });
 });
+
+test('retained browser cleanup preserves another live Account challenge and keeps its handoff',async()=>{let closed=0;const context={pages:()=>pages,browser:()=>({newBrowserCDPSession:()=>assert.fail('must not close active challenge')})};const pages=[{url:()=> 'https://account.samsung.com/iam/error/authorize',context:()=>context,close:async()=>closed++},{url:()=> 'https://account.samsung.com/accounts/challenge'}];const handle=await captureAuthBrowser({market:'mx',environment:'S2',slot:'primary'},{profilesRoot:'/fixture',readFile:()=> '43210\n/devtools/browser/fixture-id',chromium:{connectOverCDP:async()=>({contexts:()=>[context],close:async()=>{}})}});assert.equal(await handle.closeRejected(),false);assert.equal(closed,1);await handle.dispose();});
