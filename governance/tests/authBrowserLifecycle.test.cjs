@@ -66,3 +66,16 @@ test('shared PreQA2 login does not capture or close any native browser', async (
 });
 
 test('retained browser cleanup preserves another live Account challenge and keeps its handoff',async()=>{let closed=0;const context={pages:()=>pages,browser:()=>({newBrowserCDPSession:()=>assert.fail('must not close active challenge')})};const pages=[{url:()=> 'https://account.samsung.com/iam/error/authorize',context:()=>context,close:async()=>closed++},{url:()=> 'https://account.samsung.com/accounts/challenge'}];const handle=await captureAuthBrowser({market:'mx',environment:'S2',slot:'primary'},{profilesRoot:'/fixture',readFile:()=> '43210\n/devtools/browser/fixture-id',chromium:{connectOverCDP:async()=>({contexts:()=>[context],close:async()=>{}})}});assert.equal(await handle.closeRejected(),false);assert.equal(closed,1);await handle.dispose();});
+
+test('real Chromium terminal window is cleaned during transient verification without starting a login',async()=>{
+ const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{chromium}=require('playwright'),{runKeepAliveCycle}=require('../../utils/authKeepAliveRunner.cjs');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'smb-terminal-cycle-')),profile=path.join(root,'s2-cl-qa');let context,closed=false,state={human:{primary:true},handoff:{primary:{passwordAttempted:true}},pendingClose:{primary:'old'}};
+ try{
+  context=await chromium.launchPersistentContext(profile,{headless:true,args:['--remote-debugging-port=0']});context.on('close',()=>{closed=true;});
+  await context.route('**/*',route=>route.request().url()==='https://account.samsung.com/iam/error/authorize'?route.fulfill({contentType:'text/html',body:'<title>No se pudo iniciar sesión</title><h1>Expired fixture</h1>'}):route.abort());
+  await context.pages()[0].goto('https://account.samsung.com/iam/error/authorize');
+  const result=await runKeepAliveCycle({markets:['cl']},{acquireMarket:()=>{const release=()=>{};release.env={};return release;},hash:()=>null,readState:()=>state,saveState:(_m,_e,value)=>{state=value;},verify:async identity=>({...identity,status:'TRANSIENT_ERROR',reason:'NETWORK_ERROR'}),captureBrowser:identity=>captureAuthBrowser(identity,{profilesRoot:root}),recover:()=>assert.fail('network outage cannot authorize login'),finalize:()=>assert.fail('unverified session cannot publish'),log(){}});
+  assert.equal(result.identities[0].status,'TRANSIENT_ERROR');assert.equal(state.human.primary,undefined);assert.equal(state.pendingClose.primary,undefined);
+  await new Promise(resolve=>setTimeout(resolve,100));assert.equal(closed,true);console.log('TERMINAL_CYCLE_RUNTIME '+JSON.stringify({chromiumWindowClosed:true,sessionResult:result.identities[0].status,loginStarted:false,published:false}));
+ }finally{await context?.close().catch(()=>{});assert.ok(path.resolve(root).startsWith(path.resolve(os.tmpdir())+path.sep));await fs.promises.rm(root,{recursive:true,force:true,maxRetries:10,retryDelay:100});}
+});

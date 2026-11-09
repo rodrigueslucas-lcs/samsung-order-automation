@@ -173,6 +173,20 @@ async function runKeepAliveCycle({ environment = 'S2', markets = Object.keys(MAR
       if(identity.slot!==slot)return;
       try {record.checked[index]=await verifyLane(async()=>{ notify({...identity,status:'VERIFYING'}); const started=now(); const result=await verify({...identity,env:record.env}); const measured={...result,verifyDurationMs:Math.max(0,now()-started)}; notify(measured); return measured; });}
       catch {record.checked[index]={...identity,status:'FAILED'};}
+      // Cleanup is independent of session verification: a network outage must
+      // not strand a positively terminal retained window or authorize login.
+      if(record.state.human?.[slot]||record.state.pendingClose?.[slot]){
+        let retained;
+        try{
+          retained=await captureBrowser({...identity});
+          if(await retained?.closeRejected?.()){
+            for(const key of ['human','handoff','pendingClose']){record.state[key]={...record.state[key]};delete record.state[key][slot];}
+            saveState(record.market,target,record.state);
+            notify({...identity,status:'HANDOFF_ENDED',reason:'AUTHORIZATION_EXPIRED'});
+          }
+        }catch{/* Unknown ownership or closure never authorizes takeover/login. */}
+        finally{await retained?.dispose?.().catch(()=>{});}
+      }
     })));
     const recoverSlot=async(slot)=>{
       const waiting=records.filter(r=>!r.failed).flatMap(record=>record.checked.map((identity,index)=>({record,identity,index}))).filter(({identity})=>identity.slot===slot&&identity.status==='NEEDS_REFRESH');

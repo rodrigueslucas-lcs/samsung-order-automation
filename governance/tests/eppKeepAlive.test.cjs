@@ -161,3 +161,16 @@ test('ended EPP authorization clears stale human handoff without publishing or r
 test('retained terminal EPP window is cleaned before snapshot reuse without starting login on healthy proof',async()=>{const f=fixture(['HEALTHY']);f.state={human:true};f.d.capture=async()=>({closeRejected:async()=>{f.calls.push('terminal-close');return true;},dispose:async()=>f.calls.push('disconnect'),readEppSnapshot:()=>assert.fail('closed window must not be read')});const r=await maintainIdentity(cfg,{allowRefresh:true},f.d);assert.equal(r.status,'KEEP_ALIVE_OK');assert.equal(f.state.human,false);assert.ok(f.calls.includes('terminal-close'));assert.ok(!f.calls.includes('refresh'));});
 
 test('read-only EPP health check never closes retained windows',async()=>{const f=fixture(['HEALTHY']);f.state={human:true};f.d.capture=async()=>({closeRejected:()=>assert.fail('read-only cannot close windows'),readEppSnapshot:async()=>null,dispose:async()=>{}});const r=await maintainIdentity(cfg,{allowRefresh:false},f.d);assert.equal(r.humanPending,true);assert.equal(f.state.human,true);});
+
+test('healthy exported proof cannot hide an orphan terminal native EPP window with no human checkpoint',async()=>{const f=fixture(['HEALTHY']);let terminal=true;f.d.capture=async()=>({closeRejected:async()=>{terminal=false;return true;},dispose:async()=>{},readEppSnapshot:()=>assert.fail('closed terminal cannot become session proof')});const r=await maintainIdentity(cfg,{allowRefresh:true},f.d);assert.equal(r.status,'KEEP_ALIVE_OK');assert.equal(terminal,false);assert.ok(!f.calls.includes('refresh'));});
+
+test('EPP repeated cycles preserve a live challenge then recover after terminal expiry and network outage',async()=>{
+ const f=fixture();let phase='INVALID',window='CLOSED',logins=0,checks=0;
+ f.d.verify=async()=>{checks++;return phase==='HEALTHY'?{status:'HEALTHY',snapshot:snapshot(),proof:snapshot().proof}:phase==='NETWORK'?{status:'UNPROVEN',reason:'NETWORK_ERROR'}:{status:'INVALID',reason:'SERVER_IDENTITY_NOT_PROVEN'};};
+ f.d.capture=async()=>window==='CLOSED'?null:{closeRejected:async()=>{if(window!=='TERMINAL')return false;window='CLOSED';return true;},readEppSnapshot:async()=>null,dispose:async()=>{}};
+ f.d.refresh=async(_cfg,_env,options)=>{assert.equal(options.resumeOnly,false);logins++;window='CHALLENGE';return{status:'HUMAN_REQUIRED',reason:'CAPTCHA_REQUIRED'};};
+ await maintainIdentity(cfg,{allowRefresh:true},f.d);assert.equal(logins,1);assert.equal(checks,2);
+ phase='NETWORK';window='TERMINAL';await maintainIdentity(cfg,{allowRefresh:true},f.d);assert.equal(window,'CLOSED');assert.equal(logins,1);assert.equal(f.state.human,false);
+ phase='INVALID';await maintainIdentity(cfg,{allowRefresh:true},f.d);assert.equal(logins,2);assert.equal(window,'CHALLENGE');
+ phase='HEALTHY';window='CLOSED';const result=await maintainIdentity(cfg,{allowRefresh:true},f.d);assert.equal(result.status,'KEEP_ALIVE_OK');assert.equal(logins,2);assert.equal(f.state.human,false);
+});

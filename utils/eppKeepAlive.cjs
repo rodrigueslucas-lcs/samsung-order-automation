@@ -84,7 +84,7 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,env=pro
     // Retry only the read-only snapshot check once. An unavailable storefront
     // is never itself permission to launch Account or replace a session.
     if(!checkpoint.human&&outcome.status==='UNPROVEN'&&TRANSIENT_VERIFY.has(outcome.reason))outcome=await d.verify(config,existing);
-    if(outcome.status!=='HEALTHY'||checkpoint.human) {
+    if(outcome.status!=='HEALTHY'||checkpoint.human||allowRefresh) {
       owned=await d.capture(config);
       if(allowRefresh&&await owned?.closeRejected?.()){await owned.dispose();owned=null;checkpoint={...checkpoint,human:false};d.clearHandoff(config);d.save(config,checkpoint);}
 
