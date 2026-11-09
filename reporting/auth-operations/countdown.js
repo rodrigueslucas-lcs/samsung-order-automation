@@ -112,10 +112,9 @@
   // Signed Jenkins resource URLs expire. Never navigate an embedded report to
   // a private canonical origin: Chrome blocks that public-to-local iframe hop.
   function protectEmbeddedRefresh(root,cleanup=()=>{}){
-    if(!root.location||root.top===root.self)return;
+    if(!root.location)return;
     const meta=root.document.querySelector('meta[http-equiv="refresh"]');
-    if(!meta)return;
-    meta.remove();
+    meta?.remove();
     let pending=false;
     const check=async()=>{
       if(pending)return;pending=true;

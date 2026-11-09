@@ -23,5 +23,5 @@ function eventType(e) {
   if(['VERIFYING','HEALTHY','TRANSIENT_ERROR','UNPROVEN','FAILED','STALE'].includes(e.status))return 'Verification';
   return 'Identity status';
 }
-function render(model,options={}){return require('./view.cjs').view(model,options,{escape,time,elapsed,eventType,flag,chip});}
+function render(model,options={}){const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');const assetRevision=crypto.createHash('sha256').update(fs.readFileSync(path.join(__dirname,'countdown.js'))).update(fs.readFileSync(path.join(__dirname,'styles.css'))).digest('hex').slice(0,16);return require('./view.cjs').view(model,{...options,assetRevision},{escape,time,elapsed,eventType,flag,chip});}
 module.exports={render,escape,time,elapsed,eventType};
