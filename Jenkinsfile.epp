@@ -10,6 +10,7 @@ pipeline {
   }
   parameters {
     booleanParam(name: 'ALLOW_PAYMENT_SUBMIT', defaultValue: true, description: 'Authorize single-shot new test orders in EPP S2. Pending attempts remain protected.')
+    booleanParam(name: 'CO_EPP_ALLOW_PRIMARY_MARKETING', defaultValue: true, description: 'Operator-authorized required marketing opt-in for CO EPP S2 QA FIRST only. Disable to withhold consent.')
     string(name: 'P1_TARGET_IDS', defaultValue: '', description: 'Optional official SAM IDs for this EPP market. Empty executes the official campaign.')
   }
   environment {
@@ -28,6 +29,7 @@ pipeline {
           if (!['MX','PE','CO','CL'].contains(market) || env.JOB_BASE_NAME != "Samsung-SMB-EPP-${market}") error('EPP market must be pinned by the dedicated job name.')
           env.TEST_MARKET = market
           env.ALLOW_PAYMENT_SUBMIT = params.ALLOW_PAYMENT_SUBMIT ? '1' : '0'
+          env.CO_EPP_ALLOW_PRIMARY_MARKETING = market == 'CO' && params.CO_EPP_ALLOW_PRIMARY_MARKETING ? '1' : '0'
           checkout scm
           env.GIT_COMMIT = isUnix() ? sh(script: 'git rev-parse HEAD', returnStdout: true).trim() : bat(script: '@git rev-parse HEAD', returnStdout: true).trim()
           if (isUnix()) sh 'node scripts/initialize-epp-jenkins.cjs'

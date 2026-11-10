@@ -1,3 +1,4 @@
+import paymentDefect from '../../../../../utils/eppRegisteredPaymentDefect.cjs';
 import { test, expect } from "../../../../../utils/eppTestFixtures";
 import eppConfigModule from "../../../../../config/markets/epp";
 import {runEppPaymentPrerequisiteCase} from '../../../../../flows/eppPaymentPrerequisites';
@@ -57,7 +58,10 @@ test.describe("CL QST - EPP Official P1", () => {
 
   test("SAM-24865 @destructive @qst @cl @epp - Payment using Direct Bank Transfer", async ({page}) => {
     await test.step("Create a new CL EPP bank order and validate its causal confirmation", async () => {
-      await runEppPaymentPrerequisiteCase(page,cfg(),{kind:'transfer'});
+      const current=cfg();
+      const quarantine=await paymentDefect.attachRegisteredPaymentDefect(current,'SAM-24865',test.info());
+      if(quarantine)test.skip(true,quarantine);
+      await runEppPaymentPrerequisiteCase(page,current,{kind:'transfer'});
     });
   });
 

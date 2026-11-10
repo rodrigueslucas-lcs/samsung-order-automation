@@ -1,3 +1,4 @@
+import paymentDefect from '../../../../../utils/eppRegisteredPaymentDefect.cjs';
 import { test, expect } from "../../../../../utils/eppTestFixtures";
 import eppConfigModule from "../../../../../config/markets/epp";
 import {runEppPaymentPrerequisiteCase} from '../../../../../flows/eppPaymentPrerequisites';
@@ -68,10 +69,8 @@ test.describe("MX QST - Official EPP", () => {
   test("SAM-25046 @preflight @destructive @qst @mx @epp - Pay in Cash", async ({page}) => {
     await test.step("Inspect authenticated EPP cart, checkout and payment prerequisites", async () => {
       const current=cfg();
-      if(current.environment==='S2'&&current.program==='pymesmx'){
-        test.info().annotations.push({type:'known-defect',description:'RT-779284: MX_EPP_CASH_TRANSACTION_FAILED pymesmx; operator reproduced Mercado Pago cash return failure in two browsers.'});
-        test.skip(true,'ENVIRONMENT_DEFECT: MX_EPP_CASH_TRANSACTION_FAILED pymesmx — RT-779284. Operator-confirmed cash failure returns to Payment with “Lo sentimos, su transacción no fue exitosa”. No cash submit retried.');
-      }
+      const quarantine=await paymentDefect.attachRegisteredPaymentDefect(current,'SAM-25046',test.info());
+      if(quarantine)test.skip(true,quarantine);
       await runEppPaymentPrerequisiteCase(page,current,{kind:'cash'});
     });
   });
