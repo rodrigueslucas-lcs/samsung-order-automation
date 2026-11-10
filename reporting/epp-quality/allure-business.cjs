@@ -90,7 +90,7 @@ function businessDescription(entry,result,quality,reference){
     '<div style="font-size:12px;font-weight:800;color:'+fg+';letter-spacing:.7px">'+safe(status)+'</div>' +
     '<div style="font-size:20px;font-weight:800;margin:6px 0;color:#102943">'+safe(entry.title)+'</div>' +
     '<a href="'+jira+'" style="color:#0757aa;font-weight:750" target="_blank" rel="noopener noreferrer">'+entry.id+' · Official QST</a></div>' +
-    (quality==='KNOWN_DEFECT' && /^(?:RT|SAM)-\\d+$/.test(reference||'') ?
+    (quality==='KNOWN_DEFECT' && /^(?:RT|SAM)-\d+$/.test(reference||'') ?
       '<div style="background:#f5f0ff;border:1px solid #bdb4fe;border-left:5px solid #7853bb;border-radius:10px;padding:13px 16px;margin:12px 0;color:#34234d"><strong>Known Defect · </strong><a style="color:#5b3b9f;font-weight:800" href="https://jira.secext.samsung.net/browse/'+safe(reference)+'" target="_blank" rel="noopener noreferrer">'+safe(reference)+'</a><p style="margin:5px 0 0">Current matching evidence does not count as PASS.</p></div>' : '') +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-bottom:12px">' +
     section('O que foi validado',entry.objective) + section('Resultado esperado',entry.expected) + '</div>' +
