@@ -8,6 +8,8 @@ function runtimePolicy(market,{workspace=process.cwd(),io=fs,hostname=os.hostnam
  if(!source.S2?.[market])throw new Error('Approved EPP S2 fixtures unavailable.');
  const policy={market,environment:'S2',program:programmes[market],hostname,authorityRoot:path.resolve(workspace,'playwright/.auth/epp'),fixtures:{S2:{[market]:source.S2[market]}}};
  if(['CL','CO'].includes(market))policy.cardFixture=JSON.parse(io.readFileSync(path.join(workspace,'playwright/.auth',market==='CL'?'cl-test-card.json':'mx-test-card.json'),'utf8'));
+ const publisherConfig=path.resolve(policy.authorityRoot,'..','jenkins-publisher.local.json');
+ if(io.existsSync?.(publisherConfig))policy.reporting={publisherConfig};
  return policy;
 }
 function jobXml(template){

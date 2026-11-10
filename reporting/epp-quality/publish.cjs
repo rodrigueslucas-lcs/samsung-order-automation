@@ -18,7 +18,7 @@ function publishSafeArtifacts(output,values=[],io=fs){
   else{counts.omitted++;return;}
   io.writeFileSync(destination,safe);counts.copied++;
  }
- for(const name of ['quality','html','allure','allure-report','playwright','evidence','results.json']){
+ for(const name of ['quality','html','allure','allure-report','playwright','evidence','results.json','execution.json']){
   const source=path.join(root,name);if(io.existsSync(source))copy(source,path.join(target,name));
  }
  io.writeFileSync(path.join(target,'publication.json'),JSON.stringify({schemaVersion:1,sanitized:true,rawStatusesPreserved:true,...counts}));

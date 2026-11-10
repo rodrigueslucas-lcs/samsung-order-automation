@@ -138,3 +138,33 @@ identity validation. No sandbox approval or security configuration was changed.
 Seven focused tests and the official Jenkins declarative validator passed.
 The next pilot must validate actual publication; this failure is infrastructure,
 not a functional payment failure.
+
+### CL pilot 2 and regional observation
+
+Build `Samsung-SMB-EPP-CL #2` published the Executive quality dashboard,
+Playwright, Allure and sanitized artifacts successfully. Its immutable raw
+result is 5 PASS / 1 FAIL / 1 SKIP. The card failed the existing-order guard;
+confirmation passed for a distinct internal order ID sharing the earlier
+public number. Do not rewrite that build as green. Independent reconciliation
+and a subsequent runtime validation remain required. No financial retry was
+performed during this investigation.
+
+All four manual `Samsung-SMB-EPP-{MX,PE,CO,CL}` jobs now exist. Creating the
+remaining three jobs did not start builds. The `Samsung SMB Quality Summary`
+View groups the eight Base Store/EPP jobs, without modifying those Base Store
+jobs or the Auth Operations View.
+
+`node scripts/publish-regional-quality.cjs` reads only observed completed
+Jenkins builds. `--publish <JenkinsHome>` writes only the dedicated public
+`userContent/samsung-smb-quality` snapshot and timestamped history. Each EPP
+post-publication step also creates a per-build regional snapshot; its own
+Jenkins result is explicitly RUNNING while post actions are executing. Missing
+data stays unavailable. The global snapshot is refreshed explicitly after
+validation; no recurring auth task or scheduler is changed.
+
+Public `execution.json` exposes only build/run/market/programme/commit identity.
+The private manifest, workspace paths and observer configuration are no longer
+archived. Jenkins declarative validation passed after this change. The current
+reporting regression passed 145 tests and focused CI/payment tests passed 84.
+Actual remaining-market execution and final integrated acceptance are pending;
+these test counts do not represent functional SAM PASS.

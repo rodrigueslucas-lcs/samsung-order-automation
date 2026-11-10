@@ -1,6 +1,7 @@
 const fs=require('node:fs'),path=require('node:path');
 const {buildModel}=require('../reporting/epp-quality/model.cjs');
 const {render}=require('../reporting/epp-quality/render.cjs');
+function publicExecution(manifest){return {schemaVersion:1,market:manifest.market,environment:manifest.environment,program:manifest.program,runId:manifest.runId,buildNumber:manifest.buildNumber,gitCommit:/^[a-f0-9]{40}$/i.test(manifest.gitCommit||'')?manifest.gitCommit:null};}
 function cleanupPrivateWorkspace(workspace=process.cwd(),io=fs){
   const base=io.realpathSync(workspace),target=path.resolve(workspace,'playwright/.auth/epp');
   if(!io.existsSync(target))return;
@@ -23,6 +24,7 @@ function publishInfraFallback(env=process.env){
   const target=path.join(output,'public'),quality=path.join(target,'quality');
   if(fs.existsSync(target))throw new Error('Existing public artifacts preserved; refusing to mix fallback publication.');
   fs.mkdirSync(quality,{recursive:true});
+  fs.writeFileSync(path.join(target,'execution.json'),JSON.stringify(publicExecution(manifest)));
   fs.writeFileSync(path.join(quality,'quality.json'),JSON.stringify({...model,reportingFailure:true,rawDiagnostics:'Preserved privately; unavailable in this fallback report.'},null,2));
   fs.writeFileSync(path.join(quality,'index.html'),render(model,{artifactRoot:output}));
   fs.copyFileSync('reporting/executive-v3/dashboard.css',path.join(quality,'dashboard.css'));
@@ -43,6 +45,7 @@ async function finalize(env=process.env){
   const orderEvidence=require('../utils/eppCiOrderEvidence.cjs').validateOrderEvidence(manifest,document);
   const model=buildModel({...manifest,document,orderEvidence,preflightType:blocked?preflight.type:undefined,infraError:(infraError&&!blocked)||Boolean(document?.errors?.length)}),quality=path.join(output,'quality');
   fs.mkdirSync(quality,{recursive:true});fs.writeFileSync(path.join(quality,'quality.json'),JSON.stringify(model,null,2));
+  fs.writeFileSync(path.join(output,'execution.json'),JSON.stringify(publicExecution(manifest)));
   const renderOptions={artifactRoot:output};
   if(env.BUILD_URL){
     const url=new URL(env.BUILD_URL);if(!['http:','https:'].includes(url.protocol)||url.username||url.password||url.search||url.hash)throw new Error('Invalid EPP build report URL.');
@@ -85,4 +88,4 @@ if(require.main===module){
   else if(process.argv[2]==='--infra-only'){try{publishInfraFallback();}catch{console.error('[epp-ci] Infrastructure fallback could not be published.');process.exitCode=1;}}
   else finalize().catch(()=>{console.error('[epp-ci] Current-build reporting failed; sensitive details suppressed.');process.exitCode=1;});
 }
-module.exports={validateManifest,finalize,cleanupPrivateWorkspace,publishInfraFallback};
+module.exports={validateManifest,finalize,cleanupPrivateWorkspace,publishInfraFallback,publicExecution};

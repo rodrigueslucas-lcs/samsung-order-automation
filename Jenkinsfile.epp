@@ -96,7 +96,13 @@ pipeline {
           publishHTML(target: [reportDir: "${output}/public/quality", reportFiles: 'index.html', reportName: '01 · EPP Quality Dashboard', keepAll: true, alwaysLinkToLastBuild: true, allowMissing: false])
           publishHTML(target: [reportDir: "${output}/public/html", reportFiles: 'index.html', reportName: '02 · EPP Playwright', keepAll: true, alwaysLinkToLastBuild: true, allowMissing: true])
           publishHTML(target: [reportDir: "${output}/public/allure-report", reportFiles: 'index.html', reportName: '03 · EPP Allure', keepAll: true, alwaysLinkToLastBuild: true, allowMissing: true])
-          archiveArtifacts(artifacts: "${output}/public/**,test-results/epp-ci-current.json,test-results/epp-ci-quality-gate.json", allowEmptyArchive: true, fingerprint: false)
+          def regional = isUnix() ? sh(script: 'node scripts/publish-regional-quality.cjs --ci', returnStatus: true) : bat(script: '@node scripts/publish-regional-quality.cjs --ci', returnStatus: true)
+          if (regional == 0) {
+            publishHTML(target: [reportDir: "${output}/public/regional", reportFiles: 'index.html', reportName: '04 · Regional Quality Summary', keepAll: true, alwaysLinkToLastBuild: true, allowMissing: false])
+          } else {
+            echo 'Regional observation unavailable; individual build reports remain authoritative.'
+          }
+          archiveArtifacts(artifacts: "${output}/public/**,test-results/epp-ci-quality-gate.json", allowEmptyArchive: true, fingerprint: false)
           def gate = isUnix()
             ? sh(script: 'node scripts/epp-ci-report-context.cjs gate', returnStdout: true).trim()
             : bat(script: '@node scripts/epp-ci-report-context.cjs gate', returnStdout: true).trim()

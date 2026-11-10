@@ -19,6 +19,10 @@ function installRuntime(market,env,io=fs){
     const file=path.join(directory,'ci-card.json');io.writeFileSync(file,JSON.stringify(policy.cardFixture),{mode:0o600});
     configured[market==='CL'?'CL_TEST_CARD_FILE':'MX_TEST_CARD_FILE']=file;
   }
+  if(policy.reporting){
+    if(policy.reporting.publisherConfig!==path.resolve(root,'..','jenkins-publisher.local.json'))throw new Error('Invalid regional summary observer scope.');
+    configured.EPP_CI_REPORTING=JSON.stringify(policy.reporting);
+  }
   return configured;
 }
 function runCi(market,source=process.env,{execute=executeRun,io=fs,build=buildRun,summarize=summarizeRun}={}){
@@ -27,6 +31,7 @@ function runCi(market,source=process.env,{execute=executeRun,io=fs,build=buildRu
   let env={...source,TEST_MARKET:market,TEST_STORE:'EPP',ENVIRONMENT:'S2',EPP_PROGRAM:programmes[market],[`${market}_EPP_PROGRAM`]:programmes[market],[`${market}_QST_ENVIRONMENT`]:'S2',EPP_AUTH_SLOT:'primary',[`${market}_EPP_AUTH_SLOT`]:'primary',EPP_RESUME_PENDING_ORDER:'0',BROWSER_MODE:'headless',ENABLE_ALLURE:'1',ALLURE_DETAIL:'false',EPP_AUTH_PREFLIGHT:'1',EPP_CI_PRIVATE_EVIDENCE:'1'};
   for(const other of Object.keys(programmes))for(const suffix of ['QST_TARGET_IDS','EPP_QST_PDP_URL','EPP_QST_PLP_URL','EPP_QST_SKU'])delete env[`${other}_${suffix}`];
   for(const key of ['EPP_QST_PDP_URL','EPP_QST_PLP_URL','EPP_QST_SKU'])delete env[key];
+  delete env.EPP_CI_REPORTING;
   let setupError=false;
   try{env=installRuntime(market,env,io);}catch{setupError=true;}
   let run;
@@ -38,7 +43,7 @@ function runCi(market,source=process.env,{execute=executeRun,io=fs,build=buildRu
   run.env.EPP_CI_PREFLIGHT_FILE=path.join(run.output,'preflight.json');
   const manifest=path.resolve('test-results/epp-ci-current.json');
   io.mkdirSync(path.dirname(manifest),{recursive:true});
-  io.writeFileSync(manifest,JSON.stringify({market,environment:'S2',program:config.program,runId:run.env.EPP_RUN_ID,gitCommit:/^[a-f0-9]{40}$/i.test(env.GIT_COMMIT||'')?env.GIT_COMMIT:null,output:publicOutput,privateOutput:run.output,authorityRoot:env.EPP_CI_AUTHORITY_ROOT||null,relativeOutput:path.relative(process.cwd(),publicOutput).replaceAll('\\','/'),buildNumber:env.BUILD_NUMBER||null}));
+  io.writeFileSync(manifest,JSON.stringify({market,environment:'S2',program:config.program,runId:run.env.EPP_RUN_ID,gitCommit:/^[a-f0-9]{40}$/i.test(env.GIT_COMMIT||'')?env.GIT_COMMIT:null,output:publicOutput,privateOutput:run.output,authorityRoot:env.EPP_CI_AUTHORITY_ROOT||null,reporting:env.EPP_CI_REPORTING?JSON.parse(env.EPP_CI_REPORTING):null,relativeOutput:path.relative(process.cwd(),publicOutput).replaceAll('\\','/'),buildNumber:env.BUILD_NUMBER||null}));
   let exit=1,infraError=false;
   try{
     if(setupError)throw new Error('EPP CI runtime setup failed.');
