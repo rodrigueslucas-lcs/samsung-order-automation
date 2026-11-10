@@ -75,6 +75,21 @@ async function provePdpVariantSelection(page, config, {timeout=30000}={}) {
   }
   if(!choice) throw Object.assign(new Error('PDP lacks an alternate selectable variant.'),{eppReason:'MISSING_OR_UNPROVEN_EPP_PRODUCT'});
   const label=(await choice.innerText()).trim();
+  if(config.market==='MX'){
+    // MX's hover navigation can retain its full-page dim after storefront
+    // setup. Leave the header and dismiss its real backdrop, never force a
+    // click through it or remove business/security dialogs from the DOM.
+    const viewport=page.viewportSize();
+    await page.mouse.move(1,Math.max(1,(viewport?.height||720)-2));
+    const dim=page.locator('header .global-header-dim.active').filter({visible:true}).first();
+    if(await dim.isVisible()){
+      await dim.click({position:{x:5,y:5},timeout});
+      await expect(dim).toBeHidden({timeout});
+    }
+    // Default nearest-edge scrolling can put the option beneath the sticky
+    // PDP anchor. Center it before the ordinary actionability-checked click.
+    await choice.evaluate(element=>element.scrollIntoView({block:'center',inline:'nearest',behavior:'instant'}));
+  }
   await choice.click();
   await expect.poll(()=>new URL(page.url()).pathname,{timeout}).not.toBe(before.pathname);
   const after=assertStoreRoute(page.url(),config,/^p\//), sku=decodeURIComponent(after.pathname.split('/').filter(Boolean).at(-1));

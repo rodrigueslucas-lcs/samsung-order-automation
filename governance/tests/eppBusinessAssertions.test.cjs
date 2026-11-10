@@ -71,6 +71,14 @@ test('PDP variant proves a changed SKU and selected control together',async()=>{
 test('cosmetic-only variant selection is not a PDP PASS',async()=>{
  await fixture(`<main><p>QA-A</p><button class="bttn selected">Blue</button><button class="bttn" onclick="this.classList.add('selected')">Black</button></main>`,page=>assert.rejects(provePdpVariantSelection(page,config,{timeout:100})),'p/QA-A');
 });
+
+test('MX PDP closes a lingering header hover dim and centers variants below sticky navigation',async()=>{
+ await fixture(`<style>header{position:fixed;top:0;left:0;right:0;height:100px;z-index:20}.global-header-dim.active{position:fixed;inset:100px 0 0;background:#0005}.anchor{position:fixed;top:100px;left:0;right:0;height:100px;background:white;z-index:10}main{padding-top:220px;min-height:2000px}</style><header><div class="global-header-dim active" onclick="this.classList.remove('active');this.hidden=true;window.dismissed=true"></div></header><div class="anchor">Sticky PDP navigation</div><main><p id="sku">QA-A</p><button class="bttn selected">Blue</button><button class="bttn" onclick="history.pushState({},'', 'QA-B');document.querySelector('#sku').textContent='QA-B';document.querySelector('.selected').classList.remove('selected');this.classList.add('selected')">Black</button></main>`,async page=>{
+  page.setDefaultTimeout(1200);
+  const result=await provePdpVariantSelection(page,config,{timeout:1500});
+  assert.equal(result.sku,'QA-B');assert.equal(await page.evaluate(()=>window.dismissed),true);
+ },'p/QA-A');
+});
 test('variant navigation cannot substitute a Base Store product for EPP proof',async()=>{
  await fixture(`<main><p id="sku">QA-A</p><button class="bttn selected">Blue</button><button class="bttn" onclick="history.pushState({},'', '/mx/p/QA-B');document.querySelector('#sku').textContent='QA-B';this.classList.add('selected')">Black</button></main>`,page=>assert.rejects(provePdpVariantSelection(page,config,{timeout:100}),/staging multistore/),'p/QA-A');
 });
