@@ -12,10 +12,19 @@ function configuration(testInfo) {
 }
 
 export const test = base.extend({
-  page: async ({ context, eppSession }, use) => {
+  page: async ({ context, eppSession }, use, testInfo) => {
     const page = await context.newPage();
     await eppSession.protectPage(page);
-    await use(page);
+    try { await use(page); }
+    finally {
+      if(process.env.CI==='1'&&process.env.EPP_CI_PRIVATE_EVIDENCE==='1'&&['failed','timedOut','interrupted'].includes(testInfo.status)&&!page.isClosed()){
+        try{
+          const file=testInfo.outputPath('epp-failure-masked.png');
+          await page.screenshot({path:file,timeout:5000,fullPage:false,mask:[page.locator('input,textarea,[contenteditable="true"],iframe'),page.getByText(/[^\s@]+@[^\s@]+\.[^\s@]+/)]});
+          await testInfo.attach('EPP masked failure screenshot',{path:file,contentType:'image/png'});
+        }catch{/* Evidence capture must not replace the original test failure. */}
+      }
+    }
   },
   eppLease: [async ({}, use, testInfo) => {
     const lease = eppSession.acquireEppLease(configuration(testInfo));

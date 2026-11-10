@@ -15,7 +15,7 @@ test('Needs Attention uses consistent FAIL, BLOCKED and KNOWN DEFECT visual fami
       store: 'BASE_STORE',
       summary: { official: 29, failed: 1, blocked: 2 },
       tests: [
-        { samId: 'SAM-25010', title: 'Track Order', status: 'SKIPPED-BLOCKED', failureType: 'FUNCTIONAL_DEFECT' },
+        { samId: 'SAM-25010', title: 'Track Order', status: 'SKIPPED-BLOCKED', failureType: 'FUNCTIONAL_DEFECT', blockedReason: 'The storefront accepted the OTP but could not find the order in the current BaseSite.' },
         { samId: 'SAM-99998', title: 'Prerequisite example', status: 'SKIPPED-BLOCKED', failureType: 'TEST_DATA_BLOCKED' },
         { samId: 'SAM-99999', title: 'Failure example', status: 'FAIL', failureType: 'ENVIRONMENT_ERROR' },
       ],

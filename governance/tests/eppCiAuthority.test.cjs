@@ -2,6 +2,11 @@ const test=require('node:test'),assert=require('node:assert/strict'),path=requir
 const {authorityRoot,financialDirectory}=require('../../utils/eppCiAuthority.cjs');
 const root=path.resolve('playwright/.auth/epp'),env={CI:'1',ENVIRONMENT:'S2',EPP_CI_AUTHORITY_ROOT:root};
 test('local default authority remains unchanged',()=>assert.equal(financialDirectory({market:'CL'},'existing',{}),'existing'));
+test('CI respects the original programme legacy refresh owner before acquiring a lease',()=>{
+ const authority=path.resolve('test-results/shared-authority/.auth/epp'),source=path.join(authority,'s2/cl/refresh.lock');let acquired=false;
+ assert.throws(()=>require('../../utils/eppSession.cjs').acquireEppLease({market:'CL',environment:'S2'},{CI:'1',ENVIRONMENT:'S2',EPP_CI_AUTHORITY_ROOT:authority},{io:{existsSync:file=>file===source},acquire:()=>{acquired=true;}}),error=>error.code==='AUTH_BUSY');
+ assert.equal(acquired,false);
+});
 test('CI ledger uses same canonical programme/slot scope as operator',()=>{assert.equal(financialDirectory({market:'CL',environment:'S2',authSlot:'primary'},'workspace',env),path.join(root,'s2','cl'));assert.equal(financialDirectory({market:'PE',environment:'S2',programNamespace:'pe_membership_vip'},'workspace',env),path.join(root,'s2','pe','programs','pe_membership_vip'));assert.equal(financialDirectory({market:'MX',environment:'S2',authSlot:'second'},'workspace',env),path.join(root,'s2','mx','second'));});
 test('shared authority rejects other environment and relative/network/wrong roots',()=>{for(const changed of [{CI:'0'},{ENVIRONMENT:'S1'},{EPP_CI_AUTHORITY_ROOT:'relative/.auth/epp'},{EPP_CI_AUTHORITY_ROOT:'\\\\host\\share\\.auth\\epp'},{EPP_CI_AUTHORITY_ROOT:path.resolve('playwright/.auth')}])assert.throws(()=>authorityRoot({...env,...changed}));});
 test('invalid programme cannot traverse ledger root',()=>assert.throws(()=>financialDirectory({market:'CL',environment:'S2',programNamespace:'../mx'},'workspace',env)));

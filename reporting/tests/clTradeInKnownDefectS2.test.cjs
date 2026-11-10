@@ -48,6 +48,6 @@ test('CL S2 SAM-24803 reporting keeps raw prerequisite truth while surfacing the
 
   assert.match(spec, /SAM-24803 @blocked @qst @cl @base-store/);
   assert.match(spec, /eligible CL Trade-in PDP SKU\/test data is required/);
-  assert.match(allure, /mappedDefectTitle/);
+  assert.match(allure, /upsertParameter\(result, "Known Defect Title", defect.title \|\| defect.jira\)/);
   assert.match(allure, /Known Defect \$\{defectSummary\}/);
 });

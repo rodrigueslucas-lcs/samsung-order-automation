@@ -1,0 +1,118 @@
+// Isolated EPP S2 execution. Existing Base Store Jenkinsfile is unchanged.
+pipeline {
+  agent any
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+    skipDefaultCheckout(true)
+    timeout(time: 75, unit: 'MINUTES')
+    buildDiscarder(logRotator(numToKeepStr: '30', artifactNumToKeepStr: '15'))
+  }
+  parameters {
+    booleanParam(name: 'ALLOW_PAYMENT_SUBMIT', defaultValue: true, description: 'Authorize single-shot new test orders in EPP S2. Pending attempts remain protected.')
+    string(name: 'P1_TARGET_IDS', defaultValue: '', description: 'Optional official SAM IDs for this EPP market. Empty executes the official campaign.')
+  }
+  environment {
+    CI = '1'
+    ENVIRONMENT = 'S2'
+    TEST_STORE = 'EPP'
+    BROWSER_MODE = 'headless'
+    ENABLE_ALLURE = '1'
+    ALLURE_DETAIL = 'false'
+  }
+  stages {
+    stage('01 · Context and Checkout') {
+      steps {
+        script {
+          def market = env.JOB_BASE_NAME?.replace('Samsung-SMB-EPP-', '')
+          if (!['MX','PE','CO','CL'].contains(market) || env.JOB_BASE_NAME != "Samsung-SMB-EPP-${market}") error('EPP market must be pinned by the dedicated job name.')
+          env.TEST_MARKET = market
+          env.ALLOW_PAYMENT_SUBMIT = params.ALLOW_PAYMENT_SUBMIT ? '1' : '0'
+          checkout scm
+          env.GIT_COMMIT = isUnix() ? sh(script: 'git rev-parse HEAD', returnStdout: true).trim() : bat(script: '@git rev-parse HEAD', returnStdout: true).trim()
+          if (isUnix()) sh 'node scripts/initialize-epp-jenkins.cjs'
+          else bat '@node scripts/initialize-epp-jenkins.cjs'
+        }
+      }
+    }
+    stage('02 · Dependencies') {
+      steps {
+        script {
+          if (isUnix()) {
+            sh 'npm ci --ignore-scripts'
+            sh 'node scripts/install-epp-ci-tools.cjs'
+          } else {
+            bat '@call npm ci --ignore-scripts'
+            bat '@node scripts/install-epp-ci-tools.cjs'
+          }
+        }
+      }
+    }
+    stage('03 · Preflight and Official EPP QST') {
+      steps {
+        script {
+          def market = env.TEST_MARKET.toLowerCase()
+          def programmeSuffix = market == 'pe' ? '-pe_membership_vip' : ''
+          withCredentials([
+            file(credentialsId: "samsung-epp-${market}-s2-primary${programmeSuffix}-session-bundle", variable: 'EPP_SESSION_BUNDLE_FILE'),
+            file(credentialsId: "samsung-epp-${market}-s2-ci-runtime", variable: 'EPP_CI_RUNTIME_FILE'),
+            usernamePassword(credentialsId: 'samsung-storefront-primary-user', usernameVariable: 'EPP_SAMSUNG_EMAIL', passwordVariable: 'EPP_SAMSUNG_PASSWORD')
+          ]) {
+            env.EPP_RAW_EXIT = isUnix()
+              ? sh(script: 'node scripts/run-epp-jenkins.cjs "$TEST_MARKET"', returnStatus: true).toString()
+              : bat(script: '@node scripts/run-epp-jenkins.cjs %TEST_MARKET%', returnStatus: true).toString()
+          }
+        }
+      }
+    }
+    stage('04 · Payment and Order Evidence') {
+      steps {
+        script {
+          env.EPP_ORDER_VALIDATION_EXIT = isUnix()
+            ? sh(script: 'node scripts/validate-epp-ci-orders.cjs', returnStatus: true).toString()
+            : bat(script: '@node scripts/validate-epp-ci-orders.cjs', returnStatus: true).toString()
+        }
+      }
+    }
+  }
+  post {
+    always {
+      script {
+        // Never publish a manifest from an earlier build or another workspace.
+        if (!fileExists('test-results/epp-ci-current.json')) {
+          currentBuild.result = 'FAILURE'
+          echo 'INFRA_ERROR: no current EPP execution manifest; no historical report substituted.'
+        } else {
+          def manifest = new groovy.json.JsonSlurperClassic().parseText(readFile('test-results/epp-ci-current.json'))
+          if (manifest.buildNumber?.toString() != env.BUILD_NUMBER || manifest.market != env.TEST_MARKET || !(manifest.relativeOutput ==~ /^test-results\/epp\/(mx|pe|co|cl)\/s2\/[A-Za-z0-9.-]+$/)) {
+            error('INFRA_ERROR: EPP report identity mismatch.')
+          }
+          def output = manifest.relativeOutput
+          def finalizer = isUnix() ? sh(script: 'node scripts/finalize-epp-jenkins.cjs', returnStatus: true) : bat(script: '@node scripts/finalize-epp-jenkins.cjs', returnStatus: true)
+          if (finalizer != 0) {
+            echo 'INFRA_ERROR: reporting failed; publishing only a current-build infrastructure summary.'
+            def fallback = isUnix() ? sh(script: 'node scripts/finalize-epp-jenkins.cjs --infra-only', returnStatus: true) : bat(script: '@node scripts/finalize-epp-jenkins.cjs --infra-only', returnStatus: true)
+            if (fallback != 0) error('INFRA_ERROR: safe fallback failed; raw diagnostics will not be published.')
+          }
+          if (!fileExists("${output}/public/publication.json")) error('INFRA_ERROR: public EPP evidence validation failed; raw diagnostics will not be published.')
+          publishHTML(target: [reportDir: "${output}/public/quality", reportFiles: 'index.html', reportName: '01 · EPP Quality Dashboard', keepAll: true, alwaysLinkToLastBuild: true, allowMissing: false])
+          publishHTML(target: [reportDir: "${output}/public/html", reportFiles: 'index.html', reportName: '02 · EPP Playwright', keepAll: true, alwaysLinkToLastBuild: true, allowMissing: true])
+          publishHTML(target: [reportDir: "${output}/public/allure-report", reportFiles: 'index.html', reportName: '03 · EPP Allure', keepAll: true, alwaysLinkToLastBuild: true, allowMissing: true])
+          archiveArtifacts(artifacts: "${output}/public/**,test-results/epp-ci-current.json,test-results/epp-ci-quality-gate.json", allowEmptyArchive: true, fingerprint: false)
+          def gate = new groovy.json.JsonSlurperClassic().parseText(readFile('test-results/epp-ci-quality-gate.json'))
+          currentBuild.description = "${env.TEST_MARKET} · EPP S2 · ${gate.gate}"
+          if (finalizer != 0 || gate.gate in ['INFRA_ERROR', 'FAILED — NEW REGRESSION']) currentBuild.result = 'FAILURE'
+          else if (gate.gate == 'BLOCKED BY EXTERNAL DEPENDENCIES') currentBuild.result = 'UNSTABLE'
+        }
+      }
+    }
+    cleanup {
+      script {
+        if (fileExists('scripts/finalize-epp-jenkins.cjs')) {
+          def cleaned = isUnix() ? sh(script: 'node scripts/finalize-epp-jenkins.cjs --cleanup', returnStatus: true) : bat(script: '@node scripts/finalize-epp-jenkins.cjs --cleanup', returnStatus: true)
+          if (cleaned != 0) currentBuild.result = 'FAILURE'
+        }
+      }
+    }
+  }
+}

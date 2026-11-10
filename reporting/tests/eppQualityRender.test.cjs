@@ -1,4 +1,15 @@
 const test=require('node:test'),assert=require('node:assert/strict'),path=require('node:path');
 const {render,evidenceHref}=require('../epp-quality/render.cjs');
+test('current causal order is presented once with its payment and confirmation scenarios',()=>{
+ const html=render({market:'CL',environment:'S2',program:'alianzas',runId:'current',gate:'FULLY PASSED',executed:2,official:7,counts:{PASS:2},rows:[],orders:[{publicOrderNumber:'CL261104-78817132',method:'card',tcs:['SAM-24864','SAM-24866'],newOrderInCurrentRun:true,confirmationValidated:true}]},{artifactRoot:process.cwd()});
+ assert.equal(html.split('CL261104-78817132').length-1,1);
+ assert.match(html,/SAM-24864, SAM-24866/);
+ assert.match(html,/Current run · confirmation validated/);
+});
+test('no causal order renders an explicit absence rather than a historical payment success',()=>{
+ const html=render({market:'CL',environment:'S2',program:'alianzas',runId:'current',gate:'NOT_RUN',executed:0,official:7,counts:{NOT_RUN:7},rows:[]},{artifactRoot:process.cwd()});
+ assert.match(html,/No newly confirmed order proven/);
+ assert.match(html,/Historical reconciliation does not count/);
+});
 test('only evidence inside current artifact root is linked',()=>{const root=path.resolve('test-results/epp/current');assert.equal(evidenceHref(root,path.join(root,'playwright','evidence one.png')),'../playwright/evidence%20one.png');assert.equal(evidenceHref(root,path.resolve('playwright/.auth/state.json')),null);assert.equal(evidenceHref(root,'https://external.test'),null);});
 test('responsive renderer preserves raw/business distinction and escapes content',()=>{const html=render({market:'CL',environment:'S2',program:'alianzas',runId:'build-1',buildNumber:1,gate:'PASSED WITH KNOWN DEFECTS',executed:1,official:1,counts:{PASS:0,KNOWN_DEFECT:1},rows:[{tc:'SAM-24841',name:'<script>alert(1)</script>',raw:'skipped',quality:'KNOWN_DEFECT',duration:0,reference:'SAM-25146',url:'https://jira.secext.samsung.net/browse/SAM-25146',evidence:[]}]},{artifactRoot:process.cwd()});assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>/);assert.match(html,/>skipped</);assert.match(html,/name="viewport"/);assert.match(html,/overflow-x:auto/);assert.match(html,/Known defects do not count as PASS/);});

@@ -77,7 +77,48 @@ descriptions); no production reporting behavior was changed to satisfy them.
 The sequential diagnostic was interrupted after confirming both failures.
 Broader regression remains pending, not PASS.
 
-The CI wrapper is work in progress. Pipeline provisioning, safe evidence
-publication, consolidated history and real Jenkins pilots remain pending.
-No EPP job/build or new financial submission has been created in this milestone.
-These checks do not assert runtime homologation.
+## Shared CI implementation validation (before CL pilot)
+
+The isolated `Jenkinsfile.epp` now uses the official market runner, FIRST S2
+bundles, programme-specific fixtures and a durable financial/lease authority
+outside the ephemeral Jenkins workspace. It never performs authentication.
+`provision-epp-jenkins.cjs MARKET` is read-only unless `--apply` is supplied;
+it refuses to modify jobs or credentials without its ownership marker.
+
+Raw evidence is captured outside the browsable workspace. Public reports
+contain sanitized JSON, masked screenshots and sanitized traces. Publication
+fails closed if that boundary cannot be verified. Early dependency/credential
+failures produce a current-build INFRA_ERROR summary rather than old results.
+
+The executive report independently validates current-run confirmed financial
+records and displays public order numbers and their causal SAM IDs. Historical
+reconciliation cannot satisfy a normal payment PASS. Existing MX Cash and CL
+transfer pending markers remain unchanged and do not block card execution.
+
+Allure reuses the existing executor/environment/history tooling through an
+EPP-only raw-status-preservation option. History is separated by market,
+environment, programme and targeted/full campaign; Base Store defaults remain
+unchanged. Installing reporters initially reproduced Playwright version drift
+from locked 1.60.0 to 1.65.0. `install-epp-ci-tools.cjs` now pins every direct
+dependency to its lockfile version while installing the fixed reporter versions.
+
+Evidence obtained so far:
+
+- 60 focused CI/reporting/privacy tests passed; 41 session/financial/authority
+  tests passed after adding the original legacy-owner lock check.
+- Full reporting suite: 138 passed, zero failures or skips. Stale decorative
+  description expectations and an incomplete causal fixture were corrected;
+  Base Store reporting behavior was not changed to satisfy them.
+- Jenkins official declarative validator accepted the pipeline (HTTP 200).
+- Real Allure generation and sanitized publication passed with synthetic data;
+  the raw status stayed unchanged and the gate remained BLOCKED, as expected
+  for demonstration data rather than functional execution.
+- Real Chrome desktop/mobile rendering passed with seven CL rows and no
+  document overflow.
+
+The complete governance rerun with browser execution permission passed:
+1,419 tests, zero failures and zero skips. Official scope, business-step and
+architecture gates passed. No EPP job/build or new financial submission has
+been created yet.
+Real CL pilot, remaining market builds and consolidated Quality Summary remain
+acceptance requirements; the integration is not runtime-homologated yet.

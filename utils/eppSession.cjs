@@ -105,9 +105,10 @@ function persistVerifiedEppSession(config, snapshot, { io = fs, write = writeJso
 
 function acquireEppLease(config, environment = process.env, { io = fs, acquire = leaseModule.acquireMarketLease, register = leaseModule.registerLeaseProcess } = {}) {
   const files = getEppSessionPaths(config);
-  // Preserve any still-running pre-migration EPP worker. Never compete with it.
-  if (io.existsSync(files.lock)) throw Object.assign(new Error("EPP profile has an existing refresh owner."), { code: "AUTH_BUSY", exitCode: 73 });
   const authority = require('./eppCiAuthority.cjs').authorityRoot(environment);
+  const authorityLock = authority ? path.join(require('./eppCiAuthority.cjs').financialDirectory(config, files.directory, environment), 'refresh.lock') : files.lock;
+  // Preserve any still-running pre-migration EPP worker. Never compete with it.
+  if ([...new Set([files.lock,authorityLock])].some(file=>io.existsSync(file))) throw Object.assign(new Error("EPP profile has an existing refresh owner."), { code: "AUTH_BUSY", exitCode: 73 });
   const directory = path.join(authority || path.join(root, "playwright", ".auth", "epp"), ".leases");
   const release = acquire(config.market.toLowerCase(), config.environment, { directory, env: { AUTH_MARKET_LEASE: environment.EPP_LEASE_TOKEN } });
   const unregister = register(release.env);

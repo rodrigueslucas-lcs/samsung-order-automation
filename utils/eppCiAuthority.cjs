@@ -14,7 +14,7 @@ function authorityRoot(env = process.env) {
 function financialDirectory(config, fallback, env = process.env) {
   const root = authorityRoot(env);
   if (!root) return fallback;
-  if (!['MX','PE','CO','CL'].includes(config.market) || config.environment !== 'S2' || !['primary','second'].includes(config.authSlot || 'primary') || (config.programNamespace && !/^[a-z][a-z0-9_]{1,60}$/.test(config.programNamespace))) throw new Error('Invalid EPP financial authority identity.');
+  if (!['MX','PE','CO','CL'].includes(config.market) || config.environment !== 'S2' || !['primary','second'].includes(config.authSlot || 'primary') || (config.authSlot === 'second' && !['MX','CO'].includes(config.market)) || (config.programNamespace && !/^[a-z][a-z0-9_]{1,60}$/.test(config.programNamespace))) throw new Error('Invalid EPP financial authority identity.');
   return path.join(root,'s2',config.market.toLowerCase(),...(config.programNamespace?['programs',config.programNamespace]:[]),...(config.authSlot === 'second'?['second']:[]));
 }
 module.exports = {authorityRoot,financialDirectory};

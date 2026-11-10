@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import eppConfig from './config/markets/epp';
+const privateCiEvidence = process.env.CI === '1' && process.env.EPP_CI_PRIVATE_EVIDENCE === '1';
 
 // EPP never inherits Base Store auth projects, grep, storageState or artifacts.
 export default defineConfig({
@@ -28,6 +29,9 @@ export default defineConfig({
     // Access codes must not be captured by Playwright action logs or video.
     // Enable business tracing only after a separate untraced access fixture exists.
     trace: "off", video: "off", screenshot: "off",
+    // CI stores raw traces outside the browsable workspace; only the validated
+    // redacted copy is published. Local access-code capture remains disabled.
+    ...(privateCiEvidence ? { trace: { mode: 'retain-on-failure', screenshots: false, snapshots: false, sources: false } } : {}),
     actionTimeout: 15000, navigationTimeout: 60000,
   },
   projects: [{ name: "EPP · isolated Chromium" }],

@@ -2,7 +2,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {getEppSessionPaths}=require('./eppSession.cjs');
 const {financialDirectory}=require('./eppCiAuthority.cjs');
-const attemptDirectory=config=>financialDirectory(config,getEppSessionPaths(config).directory);
+const attemptDirectory=(config,env=process.env)=>financialDirectory(config,getEppSessionPaths(config).directory,env);
 function archiveConfirmedAttempt(source,target,io){
  for(let n=0;n<7;n++){
   try{io.renameSync(source,target);return;}
@@ -52,9 +52,9 @@ function observePendingEppOrder(config,kind,orderCode,io=fs){
  if(!record||!new RegExp(`^${config.market}\\d{6}-\\d{8}(?:_\\d+)?$`).test(orderCode)||(record.orderCode&&record.orderCode!==orderCode))throw new Error('Pending EPP observation requires its own reconciled order.');
  io.writeFileSync(path.join(attemptDirectory(config),`order-attempt-${kind}.json`),JSON.stringify({...record,status:'OBSERVED_ORDER',orderCode}));
 }
-function latestConfirmedEppOrder(config,kind='card',io=fs,{runId}={}){
+function latestConfirmedEppOrder(config,kind='card',io=fs,{runId,env=process.env}={}){
  if(!['card','cash','transfer'].includes(kind))throw new Error('Unsupported EPP payment attempt.');
- const directory=attemptDirectory(config);
+ const directory=attemptDirectory(config,env);
  if(!io.existsSync(directory))return null;
  const names=io.readdirSync(directory).filter(name=>new RegExp(`^confirmed-${kind}-${config.market}\\d{6}-\\d{8}(?:_\\d+)?\\.json$`).test(name));
  const records=names.map(name=>{
@@ -64,9 +64,9 @@ function latestConfirmedEppOrder(config,kind='card',io=fs,{runId}={}){
  });
  return records.filter(record=>!runId||record.runId===runId).sort((a,b)=>Date.parse(b.at)-Date.parse(a.at))[0]||null;
 }
-function confirmedEppOrderForRun(config,runId,io=fs){
+function confirmedEppOrderForRun(config,runId,io=fs,env=process.env){
  if(typeof runId!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(runId))throw new Error('CURRENT_RUN_ORDER_REQUIRED: a local EPP campaign identity is required.');
- return latestConfirmedEppOrder(config,'card',io,{runId})||latestConfirmedEppOrder(config,'transfer',io,{runId});
+ return latestConfirmedEppOrder(config,'card',io,{runId,env})||latestConfirmedEppOrder(config,'transfer',io,{runId,env});
 }
 function archiveRejectedEppOrderAttempt(config,kind,evidence,io=fs){
  const record=pendingEppOrderAttempt(config,kind,io);

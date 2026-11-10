@@ -22,6 +22,9 @@ const environment = String(
 ).toUpperCase();
 const suite = String(process.env.TEST_SUITE || 'QST');
 const store = String(process.env.TEST_STORE || 'BASE_STORE');
+const preserveRaw = store === 'EPP' && process.env.ALLURE_PRESERVE_RAW_STATUS === '1';
+const programme = String(process.env.EPP_PROGRAM || '');
+if (preserveRaw && !/^[a-z][a-z0-9_]{1,60}$/.test(programme)) throw new Error('EPP Allure programme is required.');
 const buildNumber = String(process.env.BUILD_NUMBER || 'LOCAL');
 const gitCommit = String(process.env.GIT_COMMIT || 'unknown');
 const buildUrl = String(process.env.BUILD_URL || '');
@@ -44,7 +47,7 @@ function slug(value) {
 
 const historyVariant = targetIds ? 'targeted' : 'full';
 const historyCacheRoot = path.resolve(process.env.ALLURE_HISTORY_CACHE_DIR || '.allure-history-cache');
-const historyCacheDir = path.join(historyCacheRoot, slug(market), slug(environment), slug(suite), slug(store), historyVariant);
+const historyCacheDir = path.join(historyCacheRoot, slug(market), slug(environment), slug(suite), slug(store), ...(preserveRaw ? [slug(programme)] : []), historyVariant);
 
 function runOptional(scriptName, failureMessage) {
   const script = path.resolve(scriptName);
@@ -66,6 +69,7 @@ function writeEnvironment() {
     `Environment=${environment}`,
     `Suite=${suite}`,
     `Store=${store}`,
+    ...(preserveRaw ? [`Programme=${programme}`] : []),
     `Build=${buildNumber}`,
     `GitCommit=${gitCommit}`,
     `HistoryScope=${market}-${environment}-${historyVariant}`,
@@ -134,10 +138,10 @@ if (mode === 'save') {
   process.exit(0);
 }
 
-const businessStatusNormalized = runOptional('scripts/normalize-allure-business-status.cjs', '[allure-metadata] Business-status normalization failed; existing Allure statuses were preserved.');
-const polished = runOptional('scripts/polish-allure-presentation.cjs', '[allure-metadata] Presentation polish failed; normalized results were preserved.');
-const businessViewStructured = runOptional('scripts/structure-allure-business-view.cjs', '[allure-metadata] Structured business view failed; polished results were preserved.');
-const globalContractEnforced = runOptional('scripts/enforce-allure-global-contract.cjs', '[allure-metadata] Global Allure contract failed; structured results were preserved.');
+const businessStatusNormalized = !preserveRaw && runOptional('scripts/normalize-allure-business-status.cjs', '[allure-metadata] Business-status normalization failed; existing Allure statuses were preserved.');
+const polished = !preserveRaw && runOptional('scripts/polish-allure-presentation.cjs', '[allure-metadata] Presentation polish failed; normalized results were preserved.');
+const businessViewStructured = !preserveRaw && runOptional('scripts/structure-allure-business-view.cjs', '[allure-metadata] Structured business view failed; polished results were preserved.');
+const globalContractEnforced = !preserveRaw && runOptional('scripts/enforce-allure-global-contract.cjs', '[allure-metadata] Global Allure contract failed; structured results were preserved.');
 writeEnvironment();
 writeExecutor();
 writeCategories();

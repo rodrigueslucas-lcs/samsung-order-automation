@@ -9,8 +9,9 @@ async function preflight(env=process.env){
     const snapshot=env.EPP_SESSION_BUNDLE_FILE?validateBundle(config,JSON.parse(fs.readFileSync(env.EPP_SESSION_BUNDLE_FILE,'utf8'))):sessions.loadEppSession(config);
     const verified=await verifyEppSnapshot(config,snapshot,{expectedEmail:sessions.getPrimaryEppCredentials(config).email});
     sessions.persistVerifiedEppSession(config,verified);
+    require('../utils/eppCiPreflightResult.cjs').writePreflightResult(config,env);
     console.log(`[EPP][${config.market}][${config.environment}][${config.authSlot}] KEEP_ALIVE_OK · verified session reused; no login`);
-  }finally{lease.release();}
+  }catch(error){require('../utils/eppCiPreflightResult.cjs').writePreflightResult(config,env,error);throw error;}finally{lease.release();}
 }
 if(require.main===module)preflight().catch(error=>{console.error('[EPP] preflight BLOCKED · '+(error.eppReason||'SESSION_NOT_PROVEN')+'; no login or suite started');process.exitCode=1;});
 module.exports={preflight};

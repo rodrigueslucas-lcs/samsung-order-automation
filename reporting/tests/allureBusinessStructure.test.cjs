@@ -68,7 +68,7 @@ test('structured business view hides repeated suite-row parameters and creates t
       assert.equal(parameter.excluded, true);
     }
 
-    assert.match(result.description, /^! BLOCKED · SAM-24807/m);
+    assert.match(result.description, /^BLOCKED · SAM-24807/m);
     assert.match(result.descriptionHtml, /BLOCKED/);
     assert.match(result.descriptionHtml, /O que foi validado/);
     assert.match(result.descriptionHtml, /Resultado esperado/);
@@ -116,8 +116,8 @@ test('known defect keeps raw runtime but every presentation section is non-gatin
     assert.equal(result.status, 'skipped');
     assert.equal(result.parameters.find((item) => item.name === 'Runtime Status').value, 'FAIL');
     assert.equal(result.parameters.find((item) => item.name === 'Known Defect').value, 'RT-752445');
-    assert.match(result.description, /^◆ KNOWN DEFECT · SAM-24896/m);
-    assert.match(result.description, /Defeito conhecido: RT-752445/);
+    assert.match(result.description, /^KNOWN DEFECT · SAM-24896/m);
+    assert.match(result.description, /Resultado observado:.*RT-752445/);
     assert.match(result.descriptionHtml, /KNOWN DEFECT/);
     assert.match(result.descriptionHtml, /RT-752445/);
     assert.match(result.descriptionHtml, /Resultado observado/);
