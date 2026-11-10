@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const {viewXml,provisionView,jobs,owner}=require('../../scripts/provision-epp-quality-view.cjs');
 test('quality view contains eight independent jobs and only an observability link',()=>{
  const xml=viewXml();for(const job of jobs)assert.ok(xml.includes(`<string>${job}</string>`));
- assert.equal(jobs.length,8);assert.match(xml,/userContent\/samsung-smb-quality/);assert.doesNotMatch(xml,/Auth-Operations|triggers|builders|credential/i);
+ assert.equal(jobs.length,8);assert.match(xml,/userContent\/samsung-smb-quality/);assert.match(xml,/Open report 04/);assert.doesNotMatch(xml,/&lt;a|Auth-Operations|triggers|builders|credential/i);
 });
 test('foreign existing view is preserved',async()=>{
  let calls=0;await assert.rejects(provisionView(async()=>{calls++;return{ok:true,status:200,text:async()=>'<view>another</view>'};},{apply:true}),/another owner/);assert.equal(calls,1);
