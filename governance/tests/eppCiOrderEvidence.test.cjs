@@ -8,3 +8,14 @@ test('an old order cannot validate a normal payment PASS',()=>{const result=vali
 test('Cash/transfer pending does not prevent independent card proof',()=>{let kinds=[];const result=validateOrderEvidence(manifest,document(['SAM-24864']),{latest:(_cfg,kind)=>{kinds.push(kind);return record;}});assert.deepEqual(kinds,['card']);assert.equal(result.state,'VALIDATED');});
 test('read-only recovery is not a new-order proof',()=>{const doc=document(['SAM-24864']);doc.config.metadata.epp.executionMode='RECOVERY_ONLY';const result=validateOrderEvidence(manifest,doc,{latest:()=>{throw new Error('must not query new-order proof');}});assert.equal(result.state,'RECOVERY_ONLY');assert.equal(result.orders.length,0);});
 test('missing/foreign execution cannot borrow order history',()=>{assert.equal(validateOrderEvidence(manifest,null).state,'NOT_RUN');const doc=document([]);doc.config.metadata.epp.runId='another';assert.throws(()=>validateOrderEvidence(manifest,doc),/another EPP execution/);});
+
+test('distinct internal orders sharing a public number remain distinct evidence',()=>{
+ const result=validateOrderEvidence(manifest,document(['SAM-24864','SAM-24865','SAM-24866']),{
+  latest:(_cfg,kind)=>({...record,kind,orderCode:kind==='card'?record.orderCode:'CL261104-78817132_456'}),
+  current:()=>({...record,kind:'transfer',orderCode:'CL261104-78817132_456'})
+ });
+ assert.equal(result.orders.length,2);
+ assert.deepEqual(result.orders[0].tcs,['SAM-24864']);
+ assert.deepEqual(result.orders[1].tcs,['SAM-24865','SAM-24866']);
+ assert.equal(result.orders[0].publicOrderNumber,result.orders[1].publicOrderNumber);
+});

@@ -32,3 +32,14 @@ test('MX waits for the causal matrix identity after the shell and checks a bound
  const validate=vm.runInNewContext(source+'\nvalidateMxEppConfirmation;',{URL,RegExp,assertions:{assertStoreRoute:()=>assert.ok(waited)},expect:()=>({toHaveURL:async predicate=>{assert.equal(predicate(new URL(current)),false);current=current.replace('null','MX261027-12345678_261027120000000');assert.equal(predicate(new URL(current)),true);waited=true;},toBeVisible:async()=>{}})});
  await validate(page,{market:'MX',environment:'S2',program:'pymesmx'},'MX261027-12345678');assert.ok(waited);
 });
+
+test('shared public number requires independent causal readback of a distinct internal order',()=>{
+ const check=vm.runInNewContext(source+'\nassertFreshEppOrder;');
+ const old='CL261109-78849757_261110031848044',fresh='CL261109-78849757_261110033551458';
+ const baseline=new Set([old]);
+ assert.throws(()=>check(baseline,fresh),/EPP_EXISTING_ORDER_RETURNED/);
+ assert.doesNotThrow(()=>check(baseline,fresh,fresh));
+ assert.throws(()=>check(baseline,old,old),/EPP_EXISTING_ORDER_RETURNED/);
+ assert.throws(()=>check(baseline,fresh,old),/EPP_EXISTING_ORDER_RETURNED/);
+ assert.throws(()=>check(baseline,'CL261109-78849757'),/EPP_EXISTING_ORDER_RETURNED/);
+});

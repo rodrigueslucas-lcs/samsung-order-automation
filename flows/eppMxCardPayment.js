@@ -8,6 +8,16 @@ import runtime from '../utils/eppRuntimeData.cjs';
 import guards from '../utils/destructiveGuards';
 import attemptModule from '../utils/eppOrderAttempt.cjs';
 
+function assertFreshEppOrder(baseline,orderCode,reconciledOrderCode=null){
+ if(!baseline)return;
+ const publicCode=code=>String(code).replace(/_\d+$/,'');
+ const existing=[...baseline].some(code=>String(code)===orderCode||
+  publicCode(code)===publicCode(orderCode)&&reconciledOrderCode!==orderCode);
+ // A distinct internal ID is accepted only after the programme-bound GET
+ // readback proves creation time, exact SKU/quantity and absence in baseline.
+ if(existing)throw new Error('EPP_EXISTING_ORDER_RETURNED: submit identified a pre-existing order; no new-order PASS or retry.');
+}
+
 export async function validateMxEppConfirmation(page,cfg,orderCode){
  const matchesRoute=url=>{
   const code=new URL(url).pathname.match(/;orderCode=([^;/?]+)/)?.[1];
@@ -72,7 +82,7 @@ async function submitEppMercadoCard(page,cfg,capture,reconciliation=null,confirm
  const site=cfg.apiSite||cfg.rootUrl.pathname.split('/').filter(Boolean)[2];
  const baseline=reconciliation?await reconciliation.beforeSubmit():null;
  const attempt=attemptModule.beginEppOrderAttempt(cfg,'card');
- let result;
+  let result,reconciledOrderCode=null;
  try{result=await payment.placeOrderAndCapture({orderCodePattern:new RegExp(`\\b${cfg.market}\\d{6}-\\d{8}(?:_\\d+)?\\b`,'i'),
   submitResponsePathPattern:new RegExp(`^/tokocommercewebservices/v2/${site}/users/[^/]+/carts/[^/]+/paymentmodes/[^/]+/submitOrder$`),
   orderResponsePathPattern:new RegExp(`^/tokocommercewebservices/v2/${site}/users/[^/]+/orders/${cfg.market}\\d{6}-\\d{8}(?:_\\d+)?$`)});
@@ -93,7 +103,8 @@ async function submitEppMercadoCard(page,cfg,capture,reconciliation=null,confirm
   if(reconciliation&&(!businessCode||frontendOrder)){
    const reconciled=await reconciliation.afterSubmit(baseline);
    if(reconciled){
-    attempt.observe(reconciled.orderCode);
+     assertFreshEppOrder(baseline,reconciled.orderCode,reconciled.orderCode);
+     reconciledOrderCode=reconciled.orderCode;
     await page.goto(new URL('orderConfirmation;orderCode='+encodeURIComponent(reconciled.orderCode),cfg.rootUrl).href,{waitUntil:'commit',timeout:60000});
     result=reconciled;
    }
@@ -102,7 +113,7 @@ async function submitEppMercadoCard(page,cfg,capture,reconciliation=null,confirm
   throw new Error(`EPP_SINGLE_SUBMIT_UNCONFIRMED${businessCode?' businessCode='+businessCode:''}; attempt marker preserved, no retry. Raw provider details suppressed.`);
   }
  }
- if(baseline&&[...baseline].some(code=>String(code).replace(/_\d+$/,'')===result.orderCode.replace(/_\d+$/,'')))throw new Error('EPP_EXISTING_ORDER_RETURNED: submit identified a pre-existing order; no new-order PASS or retry.');
+  assertFreshEppOrder(baseline,result.orderCode,reconciledOrderCode);
  attempt.observe(result.orderCode);
  await expect(page).toHaveURL(/orderConfirmation|order-confirmation|confirmacion/i,{timeout:60000});
  try{await validateMxEppConfirmation(page,cfg,result.orderCode);}

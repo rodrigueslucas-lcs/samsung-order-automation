@@ -14,13 +14,17 @@ function validateOrderEvidence(manifest,document,{io=fs,latest=records.latestCon
  const passed=new Set();
  function visit(suites=[]){for(const suite of suites){for(const spec of suite.specs||[]){const id=spec.title?.match(/\bSAM-\d+\b/)?.[0];for(const test of spec.tests||[])if(test.results?.at(-1)?.status==='passed')passed.add(id);}visit(suite.suites);}}
  visit(document.suites);
+ const identities=new Map();
  const add=(record,tc)=>{
   if(!record||record.runId!==manifest.runId)return false;
   if(record.market!==manifest.market||record.environment!=='S2'||record.status!=='CONFIRMED'||!new RegExp(`^${manifest.market}\\d{6}-\\d{8}(?:_\\d+)?$`).test(record.orderCode||''))throw new Error('Invalid causal EPP order record.');
   const publicOrderNumber=record.orderCode.replace(/_\d+$/,'');
-  const existing=result.orders.find(item=>item.publicOrderNumber===publicOrderNumber);
+  const existing=identities.get(record.orderCode);
   if(existing){if(!existing.tcs.includes(tc))existing.tcs.push(tc);}
-  else result.orders.push({publicOrderNumber,method:record.kind,tcs:[tc],runId:manifest.runId,confirmationValidated:true,newOrderInCurrentRun:true});
+  else {
+   const item={publicOrderNumber,method:record.kind,tcs:[tc],runId:manifest.runId,confirmationValidated:true,newOrderInCurrentRun:true};
+   identities.set(record.orderCode,item);result.orders.push(item);
+  }
   return true;
  };
  for(const [tc,kind] of Object.entries(payments[manifest.market]||{}))if(passed.has(tc)&&!add(latest(config,kind,io,{runId:manifest.runId,env}),tc))result.errors[tc]='CURRENT_RUN_ORDER_REQUIRED';
