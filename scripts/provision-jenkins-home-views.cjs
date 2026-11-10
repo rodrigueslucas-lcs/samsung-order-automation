@@ -9,7 +9,7 @@ const definitions = Object.freeze([
   {name:'01 - Overview',description:'All Samsung SMB QA automation lanes in one place. Use the dedicated Base Store, EPP and Auth & Ops tabs for focused monitoring. Quality Summary is a separate, existing view.',jobs:[...base,...epp,...operations]},
   {name:'02 - Base Store',description:'Four independent SMB Base Store QST lanes. These jobs keep their existing schedules, configuration and report history.',jobs:base},
   {name:'03 - EPP',description:'Four isolated EPP S2 QST lanes. Each market publishes its own quality dashboard and Allure report.',jobs:epp},
-  {name:'04 - Auth & Ops',description:'Authentication operations and the original cross-market automation pipeline. No functional test status is inferred from authentication health.',jobs:operations}
+  {name:'04 - Auth and Ops',description:'Authentication operations and the original cross-market automation pipeline. No functional test status is inferred from authentication health.',jobs:operations}
 ]);
 
 function routeFor(name){return '/view/' + encodeURIComponent(name);}
