@@ -27,7 +27,7 @@ function publishInfraFallback(env=process.env){
   fs.writeFileSync(path.join(target,'execution.json'),JSON.stringify(publicExecution(manifest)));
   fs.writeFileSync(path.join(quality,'quality.json'),JSON.stringify({...model,reportingFailure:true,rawDiagnostics:'Preserved privately; unavailable in this fallback report.'},null,2));
   fs.writeFileSync(path.join(quality,'index.html'),render(model,{artifactRoot:output}));
-  fs.copyFileSync('reporting/executive-v3/dashboard.css',path.join(quality,'dashboard.css'));
+  fs.copyFileSync('reporting/executive-v3/dashboard.css',path.join(quality,'dashboard.css'));fs.copyFileSync('reporting/epp-quality/dashboard-theme.css',path.join(quality,'epp-theme.css'));
   for(const directory of ['html','allure-report']){
     fs.mkdirSync(path.join(target,directory),{recursive:true});fs.writeFileSync(path.join(target,directory,'index.html'),'<!doctype html><meta charset="utf-8"><h1>INFRA_ERROR</h1><p>Current execution report unavailable. Raw diagnostics remain private; no historical report substituted.</p>');
   }
@@ -52,7 +52,7 @@ async function finalize(env=process.env){
     const base=url.href.replace(/\/?$/,'/');renderOptions.artifactBaseUrl=base+'artifact/'+manifest.relativeOutput+'/public/';
     renderOptions.playwrightUrl=base+'02_20_c2b7_20EPP_20Playwright/';renderOptions.allureUrl=base+'03_20_c2b7_20EPP_20Allure/';
   }
-  fs.writeFileSync(path.join(quality,'index.html'),render(model,renderOptions));fs.copyFileSync('reporting/executive-v3/dashboard.css',path.join(quality,'dashboard.css'));
+  fs.writeFileSync(path.join(quality,'index.html'),render(model,renderOptions));fs.copyFileSync('reporting/executive-v3/dashboard.css',path.join(quality,'dashboard.css'));fs.copyFileSync('reporting/epp-quality/dashboard-theme.css',path.join(quality,'epp-theme.css'));
   fs.writeFileSync('test-results/epp-ci-quality-gate.json',JSON.stringify({gate:model.gate,runId:model.runId,rawExit:Number(env.EPP_RAW_EXIT||1)}));
   const results=path.join(output,'allure'),report=path.join(output,'allure-report');
   if(fs.existsSync(results)&&fs.readdirSync(results).some(n=>n.endsWith('-result.json'))){
@@ -71,6 +71,7 @@ async function finalize(env=process.env){
   }else{
     fs.mkdirSync(report,{recursive:true});fs.writeFileSync(path.join(report,'index.html'),'<!doctype html><meta charset="utf-8"><title>EPP Allure unavailable</title><h1>No Allure test execution was recorded</h1><p>Inspect the current quality report and infrastructure diagnostics. No historical execution substituted.</p>');
   }
+  if (fs.existsSync(path.join(report,'data','test-cases'))) require('../reporting/epp-quality/allure-theme.cjs').applyAllureTheme(report);
   const redact=require('../reporting/epp-quality/redact.cjs'),values=[];
   for(const name of ['runtime-data.json','ci-card.json']){
     const file=path.resolve('playwright/.auth/epp',name);
