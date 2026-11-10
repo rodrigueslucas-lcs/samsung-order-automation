@@ -1,4 +1,5 @@
 const path = require('node:path');
+const {catalog: officialEppCases} = require('./allure-business.cjs');
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 function evidenceHref(root, file, artifactBaseUrl) {
@@ -36,10 +37,10 @@ function formatSeconds(milliseconds) {
 }
 const MARKET_FLAGS = Object.freeze({MX:'🇲🇽',PE:'🇵🇪',CL:'🇨🇱',CO:'🇨🇴'});
 function scenarioDisplayName(name, tc) {
-  const raw = String(name || 'Official scenario');
-  const withoutId = tc ? raw.replace(new RegExp('^' + tc + '\\s*'), '') : raw;
-  const text = withoutId.replace(/(?:@(?:qst|safe|destructive|registered|guest|epp|mx|pe|cl|co|preflight)\\s*)+/gi, '').replace(/^\\s*[-–:]\\s*/, '').trim();
-  return text || 'Official scenario';
+  // The same approved 26-case business catalog powers both the dashboard and Allure.
+  if (tc && officialEppCases[tc]) return officialEppCases[tc].title;
+  const raw=String(name||'Official scenario');
+  return raw.replace(/SAM-\d+\s*/g,'').replace(/@(?:qst|safe|destructive|registered|guest|epp|mx|pe|cl|co|preflight)\s*/gi,'').replace(/^\s*[-–:]\s*/,'').trim() || 'Official scenario';
 }
 function evidenceLinks(row, artifactRoot, artifactBaseUrl, allureUrl) {
   const links = (row.evidence || []).map((attachment, index) => {
