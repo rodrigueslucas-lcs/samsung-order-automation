@@ -276,3 +276,12 @@ The coordinator reconciles a security marker written by its login child before f
 EPP verification now has a bounded pool of two independent checks. Interactive recovery has a separate single lane, so an unresolved CAPTCHA cannot starve healthy-market verification. Programme leases, FIRST/SECOND separation, strict identity+entitlement proof and stable market ordering remain enforced.
 
 Final observed S2 runtime: Base Store six identities HEALTHY; EPP pymesmx, pe_membership_vip, co_epp_agre and alianzas all independently authenticated and entitled. A subsequent four-market EPP one-shot with refresh disabled returned KEEP_ALIVE_OK for all four; no Account login was opened. The post-use dedicated-browser inventory contained no auth windows. Governance baseline: 1381 PASS; final affected-contract and parallel-health validation: 200 PASS after the last lifecycle changes. This does not promise that Samsung cannot expire or deny a future authorization.
+## Recovery after a prolonged host pause
+
+The Base Store one-shot rechecks Jenkins activity and runs at most one immediate verify-first cycle when a completed cycle took over 20 minutes. Reviewed security retries are excluded. This does not bypass provider security or guarantee that a server-side session never expires.
+
+EPP FIRST recovery is independent by market (four dedicated profiles and leases). A human gate in one market no longer starves other FIRST markets. SECOND remains a separate phase and requires a completed, fresh FIRST report, including fresh per-identity timestamps where recorded.
+
+EPP writes sanitized progress atomically during execution. Dashboard verification timestamps use each identity observation rather than the finish time of the slowest market. A RUNNING report never authorizes SECOND recovery.
+
+Validation on 2026-11-10: 192 focused auth/reporting regressions passed. Scheduled S2 cycles recovered MX/PE EPP and reused CL, then independently reverified all three. CO remained blocked by an older navigation checkpoint and current missing identity; no healthy result was fabricated. Base Store MX provider security denial remains an explicit external gate. No scheduler configuration or Production guard was weakened.

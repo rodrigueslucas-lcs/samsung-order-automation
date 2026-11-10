@@ -160,17 +160,12 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,retrySe
   finally {await owned?.dispose();lease?.release();}
 }
 async function runCycle({environment='S2',markets=['MX','PE','CO','CL'],slot='primary',onProgress=()=>{},...options}={},dependencies={}) {
-  // Health checks must finish even when another market waits for a CAPTCHA.
-  // Only interactive recovery is serialized; every market retains its lease.
-  const lane=limitConcurrency(4),verificationLane=limitConcurrency(2),recoveryLane=limitConcurrency(1),results=[],pendingHumans=new Set();
+  // FIRST programmes are isolated by market leases. A human gate in one
+  // market must not starve the other FIRST recoveries. SECOND remains a
+  // separate CLI phase guarded by firstPhaseReady, never mixed into this wave.
+  const lane=limitConcurrency(4),verificationLane=limitConcurrency(2),recoveryLane=limitConcurrency(slot==='primary'?4:1),results=[];
   const performRefresh=dependencies.refresh||refresh;
-  const scopedDependencies={...dependencies,verify:(...args)=>verificationLane(()=>(dependencies.verify||verify)(...args)),refresh:(config,env,recoveryOptions)=>recoveryLane(async()=>{
-    if(pendingHumans.size&&!recoveryOptions.resumeOnly&&!pendingHumans.has(config.market))return{status:'UNPROVEN',reason:'EPP_INTERACTIVE_GATE_PENDING'};
-    const result=await performRefresh(config,env,{...recoveryOptions,onHuman:()=>{pendingHumans.add(config.market);recoveryOptions.onHuman();}});
-    if(['REFRESHED','BLOCKED'].includes(result.status))pendingHumans.delete(config.market);
-    else if(result.status==='HUMAN_REQUIRED')pendingHumans.add(config.market);
-    return result;
-  })};
+  const scopedDependencies={...dependencies,verify:(...args)=>verificationLane(()=>(dependencies.verify||verify)(...args)),refresh:(config,env,recoveryOptions)=>recoveryLane(()=>performRefresh(config,env,recoveryOptions))};
   await Promise.all(markets.map(market=>lane(async()=>{
     try {const scoped={...options.env,ENVIRONMENT:environment,EPP_AUTH_SLOT:slot};
       if(environment==='S2'&&!scoped[`${market}_EPP_PROGRAM`]&&!scoped.EPP_PROGRAM)scoped[`${market}_EPP_PROGRAM`]=S2_OPERATIONAL_PROGRAMMES[market];
@@ -178,7 +173,7 @@ async function runCycle({environment='S2',markets=['MX','PE','CO','CL'],slot='pr
       onProgress({market,environment,slot,status:'VERIFYING'});
       const result=await maintainIdentity(config,{...options,onProgress},scopedDependencies);
 
-      results.push(result);onProgress(result);if(result.status==='HUMAN_REQUIRED')pendingHumans.add(market);
+      results.push(result);onProgress(result);
     } catch {results.push({market,environment,slot,store:'EPP',status:'BLOCKED',reason:'UNSUPPORTED_EPP_IDENTITY'});}
   })));
   results.sort((a,b)=>markets.indexOf(a.market)-markets.indexOf(b.market));

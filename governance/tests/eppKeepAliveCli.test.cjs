@@ -46,3 +46,10 @@ for(const environment of ['S1','S2'])for(const scenario of [
 test('reviewed EPP security recovery is explicit, unscheduled and requires refresh authorization',()=>{assert.equal(parseArgs(['--allow-refresh','--retry-security-blocked']).retrySecurityBlocked,true);assert.throws(()=>parseArgs(['--retry-security-blocked']),/explicit unscheduled/);assert.throws(()=>parseArgs(['--allow-refresh','--retry-security-blocked','--scheduled']),/explicit unscheduled/);});
 
 test('a proven provider security denial reports attention required instead of a technical scheduler error',async()=>{const code=await main({argv:[],env:{},activity:async()=>({idle:true}),cycle:async()=>({ok:false,identities:[{market:'CL',environment:'S2',slot:'primary',status:'BLOCKED',reason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED'}]}),save(){},log(){}});assert.equal(code,2);});
+
+test('SECOND rejects unfinished FIRST progress and stale per-identity proof',()=>{
+ const now=Date.now(),report={store:'EPP',environment:'S2',state:'RUNNING',generatedAt:new Date(now).toISOString(),identities:['MX','PE','CO','CL'].map(market=>({market,slot:'primary',status:'KEEP_ALIVE_OK',observedAt:new Date(now).toISOString()}))};
+ assert.equal(firstPhaseReady(report,'S2',now),false);
+ report.state='COMPLETE';assert.equal(firstPhaseReady(report,'S2',now),true);
+ report.identities[0].observedAt=new Date(now-3600000).toISOString();assert.equal(firstPhaseReady(report,'S2',now),false);
+});

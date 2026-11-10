@@ -24,7 +24,7 @@ function parseArgs(argv, env = process.env) {
   if(scheduled&&retrySecurityBlocked)throw new Error('Reviewed security recovery cannot be scheduled.');
   return { publish, environment, scheduled, markets, ...(retrySecurityBlocked?{retrySecurityBlocked:true}:{}) };
 }
-async function main({ argv = process.argv.slice(2), env = process.env, cycle = runKeepAliveCycle, activity = jenkinsBuildsIdle, configure = publisherEnvironment, log = console.log, save = true, reporter = beginCycle, saveSummary = (output,summary) => { fs.mkdirSync(path.dirname(output), { recursive:true }); writeJsonAtomically(output, summary); } } = {}) {
+async function main({ argv = process.argv.slice(2), env = process.env, cycle = runKeepAliveCycle, activity = jenkinsBuildsIdle, configure = publisherEnvironment, log = console.log, save = true, reporter = beginCycle, now = Date.now, resumeReplay = true, saveSummary = (output,summary) => { fs.mkdirSync(path.dirname(output), { recursive:true }); writeJsonAtomically(output, summary); } } = {}) {
   const args = parseArgs(argv, env);
   const runtimeEnv = configure(env);
   let observation, reportingWarning = false;
@@ -35,6 +35,7 @@ async function main({ argv = process.argv.slice(2), env = process.env, cycle = r
   catch (error) { bestEffort(() => observation?.finish(null, 'FAILED')); throw error; }
   bestEffort(() => observation?.event({kind:'activity',...activityResult}));
   if (!activityResult.idle) { log('[auth:keepalive] BUSY: Samsung builds are running/queued; no auth operation was started.'); bestEffort(() => observation?.finish(null,'BUSY')); return 3; }
+  const cycleStartedAt = now();
   let summary;
   try { summary = await cycle({ environment: args.environment, markets: args.markets, publish: args.publish, retrySecurityBlocked:args.retrySecurityBlocked===true, env: runtimeEnv, onEvent:event=>bestEffort(()=>observation?.event(event)) }); }
   catch (error) { bestEffort(() => observation?.finish(null,'FAILED')); throw error; }
@@ -43,6 +44,12 @@ async function main({ argv = process.argv.slice(2), env = process.env, cycle = r
     bestEffort(() => saveSummary(output, { generatedAt: new Date().toISOString(), ...summary }));
   }
   bestEffort(() => observation?.finish(summary));
+  // A paused host can resume after every child deadline and invalidate the
+  // pre-pause proof. Release the old cycle first, then run verify-first once.
+  if (resumeReplay && !args.retrySecurityBlocked && now() - cycleStartedAt > 20 * 60000) {
+    log('[auth:keepalive] Prolonged cycle interruption; immediate bounded verify-first recovery.');
+    return main({argv,env,cycle,activity,configure,log,save,reporter,saveSummary,now,resumeReplay:false});
+  }
   if (summary.ok) return 0;
   if (summary.blocking?.some(r => r.status === 'HUMAN_REQUIRED')) return 2;
   return summary.busy?.length && !summary.blocking?.length ? 3 : 1;
