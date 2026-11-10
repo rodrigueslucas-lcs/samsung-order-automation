@@ -32,6 +32,7 @@ test('catalog covers all 26 official EPP testcases with no missing or foreign ID
   const item=catalog[row.tc];
   assert.ok(item,'Missing '+row.tc);assert.equal(item.market,row.market);
   for(const field of ['title','objective','expected','feature'])assert.ok(item[field].length>8,row.tc+' '+field);
+  assert.ok(Array.isArray(item.steps)&&item.steps.length>=3,row.tc+' expected business checkpoints');
  }
  assert.deepEqual(Object.fromEntries(['MX','PE','CL','CO'].map(m=>[m,Object.values(catalog).filter(c=>c.market===m).length])),{MX:7,PE:6,CL:7,CO:6});
 });
@@ -53,6 +54,8 @@ test('copy enriches Allure UI but preserves source bytes, original statuses, his
  assert.match(polished.descriptionHtml,/Resultado observado/);
  assert.match(polished.descriptionHtml,/Contexto da execução/);
  assert.match(polished.descriptionHtml,/Passos registrados nesta execução/);
+ assert.match(polished.descriptionHtml,/Roteiro funcional esperado/);
+ assert.match(polished.descriptionHtml,/etapas previstas, não comprovação de execução/);
  assert.equal(polished.steps.length,1);assert.equal(polished.steps[0].name,'Execute the official business journey');
  assert.ok(polished.attachments.some(a=>a.name==='screenshot'));
  const diagnostic=polished.attachments.find(a=>a.name==='Full Playwright failure diagnostic');
