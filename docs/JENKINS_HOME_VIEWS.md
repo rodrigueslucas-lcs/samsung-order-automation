@@ -7,7 +7,7 @@ The Jenkins home is organized with **four managed native List Views**. The exist
 | `01 - Overview` | The 8 market/store jobs plus the main automation and authentication operations | Single landing view; focus with the dedicated tabs |
 | `02 - Base Store` | `Samsung-SMB-MX`, `Samsung-SMB-PE`, `Samsung-SMB-CL`, `Samsung-SMB-CO` | Base Store functional QST |
 | `03 - EPP` | `Samsung-SMB-EPP-MX`, `Samsung-SMB-EPP-PE`, `Samsung-SMB-EPP-CL`, `Samsung-SMB-EPP-CO` | EPP S2 QST |
-| `04 - Auth & Ops` | `SAMSUNG-SMB-AUTOMATION`, `Samsung-SMB-Auth-Operations` | Main pipeline and authentication |
+| `04 - Auth and Ops` | `SAMSUNG-SMB-AUTOMATION`, `Samsung-SMB-Auth-Operations` | Main pipeline and authentication |
 
 The existing `Samsung SMB Quality Summary` view remains the source for the eight-lane reporting overview. Open the Regional Quality Summary published by EPP jobs for executive metrics. Jenkins native List Views do **not** support custom sectioned cards on the stock homepage; grouped tabs are the low-risk approach.
 
