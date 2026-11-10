@@ -1,6 +1,6 @@
 const {escape}=require('./render.cjs');
 const markets=['MX','PE','CO','CL'];
-const gates=['INFRA_ERROR','FAILED — NEW REGRESSION','BLOCKED BY EXTERNAL DEPENDENCIES','PASSED WITH KNOWN DEFECTS','FULLY PASSED'];
+const gates=['INFRA_ERROR','FAILED — NEW REGRESSION','BLOCKED BY EXTERNAL DEPENDENCIES','PASSED WITH KNOWN DEFECTS','FULLY PASSED','TARGETED PASSED'];
 function jobName(market,store){return `Samsung-SMB-${store==='EPP'?'EPP-':''}${market}`;}
 function count(value){return Number.isInteger(value)&&value>=0?value:null;}
 function buildRegionalSummary(observations,{generatedAt=new Date().toISOString()}={}){

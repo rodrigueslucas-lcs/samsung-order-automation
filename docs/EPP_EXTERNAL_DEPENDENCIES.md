@@ -872,3 +872,8 @@ Latest normal campaign 2026-11-07T21-16-02-087Z-71128: card businessCode601, no 
 ### PE S2 update — 2026-11-08
 
 The old PE 601/alias attempt is reconciled by own-programme API and visible confirmation, without resubmission. A subsequent normal campaign created PE261108-78846441 and passed SAM-25138 + SAM-25140 causally. Financial settlement is outside this frontend acceptance; 601 diagnostics remain preserved. Prior temporary-order uncertainty is no longer an external prerequisite for these two frontend TCs. Footer SAM-25146 and other markets' narrowly mapped known defects remain separate. Historical and latest-run evidence must not be presented as a single regional 26/26 campaign.
+## Targeted CI verification
+
+Targeted EPP runs preserve the complete official matrix: unselected cases remain NOT_RUN. Only selected cases participate in the targeted gate. A green targeted check is labelled TARGETED PASSED, never FULLY PASSED and never proof of complete market homologation. Missing selected cases, regressions and external prerequisites continue to block the selected run. The selected official IDs are carried by Playwright metadata and validated against the market inventory.
+
+2026-11-10 runtime revalidation: CL EPP build 3 passed SAM-24864 and SAM-24866 with a new causal order; CO build 2 passed SAM-24942 after independent session recovery; MX build 2 passed SAM-25045 with a new causal order. These builds used the previous full-inventory gate and therefore ended UNSTABLE solely for intentionally unselected cases. Their raw results remain unchanged.

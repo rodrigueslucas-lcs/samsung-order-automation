@@ -1,6 +1,6 @@
 const fs=require('node:fs');
 const {validateManifest}=require('./finalize-epp-jenkins.cjs');
-const gates=['INFRA_ERROR','FAILED — NEW REGRESSION','BLOCKED BY EXTERNAL DEPENDENCIES','PASSED WITH KNOWN DEFECTS','FULLY PASSED'];
+const gates=['INFRA_ERROR','FAILED — NEW REGRESSION','BLOCKED BY EXTERNAL DEPENDENCIES','PASSED WITH KNOWN DEFECTS','FULLY PASSED','TARGETED PASSED'];
 function reportContext(mode,env=process.env,io=fs,workspace=process.cwd()){
  const manifest=JSON.parse(io.readFileSync(require('node:path').join(workspace,'test-results/epp-ci-current.json'),'utf8'));
  validateManifest(manifest,env,workspace);

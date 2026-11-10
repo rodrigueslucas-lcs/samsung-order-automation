@@ -4,7 +4,7 @@ const privateCiEvidence = process.env.CI === '1' && process.env.EPP_CI_PRIVATE_E
 
 // EPP never inherits Base Store auth projects, grep, storageState or artifacts.
 export default defineConfig({
-  metadata: process.env.TEST_MARKET ? {epp:((cfg)=>({market:cfg.market,environment:cfg.environment,program:cfg.program,runId:process.env.EPP_RUN_ID||null,executionMode:process.env.EPP_RESUME_PENDING_ORDER==='1'?'RECOVERY_ONLY':'NORMAL'}))(eppConfig.getEppConfig(process.env.TEST_MARKET,process.env))} : {},
+  metadata: process.env.TEST_MARKET ? {epp:((cfg)=>({market:cfg.market,environment:cfg.environment,program:cfg.program,targetIds:String(process.env[cfg.market+'_QST_TARGET_IDS']||process.env.P1_TARGET_IDS||'').split(/[\s,;]+/).filter(Boolean),runId:process.env.EPP_RUN_ID||null,executionMode:process.env.EPP_RESUME_PENDING_ORDER==='1'?'RECOVERY_ONLY':'NORMAL'}))(eppConfig.getEppConfig(process.env.TEST_MARKET,process.env))} : {},
   testDir: "./tests/markets",
   testMatch: "**/qst/epp/*.spec.js",
   fullyParallel: false,

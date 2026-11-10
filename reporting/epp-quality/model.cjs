@@ -24,6 +24,8 @@ function classify({raw, reason = '', tc, market, program, evidence = []}) {
 function buildModel({market, environment, program, runId, buildNumber, gitCommit, document, infraError = false, preflightType, orderEvidence, scope = inventory()}) {
   if (!['MX','PE','CO','CL'].includes(market) || environment !== 'S2' || !/^[a-z][a-z0-9_]{1,60}$/.test(program || '') || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(runId || '')) throw new Error('Invalid EPP quality execution identity.');
   const observed = new Map();
+  const targetIds=document?.config?.metadata?.epp?.targetIds||[];
+  if(!Array.isArray(targetIds)||new Set(targetIds).size!==targetIds.length||targetIds.some(id=>!scope.some(r=>r.market===market&&r.tc===id)))throw new Error('Invalid targeted EPP scope.');
   if (document) {
     const metadata = document.config?.metadata?.epp;
     if (!metadata || metadata.market !== market || metadata.environment !== environment || metadata.program !== program || metadata.runId !== runId) throw new Error('EPP result belongs to another execution.');
@@ -60,11 +62,13 @@ function buildModel({market, environment, program, runId, buildNumber, gitCommit
       if(row.executionMode!=='RECOVERY_ONLY'){row.quality='FAIL';row.errorSummary=reason;}
     }
   }
+  const selectedRows=targetIds.length?rows.filter(r=>targetIds.includes(r.tc)):rows;
+  const gateCounts=Object.fromEntries(statuses.map(s=>[s,selectedRows.filter(r=>r.quality===s).length]));
   const counts = Object.fromEntries(statuses.map(s => [s,rows.filter(r => r.quality === s).length]));
-  const gate = infraError ? 'INFRA_ERROR' : counts.FAIL ? 'FAILED — NEW REGRESSION'
-    : counts.TEST_DATA_REQUIRED + counts.AUTH_BLOCKED + counts.RECONCILIATION_REQUIRED + counts.NOT_RUN ? 'BLOCKED BY EXTERNAL DEPENDENCIES'
-    : counts.KNOWN_DEFECT ? 'PASSED WITH KNOWN DEFECTS' : 'FULLY PASSED';
+  const gate = infraError ? 'INFRA_ERROR' : gateCounts.FAIL ? 'FAILED — NEW REGRESSION'
+    : gateCounts.TEST_DATA_REQUIRED + gateCounts.AUTH_BLOCKED + gateCounts.RECONCILIATION_REQUIRED + gateCounts.NOT_RUN ? 'BLOCKED BY EXTERNAL DEPENDENCIES'
+    : gateCounts.KNOWN_DEFECT ? 'PASSED WITH KNOWN DEFECTS' : targetIds.length ? 'TARGETED PASSED' : 'FULLY PASSED';
   return {schemaVersion:1,market,environment,program,runId,buildNumber,gitCommit:/^[a-f0-9]{40}$/i.test(gitCommit||'')?gitCommit:null,startedAt:document?.stats?.startTime||null,durationMs:Number(document?.stats?.duration)||0,official:rows.length,
-    executed:rows.filter(r => r.executionMode !== 'RECOVERY_ONLY' && r.raw && r.raw !== 'skipped' && r.raw !== 'interrupted').length,counts,gate,rows,orders:orderEvidence?.orders||[]};
+    executed:rows.filter(r => r.executionMode !== 'RECOVERY_ONLY' && r.raw && r.raw !== 'skipped' && r.raw !== 'interrupted').length,counts,gate,targetIds,selected:selectedRows.length,rows,orders:orderEvidence?.orders||[]};
 }
 module.exports = {statuses,classify,buildModel};
