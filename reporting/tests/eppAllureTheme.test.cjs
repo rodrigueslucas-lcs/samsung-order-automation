@@ -28,3 +28,13 @@ test('missing generated report does not publish a misleading Allure theme',()=>{
   try {assert.equal(applyAllureTheme(root),false);assert.equal(fs.readdirSync(root).length,0);}
   finally {fs.rmSync(root,{recursive:true,force:true});}
 });
+
+test('EPP Allure dark-mode details have explicit high-contrast text and errors',()=>{
+ const theme=fs.readFileSync(path.join(__dirname,'../epp-quality/allure-theme.css'),'utf8');
+ assert.match(theme,/\.test-result,\.test-result__header,\.test-result__body,\.test-result__content/);
+ assert.match(theme,/color:var\(--epp-text\)!important/);
+ assert.match(theme,/\.test-result__info-key/);
+ assert.match(theme,/\.status-details,\.test-result__status-details/);
+ assert.match(theme,/color:#ffe0e3!important/);
+ assert.doesNotMatch(theme,/\.test-result\s*\{[^}]*background:#fff/);
+});
