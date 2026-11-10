@@ -47,7 +47,7 @@ test('EPP V2 shows native flag, homologation readiness and known issue without r
  assert.match(html,/Not fully homologated/);
  assert.match(html,/Known defects & dependencies/);
  assert.match(html,/RT-779284/);
- assert.match(html,/Variants\/selectors on PDP/);
+ assert.match(html,/Product variants \/ selectors/);
  assert.doesNotMatch(html,/<span class="epp-scenario"[^>]*>SAM-25020 @qst/);
  assert.match(html,/epp-pill--fail">failed/);
  assert.match(html,/epp-pill--warn">Known defect/);
@@ -61,4 +61,15 @@ test('EPP V2 collapses multiple evidence actions without losing verified attachm
  assert.match(html,/\+2 more/);
  for(let n=1;n<=4;n++)assert.match(html,new RegExp('proof-'+n+'\\.png'));
  assert.match(html,/epp-evidence-link--allure/);
+});
+
+test('EPP dashboard and Allure display exactly the same business scenario titles for all 26 cases',()=>{
+ const {catalog}=require('../epp-quality/allure-business.cjs');
+ for(const row of require('../../scripts/report-epp-homologation.cjs').inventory()){
+  const entry=catalog[row.tc];
+  const html=render({market:row.market,environment:'S2',program:{MX:'pymesmx',PE:'pe_membership_vip',CL:'alianzas',CO:'co_epp_agre'}[row.market],
+   runId:'catalog',gate:'BLOCKED BY EXTERNAL DEPENDENCIES',official:1,executed:0,counts:{NOT_RUN:1},
+   rows:[{tc:row.tc,raw:null,quality:'NOT_RUN',evidence:[]}]},{artifactRoot:process.cwd()});
+  assert.ok(html.includes(entry.title),row.tc+' '+entry.title);
+ }
 });

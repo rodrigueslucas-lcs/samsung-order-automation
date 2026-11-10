@@ -59,15 +59,21 @@ async function finalize(env=process.env){
     const metadataEnv={...env,TEST_MARKET:model.market,ENVIRONMENT:'S2',TEST_STORE:'EPP',TEST_SUITE:'official-p1',EPP_PROGRAM:model.program,ALLURE_PRESERVE_RAW_STATUS:'1',ALLURE_HISTORY_CACHE_DIR:path.resolve(manifest.authorityRoot,'.ci-allure-history')};
     for(const market of ['MX','PE','CO','CL']){delete metadataEnv[`${market}_QST_ENVIRONMENT`];delete metadataEnv[`${market}_QST_TARGET_IDS`];}
     metadataEnv[`${model.market}_QST_TARGET_IDS`]=env.P1_TARGET_IDS||'';
-    const metadata=mode=>{
-      const generated=require('node:child_process').spawnSync(process.execPath,['scripts/prepare-allure-ci-metadata.cjs',results,report,mode],{env:metadataEnv,stdio:'inherit',windowsHide:true,timeout:30000});
-      if(generated.status!==0)throw new Error('EPP Allure metadata/history generation failed.');
+    const presentation=path.join(output,'allure-presentation');
+    // Presentation is a separate copy. Never modify original Playwright Allure source results.
+    const enriched=require('../reporting/epp-quality/allure-business.cjs').copyAndPolish(results,presentation,{market:model.market,rows:model.rows});
+    if(!enriched.total)throw new Error('EPP official Allure presentation has no verified cases.');
+    const presentationMetadata=mode=>{
+      const generated=require('node:child_process').spawnSync(process.execPath,['scripts/prepare-allure-ci-metadata.cjs',presentation,report,mode],{env:metadataEnv,stdio:'inherit',windowsHide:true,timeout:30000});
+      if(generated.status!==0)throw new Error('EPP Allure presentation metadata/history failed.');
     };
-    metadata('prepare');
-    const child=require('allure-commandline')(['generate',results,'--clean','-o',report]);
+    presentationMetadata('prepare');
+    const child=require('allure-commandline')(['generate',presentation,'--clean','-o',report]);
     const status=await new Promise((resolve,reject)=>{child.once('error',reject);child.once('close',resolve);});
     if(status!==0||!fs.existsSync(path.join(report,'index.html')))throw new Error('EPP Allure generation failed; raw results preserved.');
-    metadata('save');
+    presentationMetadata('save');
+    // Presentation files contain diagnostic copies and must never be published as raw campaign data.
+    fs.rmSync(presentation,{recursive:true,force:true});
   }else{
     fs.mkdirSync(report,{recursive:true});fs.writeFileSync(path.join(report,'index.html'),'<!doctype html><meta charset="utf-8"><title>EPP Allure unavailable</title><h1>No Allure test execution was recorded</h1><p>Inspect the current quality report and infrastructure diagnostics. No historical execution substituted.</p>');
   }
