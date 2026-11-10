@@ -31,7 +31,35 @@ const FIELDS = [
   ['CO','SAM-24952','Back to Top / tooltip','Cart & Promotions','Validate Back to Top behaviour and its programme-specific tooltip prerequisite.','Required Back to Top and tooltip behaviour is demonstrated with eligible test data.'],
   ['CO','SAM-24953','Registered credit-card payment','Payment & Order','Create one new authorised CO EPP card order and validate its causal confirmation.','The submitted test order and matching confirmation are proven.']
 ];
-const catalog = Object.freeze(Object.fromEntries(FIELDS.map(([market,id,title,feature,objective,expected]) => [id,{market,id,title,feature,objective,expected}])));
+const STEPS_BY_TC = Object.freeze({
+  'SAM-25020':["Open the configured MX EPP product page","Select an available variant","Verify the changed selection and product identity"],
+  'SAM-25021':["Open the configured EPP product page","Add the selected item to cart","Verify that the chosen product is in the cart"],
+  'SAM-25022':["Prepare the configured cart","Validate cart product and order summary","Check the required footer and cart controls"],
+  'SAM-25034':["Prepare an approved EPP cart and registered context","Continue to checkout","Validate contact information"],
+  'SAM-25044':["Prepare the EPP cart","Locate Back to Top on the page","Activate it and verify the expected scroll behavior"],
+  'SAM-25045':["Reach registered checkout with an approved product","Choose the authorised card method","Submit a new order once when permitted","Confirm the resulting order belongs to this execution"],
+  'SAM-25046':["Reach the approved cash-payment option","Verify cash-provider availability and prior attempt state","Submit only if explicitly authorised and reconciled","Validate the current payment outcome without duplication"],
+  'SAM-25109':["Open the configured PE EPP programme","Complete the authorised verification-code gate if prompted","Validate programme access"],
+  'SAM-25113':["Open the approved PE EPP product","Add the item to cart","Verify the cart product"],
+  'SAM-25114':["Prepare the EPP cart","Validate product and summary","Validate the expected footer"],
+  'SAM-25125':["Prepare a registered EPP cart","Select checkout navigation","Verify registered checkout rather than substituting guest mode"],
+  'SAM-25138':["Prepare registered PE checkout","Choose credit-card payment and approved QA data","Submit one new order if authorised","Verify the resulting order and causal confirmation"],
+  'SAM-25140':["Locate the new order from the current campaign","Open the associated confirmation","Verify the correct order number without another submission"],
+  'SAM-24836':["Open the configured CL EPP programme","Complete the authorised verification gate if present","Validate storefront access"],
+  'SAM-24840':["Open the configured CL EPP product","Add to cart","Validate the selected cart item"],
+  'SAM-24841':["Prepare the CL EPP cart","Validate cart product and summary","Verify the expected footer"],
+  'SAM-24851':["Prepare the official CL cart","Use its checkout button","Verify the expected checkout screen"],
+  'SAM-24864':["Reach CL EPP registered checkout","Select credit/debit card and approved QA data","Submit once when authorised","Validate the current public confirmation"],
+  'SAM-24865':["Reconcile any pending transfer attempt before submission","Reach the CL bank-transfer provider","Submit once only when authorised","Verify the current-campaign payment outcome"],
+  'SAM-24866':["Reuse the current run's new CL card order evidence","Validate the corresponding confirmation screen","Verify the same order without a duplicate submit"],
+  'SAM-24929':["Open configured CO EPP PDP","Select a valid product variation","Verify selected option and product identity"],
+  'SAM-24930':["Open the approved CO EPP PDP","Add selected item to cart","Verify the configured product in cart"],
+  'SAM-24931':["Prepare the CO EPP cart","Validate cart contents and summary","Validate expected footer"],
+  'SAM-24942':["Prepare approved CO EPP cart and contact fixture","Proceed to checkout","Validate the contact-details section"],
+  'SAM-24952':["Prepare CO EPP eligible cart/service test data","Locate Back to Top and the tooltip-triggering element","Validate the expected tooltip behavior without substituting a different requirement"],
+  'SAM-24953':["Prepare CO registered EPP checkout","Choose credit-card method with approved test data","Submit at most one new authorised order","Verify current-run causal confirmation"],
+});
+const catalog = Object.freeze(Object.fromEntries(FIELDS.map(([market,id,title,feature,objective,expected]) => [id,{market,id,title,feature,objective,expected,steps:STEPS_BY_TC[id]}])));
 const flags = Object.freeze({MX:'🇲🇽',PE:'🇵🇪',CL:'🇨🇱',CO:'🇨🇴'});
 const safe = value => String(value ?? '').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const text = value => String(value || '').replace(/\u001b\[[0-9;]*m/g,'').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'').trim();
@@ -94,6 +122,9 @@ function businessDescription(entry,result,quality,reference){
       '<div style="background:#f5f0ff;border:1px solid #bdb4fe;border-left:5px solid #7853bb;border-radius:10px;padding:13px 16px;margin:12px 0;color:#34234d"><strong>Known Defect · </strong><a style="color:#5b3b9f;font-weight:800" href="https://jira.secext.samsung.net/browse/'+safe(reference)+'" target="_blank" rel="noopener noreferrer">'+safe(reference)+'</a><p style="margin:5px 0 0">Current matching evidence does not count as PASS.</p></div>' : '') +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-bottom:12px">' +
     section('O que foi validado',entry.objective) + section('Resultado esperado',entry.expected) + '</div>' +
+    '<div style="border:1px solid #d9e4f0;border-radius:10px;background:#f7faff;padding:13px 16px;margin:12px 0">' +
+    '<strong style="color:#183856">Roteiro funcional esperado</strong><p style="font-size:12px;color:#607185;margin:5px 0">Referência do TC — etapas previstas, não comprovação de execução.</p>' +
+    '<ol style="margin:8px 0 0;padding-left:21px;color:#2c435d">' + (entry.steps||[]).map(step=>'<li>'+safe(step)+'</li>').join('') + '</ol></div>' +
     '<div style="border:1px solid #d9e4f0;border-left:4px solid '+fg+';border-radius:10px;background:#fff;padding:14px 16px;margin:12px 0">' +
     '<strong style="color:#183856">Resultado observado</strong><p style="margin:6px 0;color:#273a51;overflow-wrap:anywhere">'+safe(summary)+'</p></div>' +
     (verifiedSteps?'<div style="border:1px solid #d9e4f0;border-radius:10px;background:#fff;padding:14px 16px;margin:12px 0">' +
