@@ -6,7 +6,7 @@ function response(status,body='',json=null){
  return {status,ok:status>=200&&status<300,text:async()=>body,json:async()=>json||{}};
 }
 test('native home navigation separates Base Store, EPP and operations without modifying jobs',()=>{
- assert.deepEqual(definitions.map(d=>d.name),['01 - Overview','02 - Base Store','03 - EPP','04 - Auth & Ops']);
+ assert.deepEqual(definitions.map(d=>d.name),['01 - Overview','02 - Base Store','03 - EPP','04 - Auth and Ops']);
  assert.equal(definitions[0].jobs.length,10);
  assert.deepEqual(definitions[1].jobs,['Samsung-SMB-MX','Samsung-SMB-PE','Samsung-SMB-CL','Samsung-SMB-CO']);
  assert.deepEqual(definitions[2].jobs,['Samsung-SMB-EPP-MX','Samsung-SMB-EPP-PE','Samsung-SMB-EPP-CL','Samsung-SMB-EPP-CO']);
