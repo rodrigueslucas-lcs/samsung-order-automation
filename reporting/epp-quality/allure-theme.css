@@ -1,42 +1,73 @@
-/* Visual-only EPP Allure skin. Native Allure navigation, data and statuses remain authoritative. */
-:root{--smb-ink:#172e4c;--smb-accent:#2879cc;--smb-hair:#dfe7f2;--smb-bg:#f4f7fb}
-body{font-family:"Segoe UI",Inter,-apple-system,BlinkMacSystemFont,Arial,sans-serif}
-.side-nav{background:linear-gradient(180deg,#0b1d35 0%,#122d4d 100%)!important;border-right:1px solid #284667}
-.side-nav__head{background:#0d2441!important;border-bottom:1px solid #315174}
-.side-nav__brand{font-weight:800;letter-spacing:.2px}
-.side-nav__item{border-radius:8px;margin:3px 8px;overflow:hidden}
-.side-nav__link,.side-nav__item a{border-radius:8px}
-.side-nav__link:hover,.side-nav__item a:hover{background:#ffffff13!important}
-.side-nav__item_active,.side-nav__link_active{background:#2774b82c!important}
-.pane{background:#f5f8fc}
-.pane__head{background:#fff;border-bottom:1px solid #e1e8f2;padding-top:13px;padding-bottom:13px}
-.pane__title{font-weight:800;letter-spacing:-.35px;color:#163556}
-.pane__body{background:#f5f8fc}
-.tree__item{border-bottom:1px solid #eaf0f6;padding-top:2px;padding-bottom:2px}
-.tree__item:hover{background:#eaf3fd}
-.tree__item_selected,.tree__item_active{background:#e2eefb!important}
-.tree__name,.tree__title{line-height:1.55}
-.test-result{background:#fff!important;color:#1b344f}
-.test-result__header{padding:20px 24px;border-bottom:1px solid #e4ebf4}
-.test-result__title{font-weight:800;letter-spacing:-.3px;line-height:1.4}
-.test-result__body,.test-result__content{padding:16px 20px}
-.test-result__group{border:1px solid #e4ebf5;border-radius:11px;margin:12px 0;overflow:hidden;background:white}
-.test-result__group-title{font-weight:800;color:#1d426a;background:#f7faff;padding:11px 13px}
-.test-result__description{font-size:13px;line-height:1.65}
-.test-result__description a{border-radius:8px;text-underline-offset:3px}
-.test-result__description table{border-collapse:collapse;max-width:100%}
-.test-result__description td,.test-result__description th{border-bottom:1px solid #e5ebf4;padding:8px 12px}
-.test-result__tabs{border-bottom:1px solid #e0e7f1;background:#fff}
-.test-result__tab{font-weight:700}
-.test-result__tab_active{color:#1264a6;border-bottom:3px solid #237bbd}
-.test-result__step,.step{border-radius:7px;line-height:1.55}
-.test-result__step:hover,.step:hover{background:#f2f7fd}
-.step__title,.step__name{font-weight:550}
-.attachment,.test-result__attachment{border-radius:8px}
-.attachment__name,.test-result__attachment-name{font-size:12px;line-height:1.5}
-.attachment:hover,.test-result__attachment:hover{background:#f1f6fd}
-.tag,.label,.test-result__label{border-radius:999px;font-weight:700}
-.status-details,.test-result__status-details{border-radius:9px;border:1px solid #ead2d5;padding:12px;background:#fff6f7}
-::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{border-radius:10px;background:#b9c8d9;border:2px solid #f5f8fc}
+/* EPP Allure V2 — high-contrast, dark-mode-safe presentation.
+   Never modify native Allure data, interactive controls, or status semantics. */
+:root {
+  --epp-night:#111d30;
+  --epp-panel:#1a2638;
+  --epp-panel-alt:#202f44;
+  --epp-border:#35465c;
+  --epp-text:#e9f1fc;
+  --epp-muted:#b5c6db;
+  --epp-link:#8cc7ff;
+  --epp-active:#24466d;
+}
+body {font-family:"Segoe UI",Inter,system-ui,-apple-system,sans-serif;letter-spacing:.02px}
+.side-nav {background:linear-gradient(180deg,#0c2040,#102b50)!important;border-right:1px solid #335477}
+.side-nav__head {background:#0e2648!important;border-bottom:1px solid #345473}
+.side-nav__brand {font-weight:800}
+.side-nav__link,.side-nav__item a {border-radius:8px}
+.side-nav__link:hover,.side-nav__item a:hover {background:#ffffff14!important}
+.side-nav__item_active,.side-nav__link_active {background:#326dad55!important}
+.pane,.pane__body {background:var(--epp-night)!important;color:var(--epp-text)!important}
+.pane__head {background:#18283e!important;border-bottom:1px solid var(--epp-border)!important}
+.pane__title {color:#fff!important;font-weight:800;letter-spacing:-.25px}
+.tree__item {border-bottom:1px solid #ffffff0c}
+.tree__item:hover {background:#293f59!important}
+.tree__item_selected,.tree__item_active {background:#304760!important}
+.tree__name,.tree__title {color:var(--epp-text);line-height:1.5}
+.test-result,.test-result__header,.test-result__body,.test-result__content {
+  background:var(--epp-panel)!important;color:var(--epp-text)!important
+}
+.test-result__header {padding:18px 21px;border-bottom:1px solid var(--epp-border)}
+.test-result__title {color:#fff!important;font-weight:800;line-height:1.4;letter-spacing:-.2px}
+.test-result__description {color:var(--epp-text)!important;font-size:13px;line-height:1.65}
+.test-result__description a,.test-result a {color:var(--epp-link)}
+.test-result__description h1,.test-result__description h2,.test-result__description h3 {color:#fff}
+.test-result__group {background:var(--epp-panel-alt)!important;border:1px solid var(--epp-border);border-radius:10px;margin:10px 0}
+.test-result__group-title {background:#263e5b!important;color:#f1f7ff!important;font-weight:800;padding:10px 13px}
+.test-result__tabs {background:var(--epp-panel)!important;border-bottom:1px solid var(--epp-border)}
+.test-result__tab {color:#c7d5e8!important;font-weight:700}
+.test-result__tab_active {color:#9dd0ff!important;border-bottom:3px solid #62afff}
+.test-result__step,.step {border-radius:7px;color:var(--epp-text)!important}
+.test-result__step:hover,.step:hover {background:#2d435c!important}
+.step__title,.step__name,.step__content {color:var(--epp-text)!important;line-height:1.55}
+.step__status,.test-result__status {color:inherit}
+.attachment,.test-result__attachment {border-radius:8px;color:var(--epp-text)!important}
+.attachment:hover,.test-result__attachment:hover {background:#2e4561!important}
+.attachment__name,.test-result__attachment-name {font-size:12px;line-height:1.5;color:var(--epp-text)!important}
+.test-result__label,.test-result__param,.test-result__parameters,.test-result__info,
+.test-result__info-key,.test-result__info-value,.test-result__section-title,
+.test-result__section,.test-result__description > p {
+  color:var(--epp-text)!important
+}
+.test-result__info-key {color:var(--epp-muted)!important}
+.test-result__label, .tag,.label {border-radius:999px;font-weight:750}
+.status-details,.test-result__status-details {
+  background:#50262c!important;color:#ffe0e3!important;
+  border:1px solid #bf6875!important;border-radius:9px;padding:12px
+}
+.status-details pre,.status-details code,.test-result__status-details pre,
+.test-result__status-details code {color:#ffe0e3!important;white-space:pre-wrap;overflow-wrap:anywhere}
+.test-result__description table {max-width:100%;border-collapse:collapse}
+.test-result__description td,.test-result__description th {padding:8px 11px;border-bottom:1px solid var(--epp-border);color:var(--epp-text)}
+/* Existing Base Store rich descriptions intentionally contain light business cards.
+   Preserve their inline surface and dark foreground rather than applying a global text color. */
+.test-result__description [style*="background:#fff"],
+.test-result__description [style*="background: #fff"],
+.test-result__description [style*="background:#ec"],
+.test-result__description [style*="background:#fe"] {color:#17263c}
+.test-result__description [style*="color:#101828"],
+.test-result__description [style*="color: #101828"] {color:#101828!important}
+::-webkit-scrollbar {width:10px;height:10px}
+::-webkit-scrollbar-thumb {background:#536c89;border:2px solid #1b293d;border-radius:10px}
 @media(max-width:800px){.test-result__header{padding:13px}.test-result__body,.test-result__content{padding:12px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important}}
