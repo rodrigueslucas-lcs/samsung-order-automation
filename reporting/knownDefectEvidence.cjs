@@ -2,6 +2,7 @@ function matchesKnownDefectEvidence(defect, result) {
   if(defect.store==='EPP'&&((defect.jira==='RT-746043'&&defect.samId==='SAM-24952')||(defect.jira==='SAM-25161'&&defect.samId==='SAM-24865'))){
     const text=[result.error,result.message,result.blockedReason,result.statusDetails?.message,...(result.errors||[]).map(e=>e.message),...(result.annotations||[]).map(a=>a.description)].filter(x=>typeof x==='string').join('\n');
     if(/AUTH_OR_ENTITLEMENT|SERVER_IDENTITY|AMBIGUOUS_EPP_ORDER_ATTEMPT|SINGLE_SUBMIT_UNCONFIRMED|MASS_REQUIRED|EPP_TOOLTIP_TRIGGER_NOT_AVAILABLE|TimeoutError/i.test(text))return false;
+    if(defect.jira==='RT-746043'&&/CO_EPP_TOOLTIP_MISSING_RT746043 co_epp_agre/.test(text))return true;
     return defect.jira==='RT-746043'
       ? /Back to Top behind the visible tooltip[\s\S]*"tooltipOnTop"\s*:\s*false/.test(text)
       : /CL_EPP_BANK_FORBIDDEN_403/.test(text);

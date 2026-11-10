@@ -7,7 +7,7 @@
       "title": "Back to Top / tooltip stacking defect",
       "classification": "KNOWN_DEFECT", "status": "OPEN", "priority": "Major",
       "rootCause": "Storefront Issue",
-      "notes": "Operator explicitly linked the EPP tooltip scenario to RT-746043. Active quarantine requires a visible tooltip proven behind Back to Top. Missing tooltip trigger/mass, auth, and generic timeouts remain separate prerequisites/failures."
+      "notes": "Operator confirmed on 2026-11-10 that missing tooltip in S2 co_epp_agre is also RT-746043. Quarantine requires a current cart screenshot plus the typed missing-tooltip signature, or proven tooltip stacking failure. Other programmes, missing product data, auth and generic timeouts remain separate."
     },
     {
       "market": "CL", "environment": "S2", "store": "EPP", "samId": "SAM-24865",

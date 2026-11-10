@@ -60,6 +60,10 @@ test.describe("CO QST - Official EPP", () => {
         if(error.code!=='EPP_TOOLTIP_TRIGGER_NOT_AVAILABLE')throw error;
         await cart.screenshot('co-cart-tooltip-test-data-missing');
         await testInfo.attach('CO tooltip prerequisite',{body:JSON.stringify({market:current.market,environment:current.environment,program:current.program,sku:current.sku,backToTopVisible:true,tooltipTriggerCount:0}),contentType:'application/json'});
+        if(current.environment==='S2'&&current.program==='co_epp_agre'){
+          testInfo.annotations.push({type:'known-defect',description:'RT-746043: CO_EPP_TOOLTIP_MISSING_RT746043 co_epp_agre; operator confirmed the missing tooltip is the same registered defect.'});
+          test.skip(true,'CO_EPP_TOOLTIP_MISSING_RT746043 co_epp_agre: Back to Top is present but tooltip trigger is absent; operator-confirmed RT-746043. Cart screenshot attached.');
+        }
         test.skip(true,'MASS_REQUIRED: configured CO EPP cart has Back to Top but no tooltip trigger for the official behind-tooltip scenario; provide an eligible programme SKU/service.');
       }
     });

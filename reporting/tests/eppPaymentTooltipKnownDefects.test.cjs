@@ -15,3 +15,6 @@ for(const scenario of [
    assert.equal(activeKnownDefects({...runtime,...change},registry).length,0);
  });
 }
+
+const {classify}=require('../epp-quality/model.cjs');
+test('CO missing tooltip with current cart evidence matches the operator-confirmed issue only in its programme',()=>{const x={market:'CO',program:'co_epp_agre',tc:'SAM-24952',raw:'skipped',reason:'CO_EPP_TOOLTIP_MISSING_RT746043 co_epp_agre',evidence:[{path:'cart.png'}]};assert.equal(classify(x).reference,'RT-746043');assert.equal(classify({...x,evidence:[]}).quality,'NOT_RUN');assert.equal(classify({...x,program:'other'}).quality,'NOT_RUN');for(const reason of ['TimeoutError','AUTH_OR_ENTITLEMENT_REQUIRED','MASS_REQUIRED: no product'])assert.notEqual(classify({...x,reason}).quality,'KNOWN_DEFECT');});
