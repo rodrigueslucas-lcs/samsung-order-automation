@@ -1,0 +1,15 @@
+const path = require('node:path');
+const escape = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function evidenceHref(root, file) {
+  if (!file || !path.isAbsolute(file)) return null;
+  const relative = path.relative(path.resolve(root),path.resolve(file));
+  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) return null;
+  return '../'+relative.split(path.sep).map(encodeURIComponent).join('/');
+}
+function render(model, {artifactRoot}) {
+  const esc = escape;
+  const cards = Object.entries(model.counts).map(([label,count])=>`<article class="kpi"><small>${esc(label.replaceAll('_',' '))}</small><b>${count}</b></article>`).join('');
+  const rows = model.rows.map(row=>`<tr><td><a href="https://jira.secext.samsung.net/browse/${esc(row.tc)}">${esc(row.tc)}</a></td><td>${esc(row.name || 'Official scenario not executed')}</td><td>${esc(row.raw || 'NOT_RUN')}</td><td>${esc(row.quality)}</td><td>${(row.duration/1000).toFixed(1)}s</td><td>${row.reference?`<a href="${esc(row.url)}">${esc(row.reference)}</a>`:'—'}</td><td>${row.evidence.map(a=>{const href=evidenceHref(artifactRoot,a.path);return href?`<a href="${esc(href)}">Evidence</a>`:'';}).join(' ')}</td></tr>`).join('');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Samsung · ${esc(model.market)} EPP Quality</title><link rel="stylesheet" href="dashboard.css"><style>body{margin:0;padding:24px}.epp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px}.epp-table{overflow-x:auto}table{min-width:850px;width:100%}td,th{text-align:left;padding:12px;vertical-align:top}header,section{margin-bottom:24px}h1{overflow-wrap:anywhere}@media(max-width:600px){body{padding:12px}}</style></head><body><main><header><p>SAMSUNG SMB · EPP · OFFICIAL QST</p><h1>${esc(model.market)} · ${esc(model.environment)} · ${esc(model.program)}</h1><p>Build ${esc(model.buildNumber || 'LOCAL')} · Run ${esc(model.runId)}</p><h2>${esc(model.gate)}</h2><p>${model.executed}/${model.official} executed. Raw results remain unchanged. Known defects do not count as PASS.</p><nav><a href="../html/index.html">Playwright</a> · <a href="../allure-report/index.html">Allure</a> · <a href="quality.json">Quality JSON</a></nav></header><section class="epp-grid">${cards}</section><section><h2>Official test execution matrix</h2><div class="epp-table"><table><thead><tr><th>SAM</th><th>Scenario</th><th>Raw</th><th>Quality</th><th>Duration</th><th>Matched defect</th><th>Evidence</th></tr></thead><tbody>${rows}</tbody></table></div></section><section><h2>Gate rules</h2><p>Infrastructure errors and new regressions take precedence. External prerequisites and unexecuted official scenarios prevent complete homologation. Only a complete current campaign can be FULLY PASSED.</p></section></main></body></html>`;
+}
+module.exports = {render,evidenceHref};
