@@ -34,3 +34,31 @@ test('EPP dashboard does not render executable HTML or hostile links from scenar
  assert.ok(!html.includes('<img src=x'));
  assert.ok(!html.includes('href="javascript:'));
 });
+
+test('EPP V2 shows native flag, homologation readiness and known issue without rewriting raw results',()=>{
+ const model={market:'MX',environment:'S2',program:'pymesmx',runId:'v2',gate:'FAILED — NEW REGRESSION',official:7,executed:6,
+  counts:{PASS:5,FAIL:1,KNOWN_DEFECT:1},rows:[
+   {tc:'SAM-25020',name:'SAM-25020 @qst @mx @epp @safe - Variants/selectors on PDP',raw:'failed',quality:'FAIL',duration:1000,evidence:[]},
+   {tc:'SAM-25046',name:'SAM-25046 @preflight - Pay in Cash',raw:'skipped',quality:'KNOWN_DEFECT',duration:0,
+    reference:'RT-779284',url:'https://jira.secext.samsung.net/browse/RT-779284',reasonCode:'MX_EPP_CASH_TRANSACTION_FAILED',evidence:[]}],orders:[]};
+ const html=render(model,{artifactRoot:process.cwd()});
+ assert.match(html,/🇲🇽 MX/);
+ assert.match(html,/Homologation readiness/);
+ assert.match(html,/Not fully homologated/);
+ assert.match(html,/Known defects & dependencies/);
+ assert.match(html,/RT-779284/);
+ assert.match(html,/Variants\/selectors on PDP/);
+ assert.doesNotMatch(html,/<span class="epp-scenario"[^>]*>SAM-25020 @qst/);
+ assert.match(html,/epp-pill--fail">failed/);
+ assert.match(html,/epp-pill--warn">Known defect/);
+});
+test('EPP V2 collapses multiple evidence actions without losing verified attachment links',()=>{
+ const root=path.resolve('test-results/epp/current');
+ const model={market:'CL',environment:'S2',program:'alianzas',runId:'one',gate:'TARGETED PASSED',official:1,executed:1,
+ counts:{PASS:1},rows:[{tc:'SAM-24864',name:'Payment',raw:'passed',quality:'PASS',duration:200,
+ evidence:[1,2,3,4].map(n=>({name:'shot '+n,path:path.join(root,'playwright','proof-'+n+'.png')}))}]};
+ const html=render(model,{artifactRoot:root});
+ assert.match(html,/\+2 more/);
+ for(let n=1;n<=4;n++)assert.match(html,new RegExp('proof-'+n+'\\.png'));
+ assert.match(html,/epp-evidence-link--allure/);
+});

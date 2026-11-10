@@ -34,6 +34,24 @@ function safeExternal(url) {
 function formatSeconds(milliseconds) {
   return (Math.max(0, Number(milliseconds) || 0) / 1000).toFixed(1) + 's';
 }
+const MARKET_FLAGS = Object.freeze({MX:'🇲🇽',PE:'🇵🇪',CL:'🇨🇱',CO:'🇨🇴'});
+function scenarioDisplayName(name, tc) {
+  const raw = String(name || 'Official scenario');
+  const withoutId = tc ? raw.replace(new RegExp('^' + tc + '\\s*'), '') : raw;
+  const text = withoutId.replace(/(?:@(?:qst|safe|destructive|registered|guest|epp|mx|pe|cl|co|preflight)\\s*)+/gi, '').replace(/^\\s*[-–:]\\s*/, '').trim();
+  return text || 'Official scenario';
+}
+function evidenceLinks(row, artifactRoot, artifactBaseUrl, allureUrl) {
+  const links = (row.evidence || []).map((attachment, index) => {
+    const href = evidenceHref(artifactRoot, attachment.path, artifactBaseUrl);
+    if (!href) return '';
+    const friendly = /screen|image|png|jpeg/i.test(attachment.name||'') ? 'Screenshot' : /trace/i.test(attachment.name||'') ? 'Trace' : /video/i.test(attachment.name||'') ? 'Video' : 'Evidence';
+    return '<a class="epp-evidence-link" href="' + escape(href) + '" target="_blank" rel="noopener noreferrer" title="' + escape(attachment.name || friendly) + '">' + friendly + ' ' + (index + 1) + '</a>';
+  }).filter(Boolean);
+  const allure = '<a class="epp-evidence-link epp-evidence-link--allure" href="' + escape(row.allureUrl || allureUrl) + '" target="_blank" rel="noopener noreferrer">Allure</a>';
+  if (links.length <= 2) return links.join('') + allure;
+  return links.slice(0,2).join('') + '<details class="epp-evidence-more"><summary>+'+(links.length-2)+' more</summary><div class="epp-evidence-expanded">'+links.slice(2).join('')+'</div></details>' + allure;
+}
 function render(model, {artifactRoot, artifactBaseUrl, playwrightUrl='../html/index.html', allureUrl='../allure-report/index.html'}) {
   const esc = escape;
   const counts = model.counts || {};
@@ -51,6 +69,11 @@ function render(model, {artifactRoot, artifactBaseUrl, playwrightUrl='../html/in
   const kpis = Object.entries(STATUS_LABEL).map(([status, label]) =>
     '<article class="epp-kpi epp-kpi--' + status + '"><small>' + esc(label) + '</small><b>' + (Number(counts[status]) || 0) + '</b></article>'
   ).join('');
+  const knownRows = (model.rows || []).filter(row => ['KNOWN_DEFECT','TEST_DATA_REQUIRED','AUTH_BLOCKED','RECONCILIATION_REQUIRED'].includes(row.quality));
+  const isFullyApproved = gate === 'FULLY PASSED';
+  const blockerTotal = knownRows.length;
+  const readiness = '<section class="epp-panel epp-readiness" aria-labelledby="epp-readiness-title"><div class="epp-panel-head"><div><span class="epp-section-kicker">02 / Release readiness</span><h2 id="epp-readiness-title">Homologation readiness</h2><p>Scope-complete approval requires passing the actual official campaign</p></div><span class="epp-pill epp-pill--'+(isFullyApproved?'pass':'warn')+'">'+(isFullyApproved?'Fully homologated':'Not fully homologated')+'</span></div><div class="epp-readiness-content"><div><strong>'+esc(gate)+'</strong><span>Current quality gate — no historical results substituted</span></div><div><strong>'+executed+' / '+official+'</strong><span>Official tests executed</span></div><div><strong>'+blockerTotal+'</strong><span>Known blockers / external dependencies</span></div></div>'+(isTargeted?'<p class="epp-note">This is a targeted run, not a complete official homologation.</p>':'')+'</section>';
+  const blockers = knownRows.length ? '<section class="epp-panel" aria-labelledby="epp-blockers-title"><div class="epp-panel-head"><div><span class="epp-section-kicker">06 / QA blockers</span><h2 id="epp-blockers-title">Known defects & dependencies</h2><p>Linked to current-run evidence; raw results remain unchanged</p></div><span class="epp-pill epp-pill--warn">'+knownRows.length+' tracked</span></div><div class="epp-blocker-list">'+knownRows.map(row=>'<article class="epp-blocker-item"><strong>'+esc(row.tc)+'</strong>'+statusPill(row.quality)+'<span>'+esc(row.errorSummary||row.reasonCode||scenarioDisplayName(row.name,row.tc))+'</span>'+(row.reference&&safeExternal(row.url)?'<a href="'+esc(safeExternal(row.url))+'" target="_blank" rel="noopener noreferrer">'+esc(row.reference)+'</a>':'')+'</article>').join('')+'</div></section>' : '';
   const orders = (model.orders || []).map(order =>
     '<tr><td><strong>' + esc(order.publicOrderNumber) + '</strong></td><td>' + esc(order.method) +
     '</td><td>' + esc((order.tcs || []).join(', ')) + '</td><td>' +
@@ -62,10 +85,7 @@ function render(model, {artifactRoot, artifactBaseUrl, playwrightUrl='../html/in
     '<div class="epp-table-wrap epp-table"><table><thead><tr><th>Public order number</th><th>Method</th><th>Causal scenarios</th><th>Evidence</th></tr></thead><tbody>' + orders + '</tbody></table></div>' :
     '<div class="epp-order-empty"><div class="epp-order-empty-icon" aria-hidden="true">◇</div><div><strong>No newly confirmed order proven in this campaign</strong><p>Historical reconciliation does not count as a new payment PASS. Only an order causally created and confirmed during this run appears here.</p></div></div>';
   const rows = (model.rows || []).map(row => {
-    const evidence = (row.evidence || []).map(a => {
-      const href = evidenceHref(artifactRoot, a.path, artifactBaseUrl);
-      return href ? '<a class="epp-evidence-link" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">Evidence</a>' : '';
-    }).join('');
+    const evidence = evidenceLinks(row,artifactRoot,artifactBaseUrl,allureUrl);
     const jira = safeExternal(row.url);
     const reference = row.reference && jira ? '<a class="epp-tc" href="' + esc(jira) + '" target="_blank" rel="noopener noreferrer">' + esc(row.reference) + '</a>' : '—';
     const raw = row.raw || 'NOT_RUN';
@@ -74,12 +94,11 @@ function render(model, {artifactRoot, artifactBaseUrl, playwrightUrl='../html/in
     const tc = /^SAM-\d+$/.test(row.tc || '') ? row.tc : '';
     const tcLink = tc ? '<a class="epp-tc" href="https://jira.secext.samsung.net/browse/' + esc(tc) + '" target="_blank" rel="noopener noreferrer">' + esc(tc) + '</a>' : esc(row.tc);
     return '<tr class="' + (row.quality === 'NOT_RUN' ? 'epp-row--notrun' : '') + '"><td>' + tcLink +
-      '</td><td><span class="epp-scenario">' + esc(name) + '</span>' +
+      '</td><td><span class="epp-scenario" title="' + esc(name) + '">' + esc(scenarioDisplayName(name,tc)) + '</span>' +
       (reason ? '<span class="epp-detail">' + esc(reason) + '</span>' : '') +
       '</td><td>' + statusPill(raw, true) + '</td><td>' + statusPill(row.quality) +
       '</td><td>' + formatSeconds(row.duration) + '</td><td>' + reference +
-      '</td><td>' + evidence + '<a class="epp-evidence-link" href="' + esc(row.allureUrl || allureUrl) +
-      '" target="_blank" rel="noopener noreferrer">Allure</a></td></tr>';
+      '</td><td>' + evidence + '</td></tr>';
   }).join('');
   return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
     '<meta name="color-scheme" content="light"><title>Samsung · ' + esc(model.market) + ' EPP Quality</title>' +
@@ -87,7 +106,7 @@ function render(model, {artifactRoot, artifactBaseUrl, playwrightUrl='../html/in
     '<style>.epp-table{overflow-x:auto}</style></head><body class="epp-report">' +
     '<header class="epp-hero"><div class="epp-hero-top"><div>' +
     '<p class="epp-eyebrow">Samsung SMB / QA Automation / Official EPP QST</p>' +
-    '<h1>' + esc(model.market) + ' <span>· ' + esc(model.environment) + ' · ' + esc(model.program) + '</span></h1>' +
+    '<h1>' + esc(MARKET_FLAGS[model.market] || '') + ' ' + esc(model.market) + ' <span>· ' + esc(model.environment) + ' · ' + esc(model.program) + '</span></h1>' +
     '<p class="epp-hero-sub">Execution quality, official scenario coverage and auditable evidence</p></div>' +
     '<div class="epp-gate epp-gate--' + gateTone + '"><small>Quality gate</small><strong>' + esc(gate) + '</strong></div></div>' +
     '<div class="epp-hero-meta"><span>Build ' + esc(model.buildNumber || 'LOCAL') + '</span><span>Run ' + esc(model.runId) +
@@ -107,8 +126,8 @@ function render(model, {artifactRoot, artifactBaseUrl, playwrightUrl='../html/in
     width(remaining) + '%"></span></div><p class="epp-note">Raw results remain unchanged. Known defects do not count as PASS. ' +
     (isTargeted ? 'Targeted execution: ' + selected + ' selected; complete official homologation remains unproven.' :
       'The current full campaign controls homologation readiness.') + '</p></section></div>' +
-    '<section class="epp-panel" aria-labelledby="epp-summary-title"><div class="epp-panel-head"><div>' +
-    '<span class="epp-section-kicker">02 / Run context</span><h2 id="epp-summary-title">Execution summary</h2>' +
+    readiness + '<section class="epp-panel" aria-labelledby="epp-summary-title"><div class="epp-panel-head"><div>' +
+    '<span class="epp-section-kicker">03 / Run context</span><h2 id="epp-summary-title">Execution summary</h2>' +
     '<p>Separate run scope from functional approval</p></div></div><div class="epp-summary-grid">' +
     '<div class="epp-summary-stat"><span>Execution scope</span><strong>' + (isTargeted ? 'Targeted' : 'Full campaign') +
     '</strong></div><div class="epp-summary-stat"><span>Selected official TCs</span><strong>' + selected +
@@ -116,16 +135,16 @@ function render(model, {artifactRoot, artifactBaseUrl, playwrightUrl='../html/in
     '</strong></div><div class="epp-summary-stat"><span>New proven orders</span><strong>' + (model.orders || []).filter(o => o.newOrderInCurrentRun && o.confirmationValidated).length +
     '</strong></div></div></section>' +
     '<section class="epp-panel" aria-labelledby="epp-orders-title"><div class="epp-panel-head"><div>' +
-    '<span class="epp-section-kicker">03 / Payment traceability</span><h2 id="epp-orders-title">Orders created in this campaign</h2>' +
+    '<span class="epp-section-kicker">04 / Payment traceability</span><h2 id="epp-orders-title">Orders created in this campaign</h2>' +
     '<p>Only current-run, causally validated orders qualify</p></div></div>' + orderSection + '</section>' +
     '<section class="epp-panel" aria-labelledby="epp-matrix-title"><div class="epp-panel-head"><div>' +
-    '<span class="epp-section-kicker">04 / Official test inventory</span><h2 id="epp-matrix-title">Official test execution matrix</h2>' +
+    '<span class="epp-section-kicker">05 / Official test inventory</span><h2 id="epp-matrix-title">Official test execution matrix</h2>' +
     '<p>Raw Playwright results and QA classification are intentionally separate</p></div>' +
     '<span class="epp-pill">' + official + ' official TCs</span></div>' +
     '<div class="epp-table-wrap epp-table"><table><thead><tr><th>SAM</th><th>Scenario</th><th>Raw</th><th>Quality</th>' +
     '<th>Duration</th><th>Matched defect</th><th>Evidence</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>' +
-    '<section class="epp-panel" aria-labelledby="epp-gates-title"><div class="epp-panel-head"><div>' +
-    '<span class="epp-section-kicker">05 / Governance</span><h2 id="epp-gates-title">Gate rules</h2></div></div>' +
+    blockers + '<section class="epp-panel" aria-labelledby="epp-gates-title"><div class="epp-panel-head"><div>' +
+    '<span class="epp-section-kicker">07 / Governance</span><h2 id="epp-gates-title">Gate rules</h2></div></div>' +
     '<div class="epp-rule-grid"><div class="epp-rule"><strong>Regressions take priority</strong><span>Infrastructure errors and unexpected functional failures override a successful gate.</span></div>' +
     '<div class="epp-rule"><strong>Known defects are not PASS</strong><span>Existing defects and missing test data remain visible and require their own evidence.</span></div>' +
     '<div class="epp-rule"><strong>Full approval requires full scope</strong><span>Only a complete current official campaign can be FULLY PASSED.</span></div></div></section>' +
