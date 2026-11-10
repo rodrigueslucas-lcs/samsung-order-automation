@@ -13,3 +13,24 @@ test('no causal order renders an explicit absence rather than a historical payme
 });
 test('only evidence inside current artifact root is linked',()=>{const root=path.resolve('test-results/epp/current');assert.equal(evidenceHref(root,path.join(root,'playwright','evidence one.png')),'../playwright/evidence%20one.png');assert.equal(evidenceHref(root,path.resolve('playwright/.auth/state.json')),null);assert.equal(evidenceHref(root,'https://external.test'),null);});
 test('responsive renderer preserves raw/business distinction and escapes content',()=>{const html=render({market:'CL',environment:'S2',program:'alianzas',runId:'build-1',buildNumber:1,gate:'PASSED WITH KNOWN DEFECTS',executed:1,official:1,counts:{PASS:0,KNOWN_DEFECT:1},rows:[{tc:'SAM-24841',name:'<script>alert(1)</script>',raw:'skipped',quality:'KNOWN_DEFECT',duration:0,reference:'SAM-25146',url:'https://jira.secext.samsung.net/browse/SAM-25146',evidence:[]}]},{artifactRoot:process.cwd()});assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>/);assert.match(html,/>skipped</);assert.match(html,/name="viewport"/);assert.match(html,/overflow-x:auto/);assert.match(html,/Known defects do not count as PASS/);});
+
+
+test('EPP dashboard exposes executive sections without changing raw and QA status',()=>{
+ const html=render({market:'CO',environment:'S2',program:'co_epp_agre',runId:'build-3',buildNumber:3,
+  gate:'TARGETED PASSED',executed:1,official:6,targetIds:['SAM-24942'],selected:1,
+  counts:{PASS:1,NOT_RUN:5},rows:[{tc:'SAM-24942',name:'Contact Details Section',raw:'passed',quality:'PASS',duration:53800,evidence:[]},
+   {tc:'SAM-24952',name:'Official scenario',raw:null,quality:'NOT_RUN',duration:0,evidence:[]}],orders:[]},{artifactRoot:process.cwd()});
+ for(const text of ['epp-theme.css','Executive overview','Execution summary','Official test execution matrix','Payment traceability','Targeted execution','1 / 6 executed','5 official scenarios not executed'])assert.ok(html.includes(text),text);
+ assert.match(html,/epp-pill--pass">PASS|epp-pill--pass">Passed/);
+ assert.match(html,/epp-row--notrun/);
+ assert.match(html,/Only a complete current official campaign can be FULLY PASSED/);
+});
+test('EPP dashboard does not render executable HTML or hostile links from scenario data',()=>{
+ const html=render({market:'CL',environment:'S2',program:'alianzas',runId:'run',gate:'FAILED — NEW REGRESSION',official:1,executed:1,
+  counts:{FAIL:1},rows:[{tc:'SAM-24841',name:'<img src=x onerror=alert(1)>',raw:'failed',quality:'FAIL',duration:0,
+    url:'javascript:alert(1)',reference:'SAM-25146',errorSummary:'<script>bad</script>',evidence:[]}]},{artifactRoot:process.cwd()});
+ assert.ok(html.includes('&lt;img'));
+ assert.ok(html.includes('&lt;script&gt;bad'));
+ assert.ok(!html.includes('<img src=x'));
+ assert.ok(!html.includes('href="javascript:'));
+});
