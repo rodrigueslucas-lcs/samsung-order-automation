@@ -83,11 +83,9 @@ pipeline {
           currentBuild.result = 'FAILURE'
           echo 'INFRA_ERROR: no current EPP execution manifest; no historical report substituted.'
         } else {
-          def manifest = new groovy.json.JsonSlurperClassic().parseText(readFile('test-results/epp-ci-current.json'))
-          if (manifest.buildNumber?.toString() != env.BUILD_NUMBER || manifest.market != env.TEST_MARKET || !(manifest.relativeOutput ==~ /^test-results\/epp\/(mx|pe|co|cl)\/s2\/[A-Za-z0-9.-]+$/)) {
-            error('INFRA_ERROR: EPP report identity mismatch.')
-          }
-          def output = manifest.relativeOutput
+          def output = isUnix()
+            ? sh(script: 'node scripts/epp-ci-report-context.cjs output', returnStdout: true).trim()
+            : bat(script: '@node scripts/epp-ci-report-context.cjs output', returnStdout: true).trim()
           def finalizer = isUnix() ? sh(script: 'node scripts/finalize-epp-jenkins.cjs', returnStatus: true) : bat(script: '@node scripts/finalize-epp-jenkins.cjs', returnStatus: true)
           if (finalizer != 0) {
             echo 'INFRA_ERROR: reporting failed; publishing only a current-build infrastructure summary.'
@@ -99,10 +97,12 @@ pipeline {
           publishHTML(target: [reportDir: "${output}/public/html", reportFiles: 'index.html', reportName: '02 · EPP Playwright', keepAll: true, alwaysLinkToLastBuild: true, allowMissing: true])
           publishHTML(target: [reportDir: "${output}/public/allure-report", reportFiles: 'index.html', reportName: '03 · EPP Allure', keepAll: true, alwaysLinkToLastBuild: true, allowMissing: true])
           archiveArtifacts(artifacts: "${output}/public/**,test-results/epp-ci-current.json,test-results/epp-ci-quality-gate.json", allowEmptyArchive: true, fingerprint: false)
-          def gate = new groovy.json.JsonSlurperClassic().parseText(readFile('test-results/epp-ci-quality-gate.json'))
-          currentBuild.description = "${env.TEST_MARKET} · EPP S2 · ${gate.gate}"
-          if (finalizer != 0 || gate.gate in ['INFRA_ERROR', 'FAILED — NEW REGRESSION']) currentBuild.result = 'FAILURE'
-          else if (gate.gate == 'BLOCKED BY EXTERNAL DEPENDENCIES') currentBuild.result = 'UNSTABLE'
+          def gate = isUnix()
+            ? sh(script: 'node scripts/epp-ci-report-context.cjs gate', returnStdout: true).trim()
+            : bat(script: '@node scripts/epp-ci-report-context.cjs gate', returnStdout: true).trim()
+          currentBuild.description = "${env.TEST_MARKET} · EPP S2 · ${gate}"
+          if (finalizer != 0 || gate in ['INFRA_ERROR', 'FAILED — NEW REGRESSION']) currentBuild.result = 'FAILURE'
+          else if (gate == 'BLOCKED BY EXTERNAL DEPENDENCIES') currentBuild.result = 'UNSTABLE'
         }
       }
     }

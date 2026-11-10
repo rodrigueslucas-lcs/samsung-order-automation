@@ -122,3 +122,19 @@ architecture gates passed. No EPP job/build or new financial submission has
 been created yet.
 Real CL pilot, remaining market builds and consolidated Quality Summary remain
 acceptance requirements; the integration is not runtime-homologated yet.
+
+### CL pilot 1
+
+`Samsung-SMB-EPP-CL #1` executed the official seven scenarios with raw
+5 PASS / 0 FAIL / 2 SKIP. Preflight reused a healthy verified session without
+login. New card order `CL261109-78849757` causally validated SAM-24864 and
+SAM-24866 in the same run. Existing Cash MX and transfer CL records retained
+their exact hashes; private workspace auth files were cleaned.
+
+The build failed after execution because Jenkins Script Security rejected
+the `JsonSlurperClassic` constructor during report publication. The pipeline
+now delegates current-build manifest/gate parsing to Node with the same strict
+identity validation. No sandbox approval or security configuration was changed.
+Seven focused tests and the official Jenkins declarative validator passed.
+The next pilot must validate actual publication; this failure is infrastructure,
+not a functional payment failure.
