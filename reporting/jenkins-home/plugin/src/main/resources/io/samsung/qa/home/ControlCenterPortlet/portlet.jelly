@@ -1,0 +1,9 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core">
+  <link rel="stylesheet" href="${rootURL}/plugin/samsung-smb-home/control-center.css?v=${it.assetVersion}"/>
+  <div class="smb-home" data-smb-home="true" data-root="${rootURL}" aria-label="Samsung SMB QA Automation Center">
+    <p class="smb-loading" role="status">Loading Jenkins operations…</p>
+    <noscript>Live cards require JavaScript. Native Jenkins navigation remains available in the tabs and sidebar.</noscript>
+  </div>
+  <script src="${rootURL}/plugin/samsung-smb-home/control-center.js?v=${it.assetVersion}" defer="defer"></script>
+</j:jelly>

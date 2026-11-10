@@ -1,0 +1,6 @@
+<?jelly escape-by-default='true'?>
+<div>
+  Samsung SMB QA Automation Center: a scoped Dashboard View component for current-user,
+  read-only build monitoring and native Jenkins build navigation. No authentication,
+  payment, scheduler or job configuration operations are implemented by this plugin.
+</div>

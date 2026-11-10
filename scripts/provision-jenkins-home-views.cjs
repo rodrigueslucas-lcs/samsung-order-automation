@@ -89,9 +89,10 @@ async function main(){
   const workspace=require('../utils/jenkinsHomeWorkspace.cjs');
   const snapshot=await workspace.inspectHome(request);
   if(args[0]==='--apply'&&!snapshot.pluginActive)throw new Error('Home workspace Dashboard View plugin must be installed and active first.');
+  if(args[0]==='--apply'&&!snapshot.controlCenterActive)throw new Error('Home workspace scoped Control Center plugin must be installed and active first.');
   const result=await provisionHomeViews(request,{apply:args[0]==='--apply'});
   if(args[0]==='--apply')Object.assign(result,await workspace.applyHome(request,snapshot,owner));
-  else Object.assign(result,{currentDefaultView:snapshot.primary,plannedDefaultView:'01 - Overview',pluginActive:snapshot.pluginActive});
+  else Object.assign(result,{currentDefaultView:snapshot.primary,plannedDefaultView:'01 - Overview',pluginActive:snapshot.pluginActive,controlCenterActive:snapshot.controlCenterActive});
   console.log(JSON.stringify(result,null,2));
 }
 if(require.main===module)main().catch(error=>{
