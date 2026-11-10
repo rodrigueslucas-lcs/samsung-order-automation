@@ -1,37 +1,53 @@
-# Samsung SMB — Jenkins Home Views
+# Samsung SMB — Jenkins Home
 
-The Jenkins home is organized with **four managed native List Views**. The existing `Samsung SMB Automation`, `Samsung SMB Quality Summary` and built-in `All` views remain intact.
+`http://localhost:8080/` opens **01 - Overview**, the persistent primary view. Its executive landing page separates Base Store, EPP and Authentication & Operations; the ordinary job table remains available through native tabs.
 
-| View | Jobs | Purpose |
-|---|---|---|
-| `01 - Overview` | The 8 market/store jobs plus the main automation and authentication operations | Single landing view; focus with the dedicated tabs |
-| `02 - Base Store` | `Samsung-SMB-MX`, `Samsung-SMB-PE`, `Samsung-SMB-CL`, `Samsung-SMB-CO` | Base Store functional QST |
-| `03 - EPP` | `Samsung-SMB-EPP-MX`, `Samsung-SMB-EPP-PE`, `Samsung-SMB-EPP-CL`, `Samsung-SMB-EPP-CO` | EPP S2 QST |
-| `04 - Auth and Ops` | `SAMSUNG-SMB-AUTOMATION`, `Samsung-SMB-Auth-Operations` | Main pipeline and authentication |
+## Supported integration
 
-The existing `Samsung SMB Quality Summary` view remains the source for the eight-lane reporting overview. Open the Regional Quality Summary published by EPP jobs for executive metrics. Jenkins native List Views do **not** support custom sectioned cards on the stock homepage; grouped tabs are the low-risk approach.
+The administrator-approved **Dashboard View** plugin provides the managed view. The installed **Safe HTML** formatter sanitizes the presentation. This changes the controller markup formatter from plain text to sanitized HTML; it does not disable sanitization or change CSP, authorization, credentials or authentication.
 
-## One-time setup on the Jenkins host
+No injected JavaScript, iframe, redirect, service modification or Jenkins core replacement is used. Native navigation, queue, executor status, permissions and history remain available. The built-in All view and existing Samsung SMB Quality Summary are reused.
 
-Ensure your local ignored `playwright/.auth/jenkins-publisher.local.json` has the credentials for your *local* Jenkins instance, or provide `JENKINS_URL`, `JENKINS_USER` and `JENKINS_API_TOKEN` as environment variables. Never commit these secrets.
+| Navigation | Content |
+|---|---|
+| Overview | Executive header, verified configuration totals and ten job cards |
+| Base Store | MX, PE, CL and CO Base Store jobs |
+| EPP | MX, PE, CL and CO EPP jobs |
+| Auth & Ops | Original automation pipeline and Auth Operations |
+| Quality Summary | Existing eight-lane quality view |
+| All Jobs | Built-in All view |
 
-From the repo root in Git Bash:
+Status icons use Jenkins' native `buildStatus` endpoint. The execution link resolves `lastCompletedBuild`; the page does not freeze a build result or duration from a snapshot. Build SUCCESS is distinct from individual QA PASS and known-defect semantics.
+
+Report links identify their actual published build number. Discovery uses the most recent completed build with report actions among the last twenty builds, avoiding stale project-level HTML Publisher aliases that can return HTTP 500. An aborted build without reports does not mislabel an older report as its own. If none is found, the card links to the job. Reapply the provisioner to refresh report shortcuts after new runs; native job/execution links always expose current history. No periodic build or permanent executor is needed.
+
+## Provisioning
+
+Use the existing ignored publisher configuration or `JENKINS_URL`, `JENKINS_USER`, `JENKINS_API_TOKEN`. Never commit credentials.
 
 ```bash
-node --test governance/tests/jenkinsHomeViews.test.cjs
+node --test governance/tests/jenkinsHomeViews.test.cjs governance/tests/jenkinsHomeWorkspace.test.cjs
 node scripts/provision-jenkins-home-views.cjs
 node scripts/provision-jenkins-home-views.cjs --apply
 ```
 
-The first provisioner call is a **read-only preview**. The `--apply` command validates all ten job identities and view ownership before posting the four view configurations to Jenkins. It verifies the membership after each creation/update.
+The first call is read-only. Apply requires Overall/Administer and an installed, active Dashboard View plugin. Plugin installation is a separate administrator decision; this script never installs plugins or restarts Jenkins.
 
-Refresh `http://localhost:8080/` to see the ordered navigation tabs. To use `01 - Overview` immediately, click its tab. This script intentionally does **not** change the Jenkins default view; this can be set in the Jenkins UI by an administrator after reviewing the layout.
+Apply verifies ten approved jobs and managed view ownership, preserves an existing Dashboard on rerun, configures sanitized markup and saves the native primary-view setting. It rejects an unknown formatter or foreign view. Fingerprints compare security realm, authorization strategy, credentials file, executors, controller mode, job configurations and next-build numbers before/after. No build, payment, refresh, scheduler or credential publication is invoked.
 
-## Safety contract
+The primary view is saved in controller XML. To roll back the landing selection, an administrator can select built-in All in Manage Jenkins → System → Default view; jobs and reports remain intact. Reverting the formatter to Plain text removes presentation styling from descriptions globally.
 
-- No rename, deletion, reconfiguration or trigger of any Jenkins job.
-- No changes to authentication, CAPTCHA, session rotation, payment or Playwright execution.
-- No changes to the existing Quality Summary or other pre-existing tabs.
-- Any unrecognized existing view name is rejected, rather than overwritten.
-- Runs are repeatable. If creation is partially successful, a subsequent invocation rechecks ownership and finishes only the remaining views.
-- Reports and Jenkins build results remain authoritative; navigation does not imply quality approval.
+## Live validation — 2026-11-10
+
+Validated on Jenkins 2.568.3 with Dashboard View 2.569.v5ddb_c9b_a_7264, installed dynamically without restart:
+
+- Actual Chrome navigation to `/`: HTTP 200, executive heading visible, ten native status icons, no page errors, no redirect.
+- Reload retained the primary view; controller XML contained its persisted name. A controller restart was **not** performed.
+- Desktop 1500px and mobile 390px screenshots inspected; no horizontal document overflow.
+- Clicked Base Store (4), EPP (4), Auth & Ops (2), Quality Summary (8), All (10), verifying membership in the browser.
+- Job configuration fingerprints and next-build numbers unchanged; no UI-validation build started.
+- Report links audited against published build actions; inaccessible project-level aliases replaced with explicit build links.
+
+Screenshots and audit JSON are local evidence under ignored `.agent/tmp/jenkins-home-*`; they contain no auth bundles or credentials. Live evidence is separate from unit/governance tests.
+
+Browser report navigation also rendered Allure, Quality Dashboard and live Auth Operations. Historical MX Base Store build #10 emits a pre-existing invalid-regex JavaScript error in its Allure report while its overview renders; the Home change does not rewrite immutable historical reports or the separate Allure implementation.

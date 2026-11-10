@@ -19,6 +19,21 @@ test('native home navigation separates Base Store, EPP and operations without mo
   assert.doesNotMatch(config,/<triggers|<builders|<credentials|scriptPath|hudson\.model\.FreeStyleProject/);
  }
 });
+test('rerunning provisioner preserves the installed executive Dashboard view type',async()=>{
+ const writes=[];
+ const adapter=async(route,options={})=>{
+  if(options.method==='POST')writes.push(route);
+  if(route.endsWith('/config.xml'))return response(200,'<hudson.plugins.view.dashboard.Dashboard><description>'+owner+'</description></hudson.plugins.view.dashboard.Dashboard>');
+  if(route.startsWith('/job/'))return response(200,'',{name:decodeURIComponent(route.slice(5).split('/')[0])});
+  if(route.startsWith('/crumbIssuer'))return response(200,'',{crumbRequestField:'Jenkins-Crumb',crumb:'synthetic'});
+  if(route.includes('/api/json?tree=')){const name=decodeURIComponent(route.split('/')[2]);return response(200,'',{name,jobs:definitions.find(d=>d.name===name).jobs.map(name=>({name}))});}
+  return response(200);
+ };
+ await provisionHomeViews(adapter,{apply:true});
+ assert.equal(writes.length,3);
+ assert.ok(!writes.some(route=>route.includes(encodeURIComponent('01 - Overview'))));
+});
+
 test('dry run reads views and never writes or starts builds',async()=>{
  const calls=[];
  const result=await provisionHomeViews(async(route,opts={})=>{calls.push([route,opts.method]);return response(404);});

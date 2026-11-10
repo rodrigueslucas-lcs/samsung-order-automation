@@ -32,6 +32,7 @@ function viewXml(view){
 async function provisionHomeViews(request,{apply=false}={}){
   if(typeof request !== 'function')throw new Error('Jenkins request adapter is required.');
   const existing = new Map();
+  const dashboards = new Set();
   // Inspect every view before changing any of them.
   for(const view of definitions){
     const response=await request(routeFor(view.name)+'/config.xml');
@@ -39,6 +40,7 @@ async function provisionHomeViews(request,{apply=false}={}){
     if(!response.ok)throw new Error('Home view read rejected: '+view.name);
     const config=await response.text();
     if(!config.includes(owner))throw new Error('Existing home view has another owner: '+view.name+'. Preserved.');
+    if(view.name==='01 - Overview'&&config.includes('<hudson.plugins.view.dashboard.Dashboard'))dashboards.add(view.name);
     existing.set(view.name,true);
   }
   if(!apply)return {applied:false,buildStarted:false,views:definitions.map(v=>({name:v.name,exists:existing.get(v.name),jobs:v.jobs}))};
@@ -59,8 +61,10 @@ async function provisionHomeViews(request,{apply=false}={}){
   for(const view of definitions){
     const current=existing.get(view.name);
     const route=current?routeFor(view.name)+'/config.xml':'/createView?name='+encodeURIComponent(view.name);
-    const saved=await request(route,{method:'POST',headers,body:viewXml(view)});
-    if(!saved.ok)throw new Error('Home view '+(current?'update':'creation')+' rejected: '+view.name+' HTTP '+saved.status);
+    if(!dashboards.has(view.name)){
+      const saved=await request(route,{method:'POST',headers,body:viewXml(view)});
+      if(!saved.ok)throw new Error('Home view '+(current?'update':'creation')+' rejected: '+view.name+' HTTP '+saved.status);
+    }
     const verified=await request(routeFor(view.name)+'/api/json?tree=name,jobs[name]');
     if(!verified.ok)throw new Error('Home view verification unavailable: '+view.name);
     const data=await verified.json();
@@ -82,11 +86,16 @@ async function main(){
     ...options,redirect:'manual',signal:AbortSignal.timeout(30000),
     headers:{Authorization:authorization,...options.headers}
   });
+  const workspace=require('../utils/jenkinsHomeWorkspace.cjs');
+  const snapshot=await workspace.inspectHome(request);
+  if(args[0]==='--apply'&&!snapshot.pluginActive)throw new Error('Home workspace Dashboard View plugin must be installed and active first.');
   const result=await provisionHomeViews(request,{apply:args[0]==='--apply'});
+  if(args[0]==='--apply')Object.assign(result,await workspace.applyHome(request,snapshot,owner));
+  else Object.assign(result,{currentDefaultView:snapshot.primary,plannedDefaultView:'01 - Overview',pluginActive:snapshot.pluginActive});
   console.log(JSON.stringify(result,null,2));
 }
 if(require.main===module)main().catch(error=>{
-  const safe=/^(?:Home view|Existing home view|Jenkins request adapter|Usage:|Incomplete Jenkins|Invalid Jenkins|Jenkins publish)/.test(error.message);
+  const safe=/^(?:Home view|Home workspace|Existing home view|Jenkins request adapter|Usage:|Incomplete Jenkins|Invalid Jenkins|Jenkins publish)/.test(error.message);
   console.error('[jenkins-home] '+(safe?error.message:'Provisioning failed; sensitive details suppressed.'));
   process.exitCode=1;
 });
