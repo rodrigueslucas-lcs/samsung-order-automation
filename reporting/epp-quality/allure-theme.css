@@ -1,0 +1,42 @@
+/* Visual-only EPP Allure skin. Native Allure navigation, data and statuses remain authoritative. */
+:root{--smb-ink:#172e4c;--smb-accent:#2879cc;--smb-hair:#dfe7f2;--smb-bg:#f4f7fb}
+body{font-family:"Segoe UI",Inter,-apple-system,BlinkMacSystemFont,Arial,sans-serif}
+.side-nav{background:linear-gradient(180deg,#0b1d35 0%,#122d4d 100%)!important;border-right:1px solid #284667}
+.side-nav__head{background:#0d2441!important;border-bottom:1px solid #315174}
+.side-nav__brand{font-weight:800;letter-spacing:.2px}
+.side-nav__item{border-radius:8px;margin:3px 8px;overflow:hidden}
+.side-nav__link,.side-nav__item a{border-radius:8px}
+.side-nav__link:hover,.side-nav__item a:hover{background:#ffffff13!important}
+.side-nav__item_active,.side-nav__link_active{background:#2774b82c!important}
+.pane{background:#f5f8fc}
+.pane__head{background:#fff;border-bottom:1px solid #e1e8f2;padding-top:13px;padding-bottom:13px}
+.pane__title{font-weight:800;letter-spacing:-.35px;color:#163556}
+.pane__body{background:#f5f8fc}
+.tree__item{border-bottom:1px solid #eaf0f6;padding-top:2px;padding-bottom:2px}
+.tree__item:hover{background:#eaf3fd}
+.tree__item_selected,.tree__item_active{background:#e2eefb!important}
+.tree__name,.tree__title{line-height:1.55}
+.test-result{background:#fff!important;color:#1b344f}
+.test-result__header{padding:20px 24px;border-bottom:1px solid #e4ebf4}
+.test-result__title{font-weight:800;letter-spacing:-.3px;line-height:1.4}
+.test-result__body,.test-result__content{padding:16px 20px}
+.test-result__group{border:1px solid #e4ebf5;border-radius:11px;margin:12px 0;overflow:hidden;background:white}
+.test-result__group-title{font-weight:800;color:#1d426a;background:#f7faff;padding:11px 13px}
+.test-result__description{font-size:13px;line-height:1.65}
+.test-result__description a{border-radius:8px;text-underline-offset:3px}
+.test-result__description table{border-collapse:collapse;max-width:100%}
+.test-result__description td,.test-result__description th{border-bottom:1px solid #e5ebf4;padding:8px 12px}
+.test-result__tabs{border-bottom:1px solid #e0e7f1;background:#fff}
+.test-result__tab{font-weight:700}
+.test-result__tab_active{color:#1264a6;border-bottom:3px solid #237bbd}
+.test-result__step,.step{border-radius:7px;line-height:1.55}
+.test-result__step:hover,.step:hover{background:#f2f7fd}
+.step__title,.step__name{font-weight:550}
+.attachment,.test-result__attachment{border-radius:8px}
+.attachment__name,.test-result__attachment-name{font-size:12px;line-height:1.5}
+.attachment:hover,.test-result__attachment:hover{background:#f1f6fd}
+.tag,.label,.test-result__label{border-radius:999px;font-weight:700}
+.status-details,.test-result__status-details{border-radius:9px;border:1px solid #ead2d5;padding:12px;background:#fff6f7}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{border-radius:10px;background:#b9c8d9;border:2px solid #f5f8fc}
+@media(max-width:800px){.test-result__header{padding:13px}.test-result__body,.test-result__content{padding:12px}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important}}
