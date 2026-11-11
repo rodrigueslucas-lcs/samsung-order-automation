@@ -248,7 +248,9 @@ export async function prepareMxQstCart(page, config) {
   await test.step("Add configured product to cart", async () => {
     await product.addConfiguredPdpToCart({
       waitForCartMutation: true,
-      configureProduct: async (pdp) => {
+      // S2 opens the exact configured variant. Selecting a different capacity
+      // would change its SKU before the cart assertion.
+      configureProduct: config.environment === "S2" ? undefined : async (pdp) => {
         const storage = pdp.getByRole("button", { name: "512GB", exact: true });
         await expect(storage).toBeVisible({ timeout: 30000 });
         if (!/\bselected\b/.test((await storage.getAttribute("class")) || "")) {

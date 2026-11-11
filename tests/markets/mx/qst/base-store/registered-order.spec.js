@@ -52,8 +52,8 @@ test("SAM-25002 @destructive @qst @mx @base-store @registered - Complete card pa
   test.setTimeout(600000);
   requirePaymentSubmitOptIn();
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-25002"));
-  const sku = "SM-F741BLBKLTM";
-  const config = { ...mxConfig, sku, pdpUrl: new URL(`/mx/p/${sku}`, mxConfig.baseUrl.origin) };
+  const config = mxConfig;
+  const { sku } = config;
   recordBusinessEvidence(testInfo, {
     market: "MX",
     environment: mxConfig.environment,

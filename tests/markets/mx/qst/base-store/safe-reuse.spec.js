@@ -23,18 +23,18 @@ test("MX QST 04 @qst @mx @base-store @safe - Navigate to PDP", async ({ page, mx
   await expect(page.getByText(mxConfig.sku, { exact: true }).first()).toBeVisible();
 });
 
-test("SAM-24971 @qst @mx @base-store @safe - Cart page UI", async ({ page, mxConfig }, testInfo) => {
+test("SAM-24971 @qst @mx @base-store @safe - Cart page UI", async ({ page, mxCareConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24971"));
 
   let cart;
   await test.step("Prepare the controlled MX cart", async () => {
-    cart = await prepareMxQstCart(page, mxConfig);
+    cart = await prepareMxQstCart(page, mxCareConfig);
     await cart.validateCartPage();
     await cart.validateProductInCart();
   });
 
   await test.step("Validate product presentation and order summary", async () => {
-    await validateMxCartProductPresentation(page, mxConfig);
+    await validateMxCartProductPresentation(page, mxCareConfig);
     const summary = await cart.validateOrderSummary();
     expect(summary.subtotal).toBeTruthy();
     expect(summary.total).toBeTruthy();

@@ -21,6 +21,7 @@ export default class ProductPage extends BasePage {
   async addConfiguredPdpToCart({ waitForCartMutation = false, configureProduct, diagnostics,
     recoverBlankPdp, addButtonName = /Agregar al (?:carro|carrito)|Add to cart|Add to basket/i } = {}) {
     if (!this.pdpUrl) throw new Error('A configured PDP URL is required.');
+    const mxBasePdp = new URL(this.pdpUrl).pathname.startsWith('/mx/p/');
     const isCartMutation = (request) =>
       request.method() === 'POST' &&
       /\/users\/current\/carts\/(?:current|[^/]+)\/entries(?:\?|$)/.test(request.url());
@@ -54,8 +55,10 @@ export default class ProductPage extends BasePage {
       if (!loadedPdp) await this.safeGoto(this.pdpUrl);
       if (configureProduct) await configureProduct(this.page);
 
-      const addButton = this.page
-        .getByRole('main')
+      const main = this.page.getByRole('main');
+      // The recommendation carousel has its own Add to basket controls.
+      const purchaseArea = mxBasePdp ? main.locator('app-product-add-to-cart') : main;
+      const addButton = purchaseArea
         .getByRole('button', { name: addButtonName })
         .filter({ visible: true })
         .first();
@@ -82,7 +85,7 @@ export default class ProductPage extends BasePage {
             error.sku = this.sku;
             throw error;
           }
-          const error = new Error(`Configured product ${this.sku} is sold out; a currently purchasable fixture is required.`);
+          const error = new Error(`${mxBasePdp ? 'MX_CART_STOCK_UNAVAILABLE: ' : ''}Configured product ${this.sku} is sold out; a currently purchasable fixture is required.`);
           error.code = 'PRODUCT_OUT_OF_STOCK';
           error.sku = this.sku;
           throw error;
@@ -148,6 +151,15 @@ export default class ProductPage extends BasePage {
         failedRequest: outcome?.failedRequest?.failure()?.errorText ?? null,
       });
       if (outcome?.response && !outcome.response.ok()) {
+        if (outcome.response.status() === 400 && mxBasePdp) {
+          const body = await outcome.response.json().catch(() => null);
+          const stockError = Array.isArray(body?.errors) && body.errors.find((error) =>
+            error?.type === 'InsufficientStockError' && error.reason === 'noStock' &&
+            error.subjectType === 'product' && /^[A-Z0-9-]{1,40}$/.test(error.subject));
+          if (stockError) {
+            throw new Error(`MX_CART_STOCK_UNAVAILABLE: Add for ${this.sku} rejected because product ${stockError.subject} is out of stock.`);
+          }
+        }
         throw new Error(`Configured PDP add-to-cart returned HTTP ${outcome.response.status()}.`);
       }
       if (this.cartReadback && outcome?.response) {

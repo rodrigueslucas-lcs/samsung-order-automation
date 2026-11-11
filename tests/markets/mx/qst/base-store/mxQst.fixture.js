@@ -36,6 +36,16 @@ export const test = base.extend({
       pdpUrl: new URL(`/mx/p/${sku}`, baseConfig.baseUrl.origin),
     });
   },
+  mxCareConfig: async ({ mxConfig }, use, testInfo) => {
+    // The S2 Flip6 cart exposes Galaxy Canje, but the Fold6 exposes both
+    // services needed by the Cart UI and Samsung Care+ cases.
+    const sku = mxConfig.environment === "S2" && !process.env.MX_QST_SKU && !process.env.MX_SMOKE_SKU
+      ? "SM-F956BDBMLTM"
+      : mxConfig.sku;
+    const pdpUrl = new URL(`/mx/p/${sku}`, mxConfig.baseUrl.origin);
+    recordBusinessEvidence(testInfo, { sku, pdpUrl: pdpUrl.href });
+    await use({ ...mxConfig, sku, pdpUrl });
+  },
   qstBusinessScenario: [async ({}, use, testInfo) => {
     const samId = testInfo.title.match(/SAM-\d+/)?.[0];
     const businessTitle = testInfo.title.includes(" - ")

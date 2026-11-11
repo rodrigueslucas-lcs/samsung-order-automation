@@ -6,7 +6,7 @@ const { readMxCartSku } = require('../../utils/mxCartReadback.cjs');
 const cartUrl = 'https://stg2.shop.samsung.com/mx/cart';
 const pdpUrl = 'https://stg2.shop.samsung.com/mx/p/TEST';
 
-function state({ failures = 1, empty = false, unresolved = false, httpError = false, blankFirst = false, alwaysBlank = false, readyDelayMs = 0 } = {}) {
+function state({ failures = 1, empty = false, unresolved = false, httpError = false, blankFirst = false, alwaysBlank = false, readyDelayMs = 0, soldOut = false } = {}) {
   let current = pdpUrl, gets = [], clicks = 0, bodyFinished = false, resolveAdd;
   let clock = 0;
   const module = { exports: {} };
@@ -24,9 +24,17 @@ function state({ failures = 1, empty = false, unresolved = false, httpError = fa
       finished: async () => { bodyFinished = true; return null; },
       json: async () => ({ statusCode: 'success', entry: { product: { code: 'TEST' } } }) }); } };
   const page = { url: () => current, getByText: () => sku,
-    getByRole: () => ({ getByRole: () => button,
+    getByRole: () => ({
+      locator(selector) {
+        assert.equal(selector, 'app-product-add-to-cart');
+        return { getByRole: () => soldOut ? { ...button,
+          waitFor: async () => { throw Error('PDP purchase button absent'); },
+          isVisible: async () => false,
+        } : button };
+      },
+      getByRole: () => ({ ...button, isVisible: async () => false }),
       waitFor: async () => {},
-      innerText: async () => blank() ? '' : 'Rendered cart or business error',
+      innerText: async () => soldOut ? 'TEST Sold out. Get stock alert' : blank() ? '' : 'Rendered cart or business error',
       getByText: () => ({ filter() { return this; }, first() { return this; }, isVisible: async () => empty }) }),
     locator: () => ({ filter() { return this; }, count: async () => blank() ? 1 : 0 }),
     waitForResponse: () => new Promise(resolve => { resolveAdd = resolve; }),
@@ -51,6 +59,12 @@ function state({ failures = 1, empty = false, unresolved = false, httpError = fa
   return { run: () => product.addConfiguredPdpToCart({ waitForCartMutation: true }),
     gets, clicks: () => clicks };
 }
+
+test('MX sold-out PDP never clicks the recommendation Add button', async () => {
+  const s = state({ soldOut: true });
+  await assert.rejects(s.run(), error => error.code === 'PRODUCT_OUT_OF_STOCK');
+  assert.equal(s.clicks(), 0);
+});
 
 test('MX acknowledged Add survives interrupted cart document with two GETs and one Add', async () => {
   const s = state(); await s.run();

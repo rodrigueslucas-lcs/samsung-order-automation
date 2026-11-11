@@ -2,6 +2,26 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const { buildMxQstRuntimeSummary, safeArtifact } = require("../../utils/mxQstRuntimeSummary.cjs");
 
+test("MX failure classification ignores business metadata and distinguishes stock rejection from outages", () => {
+  const cases = [
+    ["SAM-1", "Configured PDP add-to-cart returned HTTP 400.", "FUNCTIONAL_FAIL"],
+    ["SAM-2", "MX_CART_STOCK_UNAVAILABLE: Add rejected for product GIFT-1.", "TEST_DATA_ERROR"],
+    ["SAM-3", "MX BC loaded 10 product links without the configured model TEST-SKU.", "TEST_DATA_ERROR"],
+    ["SAM-4", "Configured PDP add-to-cart returned HTTP 503.", "ENVIRONMENT_ERROR"],
+    ["SAM-5", "locator.click: element not visible", "TEST_AUTOMATION_ERROR"],
+  ];
+  const report = { suites: [{ specs: cases.map(([samId, message]) => ({
+    title: samId,
+    tests: [{
+      annotations: [{ type: "business-evidence", description: '{"environment":"S2","account":"registered"}' }],
+      results: [{ status: "failed", errors: [{ message }] }],
+    }],
+  })) }] };
+  const summary = buildMxQstRuntimeSummary(report, { officialIds: cases.map(([samId]) => samId) });
+  assert.deepEqual(summary.tests.map(row => row.failureType), cases.map(([, , type]) => type));
+  assert.equal(summary.summary.failed, cases.length);
+});
+
 test("runtime summary reconciles all canonical statuses", () => {
   const report = { suites: [{ specs: [
     { title: "SAM-1 works", file: "tests/a.spec.js", tests: [{ results: [{ status: "passed", duration: 10, attachments: [] }] }] },

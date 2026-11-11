@@ -26,6 +26,7 @@ function classifyFailure(status, reason = "") {
     return "PREREQUISITE_BLOCKED";
   }
   if (status !== "FAIL") return null;
+  if (/MX_CART_STOCK_UNAVAILABLE:|MX BC loaded \d+ product links without the configured model/i.test(reason)) return "TEST_DATA_ERROR";
   if (PAYMENT_OUTCOME_PATTERN.test(reason)) return "PAYMENT_OUTCOME_UNCONFIRMED";
   if (AUTOMATION_STABILITY_PATTERN.test(reason)) return "AUTOMATION_STABILITY_ERROR";
   if (AUTH_FAILURE_PATTERN.test(reason)) return "AUTH_BLOCKED";
@@ -84,7 +85,9 @@ function buildMxQstRuntimeSummary(report, {
       const statuses = results.map((result) => result.status);
       const annotations = tests.flatMap((entry) => entry.annotations || []);
       const errors = results.flatMap((result) => result.errors || []).map((error) => error.message).filter(Boolean);
-      const reason = [...annotations.map((item) => item.description), ...errors].filter(Boolean).join(" | ");
+      const blockerNotes = annotations.filter((item) =>
+        ["skip", "qst-blocker"].includes(String(item?.type || "").toLowerCase()));
+      const reason = [...blockerNotes.map((item) => item.description), ...errors].filter(Boolean).join(" | ");
       const failed = statuses.some((status) => TERMINAL_FAILURES.has(status));
       const blocked = (statuses.length > 0 && statuses.every((status) => status === "skipped")) || (failed && BLOCKED_PATTERN.test(reason));
       const status = !statuses.length ? "NOT_RUN" : blocked ? "SKIPPED-BLOCKED" : failed ? "FAIL" : "PASS";

@@ -40,7 +40,7 @@ test('auth health accepts only known staging targets before making a request', a
 function unavailableProduct(text, { preorder = false } = {}) {
   const source = fs.readFileSync('pages/ProductPage.js', 'utf8').replace(/^import .*;\r?\n/gm, '')
     .replace('export default class ProductPage', 'class ProductPage');
-  const Page = vm.runInNewContext(`${source}\nProductPage;`, { BasePage: class { constructor(page) { this.page = page; } } });
+  const Page = vm.runInNewContext(`${source}\nProductPage;`, { URL, BasePage: class { constructor(page) { this.page = page; } } });
   let navigations = 0;
   const button = { filter() { return this; }, first() { return this; }, waitFor: async () => { throw Error('not rendered'); },
     isVisible: async () => preorder, isEnabled: async () => preorder };

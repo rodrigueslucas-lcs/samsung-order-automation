@@ -30,7 +30,10 @@ function getMxConfig(environment = process.env) {
     "MX_BOOTSTRAP_URL",
     target
   );
-  const sku = environment.MX_QST_SKU || environment.MX_SMOKE_SKU || "SM-F741BLBKLTM";
+  // The former blue 512 GB fixture is sold out in S2. Use the black
+  // 256 GB Flip6 for generic cart scenarios.
+  const defaultSku = target.name === "S2" ? "SM-F741BAKJLTM" : "SM-F741BLBKLTM";
+  const sku = environment.MX_QST_SKU || environment.MX_SMOKE_SKU || defaultSku;
   const pdpUrl = parseMxUrl(
     environment.MX_SMOKE_PDP_URL || `${baseUrl.origin}/mx/p/${sku}`,
     "MX_SMOKE_PDP_URL",

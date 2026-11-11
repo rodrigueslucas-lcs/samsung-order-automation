@@ -23,11 +23,11 @@ test("MX QST 05 @qst @mx @base-store @safe - PDP variants other than color", asy
   await expect(page.getByText(/Almacenamiento \(GB\)/i)).toBeVisible({ timeout: 30000 });
 });
 
-test("SAM-24981 @qst @mx @base-store @safe - Add Samsung Care+", async ({ page, mxConfig }, testInfo) => {
+test("SAM-24981 @qst @mx @base-store @safe - Add Samsung Care+", async ({ page, mxCareConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24981"));
 
   await test.step("Prepare the controlled MX cart", async () => {
-    await prepareMxQstCart(page, mxConfig);
+    await prepareMxQstCart(page, mxCareConfig);
   });
 
   await test.step("Open Samsung Care+ and validate the available protection option", async () => {

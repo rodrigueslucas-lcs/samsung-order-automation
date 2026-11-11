@@ -43,15 +43,18 @@ test("SAM-24964 @qst @mx @base-store @safe - Store GNB matches Samsung.com", asy
       }
       await expect(page).toHaveURL(new RegExp("p6-pre-qa2\\.samsung\\.com/mx/?", "i"), { timeout: 30000 });
 
-      const gnb = page.locator("nav, [role='navigation'], [class*='gnb']").filter({ visible: true }).first();
+      const gnb = page.getByRole("navigation", { name: "main navigation", exact: true }).filter({ visible: true });
       await expect(gnb, "Samsung global navigation must be displayed on the Base Store home page.").toBeVisible({ timeout: 60000 });
 
-      const mobilesMenu = gnb.locator("a.nv00-gnb-v4__l0-menu-link[href='/mx/smartphones/all-smartphones/']");
-      await expect(mobilesMenu, "The GNB must display the Móviles category.").toBeVisible();
-      await mobilesMenu.click();
-      const smartphonesLink = gnb.locator("a.nv00-gnb-v4__l1-menu-link[href='/mx/smartphones/all-smartphones/']")
+      const category = gnb.getByRole("list", { name: "main menu", exact: true })
+        .getByRole("link", { name: /^(?:Móviles|Celulares y Tabletas)$/i });
+      await expect(category, "The GNB must expose the mobile catalog category.").toBeVisible({ timeout: 30000 });
+      await category.hover();
+      const smartphonesLink = gnb.locator("a[href='/mx/smartphones/all-smartphones/']")
+        .and(gnb.getByRole("link", { name: /Todos los celulares Galaxy|Todos los smartphones/i })
+          .or(gnb.locator("a.nv00-gnb-v4__l1-menu-link")))
         .filter({ visible: true }).first();
-      await expect(smartphonesLink, "The GNB must expose navigation to the Smartphones BC/PLP page.").toBeVisible({ timeout: 60000 });
+      await expect(smartphonesLink, "The GNB must expose the staging Smartphones BC/PLP link.").toBeVisible({ timeout: 30000 });
       gnbHref = await smartphonesLink.getAttribute("href");
       await smartphonesLink.click();
     });
