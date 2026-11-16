@@ -3,8 +3,7 @@ async function waitForMxBcProductCard(page, sku, { timeout = 30000 } = {}) {
   const card = page.locator("[role='listitem'].pd21-product-card__item")
     .filter({ has: page.locator(`a.pd21-product-card__name[data-modelcode='${sku}']`) }).first();
   try {
-    await card.waitFor({ state: 'visible', timeout });
-    return card;
+    await card.waitFor({ state: 'attached', timeout });
   } catch (original) {
     const url = new URL(page.url());
     const approved = url.origin === 'https://p6-pre-qa2.samsung.com' &&
@@ -15,8 +14,12 @@ async function waitForMxBcProductCard(page, sku, { timeout = 30000 } = {}) {
     // catalog missing the requested SKU is data evidence, not a reason to retry.
     if (loadedModels) throw new Error(`MX BC loaded ${loadedModels} product links without the configured model ${sku}.`);
     await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
-    await card.waitFor({ state: 'visible', timeout });
-    return card;
+    await card.waitFor({ state: 'attached', timeout });
   }
+  // AEM defers rendering cards below the viewport. Attachment proves the exact
+  // model exists; scrolling lets the storefront render it before interaction.
+  await card.scrollIntoViewIfNeeded({ timeout });
+  await card.waitFor({ state: 'visible', timeout });
+  return card;
 }
 module.exports = { waitForMxBcProductCard };

@@ -12,14 +12,23 @@ const { resolveMxBcCareChoice } = bcCareChoice;
 
 const PRE_QA_ORIGIN = "https://p6-pre-qa2.samsung.com";
 const PRE_QA_PLP = `${PRE_QA_ORIGIN}/mx/smartphones/all-smartphones/`;
-const PRE_QA_MODEL_CODE = "SM-F766BLGKLTM";
-const PRE_QA_PRODUCT_NAME = "Galaxy Z Flip7";
-const PRE_QA_PDP_PATH = "/mx/smartphones/galaxy-z-flip7/buy/";
+const PRE_QA_MODEL_CODE = "SM-F956BDBMLTM";
+const PRE_QA_PRODUCT_NAME = "Galaxy Z Fold6";
+const PRE_QA_PDP_PATH = "/mx/smartphones/galaxy-z-fold6/buy/";
 const PRE_QA_CDP_URL = process.env.PREQA2_CDP_URL || "http://127.0.0.1:9223";
-const PRE_QA_PDP_URL = new RegExp("p6-pre-qa2\\.samsung\\.com/mx/smartphones/galaxy-z-flip7/buy", "i");
+const PRE_QA_PDP_URL = new RegExp("p6-pre-qa2\\.samsung\\.com/mx/smartphones/galaxy-z-fold6/buy", "i");
+
+function preQaAddToCart(page) {
+  // The native AEM cart action is labelled "Continuar" on this buying tool.
+  // Scope by action and exact SKU rather than matching unrelated Continue CTAs.
+  return page.getByRole("button")
+    .and(page.locator(`a[an-ac="addToCart"][data-modelcode="${PRE_QA_MODEL_CODE}"]`))
+    .filter({ visible: true }).first();
+}
 
 async function dismissLocationBanner(page) {
-  const continueButton = page.getByRole("button", { name: /Continuar/i }).filter({ visible: true });
+  const continueButton = page.getByRole("button", { name: /Continuar/i })
+    .and(page.locator(':not([an-ac="addToCart"])')).filter({ visible: true });
   if (await continueButton.count()) {
     await continueButton.first().click().catch(() => {});
   }
@@ -88,9 +97,7 @@ async function returnToPreQaPdp(page) {
 }
 
 async function waitForPreQaAddToCart(page, testInfo) {
-  const addToCart = page.getByRole("button", {
-    name: /Añadir al carrito|Agregar al carrito|Add to cart|Add to bag/i,
-  }).filter({ visible: true }).first();
+  const addToCart = preQaAddToCart(page);
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     if (!PRE_QA_PDP_URL.test(page.url())) await returnToPreQaPdp(page);
@@ -160,11 +167,11 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
       await expect(page).toHaveURL(new RegExp("p6-pre-qa2\\.samsung\\.com/mx/smartphones/all-smartphones", "i"), { timeout: 30000 });
     });
 
-    await test.step("Open the configured Galaxy Z Flip7 PDP from the BC catalog", async () => {
+    await test.step("Open the configured Galaxy Z Fold6 PDP from the BC catalog", async () => {
       const productCard = await bcCatalog.waitForMxBcProductCard(page, PRE_QA_MODEL_CODE);
       // The filter label includes its active count (for example "Filtros (1)").
       // Readiness is the exact product card rather than incidental filter copy.
-      await expect(productCard, "The PreQA BC catalog must render the configured Galaxy Z Flip7 product card.")
+      await expect(productCard, "The PreQA BC catalog must render the configured Galaxy Z Fold6 product card.")
         .toBeVisible();
       await productCard.scrollIntoViewIfNeeded();
       const productLink = productCard.locator(`a.pd21-product-card__name[data-modelcode='${PRE_QA_MODEL_CODE}']`);
@@ -185,6 +192,13 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
       );
       await dismissLocationBanner(page);
       await expect(page.getByText(PRE_QA_PRODUCT_NAME, { exact: true }).filter({ visible: true }).first()).toBeVisible({ timeout: 60000 });
+      // The catalog's family URL defaults to another color. Select the exact
+      // catalog model through its rendered label before configuring services.
+      const color = page.locator(`input[name="basic-color"][data-modelcode="${PRE_QA_MODEL_CODE}"]`);
+      await color.waitFor({ state: "attached", timeout: 30000 });
+      await color.locator("xpath=..").locator("label").click();
+      await expect(color).toBeChecked();
+      await expect(preQaAddToCart(page)).toHaveAttribute("data-modelcode", PRE_QA_MODEL_CODE);
     });
 
     let addResponse;
@@ -206,10 +220,7 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
       // Some configurations offer Care+, others enable the exact SKU directly.
       // Never require an absent optional service or bypass a disabled CTA.
       const noCare = page.getByRole("tab", { name: /Sin protecci[oó]n para mi Galaxy/i });
-      const enabledAdd = page.getByRole("button", {
-        name: /Añadir al carrito|Agregar al carrito|Add to cart|Add to bag/i,
-      }).and(page.locator(`[data-modelcode="${PRE_QA_MODEL_CODE}"][canaddtocart="true"]`))
-        .filter({ visible: true }).first();
+      const enabledAdd = preQaAddToCart(page).and(page.locator('[canaddtocart="true"]'));
       careEvidence = await resolveMxBcCareChoice({ noCare, enabledAdd, selectOptOut: async () => {
         await noCare.click();
         const careChoice = noCare.locator("xpath=..");
