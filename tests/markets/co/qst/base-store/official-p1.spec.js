@@ -714,7 +714,8 @@ test("SAM-24919 @destructive @qst @co @base-store - Track Order",async({page,con
     const otpRequest=await tracking.requestVerificationCode(orderNumber,email,{maxAttempts:4,retryDelayMs:15000});
     i.annotations.push({type:"co-tracking-otp-request",description:`${otpRequest.method} ${otpRequest.status} ${otpRequest.endpoint}`});
     await mailPage.bringToFront();
-    const otpEmail=await mail.waitForOtpEmail({baselineMessageIds});
+    const otpEmail=await mail.waitForOtpEmail({baselineMessageIds,
+      timeoutMs:Number(process.env.CO_QST_TRACKING_OTP_TIMEOUT_MS||process.env.MAILINATOR_EMAIL_TIMEOUT_MS||180000)});
     await page.bringToFront();
     await tracking.submitVerificationCode(otpEmail.otp,orderNumber);
     const result=await tracking.validateTrackedOrder(orderNumber);

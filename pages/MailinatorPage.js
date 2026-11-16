@@ -123,9 +123,14 @@ export default class MailinatorPage extends BasePage {
     baselineOtpCodes = [],
     timeoutMs = Number(process.env.MAILINATOR_EMAIL_TIMEOUT_MS || 600000),
     intervalMs = Number(process.env.MAILINATOR_POLL_INTERVAL_MS || 3000),
+    emptyInboxReloadAfterMs = 90000,
   } = {}) {
+    if (![timeoutMs, intervalMs, emptyInboxReloadAfterMs].every(value => Number.isFinite(value) && value > 0)) {
+      throw new Error("OTP inbox deadlines must be positive finite durations.");
+    }
     const startedAt = Date.now();
     let emptyInboxRecovery = false;
+    let emptyInboxReload = false;
     const baseline = new Set(baselineMessageIds);
     const priorOtpCodes = new Set(baselineOtpCodes);
     const baselineOtpCount = Number(
@@ -144,19 +149,27 @@ export default class MailinatorPage extends BasePage {
         await this.refreshInbox();
         continue;
       }
-      const candidateCount = baselineOtpCodes.length > 0
-        ? otpCount
-        : Math.max(0, otpCount - baselineOtpCount);
-      for (let index = 0; index < candidateCount; index++) {
+      if (!otpCount && !emptyInboxReload && Date.now() - startedAt >= emptyInboxReloadAfterMs) {
+        // GO re-subscribes the existing socket, but does not recreate a silent
+        // connection. Reload this inbox once, retaining the original baseline.
+        emptyInboxReload = true;
+        await this.openInbox();
+        continue;
+      }
+      for (let index = 0; index < otpCount; index++) {
         const row = otpRows.nth(index);
         // Mailinator often renders the message row without an <a href="...msgid=...">.
         // Locator.getAttribute() waits 30s for that absent link on every poll.
-        const messageId = await row.evaluate((subject) => {
+        const stableMessageId = await row.evaluate((subject) => {
           const element = subject.closest("[role='row'], tr") || subject.parentElement;
           return element?.id || element?.querySelector("a[href*='msgid=']")?.getAttribute("href") || null;
         }
-        ) || `otp-row-${index}-of-${otpCount}`;
-        if (baseline.has(messageId)) continue;
+        );
+        // A new message may replace an old row without increasing the count.
+        // Prefer its identity; only anonymous rows need the count/code guard.
+        if (stableMessageId && baseline.has(stableMessageId)) continue;
+        if (!stableMessageId && !priorOtpCodes.size && index >= Math.max(0, otpCount - baselineOtpCount)) continue;
+        const messageId = stableMessageId || `otp-row-${index}-of-${otpCount}`;
 
         await row.click();
         await this.page.getByText("Public Message", { exact: true })
