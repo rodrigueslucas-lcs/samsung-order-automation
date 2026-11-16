@@ -7,6 +7,7 @@ async function connectAuthBrowser({ chromium, profileDir, market, environment, s
   hasWindow = hasNativeAuthWindow, log = console.log,
   launch = script => spawnSync(process.execPath, [script], { stdio: 'inherit', env: { ...process.env, SAMSUNG_AUTH_MANAGED: '1' } }),
   pause = ms => new Promise(resolve => setTimeout(resolve, ms)), now = Date.now,
+  recoverEndpoint = require('./authBrowserEndpoint.cjs').recoverAuthBrowserEndpoint,
 } = {}) {
   if (!['mx', 'pe', 'co', 'cl'].includes(market) || !['S1', 'S2'].includes(environment) || !['primary', 'second'].includes(slot)) throw new Error('Dedicated auth browser requires an explicit staging identity.');
   const expected = `${environment.toLowerCase()}-${market}-${slot === 'second' ? 'second' : 'qa'}`;
@@ -31,8 +32,20 @@ async function connectAuthBrowser({ chromium, profileDir, market, environment, s
     }
   };
   if (existing && await accessible(existing)) return existing;
-  // A CDP timeout does not prove the browser is dead. Keep its endpoint so a
-  // temporarily busy Chrome remains reconnectable; a new Chrome replaces it.
+  if (!existing) {
+    const recovered = await recoverEndpoint(profileDir);
+    // Only a positive OS proof that this exact profile has no process allows
+    // clearing an old pointer before Chrome starts. A CDP timeout alone cannot.
+    if (recovered.absent === true) fs.rmSync(portFile, { force: true });
+    if (recovered.occupied) {
+      existing = await chromium.connectOverCDP(recovered.endpoint, { timeout: 5000 });
+      if (await accessible(existing)) return existing;
+      // A verified background-only Chrome may still need one native window,
+      // using the same existing handle and the normal bounded launch below.
+    }
+  }
+  // A live verified background browser may need one native window. Unknown
+  // ownership fails above, so retries cannot accumulate windows in that profile.
   log(`[auth:login:${market}] opening its maximized Chrome window`);
   const result = launch(path.resolve(`scripts/auth-open-profile-${market}.cjs`));
   if (result.status !== 0) throw new Error(`Dedicated ${market.toUpperCase()} Chrome launcher failed.`);

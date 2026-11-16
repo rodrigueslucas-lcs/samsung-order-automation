@@ -38,6 +38,52 @@ test('wrong market/slot profile is rejected before connecting or launching', asy
   await assert.rejects(connectAuthBrowser({ market: 'mx', environment: 'S2', slot: 'second', profileDir: '/fixture/s2-mx-qa', chromium: {} }), /does not match/);
 });
 
+test('stale endpoint reuses the discovered profile without launching another window', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auth-cdp-'));
+  const directory = path.join(root, 's2-mx-qa'); fs.mkdirSync(directory);
+  const port = path.join(directory, 'DevToolsActivePort'); fs.writeFileSync(port, '12345\n');
+  const recovered = {}; let connections = 0;
+  try {
+    const result = await connectAuthBrowser({ market: 'mx', environment: 'S2', profileDir: directory,
+      chromium: { connectOverCDP: async endpoint => {
+        connections++;
+        if (endpoint === 'http://127.0.0.1:12345') throw Error('ECONNREFUSED');
+        assert.equal(endpoint, 'ws://127.0.0.1:43210/devtools/browser/exact-profile');
+        return recovered;
+      } },
+    }, { recoverEndpoint: async folder => { assert.equal(folder, directory); return { occupied: true,
+      endpoint: 'ws://127.0.0.1:43210/devtools/browser/exact-profile' }; },
+    hasWindow: async () => true, launch: () => assert.fail('duplicate blank window'), log() {} });
+    assert.equal(result, recovered); assert.equal(connections, 2);
+  } finally { fs.unlinkSync(port); fs.rmdirSync(directory); fs.rmdirSync(root); }
+});
+
+test('repeated attempts cannot open windows when existing profile ownership is unproven', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auth-cdp-'));
+  const directory = path.join(root, 's2-co-qa'); fs.mkdirSync(directory);
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await assert.rejects(connectAuthBrowser({ market: 'co', environment: 'S2', profileDir: directory, chromium: {} }, {
+        recoverEndpoint: async () => { throw Object.assign(Error('unproven owner'), { exitCode: 73 }); },
+        launch: () => assert.fail('must not accumulate blank windows'), log() {},
+      }), error => error.exitCode === 73);
+    }
+  } finally { fs.rmdirSync(directory); fs.rmdirSync(root); }
+});
+
+test('a recovered background profile opens only its missing native window', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auth-cdp-'));
+  const directory = path.join(root, 's2-pe-qa'); fs.mkdirSync(directory);
+  let opened = 0; const browser = {};
+  try {
+    const result = await connectAuthBrowser({ market: 'pe', environment: 'S2', profileDir: directory,
+      chromium: { connectOverCDP: async () => browser },
+    }, { recoverEndpoint: async () => ({ occupied: true, endpoint: 'ws://127.0.0.1:43210/devtools/browser/background' }),
+      hasWindow: async () => opened > 0, launch: () => { opened++; return { status: 0 }; }, log() {} });
+    assert.equal(result, browser); assert.equal(opened, 1);
+  } finally { fs.rmdirSync(directory); fs.rmdirSync(root); }
+});
+
 test('a CDP handle closed during native-window inspection reconnects to the same profile', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auth-cdp-'));
   const directory = path.join(root, 's1-co-qa'); fs.mkdirSync(directory);
@@ -47,7 +93,7 @@ test('a CDP handle closed during native-window inspection reconnects to the same
   try {
     const result = await connectAuthBrowser({ market: 'co', environment: 'S1', profileDir: directory,
       chromium: { connectOverCDP: async () => ++connections === 1 ? stale : live },
-    }, { hasWindow: async browser => { if (browser === stale) throw Error('browser.newBrowserCDPSession: Target page, context or browser has been closed'); return true; },
+    }, { recoverEndpoint: async () => ({ occupied: false }), hasWindow: async browser => { if (browser === stale) throw Error('browser.newBrowserCDPSession: Target page, context or browser has been closed'); return true; },
       launch: () => { launches++; return { status: 0 }; }, log() {},
     });
     assert.equal(result, live);
@@ -64,7 +110,7 @@ test('a transient CDP timeout retains the live endpoint for a later reconnect', 
   try {
     await assert.rejects(connectAuthBrowser({ market: 'cl', environment: 'S2', profileDir: directory,
       chromium: { connectOverCDP: async () => { throw Error('temporarily busy'); } },
-    }, { launch: () => ({ status: 0 }), now: () => clock, pause: async ms => { clock += ms; }, log() {} }), error => error.exitCode === 73);
+    }, { recoverEndpoint: async () => ({ occupied: false }), launch: () => ({ status: 0 }), now: () => clock, pause: async ms => { clock += ms; }, log() {} }), error => error.exitCode === 73);
     assert.equal(fs.readFileSync(port, 'utf8'), '12345\n');
   } finally { fs.unlinkSync(port); fs.rmdirSync(directory); fs.rmdirSync(root); }
 });
