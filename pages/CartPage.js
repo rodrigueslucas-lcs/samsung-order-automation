@@ -510,6 +510,13 @@ export default class CartPage extends BasePage {
       await this.continueButton.click();
       await guestEmail.first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     }
+    if (new URL(this.cartUrl).pathname === '/cl/cart' &&
+        new URL(this.page.url()).origin === new URL(this.cartUrl).origin &&
+        /^\/cl\/guestlogin\/checkout\/?$/i.test(new URL(this.page.url()).pathname)) {
+      // Angular changes the route before mounting the email/login form. The
+      // checkout click has already succeeded: wait for its UI, never replay it.
+      await guestEmail.first().waitFor({ state: 'visible', timeout: 30000 });
+    }
     if (!(await guestEmail.first().isVisible().catch(() => false))) {
       throw new Error(`Guest checkout did not reach the email/login surface. URL=${this.page.url()}`);
     }
