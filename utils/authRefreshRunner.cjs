@@ -70,6 +70,7 @@ async function refreshAuth({ market, environment, slot = 'primary', env, publish
   const releaseMarket = acquireMarket(market, environment, { env });
   let release;
   let ownedBrowser;
+  let loginStarted = false, completed = false, humanRequired = false;
   try {
     env = { ...env, ...releaseMarket.env };
     release = acquire(market, environment, slot);
@@ -87,6 +88,7 @@ async function refreshAuth({ market, environment, slot = 'primary', env, publish
       const label = `${market.toUpperCase()} ${environment} ${slot} · ${phase}`;
       report(label);
       const phaseEnv = phase === 'verify' ? { ...env, [`${market.toUpperCase()}_AUTH_AUTO_RENEW`]: '0' } : env;
+      if (phase === 'login') loginStarted = true;
       let status = await runChild(script, phaseEnv, { label, log: report, timeoutMs, interactive: phase === 'login' });
       // Only a classified lost browser/page may restart, once. Invalid sessions,
       // DNS/configuration failures and human verification never restart login.
@@ -97,6 +99,7 @@ async function refreshAuth({ market, environment, slot = 'primary', env, publish
       if (status !== 0) {
         if(phase==='login'&&status===78){ownedBrowser=await captureBrowser({market,environment,slot});await ownedBrowser?.closeSecurityBlocked?.(()=>recordSecurity({market,environment,slot}));}
         if (status === 79) {
+          humanRequired = true;
           const error = new Error(`${label}: Samsung Account requires human CAPTCHA/MFA. No credentials were retried and no READY was emitted.`);
           error.code = 'AUTH_HUMAN_REQUIRED'; throw error;
         }
@@ -115,7 +118,17 @@ async function refreshAuth({ market, environment, slot = 'primary', env, publish
     }
     report(`READY · ${market.toUpperCase()} ${environment} ${slot} authenticated session refreshed, verified and packaged.`);
     report('CAPTCHA/MFA remains a human security gate when Samsung Account requests it.');
-  } finally { try { await ownedBrowser?.dispose(); } finally { try { release?.(); } finally { releaseMarket(); } } }
+    completed = true;
+  } finally {
+    try {
+      if (loginStarted && !completed && !humanRequired) {
+        try {
+          ownedBrowser ||= await captureBrowser({ market, environment, slot });
+          if (await ownedBrowser?.closeIdle?.()) report('Ended refresh: idle dedicated Chrome closed.');
+        } catch { report('Idle browser cleanup unproven; no unrelated window was closed.'); }
+      }
+    } finally { try { await ownedBrowser?.dispose(); } finally { try { release?.(); } finally { releaseMarket(); } } }
+  }
 }
 
 module.exports = { refreshAuth, runAuthChild, acquireRefreshLock };

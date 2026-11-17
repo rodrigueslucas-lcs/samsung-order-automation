@@ -32,6 +32,9 @@ async function captureAuthBrowser({ market, environment, slot }, {
   catch(error) { if(error.code==='ECONNREFUSED'||/ECONNREFUSED/.test(String(error.message)))return null;throw error; }
   return {
     fingerprint: require('node:crypto').createHash('sha256').update(endpoint).digest('hex'),
+    closeIdle(options = {}) {
+      return require('./authIdleBrowser.cjs').closeIdleAuthBrowser(browser, { market, environment, ...options });
+    },
     async hasAccountHandoff(){return browser.contexts()[0]?.pages().some(p=>{try{return new URL(p.url()).origin==='https://account.samsung.com';}catch{return false;}})===true;},
     async closeSecurityBlocked(persist){
       const page=browser.contexts()[0]?.pages().find(p=>{try{const u=new URL(p.url());return u.origin==='https://account.samsung.com'&&/^\/iam\/blocked(?:\/|$)/i.test(u.pathname);}catch{return false;}});

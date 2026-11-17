@@ -98,7 +98,7 @@ async function refresh(market, environment) {
   const credentials = getPrimaryEppCredentials(config);
   const lease = acquireEppLease(config);
   fs.mkdirSync(files.directory, { recursive: true });
-  let browser, guard, success = false, startedNewAccountFlow = false, stage = "CONNECT_BROWSER";
+  let browser, guard, success = false, humanRequired = false, startedNewAccountFlow = false, stage = "CONNECT_BROWSER";
   const report = message => console.log(`[auth:epp] ${config.market} ${config.environment} ${config.authSlot === 'second' ? 'SECOND' : 'FIRST'} · ${message}`);
   try {
     // The operator may have renewed the owned native profile after the export.
@@ -308,6 +308,7 @@ async function refresh(market, environment) {
       error.eppReason = denied.reason; error.exitCode = 78;
     }
     error.eppStage = error.eppStage || stage;
+    humanRequired = error.exitCode === 79 || error.eppReason === 'CORPORATE_ACTIVATION_REQUIRED';
     if (error.exitCode === 78 || error.eppReason === 'CORPORATE_ACTIVATION_REQUIRED') {
       writeJsonAtomically(files.handoff, { ...readHandoff(files), blockedReason: error.eppReason, blockedAt: new Date().toISOString() });
     }
@@ -316,6 +317,11 @@ async function refresh(market, environment) {
     try { await guard?.dispose(); }
     finally {
       if (success && browser) try { const cdp = await browser.newBrowserCDPSession(); await cdp.send("Browser.close"); } catch {}
+      if (!success && browser) try {
+        if (await require('../utils/authIdleBrowser.cjs').closeIdleAuthBrowser(browser, {
+          market: config.market.toLowerCase(), environment: config.environment, rootUrl: config.rootUrl.href, humanRequired,
+        })) report('Ended refresh: idle dedicated Chrome closed; no human gate was pending');
+      } catch { report('Idle browser cleanup unproven; unrelated windows preserved'); }
       try { await browser?.close(); }
       finally { lease.release(); }
     }
