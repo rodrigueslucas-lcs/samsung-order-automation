@@ -134,13 +134,34 @@ test('restricted programme preserves current gate and proof instead of reporting
 test('missing human browser with inconclusive health cannot start login',async()=>{
  const f=fixture(['UNPROVEN']);f.state={human:true};
  const r=await maintainIdentity(cfg,{allowRefresh:true},f.d);
- assert.equal(r.status,'HUMAN_REQUIRED');assert.ok(!f.calls.includes('refresh'));assert.ok(!f.calls.includes('resume'));
+ assert.equal(r.status,'UNPROVEN');assert.equal(r.reason,'NETWORK_ERROR');assert.equal(f.state.human,true);assert.ok(!f.calls.includes('refresh'));assert.ok(!f.calls.includes('resume'));
+});
+
+test('reboot handoff without a browser preserves the actual navigation failure in read-only and maintenance checks',async()=>{
+ for(const allowRefresh of [false,true]){
+  const f=fixture([{status:'UNPROVEN',reason:'EPP_NAVIGATION_OR_RENDER_TIMEOUT'}]);f.state={human:true};
+  const r=await maintainIdentity(cfg,{allowRefresh,publish:true},f.d);
+  assert.equal(r.status,'UNPROVEN');assert.equal(r.reason,'EPP_NAVIGATION_OR_RENDER_TIMEOUT');
+  assert.equal(f.state.human,true);assert.equal(f.calls.at(-1),'release');
+  for(const action of ['refresh','resume','persist','package','publish'])assert.ok(!f.calls.includes(action));
+ }
 });
 test('missing human browser still requires allow-refresh and never ignores security blocker',async()=>{
  const f=fixture(['INVALID']);f.state={human:true};
- assert.equal((await maintainIdentity(cfg,{allowRefresh:false},f.d)).status,'HUMAN_REQUIRED');assert.ok(!f.calls.includes('refresh'));
+ assert.equal((await maintainIdentity(cfg,{allowRefresh:false},f.d)).reason,'EPP_AUTH_RECOVERY_REQUIRED');assert.ok(!f.calls.includes('refresh'));
  f.state={human:true,blockedReason:'SAMSUNG_ACCOUNT_SECURITY_BLOCKED'};
  assert.equal((await maintainIdentity(cfg,{allowRefresh:true},f.d)).reason,'SAMSUNG_ACCOUNT_SECURITY_BLOCKED');assert.ok(!f.calls.includes('refresh'));
+});
+
+test('a retained programme page is not an active Account challenge',async()=>{
+ for(const sequence of [['UNPROVEN'],['INVALID','INVALID','HEALTHY']]){
+  const f=fixture(sequence);f.state={human:true};
+  f.d.capture=async()=>({hasAccountHandoff:async()=>false,readEppSnapshot:async()=>null,dispose:async()=>{},closeVerified:async()=>{}});
+  const r=await maintainIdentity(cfg,{allowRefresh:true},f.d);
+  assert.ok(!f.calls.includes('resume'));
+  assert.equal(r.status,sequence[0]==='INVALID'?'REFRESHED':'UNPROVEN');
+  assert.equal(f.calls.filter(x=>x==='refresh').length,sequence[0]==='INVALID'?1:0);
+ }
 });
 
 for(const reason of ['COMMERCE_CONTENT_NOT_RENDERED','EPP_COMMERCE_NOT_RENDERED']){

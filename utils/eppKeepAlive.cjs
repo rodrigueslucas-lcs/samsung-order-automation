@@ -116,15 +116,23 @@ async function maintainIdentity(config,{allowRefresh=false,publish=false,retrySe
       if(policyReason)return finish('BLOCKED',outcome.status==='BLOCKED'?outcome.reason:policyReason,{blockerSource:outcome.status==='BLOCKED'?'CURRENT':'PROGRAM_POLICY',currentReason:outcome.reason||'SESSION_NOT_VERIFIED',programPolicyReason:policyReason,proof:outcome.proof,loginAttempts:0,session:base.session});
       if(outcome.status==='BLOCKED') {d.save(config,{...checkpoint,blockedReason:outcome.reason});return finish('BLOCKED',outcome.reason,{proof:outcome.proof});}
       if(checkpoint.blockedReason)return finish('BLOCKED',checkpoint.blockedReason,{proof:outcome.proof,blockerSource:'CHECKPOINT',currentReason:outcome.reason,blockerObservedAt:checkpoint.blockerObservedAt});
+      const activeHuman=!!(checkpoint.human&&owned&&(typeof owned.hasAccountHandoff!=='function'||await owned.hasAccountHandoff()));
       // Resume an audited existing human handoff only; never start a new login
       // because a network/context check was inconclusive.
-      if(outcome.status!=='INVALID'&&!(checkpoint.human&&owned&&allowRefresh))return finish(checkpoint.human?'HUMAN_REQUIRED':'UNPROVEN',checkpoint.human?'EPP_HUMAN_PENDING':outcome.reason,{proof:outcome.proof});
-      if(!allowRefresh||config.programPolicy?.allowAutomaticRetry===false)return finish(checkpoint.human?'HUMAN_REQUIRED':'BLOCKED',checkpoint.human?'EPP_HUMAN_PENDING':'EPP_AUTH_RECOVERY_REQUIRED',{proof:outcome.proof});
+      if(outcome.status!=='INVALID'&&!(activeHuman&&allowRefresh)){
+        // A checkpoint can outlive its browser after reboot. Do not ask the
+        // operator to solve a nonexistent challenge or hide a current timeout.
+        // Keep the handoff audit for a later verified recovery; never relog
+        // merely because the snapshot could not be checked.
+        const pendingHuman=activeHuman;
+        return finish(pendingHuman?'HUMAN_REQUIRED':'UNPROVEN',pendingHuman?'EPP_HUMAN_PENDING':outcome.reason,{proof:outcome.proof});
+      }
+      if(!allowRefresh||config.programPolicy?.allowAutomaticRetry===false)return finish(activeHuman?'HUMAN_REQUIRED':'BLOCKED',activeHuman?'EPP_HUMAN_PENDING':'EPP_AUTH_RECOVERY_REQUIRED',{proof:outcome.proof});
       if(checkpoint.human&&!owned&&outcome.status!=='INVALID')return finish('HUMAN_REQUIRED','EPP_HANDOFF_BROWSER_MISSING');
       // With no retained browser, two definitive invalid checks authorize one
       // fresh recovery. An old handoff must not prevent recovery forever.
       if(confirmedInvalid&&checkpoint.human&&owned?.hasAccountHandoff&&!await owned.hasAccountHandoff()){checkpoint={...checkpoint,human:false};d.save(config,checkpoint);d.clearHandoff(config);}
-      const recovery=await d.refresh(config,runtimeEnv,{resumeOnly:!!(checkpoint.human&&owned),onHuman:()=>{checkpoint={...checkpoint,human:true};d.save(config,checkpoint);onProgress({...base,status:'HUMAN_REQUIRED',reason:'EPP_HUMAN_PENDING'});}});
+      const recovery=await d.refresh(config,runtimeEnv,{resumeOnly:activeHuman,onHuman:()=>{checkpoint={...checkpoint,human:true};d.save(config,checkpoint);onProgress({...base,status:'HUMAN_REQUIRED',reason:'EPP_HUMAN_PENDING'});}});
       if(recovery.status!=='REFRESHED') {
         if(recovery.reason==='AUTHORIZATION_EXPIRED'){d.clearHandoff(config);d.save(config,{...checkpoint,human:false,blockedReason:null});}
         if(recovery.status==='HUMAN_REQUIRED')d.save(config,{...checkpoint,human:true});
