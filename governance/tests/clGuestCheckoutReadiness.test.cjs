@@ -9,30 +9,30 @@ const Cart = vm.runInNewContext(`${source}\nCartPage;`, { BasePage: class {}, UR
 let browser;
 before(async () => { browser = await chromium.launch({ headless: true }); });
 after(async () => { await browser?.close(); });
-async function scenario(environment, { registered = false, render = true } = {}) {
+async function scenario(environment, { registered = false, render = true, market = 'cl' } = {}) {
  const context = await browser.newContext();
  const page = await context.newPage();
  const origin = environment === 'S1' ? 'https://stg.shop.samsung.com' : 'https://stg2.shop.samsung.com';
  await page.route('**/*', route => route.fulfill({ contentType: 'text/html', body: `
  <button onclick="beginCheckout(this)">Continuar</button>
  <script>function beginCheckout(button) {
-  history.pushState({},'', '/cl/guestlogin/checkout'); button.remove();
+  history.pushState({},'', '/${market}/guestlogin/checkout'); button.remove();
   ${render ? `setTimeout(()=>{document.body.innerHTML='<input placeholder="Ingresa tu correo"><button>Iniciar sesión</button>'},1500)` : ''}
  }</script>` }));
- await page.goto(`${origin}/cl/cart`);
+ await page.goto(`${origin}/${market}/cart`);
  const cart = Object.create(Cart.prototype);
- Object.assign(cart, { page, cartUrl: `${origin}/cl/cart`, guestEmailPattern: /Ingresa tu correo/i,
+ Object.assign(cart, { page, cartUrl: `${origin}/${market}/cart`, guestEmailPattern: /Ingresa tu correo/i,
   continueButton: page.getByRole('button', { name: 'Continuar', exact: true }), screenshot: async () => {} });
  return { context, page, cart, registered };
 }
-for (const environment of ['S1', 'S2']) {
- test(`CL ${environment} waits for guest login hydration after route navigation without replaying checkout`, async () => {
-  const f = await scenario(environment);
+for (const market of ['cl', 'mx']) for (const environment of ['S1', 'S2']) {
+ test(`${market.toUpperCase()} ${environment} waits for guest login hydration after route navigation without replaying checkout`, async () => {
+  const f = await scenario(environment, { market });
   try {
    let reloads = 0; f.page.on('request', request => { if (request.isNavigationRequest()) reloads++; });
    await f.cart.proceedToCheckout();
    assert.equal(await f.page.getByPlaceholder('Ingresa tu correo').isVisible(), true);
-   assert.equal(new URL(f.page.url()).pathname, '/cl/guestlogin/checkout');
+   assert.equal(new URL(f.page.url()).pathname, `/${market}/guestlogin/checkout`);
    assert.equal(reloads, 0, 'hydration must not trigger another navigation/submit');
   } finally { await f.context.close(); }
  });

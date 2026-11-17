@@ -303,7 +303,12 @@ export default class MxCheckoutPage extends BasePage {
           if(!response.ok()||await response.finished())throw new Error('EPP Marketplace delivery update was not acknowledged; Continue was not clicked.');
         }
       }else{
-      const deliveryModeUpdate = this.page.waitForResponse(
+      // Clicking an already checked radio does not change the mode and need
+      // not emit another update. Never wait for a request no action requires.
+      const alreadySelected = await standardDeliveryCard.evaluate(
+        card => Boolean(card.control?.checked || card.querySelector('input[type="radio"]')?.checked)
+      );
+      const deliveryModeUpdate = alreadySelected ? null : this.page.waitForResponse(
         (response) =>
           response.request().method() === "POST" &&
           /\/users\/current\/carts\/current\/deliverymodes\/update(?:\?|$)/.test(
@@ -311,7 +316,8 @@ export default class MxCheckoutPage extends BasePage {
           ),
         { timeout: 30000 }
       );
-      await standardDeliveryCard.click();
+      deliveryModeUpdate?.catch(() => {});
+      if (!alreadySelected) await standardDeliveryCard.click();
       const selected = await this.page
         .waitForFunction(
           (card) => Boolean(card.control?.checked || card.querySelector('input[type="radio"]')?.checked),
@@ -321,8 +327,8 @@ export default class MxCheckoutPage extends BasePage {
         .then(() => true)
         .catch(() => false);
       if (!selected) throw new Error("MX Standard delivery card did not become selected.");
-      const deliveryModeResponse = await deliveryModeUpdate;
-      if (!deliveryModeResponse.ok()) {
+      const deliveryModeResponse = deliveryModeUpdate ? await deliveryModeUpdate : null;
+      if (deliveryModeResponse && !deliveryModeResponse.ok()) {
         throw new Error(
           `MX Standard delivery update failed with HTTP ${deliveryModeResponse.status()}.`
         );
@@ -354,9 +360,13 @@ export default class MxCheckoutPage extends BasePage {
       await summaryMode.first().waitFor({ state: "visible", timeout: 30000 });
     }
 
+    // The product-condition acknowledgement is also required by Base Store.
+    // Accept only this explicit condition, leaving optional subscriptions alone.
+    const acknowledgement=this.page.getByRole('checkbox',{name:/Reconozco y acepto/i}).filter({visible:true});
+    const acknowledgementCount=await acknowledgement.count();
+    if(acknowledgementCount>1)throw new Error('MX Delivery expected at most one product-condition acknowledgement.');
+    if(acknowledgementCount&&!(await acknowledgement.isChecked()))await acknowledgement.check({force:true});
     if(this.storefront){
-      const acknowledgement=this.page.getByRole('checkbox',{name:/Reconozco y acepto/i}).filter({visible:true});
-      if(await acknowledgement.count()&&!(await acknowledgement.first().isChecked()))await acknowledgement.first().check({force:true});
       const save=this.page.locator('input[name="saveInAddressBook"]');
       if(await save.count()&&await save.isChecked())await save.uncheck({force:true});
       if(await save.count()&&await save.isChecked())throw new Error('EPP checkout must not persist the delivery address.');
