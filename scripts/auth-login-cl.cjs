@@ -80,19 +80,7 @@ async function findAccountPage(context, timeoutMs = 60000) {
 }
 
 async function openOfficialClLogin(page, ssoInfo, target) {
-  const loginUrl = validatedClSsoLoginUrl(ssoInfo, target);
-  await page.waitForFunction(() => typeof window.samsung?.account?.signIn === "function", null, { timeout: 30000 });
-  // Match the storefront's IAM v3 service, including its SDK-managed return.
-  // A direct navigation to signInGate skips that browser-side initialization.
-  await page.evaluate(url => {
-    const parameters = new URL(url).searchParams;
-    window.samsung.account.signIn({
-      clientId: parameters.get("client_id"),
-      redirectUri: encodeURIComponent(parameters.get("redirect_uri")),
-      responseType: parameters.get("response_type"),
-      state: parameters.get("state"),
-    }, { locale: `${parameters.get("locale").split("_")[0]}-${parameters.get("countryCode")}` });
-  }, loginUrl);
+  return require('../utils/authStorefrontSso.cjs').openOfficialStorefrontLogin(page, ssoInfo, { ...target, market: 'cl' });
 }
 
 async function exportState(context, page) {
@@ -125,7 +113,7 @@ async function exportState(context, page) {
   const existingAccountPage = context.pages().find(candidate => { try { return new URL(candidate.url()).hostname === accountHostname; } catch { return false; } });
   let page = existingAccountPage || context.pages().slice().reverse().find(candidate => {
     try { const url = new URL(candidate.url()); return url.origin === config.baseUrl.origin && url.pathname.replace(/\/$/, "") === "/cl"; } catch { return false; }
-  }) || await context.newPage();
+  }) || require('../utils/authStorefrontReady.cjs').findAuthBootstrapPage(context, { market: 'cl', homeUrl: config.baseUrl.href }) || await context.newPage();
   const observePage = candidate => {
     candidate.on("response", async response => {
       const url = new URL(response.url());
@@ -262,6 +250,6 @@ async function exportState(context, page) {
   } else {
     const message = String(error.message).split("\n", 1)[0].replace(/https:\/\/account\.samsung\.com\/\S+/g, "https://account.samsung.com/[redacted]");
     console.error(`[auth:login:cl] ${message}`);
-    process.exitCode = error.exitCode || 1;
+    process.exitCode = require('../utils/authLoginExitCode.cjs').authLoginExitCode(error);
   }
 });

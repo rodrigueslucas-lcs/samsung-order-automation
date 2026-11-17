@@ -75,17 +75,24 @@ async function verifyIdentity({ market, environment, slot, env = process.env, at
   catch (e) { if (e.code === 'AUTH_BUSY' || /already active/i.test(e.message)) return { market, environment, slot, status: 'BUSY', attempts: 0 }; throw e; }
   try {
     const outcomes = [], diagnostics = [], audits = [];
-    for (let attempt = 1; attempt <= Math.min(2, attempts); attempt++) {
-      log(`[keepalive:${market}] ${environment} ${slot} verify ${attempt}/2`);
+    let limit = Math.min(2, attempts);
+    for (let attempt = 1; attempt <= limit; attempt++) {
+      log(`[keepalive:${market}] ${environment} ${slot} verify ${attempt}/${limit}`);
       const result = await runScript(`scripts/auth-verify-${market}.cjs`, identityEnv(market, environment, slot, env), { timeoutMs: 240000 });
       if (result.code === 0 && !result.timedOut && !result.signal && result.audit?.statePersisted && result.audit?.accountPages === 0) return { market, environment, slot, status: 'HEALTHY', attempts: attempt, code: 0, audit: result.audit };
       diagnostics.push(result.diagnostic || null); audits.push(result.audit || null);
       outcomes.push(result.timedOut || result.signal ? 21 : result.code === 0 ? 22 : result.code);
-      if (attempt < Math.min(2, attempts)) await pause(1500);
+      // At logon a failed startup probe can precede a positive signed-out
+      // result. Confirm that result once more instead of stranding an expired
+      // identity as UNPROVEN for the whole cycle. Only two consecutive
+      // positively invalid checks may ever authorize an interactive refresh.
+      if (attempt === 2 && outcomes[0] !== 20 && outcomes[1] === 20) limit = 3;
+      if (attempt < limit) await pause(1500);
     }
     // A mixed network/invalid result cannot establish persistent expiration.
-    const status = outcomes.length === 2 && outcomes.every(code => code === 20) ? 'NEEDS_REFRESH' : outcomes.every(code => code === 21) ? 'TRANSIENT_ERROR' : 'UNPROVEN';
-    const reason = diagnostics.length && diagnostics.every(value => value === diagnostics[0]) && VERIFICATION_ISSUES.includes(diagnostics[0]) ? diagnostics[0] : null;
+    const status = outcomes.length >= 2 && outcomes.slice(-2).every(code => code === 20) ? 'NEEDS_REFRESH' : outcomes.every(code => code === 21) ? 'TRANSIENT_ERROR' : 'UNPROVEN';
+    const decisiveDiagnostics = status === 'NEEDS_REFRESH' ? diagnostics.slice(-2) : diagnostics;
+    const reason = decisiveDiagnostics.length && decisiveDiagnostics.every(value => value === decisiveDiagnostics[0]) && VERIFICATION_ISSUES.includes(decisiveDiagnostics[0]) ? decisiveDiagnostics[0] : null;
     return { market, environment, slot, status, attempts: outcomes.length, code: outcomes.at(-1), verifyCodes: outcomes, diagnostics, audits, ...(reason ? { reason } : {}) };
   } finally { release(); }
 }

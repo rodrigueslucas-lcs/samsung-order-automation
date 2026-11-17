@@ -9,11 +9,11 @@ for (const market of ['mx', 'pe', 'co', 'cl']) for (const environment of ['S1', 
   test(`${market} ${environment} reuses its exact dedicated CDP profile without another launcher`, async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auth-cdp-'));
     const directory = path.join(root, `${environment.toLowerCase()}-${market}-second`); fs.mkdirSync(directory);
-    const port = path.join(directory, 'DevToolsActivePort'); fs.writeFileSync(port, '12345\n');
+    const port = path.join(directory, 'DevToolsActivePort'); fs.writeFileSync(port, '12345\n/devtools/browser/fixture\n');
     const browser = {};
     try {
       const result = await connectAuthBrowser({ market, environment, slot: 'second', profileDir: directory,
-        chromium: { connectOverCDP: async (url, options) => { assert.equal(url, 'http://127.0.0.1:12345'); assert.equal(options.timeout, 5000); return browser; } },
+        chromium: { connectOverCDP: async (url, options) => { assert.equal(url, 'ws://127.0.0.1:12345/devtools/browser/fixture'); assert.equal(options.timeout, 5000); return browser; } },
       }, { hasWindow: async () => true, launch: () => assert.fail('must not relaunch an existing browser'), log() {} });
       assert.equal(result, browser);
     } finally { fs.unlinkSync(port); fs.rmdirSync(directory); fs.rmdirSync(root); }
@@ -23,14 +23,14 @@ for (const market of ['mx', 'pe', 'co', 'cl']) for (const environment of ['S1', 
 test('an onboarding/background-only browser opens a native window without deleting identity', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auth-cdp-'));
   const directory = path.join(root, 's2-co-qa'); fs.mkdirSync(directory);
-  const port = path.join(directory, 'DevToolsActivePort'); fs.writeFileSync(port, '12345\n');
+  const port = path.join(directory, 'DevToolsActivePort'); fs.writeFileSync(port, '12345\n/devtools/browser/fixture\n');
   let opened = false;
   const browser = {};
   try {
     assert.equal(await connectAuthBrowser({ market: 'co', environment: 'S2', profileDir: directory, chromium: { connectOverCDP: async () => browser } }, {
       hasWindow: async () => opened, launch: () => { opened = true; return { status: 0 }; }, log() {},
     }), browser);
-    assert.equal(fs.readFileSync(port, 'utf8'), '12345\n');
+    assert.equal(fs.readFileSync(port, 'utf8'), '12345\n/devtools/browser/fixture\n');
   } finally { fs.unlinkSync(port); fs.rmdirSync(directory); fs.rmdirSync(root); }
 });
 
@@ -41,13 +41,13 @@ test('wrong market/slot profile is rejected before connecting or launching', asy
 test('stale endpoint reuses the discovered profile without launching another window', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auth-cdp-'));
   const directory = path.join(root, 's2-mx-qa'); fs.mkdirSync(directory);
-  const port = path.join(directory, 'DevToolsActivePort'); fs.writeFileSync(port, '12345\n');
+  const port = path.join(directory, 'DevToolsActivePort'); fs.writeFileSync(port, '12345\n/devtools/browser/fixture\n');
   const recovered = {}; let connections = 0;
   try {
     const result = await connectAuthBrowser({ market: 'mx', environment: 'S2', profileDir: directory,
       chromium: { connectOverCDP: async endpoint => {
         connections++;
-        if (endpoint === 'http://127.0.0.1:12345') throw Error('ECONNREFUSED');
+        if (endpoint === 'ws://127.0.0.1:12345/devtools/browser/fixture') throw Error('ECONNREFUSED');
         assert.equal(endpoint, 'ws://127.0.0.1:43210/devtools/browser/exact-profile');
         return recovered;
       } },
@@ -87,7 +87,7 @@ test('a recovered background profile opens only its missing native window', asyn
 test('a CDP handle closed during native-window inspection reconnects to the same profile', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auth-cdp-'));
   const directory = path.join(root, 's1-co-qa'); fs.mkdirSync(directory);
-  const port = path.join(directory, 'DevToolsActivePort'); fs.writeFileSync(port, '12345\n');
+  const port = path.join(directory, 'DevToolsActivePort'); fs.writeFileSync(port, '12345\n/devtools/browser/fixture\n');
   let connections = 0, launches = 0, disconnected = 0;
   const stale = { close: async () => { disconnected++; } }, live = {};
   try {
@@ -98,19 +98,19 @@ test('a CDP handle closed during native-window inspection reconnects to the same
     });
     assert.equal(result, live);
     assert.equal(connections, 2); assert.equal(launches, 1); assert.equal(disconnected, 1);
-    assert.equal(fs.readFileSync(port, 'utf8'), '12345\n');
+    assert.equal(fs.readFileSync(port, 'utf8'), '12345\n/devtools/browser/fixture\n');
   } finally { fs.unlinkSync(port); fs.rmdirSync(directory); fs.rmdirSync(root); }
 });
 
 test('a transient CDP timeout retains the live endpoint for a later reconnect', async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'auth-cdp-'));
   const directory = path.join(root, 's2-cl-qa'); fs.mkdirSync(directory);
-  const port = path.join(directory, 'DevToolsActivePort'); fs.writeFileSync(port, '12345\n');
+  const port = path.join(directory, 'DevToolsActivePort'); fs.writeFileSync(port, '12345\n/devtools/browser/fixture\n');
   let clock = 0;
   try {
     await assert.rejects(connectAuthBrowser({ market: 'cl', environment: 'S2', profileDir: directory,
       chromium: { connectOverCDP: async () => { throw Error('temporarily busy'); } },
     }, { recoverEndpoint: async () => ({ occupied: false }), launch: () => ({ status: 0 }), now: () => clock, pause: async ms => { clock += ms; }, log() {} }), error => error.exitCode === 73);
-    assert.equal(fs.readFileSync(port, 'utf8'), '12345\n');
+    assert.equal(fs.readFileSync(port, 'utf8'), '12345\n/devtools/browser/fixture\n');
   } finally { fs.unlinkSync(port); fs.rmdirSync(directory); fs.rmdirSync(root); }
 });

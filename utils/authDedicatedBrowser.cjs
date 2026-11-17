@@ -14,14 +14,22 @@ async function connectAuthBrowser({ chromium, profileDir, market, environment, s
   if (path.basename(path.resolve(profileDir)) !== expected) throw new Error('Dedicated auth profile does not match market/environment/account slot.');
   fs.mkdirSync(profileDir, { recursive: true });
   const portFile = path.resolve(profileDir, 'DevToolsActivePort');
-  const readPort = () => {
-    try { const port = Number(fs.readFileSync(portFile, 'utf8').split(/\r?\n/)[0]); return Number.isInteger(port) && port > 0 && port < 65536 ? port : null; }
+  const readEndpoint = () => {
+    try {
+      const [value, browserPath] = fs.readFileSync(portFile, 'utf8').trim().split(/\r?\n/);
+      const port = Number(value);
+      // A reboot can reuse a port for another market/profile. The browser's
+      // unique WS path must match too; HTTP discovery would attach to whoever
+      // currently owns that port before the OS ownership recovery can run.
+      return Number.isInteger(port) && port > 0 && port < 65536 && /^\/devtools\/browser\/[a-zA-Z0-9-]+$/.test(browserPath || '')
+        ? `ws://127.0.0.1:${port}${browserPath}` : null;
+    }
     catch (error) { if (error.code === 'ENOENT') return null; throw error; }
   };
-  const connect = async port => chromium.connectOverCDP(`http://127.0.0.1:${port}`, { timeout: 5000 }).catch(() => null);
+  const connect = async endpoint => chromium.connectOverCDP(endpoint, { timeout: 5000 }).catch(() => null);
   log(`[auth:login:${market}] connecting to dedicated ${environment} ${slot} Chrome`);
-  const port = readPort();
-  let existing = port ? await connect(port) : null;
+  const endpoint = readEndpoint();
+  let existing = endpoint ? await connect(endpoint) : null;
   const accessible = async browser => {
     try { return await hasWindow(browser); }
     catch (error) {
@@ -53,7 +61,7 @@ async function connectAuthBrowser({ chromium, profileDir, market, environment, s
   while (now() < deadline) {
     if (existing && await accessible(existing)) return existing;
     if (!existing) {
-      const next = readPort();
+      const next = readEndpoint();
       const browser = next ? await connect(next) : null;
       if (browser && await accessible(browser)) return browser;
       await browser?.close().catch(() => {});

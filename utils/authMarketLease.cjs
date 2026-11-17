@@ -1,13 +1,19 @@
 const fs = require('node:fs'); const path = require('node:path'); const os = require('node:os'); const crypto = require('node:crypto');
 function leaseDirectory(env = process.env) { return path.resolve(env.AUTH_COORDINATION_DIR || path.join(env.ProgramData || env.PROGRAMDATA || os.tmpdir(), 'SamsungSMB', 'AuthLeases')); }
-function ownerAlive(folder, current, alive) {
-  if (alive(current.pid)) return true;
+function ownerAlive(folder, current, alive, bootStartedAt = Date.now() - os.uptime() * 1000) {
+  // PIDs are recycled after Windows reboot. A process with today's same PID
+  // cannot own yesterday's lease. Require the owner AND every registration
+  // to predate the actual OS boot; any post-boot member still blocks takeover.
   const members = path.join(folder, 'members');
+  const beforeBoot = file => { try { return fs.statSync(file).mtimeMs < bootStartedAt - 5000; } catch { return false; } };
+  if (Number.isFinite(bootStartedAt) && beforeBoot(path.join(folder, 'owner.json')) &&
+      (!fs.existsSync(members) || fs.readdirSync(members).every(name => beforeBoot(path.join(members, name))))) return false;
+  if (alive(current.pid)) return true;
   if (!fs.existsSync(members)) return false;
   return fs.readdirSync(members).some(name => { try { const member = JSON.parse(fs.readFileSync(path.join(members, name), 'utf8')); return member.token !== current.token || alive(member.pid); } catch { return true; } });
 }
 function busy() { const error = new Error('Auth market/profile is occupied or its owner cannot be verified.'); error.code = 'AUTH_BUSY'; return error; }
-function acquireMarketLease(market, environment, { env = process.env, directory = leaseDirectory(env), pid = process.pid, alive = owner => { try { process.kill(owner, 0); return true; } catch (e) { return e.code !== 'ESRCH'; } } } = {}) {
+function acquireMarketLease(market, environment, { env = process.env, directory = leaseDirectory(env), pid = process.pid, bootStartedAt = Date.now() - os.uptime() * 1000, alive = owner => { try { process.kill(owner, 0); return true; } catch (e) { return e.code !== 'ESRCH'; } } } = {}) {
   if (!['mx','pe','co','cl'].includes(market) || !['S1','S2'].includes(environment)) throw new Error('Invalid auth market lease identity.');
   fs.mkdirSync(directory, { recursive: true });
   const folder = path.join(directory, `${environment.toLowerCase()}-${market}.lock`);
@@ -15,16 +21,16 @@ function acquireMarketLease(market, environment, { env = process.env, directory 
   let current;
   if (fs.existsSync(folder)) {
     try { current = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { throw busy(); }
-    if (env.AUTH_MARKET_LEASE === current.token && current.hostname === os.hostname() && ownerAlive(folder, current, alive)) {
+    if (env.AUTH_MARKET_LEASE === current.token && current.hostname === os.hostname() && ownerAlive(folder, current, alive, bootStartedAt)) {
       const release = () => {}; release.env = { AUTH_MARKET_LEASE: current.token, AUTH_COORDINATION_DIR: directory, AUTH_MARKET_LEASE_MARKET: market, AUTH_MARKET_LEASE_ENVIRONMENT: environment }; return release;
     }
-    if (current.hostname !== os.hostname() || !Number.isInteger(current.pid) || ownerAlive(folder, current, alive)) throw busy();
+    if (current.hostname !== os.hostname() || !Number.isInteger(current.pid) || ownerAlive(folder, current, alive, bootStartedAt)) throw busy();
     // Exclusive reaper prevents two contenders from deleting a newly acquired lease.
     const reaper = `${folder}.reap`;
     try { fs.mkdirSync(reaper); } catch { throw busy(); }
     try {
       const latest = JSON.parse(fs.readFileSync(file, 'utf8'));
-      if (latest.token !== current.token || ownerAlive(folder, latest, alive)) throw busy();
+      if (latest.token !== current.token || ownerAlive(folder, latest, alive, bootStartedAt)) throw busy();
       const members = path.join(folder, 'members');
       if (fs.existsSync(members)) { for (const name of fs.readdirSync(members)) fs.unlinkSync(path.join(members, name)); fs.rmdirSync(members); }
       fs.unlinkSync(file); fs.rmdirSync(folder);

@@ -147,7 +147,8 @@ async function loginPeSamsungAccount() {
   const existingAccountPage = context.pages().find((candidate) => {
     try { return new URL(candidate.url()).hostname === ACCOUNT_HOSTNAME; } catch { return false; }
   });
-  let page = existingAccountPage || await findRenderedPePage(context) || await context.newPage();
+  let page = existingAccountPage || await findRenderedPePage(context) ||
+    require('../utils/authStorefrontReady.cjs').findAuthBootstrapPage(context, { market: 'pe', homeUrl }) || await context.newPage();
   page.setDefaultTimeout(120000);
 
   try {
@@ -167,7 +168,7 @@ async function loginPeSamsungAccount() {
       if (!existingAccountPage) {
         console.log("[auth:login:pe] opening Samsung Account sign-in");
         await login.click();
-        const accountCandidate = await findAccountLoginPage(context);
+        let accountCandidate = await findAccountLoginPage(context, 15000);
         if (!accountCandidate) {
           const storefrontPage = await findRenderedPePage(context);
           const currentMenu = storefrontPage ? await waitForProfileMenu(storefrontPage).catch(() => null) : null;
@@ -176,7 +177,19 @@ async function loginPeSamsungAccount() {
             page = storefrontPage;
             menuState = "authenticated";
           } else {
-            throw new Error("Samsung Account sign-in did not open in the current tab or a new tab within 60 seconds.");
+            if (currentMenu?.state !== 'signed-out') throw Error('PE profile sign-in remained unproven; no second login action was submitted.');
+            const response = await context.request.get(`https://${API_HOSTNAME}/tokocommercewebservices/v2/pe/ssoInfo`, { timeout: 15000, maxRedirects: 0 });
+            let info;
+            try {
+              if (!response.ok()) throw Error(`PE staging ssoInfo returned HTTP ${response.status()}; no alternative login was submitted.`);
+              info = await response.json();
+            } finally { await response.dispose(); }
+            console.log('[auth:login:pe] profile action did not navigate; opening the validated official PE IAM SDK login');
+            await require('../utils/authStorefrontSso.cjs').openOfficialStorefrontLogin(page, info, { market: 'pe', hostname: HOSTNAME, environment: ENV_NAME });
+            accountCandidate = await findAccountLoginPage(context, 15000);
+            if (!accountCandidate) throw Error('PE official IAM SDK did not open Samsung Account; no credentials were submitted.');
+            page = accountCandidate;
+            page.setDefaultTimeout(120000);
           }
         } else {
           page = accountCandidate;

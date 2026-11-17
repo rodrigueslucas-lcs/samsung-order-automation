@@ -1,6 +1,21 @@
 const { prepareAuthBrowserWindow } = require('./authBrowserWindow.cjs');
 const { assertAuthStorefrontHealth, waitForAuthControl } = require('./authStorefrontHealth.cjs');
 
+function findAuthBootstrapPage(context, { market, homeUrl }) {
+  const home = new URL(homeUrl);
+  if (!['mx','pe','co','cl'].includes(market) || home.protocol !== 'https:' ||
+      !['stg.shop.samsung.com','stg2.shop.samsung.com'].includes(home.hostname) ||
+      home.pathname.replace(/\/$/, '') !== `/${market}`) throw Error('Invalid auth startup scope.');
+  // Called only on the already verified dedicated profile. Its launcher opens
+  // getcookie.html; creating a second target can stall during Chrome startup.
+  return context.pages().find(page => {
+    if (page.isClosed()) return false;
+    if (page.url() === 'about:blank') return true;
+    try { const url = new URL(page.url()); return url.origin === home.origin && url.pathname === '/getcookie.html'; }
+    catch { return false; }
+  }) || null;
+}
+
 function authProfileControl(page) {
   return page.getByRole('button', { name: 'My Profile', exact: true })
     .or(page.locator('button[data-an-la="L0_13_login"], button.nv00-gnb-v4__utility-user'))
@@ -140,4 +155,4 @@ async function prepareAuthStorefront(page, {
   return page;
 }
 
-module.exports = { authProfileControl, authActions, openAuthProfile, prepareAuthStorefront };
+module.exports = { authProfileControl, authActions, openAuthProfile, prepareAuthStorefront, findAuthBootstrapPage };

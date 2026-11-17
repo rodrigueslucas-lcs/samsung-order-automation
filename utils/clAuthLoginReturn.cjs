@@ -38,21 +38,8 @@ async function waitForClAuthenticatedReturn(context, {
   throw new Error("CL login did not return an authenticated storefront before the deadline. Complete any Samsung Account CAPTCHA/MFA in the login window; a signed-out home tab is not sufficient.");
 }
 
-function validatedClSsoLoginUrl(info, { hostname, environment }) {
-  let url;
-  try { url = new URL(info?.ssoLoginUrl); } catch { throw new Error("CL backend did not provide a valid Samsung Account login URL."); }
-  const provider = environment === "S2" ? "sec_stg_s2_smb" : "sec_stg_s1_smb";
-  if (url.protocol !== "https:" || url.hostname !== "account.samsung.com" || url.pathname !== `/accounts/v1/${provider}/signInGate`) {
-    throw new Error("CL backend SSO provider does not match the selected staging environment.");
-  }
-  for (const key of ["redirect_uri", "goBackURL"]) {
-    let callback;
-    try { callback = new URL(url.searchParams.get(key)); } catch { throw new Error("CL backend SSO callback is missing or invalid."); }
-    if (callback.protocol !== "https:" || callback.hostname !== hostname || !callback.pathname.startsWith("/cl/login/")) {
-      throw new Error("CL backend SSO callback leaves the selected CL staging storefront.");
-    }
-  }
-  return url.href;
+function validatedClSsoLoginUrl(info, target) {
+  return require('./authStorefrontSso.cjs').validatedStorefrontSsoLoginUrl(info, { ...target, market: 'cl' });
 }
 
 function assertClSsoConfiguration(configuration, ssoInfo, config) {

@@ -186,7 +186,7 @@ async function exportState(context, page) {
     const existingAccountPage = context.pages().find(candidate => {
       try { return new URL(candidate.url()).hostname === ACCOUNT_HOSTNAME; } catch { return false; }
     });
-    let page = existingAccountPage || await findRenderedMxPage(context) || await context.newPage();
+    let page = existingAccountPage || await findRenderedMxPage(context) || require('../utils/authStorefrontReady.cjs').findAuthBootstrapPage(context, { market: 'mx', homeUrl }) || await context.newPage();
     await prepareMxWindow(page, true);
     if (!existingAccountPage) {
       console.log(`[auth:login:mx] preparing ${ENV_NAME} ${accountSlot} storefront`);
@@ -219,7 +219,7 @@ async function exportState(context, page) {
     await exportState(context, page);
   } catch (error) {
     console.error(`[auth:login:mx] ${redactMxAuthError(error)}`);
-    process.exitCode = error.exitCode || 1;
+    process.exitCode = require('../utils/authLoginExitCode.cjs').authLoginExitCode(error);
   } finally {
     await browser?.close().catch(() => {});
   }
