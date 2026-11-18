@@ -319,7 +319,7 @@ async function refresh(market, environment) {
       if (success && browser) try { const cdp = await browser.newBrowserCDPSession(); await cdp.send("Browser.close"); } catch {}
       if (!success && browser) try {
         if (await require('../utils/authIdleBrowser.cjs').closeIdleAuthBrowser(browser, {
-          market: config.market.toLowerCase(), environment: config.environment, rootUrl: config.rootUrl.href, humanRequired,
+          market: config.market.toLowerCase(), environment: config.environment, rootUrl: config.rootUrl.href, identityEntryUrl: config.identityEntryUrl?.href, humanRequired,
         })) report('Ended refresh: idle dedicated Chrome closed; no human gate was pending');
       } catch { report('Idle browser cleanup unproven; unrelated windows preserved'); }
       try { await browser?.close(); }

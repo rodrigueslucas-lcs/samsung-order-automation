@@ -12,6 +12,14 @@ for(const url of ['https://account.samsung.com/iam/oauth2/authorize','https://ac
 test('an explicit human handoff survives even on a blank/loading view',async()=>{const f=fixture(['about:blank']);assert.equal(await closeIdleAuthBrowser(f.browser,{...options,humanRequired:true}),false);assert.equal(f.closes(),0);});
 test('a corporate activation form on the owned homepage survives',async()=>{const f=fixture([options.rootUrl],{gate:true});assert.equal(await closeIdleAuthBrowser(f.browser,options),false);assert.equal(f.closes(),0);});
 test('cleanup validates exact staging market before any close',async()=>{const f=fixture(['about:blank']);await assert.rejects(closeIdleAuthBrowser(f.browser,{...options,rootUrl:'https://www.samsung.com/mx/'}),/staging market/);assert.equal(f.closes(),0);});
+
+test('ended EPP identity bootstrap may close only its explicitly configured staging market home',async()=>{
+ const cl={market:'cl',environment:'S2',rootUrl:'https://stg2.shop.samsung.com/cl/multistore/alianzas/alianzas/',identityEntryUrl:'https://stg2.shop.samsung.com/cl/'};
+ for(const gate of [false,true]){const f=fixture([cl.identityEntryUrl,'devtools://devtools/bundled/devtools_app.html'],{gate});assert.equal(await closeIdleAuthBrowser(f.browser,cl),!gate);assert.equal(f.closes(),gate?0:1);}
+ const human=fixture([cl.identityEntryUrl]);assert.equal(await closeIdleAuthBrowser(human.browser,{...cl,humanRequired:true}),false);
+ for(const identityEntryUrl of ['https://www.samsung.com/cl/','https://stg2.shop.samsung.com/co/','https://stg2.shop.samsung.com/cl/checkout/one']){const f=fixture([identityEntryUrl]);await assert.rejects(closeIdleAuthBrowser(f.browser,{...cl,identityEntryUrl}),/identity entry/);assert.equal(f.closes(),0);}
+ const unrelated=fixture(['https://stg2.shop.samsung.com/cl/checkout/one']);assert.equal(await closeIdleAuthBrowser(unrelated.browser,cl),false);
+});
 test('real Chromium blank and ended staging landing close without retaining the process',async()=>{
  const {chromium}=require('@playwright/test');const browser=await chromium.launch({headless:true});try{const context=await browser.newContext(),page=await context.newPage();await page.route('**/*',route=>route.fulfill({contentType:'text/html',body:'<h1>Page Under Maintenance</h1>'}));await page.goto(options.rootUrl);await context.newPage();assert.equal(await closeIdleAuthBrowser(browser,options),true);await new Promise(resolve=>{if(!browser.isConnected())resolve();else browser.once('disconnected',resolve);});assert.equal(browser.isConnected(),false);}finally{await browser.close();}
 });

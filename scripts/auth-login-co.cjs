@@ -5,7 +5,7 @@ const { completeAccountLogin, discardRejectedAccountPages } = require("../utils/
 const { authProfileControl, openAuthProfile, prepareAuthStorefront } = require("../utils/authStorefrontReady.cjs");
 const { createAuthNavigation } = require("../utils/authNavigation.cjs");
 const gotoWithTransientRetry = createAuthNavigation("co");
-const { prepareAuthBrowserWindow } = require("../utils/authBrowserWindow.cjs");
+const { prepareAuthBrowserWindow, closeAuthDevTools } = require("../utils/authBrowserWindow.cjs");
 const fs = require("node:fs");
 const { writeJsonAtomically } = require("../utils/atomicJson");
 const path = require("node:path");
@@ -122,19 +122,11 @@ async function closeDedicatedDevTools(context) {
   // Closing only context.pages() leaves it open and halves the storefront width.
   const browserSession = await context.browser().newBrowserCDPSession();
   try {
-    const { targetInfos } = await browserSession.send("Target.getTargets");
-    for (const target of targetInfos) {
-      if (!target.url.startsWith("devtools://")) continue;
-      await browserSession.send("Target.closeTarget", { targetId: target.targetId });
+    if (await closeAuthDevTools(browserSession)) {
       console.log("[auth:login:co] closed docked DevTools in dedicated CO Chrome");
     }
   } finally {
     await browserSession.detach();
-  }
-  for (const candidate of context.pages()) {
-    if (!candidate.url().startsWith("devtools://")) continue;
-    await candidate.close();
-    console.log("[auth:login:co] closed DevTools in dedicated CO Chrome to restore storefront viewport");
   }
 }
 
