@@ -114,6 +114,42 @@ for (const market of ["mx", "pe", "co", "cl"]) {
   requireDirectoryShape(`tests/markets/${market}/qst`, ["base-store", "epp"]);
 }
 
+// Guard against a visually present but non-executable market/store skeleton.
+// A new QA must be able to discover real QST tests through the documented scripts.
+const packageScripts = JSON.parse(read("package.json")).scripts || {};
+const expectedQstScripts = {
+  mx: { base: "qst:mx:base-store", list: "qst:mx:list", epp: "qst:mx:epp", eppList: "qst:mx:epp:list" },
+  pe: { base: "qst:pe:base-store", list: "qst:pe:list", epp: "qst:pe:epp", eppList: "qst:pe:epp:list" },
+  co: { base: "qst:co:base-store", list: "qst:co:list", epp: "qst:co:epp", eppList: "qst:co:epp:list" },
+  cl: { base: "qst:cl:base-store", list: "qst:cl:base-store:list", epp: "qst:cl:epp", eppList: "qst:cl:epp:list" },
+};
+for (const [market, commands] of Object.entries(expectedQstScripts)) {
+  for (const store of ["base-store", "epp"]) {
+    const directory = `tests/markets/${market}/qst/${store}`;
+    if (!exists(directory)) continue; // already captured by required[].
+    const entries = fs.readdirSync(path.join(root, directory));
+    if (!entries.some(name => name.endsWith(".spec.js"))) {
+      boundaryFailures.push(`${directory}: QST must have executable .spec.js coverage, not a placeholder directory`);
+    }
+  }
+  for (const [role, command] of Object.entries(commands)) {
+    if (!packageScripts[command]) {
+      boundaryFailures.push(`package.json: missing ${role} QST operator command ${command}`);
+    }
+  }
+  for (const role of ["epp", "eppList"]) {
+    const script = packageScripts[commands[role]];
+    if (script && script !== `node scripts/run-epp-qst.cjs ${market.toUpperCase()}${role === "eppList" ? " --list" : ""}`) {
+      boundaryFailures.push(`package.json: ${commands[role]} must target the shared market-aware EPP runner`);
+    }
+  }
+}
+const eppRunner = "scripts/run-epp-qst.cjs";
+if (!exists(eppRunner)) boundaryFailures.push(`${eppRunner}: market-aware EPP runner is missing`);
+else if (!read(eppRunner).includes('"qst", "epp"')) {
+  boundaryFailures.push(`${eppRunner}: expected tests/markets/<market>/qst/epp ownership`);
+}
+
 if (missing.length || resurrected.length || boundaryFailures.length) {
   console.error("[repo-architecture] FAIL");
   if (missing.length) console.error(`Missing required architecture paths: ${missing.join(", ")}`);
@@ -125,7 +161,7 @@ if (missing.length || resurrected.length || boundaryFailures.length) {
 console.log("[repo-architecture] PASS");
 console.log("[repo-architecture] Canonical test navigation is market -> suite -> store under tests/markets.");
 console.log("[repo-architecture] MX/PE/CO/CL expose exactly qst and dst at market ownership level.");
-console.log("[repo-architecture] MX/PE/CO/CL QST roots expose exactly base-store and epp; reusable flow code lives outside test ownership roots.");
+console.log("[repo-architecture] MX/PE/CO/CL QST roots expose real base-store and epp specs, with market commands and the shared EPP runner; reusable flow code lives outside test ownership roots.");
 console.log("[repo-architecture] CL/CO DST roots are structural reservations only until official runtime coverage is implemented and proven.");
 console.log("[repo-architecture] PE DST is canonical under tests/markets/pe/dst; legacy and environment-named roots are removed.");
 console.log("[repo-architecture] EPP runtime access data is centralized under config/markets/epp.js while test ownership remains market-specific.");
