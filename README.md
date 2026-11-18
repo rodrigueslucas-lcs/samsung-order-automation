@@ -215,21 +215,20 @@ The rule is strict:
 
 ## Supported QST commands
 
-| Market | Base Store | List / discovery | EPP | Authentication |
-| --- | --- | --- | --- | --- |
-| MX | `npm run qst:mx:base-store` | `npm run qst:mx:list` | — | `npm run auth:refresh:mx` |
-| PE | `npm run qst:pe:base-store` | `npm run qst:pe:list` | owned under `tests/markets/pe/qst/epp` | `npm run auth:refresh:pe` |
-| CO | `npm run qst:co:base-store` | `npm run qst:co:list` | `npm run qst:co:epp` | `npm run auth:refresh:co` |
-| CL | `npm run qst:cl:base-store` | `npm run qst:cl:base-store:list` | `npm run qst:cl:epp` | `npm run auth:refresh:cl` |
+The following commands are sourced from the current `package.json`. Run from the repository root.
 
-CL also supports its combined official campaign:
+| Market | Base Store QST | Base Store list | EPP QST | EPP list | Base Store auth |
+| --- | --- | --- | --- | --- | --- |
+| MX | `npm run qst:mx:base-store` | `npm run qst:mx:list` | `npm run qst:mx:epp` | `npm run qst:mx:epp:list` | `npm run auth:refresh:mx` |
+| PE | `npm run qst:pe:base-store` | `npm run qst:pe:list` | `npm run qst:pe:epp` | `npm run qst:pe:epp:list` | `npm run auth:refresh:pe` |
+| CO | `npm run qst:co:base-store` | `npm run qst:co:list` | `npm run qst:co:epp` | `npm run qst:co:epp:list` | `npm run auth:refresh:co` |
+| CL | `npm run qst:cl:base-store` | `npm run qst:cl:base-store:list` | `npm run qst:cl:epp` | `npm run qst:cl:epp:list` | `npm run auth:refresh:cl` |
 
-```bash
-npm run qst:cl
-npm run qst:cl:list
-```
+CL combined campaign: `npm run qst:cl`; discovery: `npm run qst:cl:list`.
 
-PE established DST coverage is canonical under `tests/markets/pe/dst`:
+Additional MX fast-guest lane: `npm run qst:mx:fast` and `npm run qst:mx:fast:list`.
+
+PE DST commands:
 
 ```bash
 npm run dst:base-store
@@ -238,15 +237,49 @@ npm run dst:backoffice
 npm run dst:list
 ```
 
-MX also exposes DST Base Store commands through `dst:mx:*` scripts.
+MX DST Base Store: `npm run dst:mx:base-store`; discovery: `npm run dst:mx:list`.
 
----
+### EPP authentication and session maintenance
+
+EPP has **separate identities and programme access** from Base Store. The S2 four-market refresh is:
+
+```bash
+npm run auth:refresh:epp:all
+```
+
+This guarded operation verifies first, attempts recovery when permitted, and publishes **only verified** sessions; it can stop with `HUMAN_REQUIRED`, `BUSY` or `NOT_READY`. It is not a guarantee of four successful logins. It targets the configured S2 programmes: MX `pymesmx`, PE `pe_membership_vip`, CO `co_epp_agre`, CL `alianzas`.
+
+Other available EPP commands:
+
+```bash
+npm run auth:refresh:epp
+npm run auth:verify:epp
+npm run auth:keepalive:epp
+npm run qst:epp:access
+npm run qst:epp:report
+```
+
+The EPP keep-alive is one guarded cycle, not an unconditionally safe forced login. The Windows scheduled-task installer exists as `npm run auth:keepalive:epp:install`; use only after appropriate runtime evidence and on an approved Windows operator machine.
+
+Base Store also has a **separate keep-alive implementation** (`scripts/auth-keepalive-once.cjs` and `scripts/auth-keepalive-task.cjs`). Do not confuse Base Store and EPP session state or assume a new clone inherits either machine's scheduled tasks, Chrome profiles, tokens or Jenkins credentials.
+
+### WMC / PreQA2 (operator browser)
+
+For authorized corporate network access and the dedicated Chrome/CDP session:
+
+```bash
+npm run preqa2:bootstrap
+npm run preqa2:lanes
+npm run preqa2:health
+```
+
+Bootstrap establishes the headed WMC/PreQA2 session (human SSO/MFA may be required), lanes opens market navigation and health inspects the current browser/session. A clone without authorized WMC access cannot validate PreQA2 merely by running these commands.
 
 ## First-time setup
 
 Requirements:
 
-- supported Node.js runtime for the repository;
+- Node.js 24.x with npm (the current handoff-supported baseline);
 - npm;
 - Git access;
 - Chromium installed by Playwright;
@@ -335,6 +368,20 @@ Jenkins is the shared CI/release execution layer; local execution remains availa
 
 ---
 
+### Jenkins operator notes
+
+The root `Jenkinsfile` handles the Base Store pipeline and release evidence; EPP reporting also has dedicated operational scripts. Job names, credential IDs, network routes and dashboard URLs are **installation-specific**: configure them through approved Jenkins administration rather than hardcoding private infrastructure values in the repository.
+
+For a local dashboard resource-root diagnostic (not a test-suite refresh), use:
+
+```bash
+npm run auth:operations:resource:check
+```
+
+This is a read/check operation. Repair requires a separate, deliberate `node scripts/auth-operations-resource.cjs --apply` with Jenkins administrative access; never repeat repair blindly after an unproven result.
+
+---
+
 ## Running locally
 
 Typical S2 Base Store campaigns:
@@ -359,6 +406,19 @@ CL_QST_ENVIRONMENT=S2 CL_QST_TARGET_IDS=SAM-24821 npm run qst:cl:base-store
 Destructive payment/order flows require the relevant explicit runtime authorization. Do not enable those flags casually.
 
 The recommended operating model is one market campaign at a time unless a separately proven orchestrator is being used.
+
+---
+
+## Onboarding and repository boundaries
+
+- **Source code is portable; runtime state is not.** A new clone must install dependencies, obtain approved network/VPN access, establish its **own** storefront/EPP/WMC sessions and configure Jenkins credentials as permitted.
+- Prefer one market and one safe targeted TC for first use. Use `npm run qst:official:gate` and `npm run qst:steps:gate` to validate mappings, not to claim end-to-end passes.
+- Git branch contents are determined by **committed history**. Uncommitted Codex or developer changes are not included in a push. Avoid using `git add .` to stage unrelated in-progress work.
+- CI/CD and any additional Git remote must be explicitly configured by the owning team. Never assume a newly created repository automatically contains the Jenkins jobs, schedules or secrets from another workstation.
+
+### Windows Git Bash vs macOS/Linux
+
+The `KEY=value npm run ...` examples in this document use POSIX shell syntax and work in Git Bash, macOS Terminal and Linux shells. In Windows PowerShell use `$env:KEY='value'; npm run ...` instead.
 
 ---
 
