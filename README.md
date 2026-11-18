@@ -48,35 +48,50 @@ These numbers represent the currently audited **Base Store official P1/QST autom
 
 ## Architecture
 
-The engineer-facing navigation rule is intentionally simple:
+The canonical navigation pattern is:
 
 ```text
 market -> suite -> store
 ```
 
-Environment (`S1` / `S2`) is runtime configuration, not source-tree taxonomy.
+**QST has the same Base Store + EPP structure for all four markets.** Environment (`S1` / `S2`) is selected at runtime, never by putting environment names into the test path.
 
 ```text
 tests/
   markets/
     mx/
-      qst/base-store/
-      dst/base-store/
-      dst/backoffice/
+      qst/
+        base-store/
+        epp/
     pe/
-      qst/base-store/
-      qst/epp/
-      dst/base-store/
-      dst/epp/
-      dst/backoffice/
+      qst/
+        base-store/
+        epp/
     co/
-      qst/base-store/
-      qst/epp/
+      qst/
+        base-store/
+        epp/
     cl/
-      qst/base-store/
-      qst/epp/
+      qst/
+        base-store/
+        epp/
     shared/
+```
 
+**DST is a separate suite with uneven current implementation; do not imply nonexistent directories are implemented.** At the audited repository revision:
+
+| Market | Implemented DST test directories |
+| --- | --- |
+| MX | `dst/base-store/`, `dst/backoffice/` |
+| PE | `dst/base-store/`, `dst/epp/`, `dst/backoffice/` |
+| CO | No DST test directory yet (`dst/README.md` only) |
+| CL | No DST test directory yet (`dst/README.md` only) |
+
+The long-term convention for any new DST coverage is likewise `tests/markets/<market>/dst/<store-or-domain>/`. **Do not create empty folders or claim coverage simply to make the tree visually symmetric.** The QST paths above are backed by existing test files for all four markets.
+
+Other top-level components:
+
+```text
 pages/          Page Objects
 flows/          reusable business journeys
 config/         market + runtime configuration
