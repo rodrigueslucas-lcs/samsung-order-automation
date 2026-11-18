@@ -172,11 +172,14 @@ async function waitForEppContactEmail(page,config,{timeout=30000}={}){
       &&new URL(page.url()).searchParams.get('step')==='CHECKOUT_STEP_DELIVERY'
       &&await page.getByRole('tab',{name:/^1\.\s*Información de contacto\b/i}).filter({visible:true}).count()===1;
     if(savedMxContact){
-      // Registered checkout may resume Delivery with Contact already collapsed.
-      // Reopen the canonical Contact GET, then prove/fill the real form below.
-      // Never substitute a saved summary for the official field assertions.
+      // Saved checkout resumes Delivery even when Contact is requested by URL.
+      // Use the contact section's own Edit action; other Edit controls belong
+      // to the cart/address. The summary alone never proves the form fields.
       assertStoreRoute(page.url(),config,/^checkout\//);
-      await page.goto(new URL('checkout/one?step=CHECKOUT_STEP_CONTACT_INFO',config.rootUrl).href,{waitUntil:'domcontentloaded',timeout:60000});
+      const summary=page.getByRole('tab',{name:/^1\.\s*Información de contacto\b/i}).filter({visible:true});
+      const edit=summary.locator('a.actions__edit').filter({hasText:/Editar/i,visible:true});
+      await expect(edit,'Saved MX EPP Contact must expose its native Edit action.').toHaveCount(1,{timeout});
+      await edit.click();
       assertStoreRoute(page.url(),config,/^checkout\//);
       await expect(email).toBeVisible({timeout});
       return email;
