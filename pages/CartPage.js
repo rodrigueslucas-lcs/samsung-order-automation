@@ -399,6 +399,11 @@ export default class CartPage extends BasePage {
     await this.continueButton.scrollIntoViewIfNeeded();
 
     const reminder = this.page.locator('[class*="ins-custom-cart-reminder-container"]').filter({ visible: true });
+    const cartTargetForReminder = new URL(this.cartUrl);
+    const nativeClReminder = registered && cartTargetForReminder.protocol === 'https:' &&
+      ['stg.shop.samsung.com', 'stg2.shop.samsung.com'].includes(cartTargetForReminder.hostname) &&
+      cartTargetForReminder.pathname === '/cl/cart';
+    let resumedClCheckout = false;
     const dismissReminder = async () => {
       const close = reminder.getByText(/^x$/i).filter({ visible: true }).last();
       if (!(await close.isVisible().catch(() => false))) return false;
@@ -409,6 +414,18 @@ export default class CartPage extends BasePage {
     const finishReminder = async () => {
       const finish = reminder.getByText(/^Finalizar compra$/i).filter({ visible: true }).last();
       if (!(await finish.isVisible().catch(() => false))) return false;
+      if (nativeClReminder) {
+        // The reminder link can leave registered CL on its cart. Close that
+        // overlay and resume the native checkout once, before any payment.
+        if (!(await dismissReminder())) return false;
+        const current = new URL(this.page.url());
+        if (!resumedClCheckout && current.origin === cartTargetForReminder.origin &&
+            current.pathname === cartTargetForReminder.pathname && await this.continueButton.isVisible()) {
+          resumedClCheckout = true;
+          await this.continueButton.click({ timeout: 10000 });
+        }
+        return true;
+      }
       await finish.click();
       return true;
     };
