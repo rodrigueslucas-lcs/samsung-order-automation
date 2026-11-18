@@ -1,12 +1,12 @@
-// Observe only the configured MX product reads. A slow read must not be
+// Observe only the configured MX/PE product reads. A slow read must not be
 // cancelled by a PDP reload while the purchase component is still hydrating.
-function watchMxPdpReads(page, pdpUrl) {
+function watchProductPdpReads(page, pdpUrl) {
   const pdp = new URL(pdpUrl);
-  const match = pdp.pathname.match(/^\/mx\/p\/([A-Z0-9-]+)$/);
+  const match = pdp.pathname.match(/^\/(mx|pe)\/p\/([A-Z0-9-]+)$/);
   const environment = {'stg.shop.samsung.com':'s1','stg2.shop.samsung.com':'s2'}[pdp.hostname];
-  if (pdp.protocol !== 'https:' || !environment || !match) throw new Error('MX PDP observation requires its exact staging route.');
+  if (pdp.protocol !== 'https:' || !environment || !match) throw new Error('Product observation requires its exact staging route.');
   const origin = `https://${environment}-smb-api-cdn.ecom-stg.samsung.com`;
-  const pathname = `/tokocommercewebservices/v2/mx/products/${match[1]}`;
+  const pathname = `/tokocommercewebservices/v2/${match[1]}/products/${match[2]}`;
   const pending = new Set(), waiters = new Set();
   const onRequest = request => {
     const url = new URL(request.url());
@@ -40,4 +40,4 @@ function watchMxPdpReads(page, pdpUrl) {
     },
   };
 }
-module.exports = { watchMxPdpReads };
+module.exports = { watchProductPdpReads };

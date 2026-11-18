@@ -6,14 +6,16 @@ const { readMxCartSku } = require('../../utils/mxCartReadback.cjs');
 const cartUrl = 'https://stg2.shop.samsung.com/mx/cart';
 const pdpUrl = 'https://stg2.shop.samsung.com/mx/p/TEST';
 
-function state({ failures = 1, empty = false, unresolved = false, httpError = false, blankFirst = false, alwaysBlank = false, readyDelayMs = 0, soldOut = false } = {}) {
+function state({ failures = 1, empty = false, unresolved = false, httpError = false, blankFirst = false, alwaysBlank = false, readyDelayMs = 0, soldOut = false, market = 'MX' } = {}) {
+  const cartUrl = `https://stg2.shop.samsung.com/${market.toLowerCase()}/cart`;
+  const pdpUrl = `https://stg2.shop.samsung.com/${market.toLowerCase()}/p/TEST`;
   let current = pdpUrl, gets = [], clicks = 0, bodyFinished = false, resolveAdd;
   let clock = 0;
   const module = { exports: {} };
-  vm.runInNewContext(fs.readFileSync('utils/mxCartReadback.cjs', 'utf8'), {
+  vm.runInNewContext(fs.readFileSync('utils/productCartReadback.cjs', 'utf8'), {
     module, URL, Date: { now: () => clock }, require: name=>{assert.equal(name,'./mxStorefrontScope.cjs');return require('../../utils/mxStorefrontScope.cjs');},
   });
-  const { readMxCartSku: readback } = module.exports;
+  const readback = (page,options) => module.exports.readProductCartSku(page,{...options,market});
   const blank = () => alwaysBlank || ((blankFirst || clock < readyDelayMs) && gets.length === 1);
   const sku = { first() { return this; }, filter() { return this; },
     isVisible: async () => current === pdpUrl || (!empty && !unresolved && !blank()),
@@ -111,4 +113,22 @@ test('MX readback refuses Production and other markets before any navigation', a
   for (const url of ['https://shop.samsung.com/mx/cart', 'https://stg2.shop.samsung.com/pe/cart']) {
     await assert.rejects(readMxCartSku({}, { cartUrl: url, sku: 'TEST' }), /staging cart/);
   }
+});
+
+test('PE acknowledged Add waits for cart hydration without repeating the confirmed mutation',async()=>{
+ const s=state({market:'PE',failures:0,readyDelayMs:15000});await s.run();
+ assert.equal(s.clicks(),1);assert.equal(s.gets.length,1);
+});
+
+for(const options of [{blankFirst:true,failures:0},{failures:1}])test('PE acknowledged Add recovers only cart GETs '+JSON.stringify(options),async()=>{
+ const s=state({market:'PE',...options});await s.run();assert.equal(s.clicks(),1);assert.equal(s.gets.length,2);
+});
+
+for(const options of [{empty:true,failures:0},{alwaysBlank:true,failures:0},{httpError:true,failures:0}])test('PE unresolved or empty cart after success never repeats Add '+JSON.stringify(options),async()=>{
+ const s=state({market:'PE',...options});await assert.rejects(s.run());assert.equal(s.clicks(),1);
+});
+
+test('PE readback rejects another market and Production before any navigation',async()=>{
+ const {readProductCartSku}=require('../../utils/productCartReadback.cjs');
+ for(const cartUrl of ['https://shop.samsung.com/pe/cart','https://stg2.shop.samsung.com/mx/cart'])await assert.rejects(readProductCartSku({}, {cartUrl,sku:'TEST',market:'PE'}),/staging cart/);
 });

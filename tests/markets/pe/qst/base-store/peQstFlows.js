@@ -5,6 +5,7 @@ import CheckoutPage from "../../../../../pages/CheckoutPage";
 import PaymentPage from "../../../../../pages/PaymentPage";
 import { testData } from "../../../../../utils/testData";
 import peBusinessEvidence from "../../../../../utils/peBusinessEvidence.cjs";
+import productCartReadback from "../../../../../utils/productCartReadback.cjs";
 import { test } from "@playwright/test";
 
 const { captureBusinessExchange, attachProductContext } = peBusinessEvidence;
@@ -28,6 +29,7 @@ export async function addConfiguredProductToPeCart(page, config, { addButtonName
     sku: config.sku,
     pdpUrl: config.pdpUrl.href,
     cartUrl: config.cartUrl.href,
+    cartReadback: (target, options) => productCartReadback.readProductCartSku(target, { ...options, market: 'PE' }),
   });
   await test.step("Open controlled PE PDP and add configured product to cart", async () => {
     await captureBusinessExchange(page, testInfo, "Add to Cart", () =>
@@ -121,7 +123,7 @@ export async function reachPeRegisteredDelivery(page, config) {
     }
 
     await page
-      .getByRole("heading", { name: /Direcci[oó]n de entrega/i })
+      .getByRole("heading", { name: /^2\.\s*Direcci[oó]n de entrega$/i, level: 2 })
       .waitFor({ state: "visible", timeout: 60000 });
   });
   return { cart, checkout };

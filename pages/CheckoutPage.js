@@ -79,10 +79,10 @@ export default class CheckoutPage extends BasePage {
       }
 
       await this.screenshot("04-customer-info");
-      await this.customerContinueButton.click();
+      await this.submitPeContact();
 
       const deliveryReached = await this.page
-        .getByRole("heading", { name: /Direcci[oó]n de entrega/i })
+        .getByRole("tabpanel", { name: "Envío", exact: true })
         .waitFor({ state: "visible", timeout: 30000 })
         .then(() => true, () => false);
       if (deliveryReached || /CHECKOUT_STEP_DELIVERY/.test(this.page.url())) break;
@@ -105,10 +105,36 @@ export default class CheckoutPage extends BasePage {
     }
 
     await this.page
-      .getByRole("heading", { name: /Direcci[oó]n de entrega/i })
+      .getByRole("heading", { name: /^2\.\s*Direcci[oó]n de entrega$/i, level: 2 })
       .waitFor({ state: "visible", timeout: 60000 });
 
     await this.screenshot("05-delivery-step");
+  }
+
+  async submitPeContact() {
+    const storefront = new URL(this.page.url());
+    const apiHost = this.peApiOrigin || ({
+      'stg.shop.samsung.com': 'https://s1-smb-api-cdn.ecom-stg.samsung.com',
+      'stg2.shop.samsung.com': 'https://s2-smb-api-cdn.ecom-stg.samsung.com',
+    })[storefront.hostname];
+    if (!apiHost || storefront.protocol !== 'https:' || storefront.port ||
+        !['stg.shop.samsung.com', 'stg2.shop.samsung.com'].includes(storefront.hostname) ||
+        !storefront.pathname.startsWith('/pe/')) {
+      throw new Error('PE Contact requires the configured staging checkout.');
+    }
+    // The Delivery heading renders before the Contact write finishes. Observe
+    // its exact acknowledgement before starting the address-form readiness clock.
+    await Promise.all([
+      this.page.waitForResponse(response => {
+        const target = new URL(response.url());
+        return response.request().method() === 'POST' && target.origin === apiHost &&
+          target.pathname === `/tokocommercewebservices/v2/${this.peApiSite || 'pe'}/users/current/carts/current/checkout/update`;
+      }, { timeout: 120000 }).then(async response => {
+        if (!response.ok()) throw new Error(`PE Contact update returned HTTP ${response.status()}; Contact will not be resubmitted.`);
+        if (await response.finished()) throw new Error('PE Contact update was interrupted; Contact will not be resubmitted.');
+      }),
+      this.customerContinueButton.click(),
+    ]);
   }
 
   async validateAuthenticatedDeliveryForm() {

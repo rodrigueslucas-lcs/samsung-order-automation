@@ -1,5 +1,5 @@
 import BasePage from './BasePage';
-import mxPdpReadiness from '../utils/mxPdpReadiness.cjs';
+import productPdpReadiness from '../utils/productPdpReadiness.cjs';
 
 export default class ProductPage extends BasePage {
   constructor(page, options = {}) {
@@ -23,8 +23,10 @@ export default class ProductPage extends BasePage {
     recoverBlankPdp, addButtonName = /Agregar al (?:carro|carrito)|Add to cart|Add to basket/i } = {}) {
     if (!this.pdpUrl) throw new Error('A configured PDP URL is required.');
     const mxBasePdp = new URL(this.pdpUrl).pathname.startsWith('/mx/p/');
-    const reads = mxBasePdp && typeof this.page.on === 'function'
-      ? mxPdpReadiness.watchMxPdpReads(this.page, this.pdpUrl) : null;
+    const marketLabel = new URL(this.pdpUrl).pathname.split('/')[1]?.toUpperCase();
+    const scopedPdp = /^\/(mx|pe)\/p\//.test(new URL(this.pdpUrl).pathname);
+    const reads = scopedPdp && typeof this.page.on === 'function'
+      ? productPdpReadiness.watchProductPdpReads(this.page, this.pdpUrl) : null;
     try {
     const isCartMutation = (request) =>
       request.method() === 'POST' &&
@@ -173,10 +175,10 @@ export default class ProductPage extends BasePage {
         throw new Error(`Configured PDP add-to-cart returned HTTP ${outcome.response.status()}.`);
       }
       if (this.cartReadback && outcome?.response) {
-        if (await outcome.response.finished()) throw new Error('MX Add response was interrupted; Add will not be repeated.');
+        if (await outcome.response.finished()) throw new Error(`${marketLabel} Add response was interrupted; Add will not be repeated.`);
         const body = await outcome.response.json();
         if (body.statusCode !== 'success' || body.entry?.product?.code !== this.sku) {
-          throw new Error('MX Add response did not confirm the configured product; Add will not be repeated.');
+          throw new Error(`${marketLabel} Add response did not confirm the configured product; Add will not be repeated.`);
         }
       }
 
@@ -187,7 +189,7 @@ export default class ProductPage extends BasePage {
 
       diagnostics?.push({ attempt, checkpoint: 'cart-check', url: this.page.url(), cartContainsSku: false });
       if (this.cartReadback && outcome?.response) {
-        throw new Error('MX cart lost the configured product after acknowledged Add; Add will not be repeated.');
+        throw new Error(`${marketLabel} cart lost the configured product after acknowledged Add; Add will not be repeated.`);
       }
       if (attempt === maxAttempts) {
         const failure = outcome?.failedRequest?.failure()?.errorText || 'no successful cart mutation or persisted cart state was observed';
