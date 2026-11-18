@@ -2,13 +2,16 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { completeAccountLogin } = require('../../utils/authAccountLogin.cjs');
 
-function scenario({ initial = 'email', captcha = false, remainCaptcha = false, market = 'pe', hostname = 'stg2.shop.samsung.com', warm = false, lateEmail = false, latePassword = false } = {}) {
+function scenario({ initial = 'email', captcha = false, remainCaptcha = false, market = 'pe', hostname = 'stg2.shop.samsung.com', warm = false, lateEmail = false, latePassword = false, rejectedReplacement = null } = {}) {
   let state = initial, clock = 0, url = warm ? `https://${hostname}/${market}/` : 'https://account.samsung.com/accounts/fixture';
   const calls = [], logs = [];
   let emailChecks = 0, passwordChecks = 0;
+  let emailValue = '', challengeCompleted = false;
   const locator = visible => ({ filter() { return this; }, first() { return this; }, last() { return this; },
-    evaluateAll: async () => false, isVisible: async () => visible(), count: async () => Number(visible()), fill: async () => calls.push('fill-' + state),
-    click: async () => { assert.ok(calls.includes('fill-' + state), 'credential field must be populated before submit'); calls.push('click-' + state); if (state === 'email') state = captcha ? 'captcha' : 'password'; else url = `https://${hostname}/${market}/`; } });
+    evaluateAll: async () => false, isVisible: async () => visible(), count: async () => Number(visible()),
+    inputValue: async () => emailValue,
+    fill: async value => { calls.push('fill-' + state); if(state==='email')emailValue=value; },
+    click: async () => { assert.ok(calls.includes('fill-' + state), 'credential field must be populated before submit'); calls.push('click-' + state); if (state === 'email') state = captcha && !challengeCompleted ? 'captcha' : 'password'; else url = `https://${hostname}/${market}/`; } });
   const page = { isClosed: () => false, url: () => url,
     locator: selector => selector.includes('iframe') ? locator(() => state === 'captcha') : locator(() => {
       const kind = selector.includes('password') ? 'password' : 'email';
@@ -17,10 +20,10 @@ function scenario({ initial = 'email', captcha = false, remainCaptcha = false, m
       if (kind === 'password' && latePassword && passwordChecks++ === 0) return false;
       return true;
     }),
-    getByText: () => locator(() => false), getByRole: () => locator(() => true),
+    getByText: pattern => locator(() => String(pattern).includes('El ID') && state==='email' && challengeCompleted && emailValue===rejectedReplacement), getByRole: () => locator(() => true),
   };
   const run = () => completeAccountLogin(page, { market, hostname, credentials: { email: 'fixture@example.test', password: 'fixture-only' },
-    timeout: 2000, now: () => clock, pause: async ms => { clock += ms; if (state === 'captcha' && !remainCaptcha && clock >= 500) state = 'password'; }, log: line => logs.push(line) });
+    timeout: 2000, now: () => clock, pause: async ms => { clock += ms; if (state === 'captcha' && !remainCaptcha && clock >= 500) { challengeCompleted=true;state=rejectedReplacement?'email':'password';if(rejectedReplacement)emailValue=rejectedReplacement; } }, log: line => logs.push(line) });
   return { run, calls, logs };
 }
 
@@ -59,6 +62,18 @@ test('unresolved human verification is typed and never resubmits credentials', a
   const s = scenario({ initial: 'captcha', remainCaptcha: true });
   await assert.rejects(s.run(), error => error.exitCode === 79);
   assert.deepEqual(s.calls, []);
+});
+
+test('post-CAPTCHA invalid non-email replacement restores configured identity once before continuing',async()=>{
+  const s=scenario({captcha:true,rejectedReplacement:'invalid-id'});await s.run();
+  assert.deepEqual(s.calls,['fill-email','click-email','fill-email','click-email','fill-password','click-password']);
+  assert.ok(s.logs.some(line=>/rejected non-email replacement/.test(line)));
+  assert.ok(s.logs.every(line=>!/fixture@example|fixture-only|invalid-id/.test(line)));
+});
+for(const replacement of ['other@example.test','fixture@example.test'])test('post-CAPTCHA rejected valid ID is not overwritten or resubmitted: '+replacement,async()=>{
+  const s=scenario({captcha:true,rejectedReplacement:replacement});
+  await assert.rejects(s.run(),error=>error.exitCode===79&&/identity review/.test(error.message));
+  assert.deepEqual(s.calls,['fill-email','click-email']);
 });
 
 test('visible CAPTCHA fills only email and leaves password/submission for after human completion', async () => {

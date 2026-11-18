@@ -107,6 +107,7 @@ async function exportState(context, page) {
 
 (async () => {
   const browser = await connectAuthBrowser({ chromium, profileDir, market: "cl", environment: config.environment, slot });
+  try {
   const context = browser.contexts()[0];
   if (!context) throw new Error("Dedicated CL Chrome has no browser context.");
   await discardRejectedAccountPages(context);
@@ -143,7 +144,6 @@ async function exportState(context, page) {
   };
   context.pages().forEach(observePage);
   context.on("page", observePage);
-  try {
     console.log(`[auth:login:cl] ${config.environment} ${slot}: Chrome opened; preparing storefront`);
     await installClChatNoticeDismissal(page);
     page.setDefaultTimeout(120000);

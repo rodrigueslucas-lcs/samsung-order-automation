@@ -131,6 +131,23 @@ async function completeAccountLogin(page, { market, hostname, credentials, timeo
       }
       await pause(250); continue;
     }
+    if (!passwordSubmitted && await email.isVisible() && !await password.isVisible() &&
+        await page.getByText(/^El ID no es válido\.$/).first().isVisible()) {
+      formAction='email-read';const value=(await email.inputValue({timeout:1500})).trim();formAction='';
+      const expected=String(configured().email||'').trim();
+      // A provider/autofill replacement can invalidate the ID after CAPTCHA.
+      // Restore only the configured identity, once, before any password. Never
+      // overwrite another valid email or resubmit an ID the provider rejected.
+      if (!emailRestored && expected && value.toLowerCase()!==expected.toLowerCase() &&
+          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        formAction='email-fill';await email.fill(expected,{timeout:2000});formAction='';
+        emailFilled=true;emailRestored=true;
+        report('configured email restored after a rejected non-email replacement');
+      } else {
+        const rejected=new Error('Samsung Account rejected the visible ID; manual identity review required. No credential was resubmitted.');
+        rejected.exitCode=79;throw rejected;
+      }
+    }
     if(resumeOnly&&resumeEmailPhase!=='NONE'&&await email.isVisible()&&!await password.isVisible()) {
       formAction='email-read';const value=(await email.inputValue({timeout:1500})).trim();formAction='';
       if(!value&&!emailRestored){formAction='email-fill';await email.fill(configured().email,{timeout:2000});formAction='';emailRestored=true;report('configured email restored after provider reset');}
