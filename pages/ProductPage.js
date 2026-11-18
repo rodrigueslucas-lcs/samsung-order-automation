@@ -1,4 +1,5 @@
 import BasePage from './BasePage';
+import mxPdpReadiness from '../utils/mxPdpReadiness.cjs';
 
 export default class ProductPage extends BasePage {
   constructor(page, options = {}) {
@@ -22,6 +23,9 @@ export default class ProductPage extends BasePage {
     recoverBlankPdp, addButtonName = /Agregar al (?:carro|carrito)|Add to cart|Add to basket/i } = {}) {
     if (!this.pdpUrl) throw new Error('A configured PDP URL is required.');
     const mxBasePdp = new URL(this.pdpUrl).pathname.startsWith('/mx/p/');
+    const reads = mxBasePdp && typeof this.page.on === 'function'
+      ? mxPdpReadiness.watchMxPdpReads(this.page, this.pdpUrl) : null;
+    try {
     const isCartMutation = (request) =>
       request.method() === 'POST' &&
       /\/users\/current\/carts\/(?:current|[^/]+)\/entries(?:\?|$)/.test(request.url());
@@ -67,6 +71,12 @@ export default class ProductPage extends BasePage {
         .waitFor({ state: 'visible', timeout: 20000 })
         .then(() => true)
         .catch(() => false);
+
+      if (!buttonReady && reads?.pending()) {
+        await reads.settle();
+        buttonReady = await addButton.waitFor({ state: 'visible', timeout: 15000 })
+          .then(() => true, () => false);
+      }
 
       if (!buttonReady && recoverBlankPdp && await recoverBlankPdp()) {
         buttonReady = await addButton.waitFor({ state: 'visible', timeout: 30000 })
@@ -184,6 +194,7 @@ export default class ProductPage extends BasePage {
         throw new Error(`AUTOMATION_RECOVERY_EXHAUSTED: cart did not contain ${this.sku} after one bounded refresh/retry cycle: ${failure}.`);
       }
     }
+    } finally { reads?.dispose(); }
   }
 
   async validateProductLoaded() {
