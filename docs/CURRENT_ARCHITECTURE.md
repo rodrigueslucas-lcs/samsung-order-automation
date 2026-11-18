@@ -107,7 +107,9 @@ Primary QST commands:
 
 ```text
 npm run qst:mx:base-store
+npm run qst:mx:epp
 npm run qst:pe:base-store
+npm run qst:pe:epp
 npm run qst:co:base-store
 npm run qst:co:epp
 npm run qst:cl:base-store
