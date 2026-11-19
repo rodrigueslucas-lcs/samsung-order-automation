@@ -4,6 +4,7 @@ import clTestCard from "../../utils/clTestCard.cjs";
 import destructiveGuards from "../../utils/destructiveGuards";
 import { installBusinessNetworkEvidence } from "../../utils/businessNetworkEvidence";
 import evidenceContext from "../../reporting/evidence/evidenceContext.js";
+import clCausalReadback from './causalOrderReadback.cjs';
 
 const { recordBusinessEvidence } = evidenceContext;
 const CL_S2_RT_751761_BLOCKED_IDS = new Set([
@@ -165,6 +166,10 @@ export async function executeClPaymentOrder(browser, testInfo, { reachDelivery, 
   });
 
   const { context, page } = await reachDelivery(browser, { singleItem: true, paymentProduct: true });
+  let observedCart;
+  const causalCard = environment === 'S2' && kind === 'card' && !flowCard;
+  const observeCart = response => { if (clCausalReadback.isClCartResponse(response)) observedCart = response; };
+  if (causalCard) page.on('response', observeCart);
   installBusinessNetworkEvidence(page, testInfo, "CL");
   try {
     await test.step("Choose the registered delivery address and continue to CL Payment", async () => {
@@ -191,9 +196,16 @@ export async function executeClPaymentOrder(browser, testInfo, { reachDelivery, 
     }
     await test.step("Submit once and prove a new Samsung order confirmation", async () => {
       const storefrontOrigin = new URL(page.url()).origin;
-      const result = await payment.placeOrderAndCapture(kind === "transfer" || flowCard ? {
+      const reader = causalCard ? await clCausalReadback.createClReadbackFromCartResponse(page, observedCart) : null;
+      const baseline = reader ? await reader.beforeSubmit() : null;
+      let result;
+      try { result = await payment.placeOrderAndCapture(kind === "transfer" || flowCard ? {
         submitResponsePathPattern: /^\/tokocommercewebservices\/v2\/cl\/users\/[^/]+\/carts\/[^/]+\/paymentmodes\/cl-[^/]+\/submitOrder$/i,
-      } : {});
+      } : {}); }
+      catch (error) {
+        if (!reader || !/business code 601 despite HTTP success/.test(String(error.message))) throw error;
+        result = await clCausalReadback.confirmClCreatedOrder(page, reader, baseline);
+      }
       expect(result.orderCode).toMatch(/^CL\d{6}-\d{8}(?:_\d+)?$/i);
       const publicOrderCode = result.orderCode.replace(/_\d+$/, "");
       if (new URL(page.url()).hostname === "sandbox.flow.cl") {
@@ -227,6 +239,7 @@ export async function executeClPaymentOrder(browser, testInfo, { reachDelivery, 
       testInfo.annotations.push({ type: "cl-qst-order", description: result.orderCode });
     });
   } finally {
+    if (causalCard) page.off('response', observeCart);
     await context.close();
   }
 }

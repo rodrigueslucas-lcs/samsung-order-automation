@@ -4,6 +4,37 @@ The official cases remain in `tests/markets/cl/qst/base-store/official-p1.spec.j
 Shared execution is in `flows/cl/paymentFlows.js`. S1/S2 remains runtime configuration.
 Runtime evidence below covers S2 only; S1 execution has not been validated by this change.
 
+## Current validation (2026-11-19)
+
+SAM-24826 passed in a new, uninterrupted S2 execution after fixing the late
+registered-cart reminder. That execution submitted once and confirmed new internal
+order `CL261119-78894732_261119140451162` on the real Samsung confirmation page.
+Its ignored report is `test-results/cl13-confirmation-causal/results.json`.
+SAM-24822 also passed separately, creating
+`CL261119-78894732_261119141802272`; its report is
+`test-results/cl13-card-reconciled/results.json`. The preceding card execution
+failed in the MercadoPago SDK without a submit-order request or a new order.
+Two read-only history checks reconciled that attempt before the fresh run.
+The October observations below remain historical evidence, not current results.
+
+The CL submit API can return HTTP 200/business `601` after creating an order.
+The S2 Base Store MercadoPago card flow now captures a pre-submit order-history
+baseline and the observed cart. Only after this exact response, it may reconcile
+through read-only GETs: exactly one new CL-site order, creation time within the
+execution, the same single SKU, quantity and total, and no rejected/cancelled
+status. It then requires the exact order route, visible order number and genuine
+confirmation message. A response code or a preallocated cart code alone never
+proves success. Failed proof remains a failure; payment is never resubmitted.
+
+This reconciliation is scoped to CL S2 Base Store card payments. S1, bank
+transfer, Webpay and other markets keep their existing payment contracts.
+The shared readback kernel also preserves the existing EPP causal checks.
+
+Jenkins now binds the dedicated `samsung-cl-test-card` file credential and copies
+it to `playwright/.auth/cl-test-card.json` on both Windows and Unix. The previous
+CL block copied the MX credential to an MX path, leaving the CL loader without
+its required fixture. Card data remains ignored and must never be committed.
+
 ## Runtime evidence (2026-10-19)
 
 | Case | Evidence and remaining work |
@@ -31,8 +62,8 @@ Payment execution requires `ALLOW_PAYMENT_SUBMIT=1` and a verified registered CL
 Orders are normalized to quantity one. Submission is never automatically retried.
 Inspect an ambiguous result before running the case again; confirmed bank orders must not be resubmitted.
 
-`CL_QST_CARD_PROVIDER=webpay` is the native credit/debit default.
-`CL_QST_CARD_PROVIDER=mercado` selects direct MercadoPago card entry.
+S2 defaults to direct MercadoPago card entry; S1 defaults to native Webpay.
+`CL_QST_CARD_PROVIDER=webpay` or `mercado` selects an explicit provider.
 Installment validation uses the direct card form and its actual offered options.
 
 Direct card fixtures are market-specific. Set `CL_TEST_CARD_BRAND=mastercard` or `amex`.
@@ -45,5 +76,4 @@ The loader deliberately does not borrow the MX card credential.
 
 Official fixture reference: [MercadoPago Chile test cards](https://www.mercadopago.cl/developers/es/docs/your-integrations/test/cards).
 Jenkins direct-card/installment execution needs these CL-specific runtime inputs;
-an existing MX fixture binding does not satisfy that prerequisite. No Jenkins configuration
-or credentials were changed by this patch.
+an existing MX fixture binding does not satisfy that prerequisite.

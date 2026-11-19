@@ -365,7 +365,7 @@ pipeline {
                 usernamePassword(credentialsId: 'samsung-storefront-primary-user', usernameVariable: 'SAMSUNG_ACCOUNT_EMAIL', passwordVariable: 'SAMSUNG_ACCOUNT_PASSWORD'),
                 file(credentialsId: env.CL_SESSION_BUNDLE_CREDENTIAL, variable: 'CL_SESSION_BUNDLE'),
                 file(credentialsId: env.CL_BACKOFFICE_ADMIN_CREDENTIAL, variable: 'CL_BACKOFFICE_ADMIN_SECRET'),
-                file(credentialsId: 'samsung-mx-test-card', variable: 'CL_TEST_CARD_SECRET')
+                file(credentialsId: 'samsung-cl-test-card', variable: 'CL_TEST_CARD_SECRET')
               ]
               withCredentials(clCredentials) {
                 if (isUnix()) {
@@ -374,7 +374,7 @@ pipeline {
                     npm run auth:install:cl
                     mkdir -p playwright/.auth
                     cp "$CL_BACKOFFICE_ADMIN_SECRET" "playwright/.auth/backoffice-admin-${BACKOFFICE_ENV}.json"
-                    cp "$CL_TEST_CARD_SECRET" playwright/.auth/mx-test-card.json
+                    cp "$CL_TEST_CARD_SECRET" playwright/.auth/cl-test-card.json
                     chmod 600 playwright/.auth/*.json || true
                     CI=1 node scripts/verify-jenkins-storefront-auth.cjs cl
                     npx -y node@22 scripts/run-cl-qst-p1.cjs
@@ -384,7 +384,7 @@ pipeline {
                     call npm run auth:install:cl || exit /b 2
                     if not exist playwright\\.auth mkdir playwright\\.auth
                     copy /Y "%CL_BACKOFFICE_ADMIN_SECRET%" "playwright\\.auth\\backoffice-admin-%BACKOFFICE_ENV%.json" >nul || exit /b 2
-                    copy /Y "%CL_TEST_CARD_SECRET%" "playwright\\.auth\\mx-test-card.json" >nul || exit /b 2
+                    copy /Y "%CL_TEST_CARD_SECRET%" "playwright\\.auth\\cl-test-card.json" >nul || exit /b 2
                     set CI=1
                     call node scripts/verify-jenkins-storefront-auth.cjs cl || exit /b 20
                     call npx -y node@22 scripts/run-cl-qst-p1.cjs

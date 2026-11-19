@@ -40,6 +40,16 @@ test('CL sandbox card loader rejects missing CL mass instead of borrowing MX cre
   assert.throws(() => getClTestCard({ CL_TEST_CARD_BRAND: 'unknown' }), /must be mastercard or amex/);
 });
 
+test('Jenkins provisions the CL card fixture consumed by its loader on both platforms', () => {
+  const pipeline = fs.readFileSync('Jenkinsfile', 'utf8');
+  const cl = pipeline.slice(pipeline.indexOf("if (params.MARKET == 'CL')"), pipeline.indexOf("env.CO_TEST_CARD_CREDENTIAL"));
+  assert.match(cl, /file\(credentialsId: 'samsung-cl-test-card', variable: 'CL_TEST_CARD_SECRET'\)/);
+  assert.ok(cl.includes('cp "$CL_TEST_CARD_SECRET" playwright/.auth/cl-test-card.json'));
+  assert.ok(cl.includes('copy /Y "%CL_TEST_CARD_SECRET%" "playwright\\\\.auth\\\\cl-test-card.json"'));
+  assert.ok(!cl.includes('playwright/.auth/mx-test-card.json'));
+  assert.ok(!cl.includes('playwright\\\\.auth\\\\mx-test-card.json'));
+});
+
 test('CL sandbox card loader supports explicit brand selection without exposing values', () => {
   const env = { CL_TEST_CARD_FILE: 'test-results/nonexistent-cl-card-fixture.json',
     CL_TEST_CARD_HOLDER: 'APRO', CL_TEST_CARD_EXPIRY: '11/30', CL_TEST_CARD_CVV: 'fixture', CL_TEST_CARD_DOCUMENT: 'fixture' };
