@@ -26,3 +26,12 @@ test('other market browser selection is preserved', () => {
     assert.equal(config({ TEST_MARKET: market, PW_VIDEO: '0' }).use.channel, 'chrome');
   }
 });
+
+test('CL official campaign retains evidence teardown budget without changing its browser or other suites', () => {
+  const cl = config({ TEST_MARKET: 'CL', TEST_SUITE: 'P1/QST', TEST_STORE: 'BASE_STORE', PW_VIDEO: '1' });
+  assert.equal(cl.timeout, 120000);
+  assert.equal(cl.use.channel, undefined);
+  assert.equal(config({ TEST_MARKET: 'CL', TEST_SUITE: 'DST' }).timeout, 30000);
+  assert.equal(config({ TEST_MARKET: 'PE', TEST_SUITE: 'P1/QST' }).timeout, 30000);
+  assert.equal(config({ TEST_MARKET: 'CL', TEST_SUITE: 'P1/QST', TEST_STORE: 'EPP' }).timeout, 30000);
+});

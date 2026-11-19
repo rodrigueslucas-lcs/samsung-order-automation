@@ -337,8 +337,12 @@ export default class ProfilePage extends MyAccountPage {
     // Address controls render before the address-list request has completed.
     await this.addressCards.first().waitFor({ state: "visible", timeout: 30000 });
     for (let attempt = 0; attempt < 10; attempt++) {
-      if (await this.page.getByText(marker, { exact: false }).first().isVisible().catch(() => false)) return;
+      const address = this.page.getByText(marker, { exact: false }).first();
       const more = this.page.getByRole("button", { name: /Ver m[aá]s/i }).filter({ visible: true }).first();
+      // Initial cards can render before the pagination control. Await either
+      // the requested address or pagination instead of declaring the list done.
+      await address.or(more).first().waitFor({ state: "visible", timeout: 30000 }).catch(() => {});
+      if (await address.isVisible().catch(() => false)) return;
       if (!(await more.isVisible().catch(() => false))) return;
       const before = await this.addressCards.count();
       await more.click();

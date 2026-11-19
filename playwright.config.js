@@ -10,6 +10,7 @@ const headless = process.env.MX_QST_HEADLESS === '1' ||
 const mxOfficialP1 = process.env.TEST_MARKET === 'MX' && process.env.TEST_SUITE === 'P1/QST';
 const peOfficialP1 = process.env.TEST_MARKET === 'PE' && process.env.TEST_SUITE === 'P1/QST';
 const coOfficialP1 = process.env.TEST_MARKET === 'CO' && process.env.TEST_SUITE === 'P1/QST';
+const clOfficialP1 = process.env.TEST_MARKET === 'CL' && process.env.TEST_SUITE === 'P1/QST' && process.env.TEST_STORE === 'BASE_STORE';
 const { MX_BASE_P1_IDS } = mxQstScope;
 const mxActiveP1Pattern = new RegExp(`(?:${MX_BASE_P1_IDS.join('|')})\\b`);
 
@@ -35,8 +36,9 @@ const peProjectUse = { ...chromiumUse };
 
 export default defineConfig({
   testDir: './tests',
-  // A confirmed CO order must retain enough teardown budget to finalize video/trace.
-  timeout: coOfficialP1 ? 120000 : 30000,
+  // CL/CO scenario bodies set their own budget; context teardown still uses
+  // this default while finalizing video/trace, including under CI load.
+  timeout: coOfficialP1 || clOfficialP1 ? 120000 : 30000,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

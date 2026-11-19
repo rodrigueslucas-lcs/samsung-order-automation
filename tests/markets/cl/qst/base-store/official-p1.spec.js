@@ -575,10 +575,8 @@ test.describe("CL QST - Base Store Official P1", () => {
       try {
         await selectClNewAddress(page);
         const shipping = page.locator('[data-activestepname="CHECKOUT_STEP_DELIVERY"]');
-        await shipping.locator('mat-select[name="regionIso"]:not([aria-disabled="true"])').first().click();
-        await page.getByRole("option", { name: /Metropolitana/i }).first().click();
-        await shipping.locator('mat-select[name="town"]:not([aria-disabled="true"])').first().click();
-        await page.getByRole("option", { name: config().checkoutCommune, exact: true }).first().click();
+        await selectClCheckoutOption(page, shipping.locator('mat-select[name="regionIso"]:visible').first(), /Metropolitana/i);
+        await selectClCheckoutOption(page, shipping.locator('mat-select[name="town"]:visible').first(), config().checkoutCommune);
         await shipping.locator('input[name="line2"]:visible').first().fill("QA AUTOMATION CHECKOUT");
         await shipping.locator('input[name="line1"]:visible').first().fill("123");
         const save = shipping.locator('input[name="saveInAddressBook"]:visible').first();
