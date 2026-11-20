@@ -1,4 +1,3 @@
-import { expect } from "@playwright/test";
 import BackOfficePage from "./BackOfficePage";
 
 export default class BackOfficeCatalogPage extends BackOfficePage {
@@ -34,11 +33,20 @@ export default class BackOfficeCatalogPage extends BackOfficePage {
       .last();
     await searchInput.fill(productCode);
     const toolbar = searchInput.locator("xpath=../..");
-    await this.waitForZkUpdate(() => toolbar.locator('button[title="Search"]').click());
+    return this.submitProductSearch(toolbar.locator('button[title="Search"]'), productCode);
+  }
 
-    const code = this.page.getByText(productCode, { exact: true }).filter({ visible: true });
-    await code.first().waitFor({ state: "visible", timeout: 30000 });
-    return code.first();
+  async submitProductSearch(searchButton, productCode) {
+    const eventTargetId = await searchButton.getAttribute("id");
+    if (!eventTargetId) throw new Error("BackOffice product Search button has no ZK identity.");
+    // Product thumbnails emit AU requests after navigation. Wait for this
+    // button's onClick response, not the first image/size notification.
+    await this.waitForZkUpdate(() => searchButton.click(), { timeout: 90000, eventTargetId });
+    const code = this.page.getByText(productCode, { exact: true }).filter({ visible: true }).first();
+    await code.waitFor({ state: "visible", timeout: 30000 }).catch(() => {
+      throw new Error(`BackOffice product Search completed, but exact SKU ${productCode} was not rendered.`);
+    });
+    return code;
   }
 
   async openAdvancedSearch() {
@@ -75,10 +83,6 @@ export default class BackOfficeCatalogPage extends BackOfficePage {
       .getByRole("button", { name: "Search", exact: true })
       .filter({ visible: true })
       .last();
-    await this.waitForZkUpdate(() => searchButton.click());
-
-    const code = this.page.getByText(productCode, { exact: true }).filter({ visible: true });
-    await expect(code.first()).toBeVisible({ timeout: 30000 });
-    return code.first();
+    return this.submitProductSearch(searchButton, productCode);
   }
 }

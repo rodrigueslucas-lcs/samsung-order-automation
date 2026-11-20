@@ -27,7 +27,7 @@ test('Products navigation completes its AU before accessing the replacement sear
 });
 
 test('CL address paging awaits initial cards and growth after every click', async () => {
-  let cards = 0, clicks = 0, pending = false;
+  let cards = 0, clicks = 0, pending = false, readinessChecks = 0;
   const Profile = load('pages/ProfilePage.js', 'ProfilePage', { MyAccountPage: class {}, process,
     expect: { poll: read => ({ toBeGreaterThan: async before => {
       assert.equal(pending, true); cards += 3; pending = false;
@@ -37,8 +37,14 @@ test('CL address paging awaits initial cards and growth after every click', asyn
   profile.addressCards = { first: () => ({ waitFor: async () => { cards = 3; } }), count: async () => cards };
   const more = { filter() { return this; }, first() { return this; }, isVisible: async () => true,
     click: async () => { assert.equal(pending, false); pending = true; clicks++; } };
-  profile.page = { getByText: () => ({ first: () => ({ isVisible: async () => cards >= 9 }) }), getByRole: () => more };
+  const address = { first() { return this; }, isVisible: async () => cards >= 9,
+    or: control => {
+      assert.equal(control, more);
+      return { first() { return this; }, waitFor: async () => { readinessChecks++; } };
+    } };
+  profile.page = { getByText: () => address, getByRole: () => more };
   await profile.expandClAddressesUntil('QA AUTOMATION marker');
   assert.equal(clicks, 2);
+  assert.equal(readinessChecks, 3);
   assert.equal(pending, false);
 });

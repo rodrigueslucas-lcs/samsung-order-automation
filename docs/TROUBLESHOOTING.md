@@ -215,3 +215,11 @@ This is enough to reproduce/diagnose most issues without guessing.
   the official account options. Samsung must restore/publish that CMS page and
   its navigation for the MX S2 site. No Jira ID has been supplied for this issue;
   keep the full menu assertions and the raw failure until the page is restored.
+- **CL SAM-24830, build #15:** product navigation emitted thumbnail `onImageLoad`
+  ZK updates before the actual Search `onClick` query. Waiting for the first AU
+  response falsely marked the search ready; the SKU wait expired while the real
+  query was still pending and `Processing...` remained visible. Product search
+  now waits for the response containing the clicked button's ZK UUID, allowing
+  a bounded 90-second query and requiring the exact SKU afterward. It submits
+  Search once. Background image updates cannot satisfy this readiness check;
+  HTTP failures and a completed query without the product still fail.

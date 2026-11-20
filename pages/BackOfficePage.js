@@ -58,13 +58,19 @@ export default class BackOfficePage extends BasePage {
     await this.page.locator("#zk_proc").waitFor({ state: "hidden", timeout });
   }
 
-  async waitForZkUpdate(action, { timeout = 30000 } = {}) {
+  async waitForZkUpdate(action, { timeout = 30000, eventTargetId = null } = {}) {
     await this.waitForZkReady({ timeout });
     const requests = new Set();
     const origin = new URL(this.url).origin;
     const track = request => {
       const url = new URL(request.url());
       if (request.method() === "POST" && url.origin === origin && /\/zkau(?:\/|$)/.test(url.pathname)) {
+        if (eventTargetId) {
+          const data = new URLSearchParams(request.postData() || "");
+          const matched = [...data.keys()].some(key => /^cmd_\d+$/.test(key) &&
+            data.get(key) === "onClick" && data.get(key.replace("cmd_", "uuid_")) === eventTargetId);
+          if (!matched) return;
+        }
         requests.add(request);
       }
     };

@@ -5,7 +5,42 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync('pages/BackOfficePage.js', 'utf8')
   .replace(/^import .*;\r?\n/gm, '').replace(/^export default /gm, '').replace(/^export /gm, '');
-const BackOfficePage = vm.runInNewContext(`${source}\nBackOfficePage;`, { BasePage: class {}, URL, process });
+const BackOfficePage = vm.runInNewContext(`${source}\nBackOfficePage;`, { BasePage: class {}, URL, URLSearchParams, process });
+
+test('product search waits for its own delayed ZK click, ignoring thumbnail and foreign-target updates', async () => {
+  const { chromium } = require('@playwright/test');
+  const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+  try {
+    const page = await browser.newPage();
+    let submits = 0;
+    await page.route('https://bo-s2.example/**', async route => {
+      const request = route.request();
+      if (request.method() === 'GET') return route.fulfill({ contentType: 'text/html', body: `
+        <button id="query">Search</button><div id="zk_proc" style="display:none">Processing...</div><div id="results"></div>
+        <script>document.querySelector('button').onclick=async()=>{
+          document.querySelector('#zk_proc').style.display='block';
+          await fetch('/backoffice/zkau',{method:'POST',body:'cmd_0=onImageLoad&uuid_0=thumbnail'});
+          await fetch('/backoffice/zkau',{method:'POST',body:'cmd_0=onClick&uuid_0=other-button'});
+          await fetch('/backoffice/zkau',{method:'POST',body:'cmd_0=onChange&uuid_0=input&cmd_1=onClick&uuid_1=query'});
+          document.querySelector('#results').textContent='SM-S918BZKILTL';
+          document.querySelector('#zk_proc').style.display='none';
+        }</script>` });
+      const data = new URLSearchParams(request.postData());
+      if (data.get('uuid_1') === 'query') { submits++; await new Promise(resolve => setTimeout(resolve, 250)); }
+      return route.fulfill({ contentType: 'application/json', body: '{}' });
+    });
+    await page.goto('https://bo-s2.example/backoffice/');
+    const catalogSource = fs.readFileSync('pages/BackOfficeCatalogPage.js', 'utf8')
+      .replace(/^import .*;\r?\n/gm, '').replace('export default class BackOfficeCatalogPage', 'class BackOfficeCatalogPage');
+    const Catalog = vm.runInNewContext(catalogSource + '\nBackOfficeCatalogPage;', { BackOfficePage });
+    const catalog = Object.create(Catalog.prototype);
+    catalog.page = page; catalog.url = page.url();
+    const result = await catalog.submitProductSearch(page.getByRole('button', { name: 'Search' }), 'SM-S918BZKILTL');
+    assert.equal(await result.innerText(), 'SM-S918BZKILTL');
+    assert.equal(submits, 1);
+    assert.equal(await page.locator('#zk_proc').isVisible(), false);
+  } finally { await browser.close(); }
+});
 
 function scenario({ status = 200, failedBody = false, actionFails = false, timeout = 30000 } = {}) {
   const events = [];
