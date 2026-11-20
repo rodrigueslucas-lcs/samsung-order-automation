@@ -57,12 +57,13 @@ async function createFreshGuestOrder(page, mxConfig) {
   const email = `${inbox}@mailinator.com`;
   const { checkout } = await reachMxGuestPayment(page, mxConfig, email);
   if (mxConfig.environment === "S2") {
-    const payment = new MarketPaymentPage(page, { market: "MX" });
+    const payment = new MarketPaymentPage(page, { market: "MX", cardPanel: "credit" });
     const card = getMxTestCard();
     await payment.selectCreditCard();
     await payment.fillCardData(card);
     await payment.validateCreditCardReady(card);
     const result = await payment.placeOrderAndCapture();
+    await payment.validateMxOrderConfirmation(result.orderCode);
     fs.mkdirSync(path.dirname(guestOrderRuntimeFile), { recursive: true });
     fs.writeFileSync(guestOrderRuntimeFile, JSON.stringify({
       orderNumber: result.orderCode,

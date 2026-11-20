@@ -20,6 +20,7 @@ test('CL capture scopes rejection and order identity to CL commerce endpoints', 
   const source = fs.readFileSync('pages/MarketPaymentPage.js', 'utf8')
     .replace(/^import .*;\r?\n/gm, '').replace('export default class MarketPaymentPage', 'class MarketPaymentPage');
   const Page = vm.runInNewContext(`${source}\nMarketPaymentPage;`, {
+    URL,
     PaymentPage: class { async placeOrderAndCapture(options) { return options; } },
     paymentMarketProfile: {}, destructiveGuards: {},
   });
@@ -32,6 +33,7 @@ test('CL capture scopes rejection and order identity to CL commerce endpoints', 
   assert.ok(!options.orderResponsePathPattern.test('/tokocommercewebservices/v2/cl/users/current/carts/current'));
   assert.ok(options.orderResponsePathPattern.test('/tokocommercewebservices/v2/cl/users/current/orders/CL261019-12345678'));
   payment.marketProfile = { code: 'MX' };
+  payment.page = { url: () => 'https://stg.shop.samsung.com/mx/checkout/one' };
   assert.equal((await payment.placeOrderAndCapture()).submitResponsePathPattern, undefined);
 });
 

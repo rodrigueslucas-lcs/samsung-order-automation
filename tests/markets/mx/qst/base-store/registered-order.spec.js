@@ -75,7 +75,7 @@ test("SAM-25002 @destructive @qst @mx @base-store @registered - Complete card pa
     await reachRegisteredPaymentViaUi(page, config);
   });
 
-  const payment = new MarketPaymentPage(page, { market: "MX" });
+  const payment = new MarketPaymentPage(page, { market: "MX", cardPanel: mxConfig.environment === "S2" ? "credit" : "debit" });
   const card = getMxTestCard();
 
   await test.step("Select Mercado Pago credit card", async () => {
@@ -95,6 +95,11 @@ test("SAM-25002 @destructive @qst @mx @base-store @registered - Complete card pa
     expect(result.orderCode).toMatch(/^MX\d{6}-\d{8}(?:_\d+)?$/i);
   });
 
+  const confirmation = mxConfig.environment === "S2"
+    ? await test.step("Validate the captured order on the confirmation page", () =>
+      payment.validateMxOrderConfirmation(result.orderCode))
+    : { confirmationValidated: false, finalUrl: result.finalUrl };
+
   recordBusinessEvidence(testInfo, {
     orderCode: result.orderCode,
     paymentMode: "mx-mercadoCC",
@@ -109,10 +114,10 @@ test("SAM-25002 @destructive @qst @mx @base-store @registered - Complete card pa
       orderId: result.orderCode,
       paymentMode: "mx-mercadoCC",
       outcome: result.outcome,
-      finalUrl: result.finalUrl,
+      finalUrl: confirmation.finalUrl,
       responses: result.responses || [],
       authorizedSubmit: true,
-      confirmationValidated: true,
+      confirmationValidated: confirmation.confirmationValidated,
     }, null, 2)),
     contentType: "application/json",
   });

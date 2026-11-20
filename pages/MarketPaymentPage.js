@@ -6,9 +6,18 @@ const { getPaymentMarketProfile } = paymentMarketProfile;
 const { requirePaymentSubmitOptIn } = destructiveGuards;
 
 export default class MarketPaymentPage extends PaymentPage {
-  constructor(page, { market } = {}) {
+  constructor(page, { market, cardPanel = "debit" } = {}) {
     super(page);
     this.marketProfile = getPaymentMarketProfile(market);
+    if (this.marketProfile.code === "MX") {
+      if (!["credit", "debit"].includes(cardPanel)) throw new Error("MX cardPanel must be credit or debit.");
+      this.creditCardOption = cardPanel === "credit"
+        ? page.getByRole("button").filter({ has: page.getByRole("heading", { name: /^Tarjeta de Cr[eé]dito$/i }) })
+          .filter({ visible: true }).first()
+        : page.getByRole("button", {
+          name: /Tarjeta de (?:D[eé]bito\s*\/\s*Cr[eé]dito|Cr[eé]dito\s*\/\s*D[eé]bito)/i,
+        }).filter({ visible: true }).first();
+    }
     if (this.marketProfile.code === "CL") {
       this.installmentsCombobox = page.getByRole("combobox", { name: /Intereses/i })
         .filter({ visible: true });
@@ -61,19 +70,55 @@ export default class MarketPaymentPage extends PaymentPage {
       submitResponsePathPattern: /^\/tokocommercewebservices\/v2\/cl\/users\/[^/]+\/carts\/[^/]+\/paymentmodes\/cl-mercadoCC\/submitOrder$/i,
       orderResponsePathPattern: /^\/tokocommercewebservices\/v2\/cl\/users\/[^/]+\/orders(?:\/|$)/i,
     } : {};
+    const url = this.marketProfile.code === "MX" ? new URL(this.page.url()) : null;
+    const mxCapture = this.marketProfile.code === "MX" &&
+      url.origin === "https://stg2.shop.samsung.com" && url.pathname === "/mx/checkout/one" ? {
+        // Card details can reference saved-card orders. Only the actual order
+        // detail response may establish the identity of this submission.
+        orderResponsePathPattern: /^\/tokocommercewebservices\/v2\/mx\/users\/[^/]+\/orders\/[^/]+$/i,
+        submitResponsePathPattern: /^\/tokocommercewebservices\/v2\/mx\/users\/[^/]+\/carts\/[^/]+\/paymentmodes\/mx-mercadoCC\/submitOrder$/i,
+      } : {};
     return super.placeOrderAndCapture({
       ...clCapture,
+      ...mxCapture,
       ...options,
       orderCodePattern: options.orderCodePattern || orderCodePattern,
     });
   }
 
+  async validateMxOrderConfirmation(orderCode, { timeout = 60000 } = {}) {
+    const initial = new URL(this.page.url());
+    if (this.marketProfile.code !== "MX" || initial.origin !== "https://stg2.shop.samsung.com" ||
+        !/^\/mx\/(?:checkout\/one|orderConfirmation(?:;.*)?)$/i.test(initial.pathname)) {
+      throw new Error("MX confirmation validation requires the S2 Base Store checkout or receipt.");
+    }
+    if (!/^MX\d{6}-\d{8}(?:_\d+)?$/i.test(orderCode || "")) {
+      throw new Error("MX confirmation requires the order captured in this execution.");
+    }
+    const publicCode = orderCode.split("_")[0];
+    await this.page.waitForURL((url) => {
+      if (url.origin !== initial.origin || !/^\/mx\/orderConfirmation(?:;.*)?$/i.test(url.pathname)) return false;
+      const actual = url.searchParams.get("orderCode") ||
+        decodeURIComponent(url.pathname).match(/;orderCode=([^;&]+)/i)?.[1];
+      return actual === orderCode || actual === publicCode ||
+        (!orderCode.includes("_") && actual?.split("_")[0] === publicCode);
+    }, { timeout }).catch(() => {
+      throw new Error("MX did not reach the captured order's confirmation page; reconcile before another submit.");
+    });
+    await this.page.getByText(publicCode, { exact: false }).filter({ visible: true }).first()
+      .waitFor({ state: "visible", timeout });
+    await this.page.getByText(/Recibimos tu (?:orden|pedido).*exitos[ao]|Gracias por tu compra|Tu (?:pedido|orden) se encuentra en validaci[oó]n/i)
+      .filter({ visible: true }).first().waitFor({ state: "visible", timeout });
+    const final = new URL(this.page.url());
+    return { confirmationValidated: true, finalUrl: final.origin + final.pathname };
+  }
+
   async selectCreditCard() {
     const directCard = this.creditCardOption.filter({ visible: true }).first();
 
-    if (this.marketProfile.code === "CL") {
-      // CL renders its card accordion asynchronously. Never route it through
-      // the MX digital-wallet fallback while payment methods are loading.
+    if (["CL", "MX"].includes(this.marketProfile.code)) {
+      // Native card accordions render asynchronously. Never route them through
+      // a digital-wallet redirect while payment methods are loading.
       await directCard.waitFor({ state: "visible", timeout: 90000 });
       return super.selectCreditCard();
     }

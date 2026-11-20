@@ -171,3 +171,47 @@ git status if code was changed
 ```
 
 This is enough to reproduce/diagnose most issues without guessing.
+
+## 14. Base Store MX/CL build findings — 2026-11-19
+
+- **MX SAM-25002 / SAM-25010:** the native card label is `Tarjeta de Débito/Crédito`.
+  A selector accepting only the reversed wording entered the wallet fallback,
+  initiated CheckoutPro and stopped at MercadoPago login. `MarketPaymentPage`
+  now recognizes both native card labels and waits for the native accordion;
+  choosing a card no longer initiates a wallet order. Preserve any earlier
+  wallet initiation evidence and reconcile it before another financial attempt.
+  The S2 Base Store credit-card scenarios explicitly choose the separate native
+  `Tarjeta de Crédito` panel offered by the checkout. The debit/credit NoMSI
+  method returned 601 without a confirmed order in controlled attempts; this is
+  not a reason to silently switch methods after submission. The original MX
+  test-card fixture remains unchanged. Older uncertain attempts were reconciled
+  against BackOffice before the next controlled execution.
+  A captured order code is not receipt-page proof: both S2 order creation paths
+  now wait for that same order's confirmation URL, visible public number and
+  success message before recording confirmation. They never navigate to a
+  receipt as a fallback or repeat payment to satisfy this check.
+  The native card-details response can contain historical saved-card order
+  identifiers. S2 Base Store capture therefore accepts identity only from an
+  individual `/v2/mx/users/.../orders/...` response, excluding card details and
+  the order-history list. An identifier found in payment details must never be
+  reported as the newly created order.
+  Final targeted validation proved SAM-25002 with a new order and matching
+  receipt UI, and SAM-25010 with a new guest order, OTP and tracking details.
+  Earlier attempts and their raw failures remain historical evidence.
+- **CL SAM-24811:** the checkout saved the QA address, proven by its address API.
+  The first cards rendered before `Ver más`, so an immediate visibility check
+  ended pagination early. The page object now waits for the requested address
+  or pagination control and still requires the actual address to be visible.
+- **CL SAM-24814:** use the existing checkout selector helper to wait for the
+  visible, enabled dependent commune control after region selection.
+- **CL SAM-24818:** its business step finished, but the context teardown hit
+  the default 30-second evidence budget while finalizing video. CL Base Store
+  official campaigns now retain a 120-second teardown budget, as CO already
+  does. Scenario assertions and the other suites' defaults remain unchanged.
+- **MX SAM-24963 remains an external CMS failure:** build #20 received HTTP 404
+  from `/tokocommercewebservices/v2/mx/cms/pages` for `pageType=ContentPage` and
+  `pageLabelOrId=/mypage`, then rendered the not-found page with an empty body.
+  The authenticated dropdown exposed only the username and logout, rather than
+  the official account options. Samsung must restore/publish that CMS page and
+  its navigation for the MX S2 site. No Jira ID has been supplied for this issue;
+  keep the full menu assertions and the raw failure until the page is restored.
