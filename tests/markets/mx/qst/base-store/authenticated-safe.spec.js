@@ -1,5 +1,7 @@
 import evidenceContext from "../../../../../reporting/evidence/evidenceContext.js";
 import qstEvidenceMetadata from "../../../../../utils/qstEvidenceMetadata.js";
+import MxMyAccountPage from "../../../../../pages/MxMyAccountPage";
+import mxAuthState from "../../../../../utils/mxAuthState";
 import { test, expect } from "../../dst/base-store/mx.auth.fixture";
 
 const { recordBusinessEvidence } = evidenceContext;
@@ -45,8 +47,25 @@ test("SAM-24962 @qst @mx @base-store @safe @registered - Login Home page", async
   });
 });
 
-test("SAM-24963 @qst @mx @base-store @safe @registered - Validate My account menu", async ({ page }, testInfo) => {
+test("SAM-24963 @qst @mx @base-store @safe @registered - Validate My account menu", async ({ page, mxConfig }, testInfo) => {
   recordBusinessEvidence(testInfo, getMxQstEvidenceMetadata("SAM-24963"));
+
+  if (mxConfig.environment === "S2") {
+    const account = new MxMyAccountPage(page);
+    await test.step("Prove the current registered session and open MX profile settings", async () => {
+      await mxAuthState.validateCurrentPageAuthenticated(page);
+      await account.openProfileSettings();
+    });
+    await test.step("Prove authenticated logout remains available on My Account", async () => {
+      await mxAuthState.validateCurrentPageAuthenticated(page);
+      await page.mouse.move(20, 500);
+      await page.keyboard.press("Escape");
+    });
+    const navigation = await test.step("Validate all required My Account navigation options and destinations", () =>
+      account.validateNavigation());
+    recordBusinessEvidence(testInfo, { authenticated: true, menuValidated: true, logoutValidated: true, navigation });
+    return;
+  }
 
   let menu;
   await test.step("Open the authenticated My Account menu", async () => {

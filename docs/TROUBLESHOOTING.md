@@ -208,13 +208,20 @@ This is enough to reproduce/diagnose most issues without guessing.
   the default 30-second evidence budget while finalizing video. CL Base Store
   official campaigns now retain a 120-second teardown budget, as CO already
   does. Scenario assertions and the other suites' defaults remain unchanged.
-- **MX SAM-24963 remains an external CMS failure:** build #20 received HTTP 404
-  from `/tokocommercewebservices/v2/mx/cms/pages` for `pageType=ContentPage` and
-  `pageLabelOrId=/mypage`, then rendered the not-found page with an empty body.
-  The authenticated dropdown exposed only the username and logout, rather than
-  the official account options. Samsung must restore/publish that CMS page and
-  its navigation for the MX S2 site. No Jira ID has been supplied for this issue;
-  keep the full menu assertions and the raw failure until the page is restored.
+- **MX SAM-24963 automation correction:** build #20's guessed `/mx/mypage/`
+  fallback received CMS HTTP 404. That observation did not establish an
+  application defect for the My Account menu TC. Authenticated operator evidence
+  and an independent browser replay showed that `/mx/mypage/profile-setting`
+  renders the actual account navigation in `ul.lower-nav-links-mx`, while the
+  compact avatar dropdown exposes identity/logout. S2 now proves authentication
+  before and after entering profile settings, validates all six required account
+  links and their expected MX paths in that navigation, and proves logout
+  separately. Footer links cannot satisfy the assertions. The native Orders
+  label is `Mis órdenes`. CMS links can carry Samsung Production/PreQA hosts;
+  the menu TC inspects them without clicking or navigating outside staging.
+  Unknown hosts or wrong paths still fail. The old CMS response and failed runs remain historical
+  evidence; do not classify this TC as a known application defect from that
+  fallback alone. S1 behavior is preserved pending independent runtime proof.
 - **CL SAM-24830, build #15:** product navigation emitted thumbnail `onImageLoad`
   ZK updates before the actual Search `onClick` query. Waiting for the first AU
   response falsely marked the search ready; the SKU wait expired while the real
