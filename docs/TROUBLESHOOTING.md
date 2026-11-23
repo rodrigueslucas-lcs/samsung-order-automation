@@ -230,3 +230,18 @@ This is enough to reproduce/diagnose most issues without guessing.
   a bounded 90-second query and requiring the exact SKU afterward. It submits
   Search once. Background image updates cannot satisfy this readiness check;
   HTTP failures and a completed query without the product still fail.
+
+## 15. EPP CI stops before the official tests
+
+An `INFRA_ERROR` with no Playwright results is not a product-test failure.
+Read the current build's `[epp-ci] Preparation failed` stage/reason. Diagnostics
+use allowlisted codes; exception text, stacks and credentials are suppressed.
+Failed child-process startup is also reported instead of silently returning 1.
+
+MX build #10 reproduced `EXECUTION / AUTH_BUSY`: scheduled EPP maintenance
+already held the dedicated EPP identity. S2 CI now waits up to ten minutes for
+normal lease acquisition before preflight or any test/payment. It does not
+remove locks, stop the owner, start a competing login or replay a submission.
+If the owner remains active at the deadline, the build still reports AUTH_BUSY.
+Local callers retain their immediate BUSY behavior. Build #9 discarded the
+original exception, so its exact historical cause cannot be asserted.

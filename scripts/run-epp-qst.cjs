@@ -33,10 +33,31 @@ function buildRun(market, args = [], sourceEnv = process.env, {readData = requir
   return { env, output, ids, command: [require.resolve("@playwright/test/cli"), "test", selector, "--config=playwright.epp.config.js", "--workers=1", ...(targets.length ? ["--grep", `(?:${targets.join("|")})\\b`] : []), ...args] };
 }
 
+function acquireCampaignLease(config, env, {
+  acquire = acquireEppLease, now = Date.now,
+  pause = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms),
+  log = console.log, timeoutMs = 600000,
+} = {}) {
+  const canWait = env.CI === '1' && env.ENVIRONMENT === 'S2' && Boolean(env.EPP_CI_AUTHORITY_ROOT);
+  const deadline = now() + timeoutMs;
+  let nextLog = 0;
+  while (true) {
+    try { return acquire(config, env); }
+    catch (error) {
+      if (error.code !== 'AUTH_BUSY' || !canWait || now() >= deadline) throw error;
+      if (now() >= nextLog) {
+        log('[epp-qst] EPP lane occupied; waiting before preflight/tests. No owner stopped and no payment submitted.');
+        nextLog = now() + 30000;
+      }
+      pause(Math.min(5000, deadline - now()));
+    }
+  }
+}
+
 function executeRun(run, { acquire = acquireEppLease, spawn = spawnSync } = {}) {
   // Discovery is read-only; business execution owns the isolated EPP identity
   // until the worker exits, including every failure/launch-error path.
-  const lease = run.command.includes("--list") ? null : acquire(getEppConfig(run.env.TEST_MARKET, run.env), run.env);
+  const lease = run.command.includes("--list") ? null : acquireCampaignLease(getEppConfig(run.env.TEST_MARKET, run.env), run.env, { acquire });
   try {
     if (lease && (run.env.EPP_SESSION_BUNDLE_FILE || run.env.EPP_AUTH_PREFLIGHT === '1')) {
       const checked = spawn(process.execPath, [path.resolve(__dirname,'auth-epp-preflight.cjs')], { cwd:path.resolve(__dirname,'..'),env:{...run.env,...lease.env},stdio:'inherit',windowsHide:true });
@@ -75,4 +96,4 @@ if (require.main === module) {
     summarizeRun(run);
   } catch(error) { const failure=classifyRunFailure(error);console.error(failure.message);process.exitCode=failure.exitCode; }
 }
-module.exports = { buildRun, executeRun, classifyRunFailure, summarizeRun };
+module.exports = { buildRun, executeRun, acquireCampaignLease, classifyRunFailure, summarizeRun };
