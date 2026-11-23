@@ -5,6 +5,20 @@ const {authorityRoot}=require('../utils/eppCiAuthority.cjs');
 const {buildModel}=require('../reporting/epp-quality/model.cjs');
 const {render}=require('../reporting/epp-quality/render.cjs');
 const programmes={MX:'pymesmx',PE:'pe_membership_vip',CL:'alianzas',CO:'co_epp_agre'};
+function preparationFailure(stage,error){
+  const allowed=new Set(['AUTH_BUSY','ENOENT','EACCES','EPERM','ETIMEDOUT','E2BIG','EPP_PREFLIGHT_LAUNCH_FAILED','EPP_TEST_LAUNCH_FAILED']);
+  const known=new Map([
+    ['EPP CI runtime credential scope mismatch.','EPP_RUNTIME_SCOPE_MISMATCH'],
+    ['Durable EPP authority unavailable.','EPP_AUTHORITY_UNAVAILABLE'],
+    ['Durable EPP financial authority unavailable; no execution started.','EPP_AUTHORITY_UNAVAILABLE'],
+    ['EPP session credential unavailable; no execution started.','EPP_SESSION_CREDENTIAL_UNAVAILABLE'],
+    ['Financial authority must be outside the ephemeral Jenkins workspace.','EPP_AUTHORITY_INSIDE_WORKSPACE'],
+    ['Invalid EPP provider fixture scope.','EPP_PROVIDER_FIXTURE_SCOPE_MISMATCH'],
+    ['Invalid regional summary observer scope.','EPP_REPORTING_SCOPE_MISMATCH'],
+    ['Ignored EPP product fixture is incomplete; contents suppressed.','EPP_PRODUCT_FIXTURE_INCOMPLETE'],
+  ]);
+  return {stage,reason:allowed.has(error?.code)?error.code:known.get(error?.message)||'EPP_CI_PREPARATION_FAILED'};
+}
 function installRuntime(market,env,io=fs){
   if(!env.EPP_CI_RUNTIME_FILE)return env;
   const policy=JSON.parse(io.readFileSync(env.EPP_CI_RUNTIME_FILE,'utf8'));
@@ -32,10 +46,10 @@ function runCi(market,source=process.env,{execute=executeRun,io=fs,build=buildRu
   for(const other of Object.keys(programmes))for(const suffix of ['QST_TARGET_IDS','EPP_QST_PDP_URL','EPP_QST_PLP_URL','EPP_QST_SKU'])delete env[`${other}_${suffix}`];
   for(const key of ['EPP_QST_PDP_URL','EPP_QST_PLP_URL','EPP_QST_SKU'])delete env[key];
   delete env.EPP_CI_REPORTING;
-  let setupError=false;
-  try{env=installRuntime(market,env,io);}catch{setupError=true;}
+  let setupError=false,failure=null;
+  try{env=installRuntime(market,env,io);}catch(error){setupError=true;failure=preparationFailure('RUNTIME_INSTALL',error);}
   let run;
-  try{run=build(market,[],env,setupError?{readData:()=>null}:undefined);}catch{setupError=true;run=build(market,[],env,{readData:()=>null});}
+  try{run=build(market,[],env,setupError?{readData:()=>null}:undefined);}catch(error){setupError=true;failure ||= preparationFailure('BUILD_RUN',error);run=build(market,[],env,{readData:()=>null});}
   const config=getEppConfig(market,run.env);
   const publicOutput=run.output;
   run.output=require('../utils/eppCiWorkspace.cjs').privateRunDirectory(market,run.env.EPP_RUN_ID,env);
@@ -44,7 +58,7 @@ function runCi(market,source=process.env,{execute=executeRun,io=fs,build=buildRu
   const manifest=path.resolve('test-results/epp-ci-current.json');
   io.mkdirSync(path.dirname(manifest),{recursive:true});
   io.writeFileSync(manifest,JSON.stringify({market,environment:'S2',program:config.program,runId:run.env.EPP_RUN_ID,gitCommit:/^[a-f0-9]{40}$/i.test(env.GIT_COMMIT||'')?env.GIT_COMMIT:null,output:publicOutput,privateOutput:run.output,authorityRoot:env.EPP_CI_AUTHORITY_ROOT||null,reporting:env.EPP_CI_REPORTING?JSON.parse(env.EPP_CI_REPORTING):null,relativeOutput:path.relative(process.cwd(),publicOutput).replaceAll('\\','/'),buildNumber:env.BUILD_NUMBER||null}));
-  let exit=1,infraError=false;
+  let exit=1,infraError=false,stage='PREREQUISITES';
   try{
     if(setupError)throw new Error('EPP CI runtime setup failed.');
     const authority=authorityRoot(env);
@@ -52,9 +66,14 @@ function runCi(market,source=process.env,{execute=executeRun,io=fs,build=buildRu
     const authorityRelative=path.relative(process.cwd(),authority);
     if(!authorityRelative.startsWith('..')&&!path.isAbsolute(authorityRelative))throw new Error('Financial authority must be outside the ephemeral Jenkins workspace.');
     if(!env.EPP_SESSION_BUNDLE_FILE||!io.existsSync(env.EPP_SESSION_BUNDLE_FILE))throw new Error('EPP session credential unavailable; no execution started.');
-    exit=execute(run);summarize(run);
-  }catch{infraError=true;}
+    stage='EXECUTION';exit=execute(run);summarize(run);
+  }catch(error){infraError=true;failure ||= preparationFailure(stage,error);}
   finally{
+    if(failure){
+      io.mkdirSync(run.output,{recursive:true});
+      io.writeFileSync(path.join(run.output,'preparation-failure.json'),JSON.stringify(failure));
+      console.error(`[epp-ci] Preparation failed: stage=${failure.stage} reason=${failure.reason}; no error message, stack or credential contents published.`);
+    }
     const filename=path.join(run.output,'results.json');
     let document=null;
     try{if(io.existsSync(filename))document=JSON.parse(io.readFileSync(filename,'utf8'));}catch{infraError=true;}
@@ -71,4 +90,4 @@ function runCi(market,source=process.env,{execute=executeRun,io=fs,build=buildRu
   return exit;
 }
 if(require.main===module){try{process.exitCode=runCi(process.argv[2]);}catch{console.error('[epp-ci] Preflight/configuration/reporting error; sensitive details suppressed.');process.exitCode=1;}}
-module.exports={runCi,programmes,installRuntime};
+module.exports={runCi,programmes,installRuntime,preparationFailure};

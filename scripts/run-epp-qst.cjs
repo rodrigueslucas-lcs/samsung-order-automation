@@ -40,9 +40,11 @@ function executeRun(run, { acquire = acquireEppLease, spawn = spawnSync } = {}) 
   try {
     if (lease && (run.env.EPP_SESSION_BUNDLE_FILE || run.env.EPP_AUTH_PREFLIGHT === '1')) {
       const checked = spawn(process.execPath, [path.resolve(__dirname,'auth-epp-preflight.cjs')], { cwd:path.resolve(__dirname,'..'),env:{...run.env,...lease.env},stdio:'inherit',windowsHide:true });
+      if(checked.error)throw Object.assign(new Error('EPP preflight process did not launch; details suppressed.'),{code:'EPP_PREFLIGHT_LAUNCH_FAILED'});
       if (checked.status !== 0) return checked.status ?? 1;
     }
     const result = spawn(process.execPath, run.command, { cwd: path.resolve(__dirname, ".."), env: { ...run.env, ...lease?.env }, stdio: "inherit", windowsHide: true });
+    if(result.error)throw Object.assign(new Error('EPP test process did not launch; details suppressed.'),{code:'EPP_TEST_LAUNCH_FAILED'});
     return result.status ?? 1;
   } finally { lease?.release(); }
 }

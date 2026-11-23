@@ -1,5 +1,23 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {runCi}=require('../../scripts/run-epp-jenkins.cjs');
+
+test('CI preparation diagnostics classify only allowlisted codes and never publish exception contents',()=>{
+ const {preparationFailure}=require('../../scripts/run-epp-jenkins.cjs');
+ assert.deepEqual(preparationFailure('EXECUTION',{code:'AUTH_BUSY',message:'private-session-value',stack:'private-stack'}),{stage:'EXECUTION',reason:'AUTH_BUSY'});
+ const unknown=preparationFailure('RUNTIME_INSTALL',{code:'private-session-value',message:'private-session-value'});
+ assert.deepEqual(unknown,{stage:'RUNTIME_INSTALL',reason:'EPP_CI_PREPARATION_FAILED'});
+ assert.ok(!JSON.stringify(unknown).includes('private-session-value'));
+});
+
+for(const preflight of [true,false])test(`failed process launch is typed and releases the EPP lease (preflight=${preflight})`,()=>{
+ const {executeRun}=require('../../scripts/run-epp-qst.cjs');let released=0,spawns=0;
+ const run={env:{TEST_MARKET:'MX',ENVIRONMENT:'S2',EPP_AUTH_PREFLIGHT:preflight?'1':'0'},command:['synthetic-cli']};
+ assert.throws(()=>executeRun(run,{acquire:()=>({env:{},release:()=>released++}),spawn:()=>{spawns++;return {error:new Error('private-process-environment'),status:null};}}),error=>{
+  assert.equal(error.code,preflight?'EPP_PREFLIGHT_LAUNCH_FAILED':'EPP_TEST_LAUNCH_FAILED');
+  assert.ok(!error.message.includes('private-process-environment'));return true;
+ });
+ assert.equal(released,1);assert.equal(spawns,1);
+});
 test('CO S2 reuses the explicitly scoped provider fixture without a local default dependency',()=>{
  const folder=fs.mkdtempSync(path.join(os.tmpdir(),'epp-provider-fixture-'));
  try{
