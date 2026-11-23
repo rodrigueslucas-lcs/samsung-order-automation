@@ -91,15 +91,26 @@ export async function continueClRegisteredDeliveryToPayment(page,{addressReady=f
     : shipping.getByText(/Entrega d[ií]a siguiente|Despacho est[aá]ndar/i)
       .filter({ visible: true }).first();
   await expect(delivery).toBeVisible({ timeout: 30000 });
-  if(storefront){
-    const site=storefront.apiSite||storefront.rootUrl.pathname.split('/').filter(Boolean)[2];
-    const origin=`https://${storefront.environment.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com`;
+  const nativeTarget=storefront?null:new URL(page.url());
+  const nativeClS2=nativeTarget?.origin==='https://stg2.shop.samsung.com'&&nativeTarget.pathname==='/cl/checkout/one';
+  if(storefront||nativeClS2){
+    const site=storefront?(storefront.apiSite||storefront.rootUrl.pathname.split('/').filter(Boolean)[2]):'cl';
+    const origin=storefront?`https://${storefront.environment.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com`:'https://s2-smb-api-cdn.ecom-stg.samsung.com';
     // The checked radio/updated price is optimistic. Continue must wait for
     // the native delivery save to complete; never replay a payment or POST.
     const saved=page.waitForResponse(response=>{const u=new URL(response.url());return response.request().method()==='POST'&&u.origin===origin&&u.pathname===`/tokocommercewebservices/v2/${site}/users/current/carts/current/deliverymodes/update`;},{timeout:60000});
     const [response]=await Promise.all([saved,delivery.click()]);
-    if(!response.ok()||await response.finished())throw new Error('CL EPP delivery persistence failed; no payment submitted.');
+    if(!response.ok()||await response.finished())throw new Error('CL delivery persistence failed; no payment submitted.');
   }else await delivery.click();
+  if(nativeClS2){
+    const receipt=shipping.getByRole('checkbox',{name:/^Boleta$/i});
+    await expect(receipt).toBeVisible();
+    if(!await receipt.isChecked())await receipt.check();
+    await expect(receipt).toBeChecked();
+    for(const name of ['companyId','companyName','commercializeTxt']){
+      await expect(shipping.locator(`input[name="${name}"]:visible`)).toHaveCount(0);
+    }
+  }
   // EPP exposes the same legal choice by its accessible label, while the
   // native input name differs from Base Store. Scope to Delivery and avoid
   // selecting the unrelated subscription or invoice checkboxes.

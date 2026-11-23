@@ -28,8 +28,8 @@ test('CL Delivery selects legal terms by accessible label across EPP and Base St
  const calls=[];let checked=false;
  const terms={isChecked:async()=>checked,check:async()=>{checked=true;calls.push('terms');}};
  const shipping={getByText:()=>({filter:()=>({first:()=>({click:async()=>calls.push('shipping')})})}),getByRole:(role,options)=>{assert.equal(role,'checkbox');assert.ok(options.name.test('Acepto los términos y condiciones de Samsung.com/cl'));assert.ok(!options.name.test('Suscribir para recibir información'));return terms;}};
- const page={locator:()=>shipping,getByRole:()=>({click:async()=>calls.push('continue')})};
- const run=vm.runInNewContext(code+'\ncontinueClRegisteredDeliveryToPayment;',{evidenceContext:{recordBusinessEvidence(){}},expect:()=>({toBeVisible:async()=>{},toHaveURL:async()=>{}})});
+ const page={url:()=> 'https://stg.shop.samsung.com/cl/checkout/one',locator:()=>shipping,getByRole:()=>({click:async()=>calls.push('continue')})};
+ const run=vm.runInNewContext(code+'\ncontinueClRegisteredDeliveryToPayment;',{URL,evidenceContext:{recordBusinessEvidence(){}},expect:()=>({toBeVisible:async()=>{},toHaveURL:async()=>{}})});
  await run(page,{addressReady:true});assert.deepEqual(calls,['shipping','terms','continue']);
  calls.length=0;await run(page,{addressReady:true});assert.deepEqual(calls,['shipping','continue']);
 });
@@ -53,6 +53,28 @@ test('EPP Delivery awaits its own native persistence response before Continue, w
  const pending=run(page,{addressReady:true,storefront:{environment:'S2',rootUrl:new URL('https://stg2.shop.samsung.com/cl/multistore/alianzas/alianzas/')}});
  await new Promise(resolve=>setImmediate(resolve));assert.ok(!calls.includes('continue'));finish();await pending;
  assert.deepEqual(calls,['listen','shipping','saving','saved','terms','continue']);
+});
+
+for(const status of [200,500])test(`CL S2 Base Store blocks Continue until its delivery save finishes (HTTP ${status})`,async()=>{
+ const code=fs.readFileSync('flows/cl/paymentFlows.js','utf8').replace(/^import .*;\r?\n/gm,'').replace(/export async function/g,'async function');
+ const calls=[];let finish;
+ const persisted=new Promise(resolve=>{finish=resolve;});
+ const response={url:()=> 'https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/cl/users/current/carts/current/deliverymodes/update',request:()=>({method:()=> 'POST'}),ok:()=>status===200,finished:async()=>{await persisted;calls.push('persisted');return null;}};
+ let receiptChecked=false;
+ const receipt={isChecked:async()=>receiptChecked,check:async()=>{receiptChecked=true;calls.push('receipt');}};
+ const shipping={locator:()=>({}),getByText:()=>({filter:()=>({first:()=>({click:async()=>calls.push('shipping')})})}),getByRole:(_role,options)=>options.name.test('Boleta')?receipt:{isChecked:async()=>true}};
+ const page={url:()=> 'https://stg2.shop.samsung.com/cl/checkout/one?step=CHECKOUT_STEP_DELIVERY',locator:()=>shipping,getByRole:()=>({click:async()=>calls.push('continue')}),waitForResponse:async predicate=>{
+  assert.equal(predicate(response),true);
+  for(const foreign of [response.url().replace('/cl/','/alianzas/'),response.url().replace('s2-smb','s1-smb'),response.url().replace('deliverymodes/update','checkout/update')])assert.equal(predicate({...response,url:()=>foreign}),false);
+  assert.equal(predicate({...response,request:()=>({method:()=> 'GET'})}),false);
+  return response;
+ }};
+ const run=vm.runInNewContext(code+'\ncontinueClRegisteredDeliveryToPayment;',{URL,evidenceContext:{recordBusinessEvidence(){}},expect:()=>({toBeVisible:async()=>{},toHaveURL:async()=>{},toBeChecked:async()=>assert.ok(receiptChecked),toHaveCount:async n=>assert.equal(n,0)})});
+ const pending=run(page,{addressReady:true});
+ const checked=status===200?pending:assert.rejects(pending,/delivery persistence failed/);
+ await new Promise(resolve=>setImmediate(resolve));assert.ok(!calls.includes('continue'));
+ finish();await checked;
+ assert.deepEqual(calls,status===200?['shipping','persisted','receipt','continue']:['shipping']);
 });
 
 test('CL S2 EPP chooses the operator-proven standard 2-4 service instead of first next-day offer',async()=>{

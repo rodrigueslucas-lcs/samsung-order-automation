@@ -255,3 +255,9 @@ hydration. It never reloads a still-pending request at that deadline; missing
 content continues to fail. Existing access gates and the one bounded GET
 recovery are preserved, and no cart/payment action is repeated. A failed
 render attaches safe request counters instead of cookie or token contents.
+
+### CL S2 Base Store: Delivery save before Payment
+
+If SAM-24826 remains on `CHECKOUT_STEP_DELIVERY`, inspect the native delivery-save response before treating the URL timeout as a payment failure. CL build #16 clicked Continue less than one second after selecting shipping, while `POST /tokocommercewebservices/v2/cl/users/current/carts/current/deliverymodes/update` was still pending. The shared CL flow now waits for that exact successful response and its completed body before continuing, as the EPP flow already did. An HTTP failure stops the flow before payment. This does not replay delivery or payment submissions, change shipping selection, or alter S1 behavior.
+
+A follow-up local run also exposed both receipt choices unchecked, with required company invoice fields visible. CL S2 Base Store now explicitly selects `Boleta`, checks that it stayed selected and waits for company invoice fields to disappear before Continue. Successful shipping persistence alone is not sufficient to claim the TC passed; validate the actual confirmation flow.
