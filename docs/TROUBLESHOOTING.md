@@ -245,3 +245,13 @@ remove locks, stop the owner, start a competing login or replay a submission.
 If the owner remains active at the deadline, the build still reports AUTH_BUSY.
 Local callers retain their immediate BUSY behavior. Build #9 discarded the
 original exception, so its exact historical cause cannot be asserted.
+
+After preparation succeeds, `EPP_COMMERCE_RENDER_FAILED` requires separate
+PDP evidence. A controlled MX reproduction showed the existing recovery
+reload aborting the exact product GET before it finished. The storefront
+observer now tracks only GETs for the configured S2 programme and SKU. It
+allows up to 90 seconds for an already pending product read and then checks
+hydration. It never reloads a still-pending request at that deadline; missing
+content continues to fail. Existing access gates and the one bounded GET
+recovery are preserved, and no cart/payment action is repeated. A failed
+render attaches safe request counters instead of cookie or token contents.

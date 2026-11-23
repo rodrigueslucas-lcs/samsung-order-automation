@@ -6,6 +6,7 @@ import business from "../utils/eppBusinessAssertions.cjs";
 import serverProof from "../utils/eppServerProof.cjs";
 import mxReadback from '../utils/mxCartReadback.cjs';
 import eppOverlays from '../utils/eppStorefrontOverlays.cjs';
+import eppProductReads from '../utils/eppPendingProductRead.cjs';
 
 function enforceEppQst(condition, reason, cfg) {
   if (!condition) return;
@@ -20,17 +21,38 @@ function enforceEppQst(condition, reason, cfg) {
 const CODE_INPUT = /verification|verify|access code|c[oó]digo|clave de acceso/i;
 const CODE_BUTTON = /verify|continue|enter|submit|access|ingresar|continuar|validar|acceder/i;
 
-export async function recoverEppPdpContent(page,cfg,state,inspect){
+export async function recoverEppPdpContent(page,cfg,state,inspect,{pendingProduct=null}={}){
   const current=new URL(page.url());
   if(cfg.environment!=='S2'||state.reason!=='COMMERCE_CONTENT_NOT_RENDERED'||!cfg.pdpUrl||current.href!==cfg.pdpUrl.href)return state;
+  const settleProduct = async currentState => {
+    if(currentState.reason!=='COMMERCE_CONTENT_NOT_RENDERED'||!pendingProduct?.hasPending())return currentState;
+    // Observe the already-started, exact programme/SKU GET. Never replay a
+    // mutation or destroy a slow product response with a premature reload.
+    await expect.poll(async()=>{
+      const observed=await inspect();
+      return observed.reason!=='COMMERCE_CONTENT_NOT_RENDERED'||!pendingProduct.hasPending();
+    },{timeout:90000}).toBeTruthy().catch(()=>{});
+    const observed=await inspect();
+    if(observed.reason!=='COMMERCE_CONTENT_NOT_RENDERED'||pendingProduct.hasPending())return observed;
+    await expect.poll(async()=>(await inspect()).reason!=='COMMERCE_CONTENT_NOT_RENDERED',{timeout:15000}).toBeTruthy().catch(()=>{});
+    return inspect();
+  };
+  const settled=await settleProduct(state);
+  if(settled.reason!=='COMMERCE_CONTENT_NOT_RENDERED'||pendingProduct?.hasPending())return settled;
   // Only this already requested PDP GET may be recovered. No access gate,
   // cart mutation, identity submission or payment is replayed here.
   await page.reload({waitUntil:'domcontentloaded',timeout:60000});
   await expect.poll(async()=> (await inspect()).reason!=='COMMERCE_CONTENT_NOT_RENDERED',{timeout:30000}).toBeTruthy().catch(()=>{});
-  return inspect();
+  return settleProduct(await inspect());
 }
 
 export async function openEppStore(page, cfg, {identityProof=null}={}) {
+  const pendingProduct=eppProductReads.watchEppProductRead(page,cfg);
+  try{return await openEppStoreContent(page,cfg,{identityProof},pendingProduct);}
+  finally{pendingProduct.stop();}
+}
+
+async function openEppStoreContent(page,cfg,{identityProof},pendingProduct){
   await eppOverlays.installEppOverlayDismissal(page,cfg);
   const entry = new URL(cfg.entryUrl);
   if (entry.origin !== cfg.rootUrl.origin || !entry.pathname.startsWith(cfg.rootUrl.pathname) || entry.username || entry.password) {
@@ -53,8 +75,9 @@ export async function openEppStore(page, cfg, {identityProof=null}={}) {
     const state = await inspect();
     return ["READY", "CODE_REQUIRED", "HUMAN_REQUIRED"].includes(state.status) || ['OUTSIDE_EPP_STORE','VERIFICATION_CODE_REJECTED'].includes(state.reason);
   }, { timeout: 45000 }).toBeTruthy().catch(() => {});
-  const initial = await recoverEppPdpContent(page,cfg,await inspect(),inspect);
+  const initial = await recoverEppPdpContent(page,cfg,await inspect(),inspect,{pendingProduct});
   if(cfg.environment==='S2'&&initial.reason==='COMMERCE_CONTENT_NOT_RENDERED'){
+    if(pendingProduct?.snapshot)await test.info().attach('EPP PDP read readiness',{body:JSON.stringify({sku:cfg.sku,...pendingProduct.snapshot()}),contentType:'application/json'});
     await businessScreenshot(page,'epp-commerce-not-rendered');
     throw new Error('EPP_COMMERCE_RENDER_FAILED: expected storefront content did not render after bounded GET recovery; this is not a prerequisite skip.');
   }
