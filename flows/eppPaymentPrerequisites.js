@@ -15,6 +15,7 @@ import {validateExistingEppCardOrder} from './eppCardConfirmation';
 import {submitClEppBank} from './eppClBankPayment';
 import coCheckout from './co/eppCheckout.cjs';
 import causalReadback from '../utils/eppCausalOrderReadback.cjs';
+import paymentReadiness from '../utils/eppPaymentReadiness.cjs';
 
 // Worker-local, current-campaign prerequisites only; never historical order evidence.
 const campaignPrerequisites=new Map();
@@ -22,6 +23,9 @@ const campaignKey=(cfg,runId)=>[cfg.market,cfg.environment,cfg.program,runId].jo
 
 function enforceEppPayment(condition, reason, cfg) {
   if (!condition) return;
+  // A configured checkout that remains on its loading skeleton is an
+  // unexpected render failure, not a missing prerequisite or known defect.
+  if(reason.startsWith('EPP_COMMERCE_NOT_RENDERED:'))throw new Error(reason);
   // An unresolved earlier initiation prevents this case from executing at
   // all. Report that prerequisite consistently, without rewriting the failed
   // case which actually submitted it or releasing its durable marker.
@@ -44,6 +48,7 @@ export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProvi
   const site=cfg.apiSite||cfg.rootUrl.pathname.split('/').filter(Boolean)[2],apiOrigin=`https://${cfg.environment.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com`;
   const recordCart=response=>{const u=new URL(response.url());if(response.request().method()==='GET'&&u.origin===apiOrigin&&u.pathname===`/tokocommercewebservices/v2/${site}/users/current/carts/current`&&response.ok())observedCartResponse=response;};
   page.on('response',recordCart);
+  const paymentRead=paymentReadiness.watchMxEppPaymentRead(page,cfg);
   const blocked=(reason,detail,stage)=>({status:'BLOCKED',reason,detail,stage});
   const capture=async name=>{
     const path=test.info().outputPath(name+'.png');
@@ -67,6 +72,10 @@ export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProvi
       reconciliation=await normalizeEppPaymentCart(page,cfg,cart,{observedResponse:observedCartResponse});
     }
     if(cfg.market==='MX')await cart.validateControlledSingleSku(cfg.sku);
+    if(cfg.market==='MX'&&cfg.environment==='S2'){
+      if(!observedCartResponse)throw new Error('MX EPP cart evidence not observed; no unproven checkout.');
+      reconciliation=await causalReadback.createEppReadbackFromCartResponse(page,cfg,observedCartResponse);
+    }
     if(cfg.market==='PE')reconciliation=await normalizeEppPaymentCart(page,cfg,cart,{observedResponse:observedCartResponse});
     if(cfg.market==='CL'){
       if(!observedCartResponse)throw new Error('CL EPP cart request was not observed; no blind reload or payment.');
@@ -105,7 +114,8 @@ export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProvi
     assertions.assertStoreRoute(page.url(),cfg,/^checkout\//);
     const pattern=/tarjeta|cr[eé]dito|d[eé]bito|credit|debit|efectivo|banc|mercado|webpay|flow|cash|wallet|spei|oxxo/i;
     const offers=page.getByRole('button',{name:pattern}).filter({visible:true});
-    const rendered=await offers.first().waitFor({timeout:60000}).then(()=>true,()=>false);
+    let rendered=await offers.first().waitFor({timeout:60000}).then(()=>true,()=>false);
+    if(!rendered)rendered=await paymentReadiness.recoverMxEppPaymentRead(page,offers,paymentRead);
     await capture('epp-payment-provider-discovery');
     if(!rendered)return blocked('EPP_COMMERCE_NOT_RENDERED','Payment step opened, but no payment-provider controls rendered.','PAYMENT');
     const providers=await offers.evaluateAll(es=>es.map(e=>e.textContent.trim().replace(/\d{4,}/g,'[digits]').slice(0,100)));
@@ -116,7 +126,7 @@ export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProvi
     if(onProviderReady)return await onProviderReady(page,cfg,capture,reconciliation);
     if(cash)return await inspectMxEppCash(page,cfg,capture,cash);
     return blocked('PAYMENT_FLOW_NOT_PROVEN','Provider is visible; its EPP backend, approved test-data and confirmation contract must be proven before enabling a submit adapter.','PROVIDER');
-  } finally {page.off('response',recordCart);cash?.stop();proof.stop();}
+  } finally {paymentRead.stop();page.off('response',recordCart);cash?.stop();proof.stop();}
 }
 
 export async function runEppPaymentPrerequisiteCase(page,cfg,options){

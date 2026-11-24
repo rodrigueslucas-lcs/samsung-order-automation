@@ -3,17 +3,29 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 const source=fs.readFileSync('flows/eppPaymentPrerequisites.js','utf8').replace(/^import .*;\r?\n/gm,'').replace(/export async function/g,'async function');
-function fixture({accepted=true,product=true,market='MX',step='CHECKOUT_STEP_CONTACT_INFO',pending=null,resume=false,authorized=true}={}){
- const calls=[];const entries=[];const cartOptions=[];const cfg={market,environment:'S2',rootUrl:new URL('https://stg2.shop.samsung.com/mx/multistore/pymesmx/pymesmx/'),...(product?{sku:'QA',pdpUrl:'qa'}:{})};
+for(const market of ['MX','PE','CO','CL'])test(`${market} unexpected Payment loading failure cannot become a prerequisite skip`,()=>{
+ const skips=[];
+ const enforce=vm.runInNewContext(source+'\nenforceEppPayment;',{test:{skip:(...args)=>skips.push(args)}});
+ enforce(false,'EPP_COMMERCE_NOT_RENDERED: unused',{market,environment:'S2'});
+ assert.throws(()=>enforce(true,'EPP_COMMERCE_NOT_RENDERED: Payment controls did not render',{market,environment:'S2'}),/EPP_COMMERCE_NOT_RENDERED/);
+ assert.equal(skips.length,0);
+});
+function fixture({accepted=true,product=true,market='MX',step='CHECKOUT_STEP_CONTACT_INFO',pending=null,resume=false,authorized=true,observeCart=true}={}){
+ const calls=[];const entries=[];const cartOptions=[];const readbacks=[];const cfg={market,environment:'S2',rootUrl:new URL('https://stg2.shop.samsung.com/mx/multistore/pymesmx/pymesmx/'),...(product?{sku:'QA',pdpUrl:'qa'}:{})};
  const cart={validateControlledSingleSku:async()=>calls.push('sku'),proceedToAuthenticatedCheckout:async()=>calls.push('checkout')};
- const page={on:(_event,listener)=>listener({url:()=>`https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/${cfg.rootUrl.pathname.split('/').filter(Boolean)[2]}/users/current/carts/current`,request:()=>({method:()=> 'GET'}),ok:()=>true}),off:()=>{},context:()=>({}),url:()=>cfg.rootUrl.href+'checkout/one?step='+step};
+ const page={on:(_event,listener)=>observeCart&&listener({url:()=>`https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/${cfg.rootUrl.pathname.split('/').filter(Boolean)[2]}/users/current/carts/current`,request:()=>({method:()=> 'GET'}),ok:()=>true}),off:()=>{},context:()=>({}),url:()=>cfg.rootUrl.href+'checkout/one?step='+step};
  const api=vm.runInNewContext(source+'\n({probeEppPaymentPrerequisites,runEppPaymentPrerequisiteCase});',{
- URL,normalizeEppPaymentCart:async()=>{calls.push('persisted-normalize');return{};},completePeEppCheckout:async()=>({status:'BLOCKED',reason:'MISSING_EPP_CONTACT_DATA'}),causalReadback:{createEppReadbackFromCartResponse:async()=>({})},clPaymentCart:{prepareClPaymentCart:async()=>{},normalizeClPaymentQuantity:async()=>{}},completeClEppCheckout:async()=>({status:'BLOCKED',reason:'MISSING_EPP_CONTACT_DATA'}),submitMxEppCard:async()=>{throw Error('Unexpected financial adapter invocation in prerequisite fixture');},attempts:{pendingEppOrderAttempt:()=>pending},process:{env:{EPP_RUN_ID:'current-run',...(resume?{EPP_RESUME_PENDING_ORDER:'1'}:{}),...(authorized?{ALLOW_PAYMENT_SUBMIT:'1'}:{})}},session:{getPrimaryEppCredentials:()=>({email:'ignored'})},server:{watchEppServerProof:()=>({accepted:()=>accepted,settle:async()=>{},stop:()=>calls.push('stop')})},runtime:{getEppRuntimeData:()=>null,getEppContact:()=>null},assertions:{assertStoreRoute:()=>{}},openEppStore:async(_page,config)=>{calls.push('open');entries.push(config.entryUrl);},addConfiguredEppProduct:async(_page,_cfg,options)=>{cartOptions.push(options);calls.push('add');return cart;},test:{setTimeout:()=>{},info:()=>({annotations:[]}),skip:(_condition,reason)=>{if(reason?.startsWith('AMBIGUOUS_EPP_ORDER_ATTEMPT'))calls.push('blocked-reconciliation');}},
- });return {calls,entries,cartOptions,run:()=>api.probeEppPaymentPrerequisites(page,cfg),wrapper:()=>api.runEppPaymentPrerequisiteCase(page,cfg,{kind:'card'})};
+ URL,paymentReadiness:{watchMxEppPaymentRead:()=>({stop(){}})},normalizeEppPaymentCart:async()=>{calls.push('persisted-normalize');return{};},completePeEppCheckout:async()=>({status:'BLOCKED',reason:'MISSING_EPP_CONTACT_DATA'}),causalReadback:{createEppReadbackFromCartResponse:async(_page,config)=>{readbacks.push(config.market);return{};}},clPaymentCart:{prepareClPaymentCart:async()=>{},normalizeClPaymentQuantity:async()=>{}},completeClEppCheckout:async()=>({status:'BLOCKED',reason:'MISSING_EPP_CONTACT_DATA'}),submitMxEppCard:async()=>{throw Error('Unexpected financial adapter invocation in prerequisite fixture');},attempts:{pendingEppOrderAttempt:()=>pending},process:{env:{EPP_RUN_ID:'current-run',...(resume?{EPP_RESUME_PENDING_ORDER:'1'}:{}),...(authorized?{ALLOW_PAYMENT_SUBMIT:'1'}:{})}},session:{getPrimaryEppCredentials:()=>({email:'ignored'})},server:{watchEppServerProof:()=>({accepted:()=>accepted,settle:async()=>{},stop:()=>calls.push('stop')})},runtime:{getEppRuntimeData:()=>null,getEppContact:()=>null},assertions:{assertStoreRoute:()=>{}},openEppStore:async(_page,config)=>{calls.push('open');entries.push(config.entryUrl);},addConfiguredEppProduct:async(_page,_cfg,options)=>{cartOptions.push(options);calls.push('add');return cart;},test:{setTimeout:()=>{},info:()=>({annotations:[]}),skip:(_condition,reason)=>{if(reason?.startsWith('AMBIGUOUS_EPP_ORDER_ATTEMPT'))calls.push('blocked-reconciliation');}},
+ });return {calls,entries,cartOptions,readbacks,run:()=>api.probeEppPaymentPrerequisites(page,cfg),wrapper:()=>api.runEppPaymentPrerequisiteCase(page,cfg,{kind:'card'})};
 }
 test('payment prerequisite cannot mutate cart before independent entitlement proof',async()=>{const f=fixture({accepted:false});assert.equal((await f.run()).reason,'AUTH_OR_ENTITLEMENT_REQUIRED');assert.deepEqual(f.calls,['open','stop']);});
 test('missing eligible EPP product is specific and does not add a guessed SKU',async()=>{const f=fixture({product:false});assert.equal((await f.run()).reason,'MISSING_OR_UNPROVEN_EPP_PRODUCT');assert.ok(!f.calls.includes('add'));});
 test('MX contact fixture is required after a controlled exact-SKU cart',async()=>{const f=fixture();assert.equal((await f.run()).reason,'MISSING_EPP_CONTACT_DATA');assert.deepEqual(f.calls,['open','add','sku','checkout','stop']);});
+
+test('MX S2 binds its order reader to the observed own cart before checkout',async()=>{
+ const f=fixture();await f.run();assert.deepEqual(f.readbacks,['MX']);
+ const missing=fixture({observeCart:false});await assert.rejects(missing.run(),/cart evidence not observed/);assert.ok(!missing.calls.includes('checkout'));
+});
 
 test('PE payment has one server-proven normalizer and disables the earlier optimistic mutation',async()=>{
  const f=fixture({market:'PE'});assert.equal((await f.run()).reason,'MISSING_EPP_CONTACT_DATA');

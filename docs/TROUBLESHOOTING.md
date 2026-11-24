@@ -261,3 +261,26 @@ render attaches safe request counters instead of cookie or token contents.
 If SAM-24826 remains on `CHECKOUT_STEP_DELIVERY`, inspect the native delivery-save response before treating the URL timeout as a payment failure. CL build #16 clicked Continue less than one second after selecting shipping, while `POST /tokocommercewebservices/v2/cl/users/current/carts/current/deliverymodes/update` was still pending. The shared CL flow now waits for that exact successful response and its completed body before continuing, as the EPP flow already did. An HTTP failure stops the flow before payment. This does not replay delivery or payment submissions, change shipping selection, or alter S1 behavior.
 
 A follow-up local run also exposed both receipt choices unchecked, with required company invoice fields visible. CL S2 Base Store now explicitly selects `Boleta`, checks that it stayed selected and waits for company invoice fields to disappear before Continue. Successful shipping persistence alone is not sufficient to claim the TC passed; validate the actual confirmation flow.
+
+### EPP payment rendering failures are not prerequisite skips
+
+`EPP_COMMERCE_NOT_RENDERED` at Payment means the configured checkout opened but its provider controls did not render within the bounded wait. This is an unexpected failure in every market, not a missing-mass skip. Inspect the native payment-mode request and the masked discovery screenshot; do not associate a card loading failure with the MX Cash defect RT-779284. No order is proven until its new causal confirmation is validated.
+
+For MX S2 `pymesmx`, one native Payment reload is allowed before the financial adapter only when the exact current-cart `paymentmodes` GET failed without an HTTP response after at least 55 seconds. A short bounded settle permits the native one-minute request deadline to finish; an in-flight read is never canceled. HTTP errors, successful reads with missing UI, other programmes and other routes do not qualify. The reloaded page must render providers and retain independent identity proof before proceeding. This recovery never repeats a payment submission.
+
+MX S2 now obtains its programme-bound order reader from the accepted current-cart response, so it records order history before every card submit. For a 601 response, only a new order absent from that baseline, with the same programme, SKU, quantity and creation window, followed by genuine confirmation UI, can satisfy the frontend contract. A 601 alone never passes the TC. Unconfirmed attempts remain guarded until read-only reconciliation proves either their causal order or the existing rejected-attempt archival contract.
+
+The MX S2 `pymesmx` credit-card case selects the native Crédito panel, as the proven MX Base Store credit flow does. Its submit capture is restricted to the programme's `mx-mercadoCC` endpoint; the combined Débito/Crédito panel is not a fallback for this TC. Other markets and programme selections are preserved.
+
+The native mode identifier has also been observed as `mx-mercadoCc`. Capture
+accepts that casing only in the final two mode characters, retaining exact
+programme and operation paths. The November 23 native-credit run displayed the
+transaction-failure banner after one submit, without confirmation. Its response
+body was missed by the earlier case-sensitive matcher: HTTP 200 alone does not
+identify its business outcome. The durable attempt remains unresolved; do not
+infer 601, mark PASS, delete its marker, or retry from that screenshot alone.
+Read-only current-cart inspection exposed no terminal payment result. The first
+S2 BackOffice lookup found no Cart entry under Order; this does not prove that
+Cart is absent from every navigation area or role. Obtain the terminal
+gateway/backend outcome for that attempt before another financial submission.
+This card failure is separate from the known Cash defect RT-779284.

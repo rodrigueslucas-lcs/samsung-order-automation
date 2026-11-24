@@ -62,8 +62,9 @@ async function submitEppMercadoCard(page,cfg,capture,reconciliation=null,confirm
  guards.requirePaymentSubmitOptIn();
  const card=cfg.market==='CL'?clTestCard.getClTestCard():cfg.market==='CO'?coTestCard.getCoTestCard({...process.env,CO_QST_ENVIRONMENT:cfg.environment}):runtime.getEppRuntimeData(cfg)?.payment?.card;
  if(!card||!['number','holderName','expiry','cvv','document'].every(k=>typeof card[k]==='string'&&card[k]))return{status:'BLOCKED',reason:'PAYMENT_FLOW_NOT_PROVEN',stage:'DATA',detail:'Approved same-market/provider card fixture is unavailable in ignored EPP runtime data.'};
- const payment=['CL','CO'].includes(cfg.market)?new MarketPaymentPage(page,{market:cfg.market}):new PaymentPage(page);payment.screenshot=capture;
- if(cfg.market==='MX')payment.creditCardOption=cfg.environment==='S2'?page.getByRole('button',{name:/^Tarjeta de D[eé]bito/i}).filter({visible:true}).first():page.getByRole('button',{name:/^Tarjeta de (?:Cr[eé]dito|D[eé]bito)/i}).filter({visible:true});
+ const mxCredit=cfg.market==='MX'&&cfg.environment==='S2'&&cfg.program==='pymesmx';
+ const payment=['CL','CO'].includes(cfg.market)||mxCredit?new MarketPaymentPage(page,{market:cfg.market,...(mxCredit?{cardPanel:'credit'}:{})}):new PaymentPage(page);payment.screenshot=capture;
+ if(cfg.market==='MX'&&!mxCredit)payment.creditCardOption=cfg.environment==='S2'?page.getByRole('button',{name:/^Tarjeta de D[eé]bito/i}).filter({visible:true}).first():page.getByRole('button',{name:/^Tarjeta de (?:Cr[eé]dito|D[eé]bito)/i}).filter({visible:true});
  await payment.selectCreditCard();
  for(const name of ['cardNumber','expirationDate','securityCode']){
   const host=await page.frameLocator(`iframe[name="${name}"]`).locator('#'+name).evaluate(field=>field.ownerDocument.location.hostname);
@@ -84,7 +85,7 @@ async function submitEppMercadoCard(page,cfg,capture,reconciliation=null,confirm
  const attempt=attemptModule.beginEppOrderAttempt(cfg,'card');
   let result,reconciledOrderCode=null;
  try{result=await payment.placeOrderAndCapture({orderCodePattern:new RegExp(`\\b${cfg.market}\\d{6}-\\d{8}(?:_\\d+)?\\b`,'i'),
-  submitResponsePathPattern:new RegExp(`^/tokocommercewebservices/v2/${site}/users/[^/]+/carts/[^/]+/paymentmodes/[^/]+/submitOrder$`),
+  submitResponsePathPattern:new RegExp(`^/tokocommercewebservices/v2/${site}/users/[^/]+/carts/[^/]+/paymentmodes/${mxCredit?'mx-mercado[Cc][Cc]':'[^/]+'}/submitOrder$`),
   orderResponsePathPattern:new RegExp(`^/tokocommercewebservices/v2/${site}/users/[^/]+/orders/${cfg.market}\\d{6}-\\d{8}(?:_\\d+)?$`)});
  }catch(error){
   const businessCode=String(error.message).match(/business code (\d{3})/)?.[1];
@@ -96,10 +97,10 @@ async function submitEppMercadoCard(page,cfg,capture,reconciliation=null,confirm
    network=rows.map(row=>{const path=new URL(row.endpoint).pathname;return{method:row.method,status:row.status,path:path.startsWith('/tokocommercewebservices/v2/')?path.replace(/\/users\/[^/]+/,'/users/[identity]').replace(/\/carts\/[^/]+/,'/carts/[cart]'):'[provider endpoint]'};});
   }catch{}
   await test.info().attach('EPP single submit diagnostic',{body:JSON.stringify({market:cfg.market,environment:cfg.environment,program:cfg.program,outcome,businessCode,network,submitCount:1}),contentType:'application/json'});
-  // CL/PE's frontend acceptance is causal order creation + visible confirmation,
+  // Frontend acceptance is causal order creation + visible confirmation,
   // not settlement. Preserve the 601 evidence; only a new programme/SKU-bound
   // order AND the success UI below can satisfy that frontend contract.
-  const frontendOrder=cfg.environment==='S2'&&(cfg.market==='CL'&&cfg.program==='alianzas'||cfg.market==='PE'&&cfg.program==='pe_membership_vip'&&businessCode==='601');
+  const frontendOrder=cfg.environment==='S2'&&(cfg.market==='CL'&&cfg.program==='alianzas'||cfg.market==='PE'&&cfg.program==='pe_membership_vip'&&businessCode==='601'||cfg.market==='MX'&&cfg.program==='pymesmx'&&businessCode==='601');
   if(reconciliation&&(!businessCode||frontendOrder)){
    const reconciled=await reconciliation.afterSubmit(baseline);
    if(reconciled){
