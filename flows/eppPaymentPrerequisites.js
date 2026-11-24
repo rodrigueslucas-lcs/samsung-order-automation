@@ -23,20 +23,10 @@ const campaignKey=(cfg,runId)=>[cfg.market,cfg.environment,cfg.program,runId].jo
 
 function enforceEppPayment(condition, reason, cfg) {
   if (!condition) return;
-  // A configured checkout that remains on its loading skeleton is an
-  // unexpected render failure, not a missing prerequisite or known defect.
-  if(reason.startsWith('EPP_COMMERCE_NOT_RENDERED:'))throw new Error(reason);
-  // An unresolved earlier initiation prevents this case from executing at
-  // all. Report that prerequisite consistently, without rewriting the failed
-  // case which actually submitted it or releasing its durable marker.
-  if(reason.startsWith('AMBIGUOUS_EPP_ORDER_ATTEMPT:')){
-    test.skip(true,reason);
-    throw new Error(reason); // Fail closed if an embedded skip stub returns.
-  }
-  // A CL S2 QST precondition is a reported failure, not a silent skip.
-  // Never retry ambiguous submissions or bypass identity/provider checks.
-  if (cfg?.market === 'CL' && cfg.environment === 'S2') throw new Error(reason);
-  test.skip(true, reason);
+  // Operational failures must remain visible as failed executions. Keep the
+  // concrete prerequisite/error code and every financial guard; no silent skip
+  // or implicit authorization to repeat an unresolved payment.
+  throw new Error(reason);
 }
 
 // Discovery alone cannot pass a payment case. A proven market adapter may
@@ -170,8 +160,11 @@ export async function runEppPaymentPrerequisiteCase(page,cfg,options){
   }
   // Identified old attempts are independently reconciled and archived before
   // a fresh checkout; unidentified submits are never cleared or blindly retried.
-  if(pendingRecords.some(pending=>pending.status!=='OBSERVED_ORDER'||!pending.orderCode||pending.kind==='transfer'&&pending.providerConfirmationSubmitted!==true)){
-    const reason='AMBIGUOUS_EPP_ORDER_ATTEMPT: reconcile the existing initiation before any cart reset or new submit.';
+  const unresolved=pendingRecords.find(pending=>pending.status!=='OBSERVED_ORDER'||!pending.orderCode||pending.kind==='transfer'&&pending.providerConfirmationSubmitted!==true);
+  if(unresolved){
+    const at=Date.parse(unresolved.at);
+    const when=Number.isFinite(at)?' at '+new Date(at).toISOString():'';
+    const reason=`AMBIGUOUS_EPP_ORDER_ATTEMPT: previous ${unresolved.kind} submission${when} has no reconciled outcome; no cart reset or new submit.`;
     campaignPrerequisites.set(campaignKey(cfg,runId),{reason:'AMBIGUOUS_EPP_ORDER_ATTEMPT'});
     enforceEppPayment(true,reason,cfg);
     throw new Error(reason); // Fail closed even if an embedded runner does not terminate on skip.

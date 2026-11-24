@@ -10,12 +10,9 @@ import eppProductReads from '../utils/eppPendingProductRead.cjs';
 
 function enforceEppQst(condition, reason, cfg) {
   if (!condition) return;
-  // Chile S2 homologation reports an actual FAIL, never a concealed SKIP.
-  // A failed auth or entitlement remains blocked; it is not bypassed.
-  if (cfg?.market === 'CL' && cfg.environment === 'S2') {
-    throw new Error(reason);
-  }
-  test.skip(true, reason);
+  // Surface operational errors in every market. Identity, entitlement and
+  // product prerequisites remain mandatory; they cannot silently skip a TC.
+  throw new Error(reason);
 }
 
 const CODE_INPUT = /verification|verify|access code|c[oó]digo|clave de acceso/i;

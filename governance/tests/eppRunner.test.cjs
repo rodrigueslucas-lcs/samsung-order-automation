@@ -89,21 +89,17 @@ test('CL S2 retains all seven scenarios and permits only registered transfer-def
  assert.equal(spec.replace(registeredTransfer,'').includes('test.skip('),false);
  for(const id of ['SAM-24836','SAM-24840','SAM-24841','SAM-24851','SAM-24864','SAM-24865','SAM-24866'])assert.ok(spec.includes(id));
 });
-test('CL S2 strict checkout gates do not enable payments by default',()=>{
- const fs=require('node:fs');
- const path=require('node:path');
- for(const file of ['flows/eppStorefront.js','flows/eppPaymentPrerequisites.js']){
-   const source=fs.readFileSync(path.resolve(__dirname,'../..',file),'utf8');
-   assert.ok(source.includes("cfg?.market === 'CL' && cfg.environment === 'S2'"));
-   assert.ok(source.includes('throw new Error(reason)'));
- }
- const run=buildRun('CL',[],{CL_QST_ENVIRONMENT:'S2',BROWSER_MODE:'headed',ALLOW_PAYMENT_SUBMIT:'1'},{readData:()=>null});
+test('all S2 EPP runners preserve explicit headed payment authorization and keep it off by default',()=>{
+ for(const market of ['MX','PE','CO','CL']){
+ const selection={[market+'_QST_ENVIRONMENT']:'S2'};
+ const run=buildRun(market,[],{...selection,BROWSER_MODE:'headed',ALLOW_PAYMENT_SUBMIT:'1'},{readData:()=>null});
  assert.equal(run.env.ALLOW_PAYMENT_SUBMIT,'1');
  assert.equal(run.env.BROWSER_MODE,'headed');
  assert.equal(run.env.ENVIRONMENT,'S2');
  assert.equal(run.env.TEST_STORE,'EPP');
- const defaultRun=buildRun('CL',[],{CL_QST_ENVIRONMENT:'S2'},{readData:()=>null});
+ const defaultRun=buildRun(market,[],selection,{readData:()=>null});
  assert.notEqual(defaultRun.env.ALLOW_PAYMENT_SUBMIT,'1');
+ }
 });
 
 test('runtime BUSY is explicit and does not expose sensitive exception details',()=>{

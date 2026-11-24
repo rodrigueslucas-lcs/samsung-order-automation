@@ -33,12 +33,26 @@ test('PE payment has one server-proven normalizer and disables the earlier optim
  const other=fixture();await other.run();assert.equal(other.cartOptions[0].normalizeQuantity,true);
 });
 test('non-MX checkout without local contact mass reports its concrete data prerequisite',async()=>{const f=fixture({market:'CL'});assert.equal((await f.run()).reason,'MISSING_EPP_CONTACT_DATA');assert.ok(f.calls.includes('stop'));});
-test('even a returning skip stub cannot turn prerequisite discovery into payment PASS',async()=>{await assert.rejects(fixture({accepted:false}).wrapper(),/causal confirmed order/);});
+test('missing accepted identity fails with its actual cause instead of skipping or reaching payment',async()=>{const f=fixture({accepted:false});await assert.rejects(f.wrapper(),/AUTH_OR_ENTITLEMENT_REQUIRED/);assert.deepEqual(f.calls,['open','stop']);});
 
-test('an unresolved attempt prevents a fresh cart or submit before any store action',async()=>{const f=fixture({pending:{kind:'card',status:'SUBMITTING'}});await assert.rejects(f.wrapper(),/AMBIGUOUS_EPP_ORDER_ATTEMPT/);assert.deepEqual(f.calls,['blocked-reconciliation']);});
+test('an unresolved attempt fails explicitly before any store action without skipping',async()=>{const f=fixture({pending:{kind:'card',status:'SUBMITTING'}});await assert.rejects(f.wrapper(),/AMBIGUOUS_EPP_ORDER_ATTEMPT/);assert.deepEqual(f.calls,[]);});
+
+test('unresolved payment failure identifies the existing method and timestamp without a skip or another submit',async()=>{
+ const pending={kind:'card',status:'SUBMITTING',at:'2026-11-23T23:14:19.987Z'};
+ const f=fixture({pending});
+ await assert.rejects(f.wrapper(),error=>error.message.includes('previous card submission at '+pending.at)&&error.message.startsWith('AMBIGUOUS_EPP_ORDER_ATTEMPT:'));
+ assert.deepEqual(f.calls,[]);assert.equal(pending.status,'SUBMITTING');
+});
 test('CO unresolved card attempt blocks before any cart mutation or second submit',async()=>{
  const f=fixture({market:'CO',pending:{kind:'card',status:'SUBMITTING'}});
- await assert.rejects(f.wrapper(),/AMBIGUOUS_EPP_ORDER_ATTEMPT/);assert.deepEqual(f.calls,['blocked-reconciliation']);
+ await assert.rejects(f.wrapper(),/AMBIGUOUS_EPP_ORDER_ATTEMPT/);assert.deepEqual(f.calls,[]);
+});
+
+for(const market of ['MX','PE','CO','CL'])for(const reason of ['AMBIGUOUS_EPP_ORDER_ATTEMPT','AUTH_OR_ENTITLEMENT_REQUIRED','MISSING_EPP_CONTACT_DATA','MISSING_OR_UNPROVEN_EPP_PRODUCT','PAYMENT_SUBMIT_NOT_AUTHORIZED'])test(`${market} ${reason} fails instead of skipping`,()=>{
+ let skips=0;
+ const enforce=vm.runInNewContext(source+'\nenforceEppPayment;',{test:{skip:()=>skips++}});
+ assert.throws(()=>enforce(true,reason+': synthetic cause',{market,environment:'S2'}),error=>error.message===reason+': synthetic cause');
+ assert.equal(skips,0);
 });
 
 test('read-only recovery with no pending attempt cannot reset or add to a cart',async()=>{const f=fixture({resume:true});await assert.rejects(f.wrapper(),/AMBIGUOUS_EPP_ORDER_ATTEMPT/);assert.deepEqual(f.calls,[]);});

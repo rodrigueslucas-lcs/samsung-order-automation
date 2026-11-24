@@ -284,3 +284,17 @@ S2 BackOffice lookup found no Cart entry under Order; this does not prove that
 Cart is absent from every navigation area or role. Obtain the terminal
 gateway/backend outcome for that attempt before another financial submission.
 This card failure is separate from the known Cash defect RT-779284.
+
+### Selected EPP tests must expose operational failures
+
+The storefront and payment prerequisite helpers throw their concrete error code
+instead of skipping a selected TC. Missing identity, entitlement, product/contact
+data, submit authorization or reconciliation therefore produces a visible test
+failure. This does not bypass the prerequisite, clear an uncertain attempt or
+authorize a repeated payment. A previous unresolved submission fails with
+`AMBIGUOUS_EPP_ORDER_ATTEMPT` before cart reset or another financial submit.
+
+The exact EPP notification tutorial close uses a bounded ten-second native click
+wait so first paint/entrance animation can finish. It still requires the tutorial
+to disappear, never forces a click, and never accepts notification permission or
+closes business/payment/CAPTCHA dialogs.

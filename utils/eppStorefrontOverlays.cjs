@@ -6,7 +6,10 @@ async function dismissEppNotificationTutorial(page,config){
  const close=notice.locator('.ins-web-opt-in-reminder-close-button').filter({visible:true}).first();
  if(!await close.isVisible().catch(()=>false))return false;
  try{
-  await close.click({timeout:3000});
+  // Keep native actionability checks: first paint or the tutorial's entrance
+  // animation can outlast three seconds. Never force the click or accept the
+  // notification prompt; disappearance is still independently required.
+  await close.click({timeout:10000});
   await notice.waitFor({state:'hidden',timeout:3000});
  }catch{
   // A locator handler or the tutorial itself can remove the same node while

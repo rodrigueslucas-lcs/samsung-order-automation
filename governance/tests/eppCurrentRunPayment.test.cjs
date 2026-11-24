@@ -28,12 +28,22 @@ test('old CL transfer blocks its own method and unproven confirmation, preservin
  for(const authorized of ['0','1']){
   env.ALLOW_PAYMENT_SUBMIT=authorized;
   const optionsToCheck=authorized==='0'?[{kind:'card'},{kind:'transfer'},{kind:'card',confirmationOnly:true}]:[{kind:'transfer'},{kind:'card',confirmationOnly:true}];
-  for(const options of optionsToCheck)await assert.rejects(run({},cfg,options),e=>e.blocked&&e.message.startsWith('AMBIGUOUS_EPP_ORDER_ATTEMPT:'));
+  for(const options of optionsToCheck)await assert.rejects(run({},cfg,options),e=>!e.blocked&&e.message.startsWith('AMBIGUOUS_EPP_ORDER_ATTEMPT:'));
  }
- assert.equal(calls.length,5);assert.equal(old.status,'SUBMITTING');assert.equal(old.runId,'previous-run');
+ assert.deepEqual(calls,[]);assert.equal(old.status,'SUBMITTING');assert.equal(old.runId,'previous-run');
 });
 
-test('confirmation inherits only its own campaign explicit payment prerequisite and never submits',async()=>{const calls=[],env={ALLOW_PAYMENT_SUBMIT:'1',EPP_RUN_ID:'campaign-a',PE_QST_TARGET_IDS:'SAM-25138,SAM-25140'},cfg={market:'PE',environment:'S2',program:'pe_membership_vip'};const source=require('fs').readFileSync('flows/eppPaymentPrerequisites.js','utf8').replace(/^import .*;\r?\n/gm,'').replace(/export async function/g,'async function');const run=require('vm').runInNewContext(source+'\nprobeEppPaymentPrerequisites=async()=>{calls.push("probe");return{status:"BLOCKED",reason:"AUTH_OR_ENTITLEMENT_REQUIRED",stage:"AUTH",detail:"Identity not accepted"};};runEppPaymentPrerequisiteCase;',{calls,process:{env},attempts:{pendingEppOrderAttempt:()=>null,confirmedEppOrderForRun:()=>null},submitPeEppCard(){throw Error('unexpected submit');},test:{setTimeout(){},info:()=>({annotations:[]}),skip:(_value,reason)=>{throw Object.assign(Error(reason),{skipped:true});}}});await assert.rejects(run({},cfg,{kind:'card'}),e=>e.skipped&&/AUTH_OR_ENTITLEMENT_REQUIRED/.test(e.message));await assert.rejects(run({},cfg,{kind:'card',confirmationOnly:true}),e=>e.skipped&&/campaign payment was blocked/.test(e.message));assert.deepEqual(calls,['probe']);env.EPP_RUN_ID='campaign-b';await assert.rejects(run({},cfg,{kind:'card',confirmationOnly:true}),/CURRENT_RUN_ORDER_REQUIRED/);assert.deepEqual(calls,['probe']);});
+test('confirmation inherits only its own campaign payment failure without a skip or another submit',async()=>{
+ const calls=[],env={ALLOW_PAYMENT_SUBMIT:'1',EPP_RUN_ID:'campaign-a',PE_QST_TARGET_IDS:'SAM-25138,SAM-25140'},cfg={market:'PE',environment:'S2',program:'pe_membership_vip'};
+ const run=vm.runInNewContext(source+'\nprobeEppPaymentPrerequisites=async()=>{calls.push("probe");return{status:"BLOCKED",reason:"AUTH_OR_ENTITLEMENT_REQUIRED",stage:"AUTH",detail:"Identity not accepted"};};runEppPaymentPrerequisiteCase;',{
+  calls,process:{env},attempts:{pendingEppOrderAttempt:()=>null,confirmedEppOrderForRun:()=>null},submitPeEppCard(){throw Error('unexpected submit');},
+  test:{setTimeout(){},info:()=>({annotations:[]}),skip:(_value,reason)=>{throw Object.assign(Error(reason),{skipped:true});}},
+ });
+ await assert.rejects(run({},cfg,{kind:'card'}),e=>!e.skipped&&/AUTH_OR_ENTITLEMENT_REQUIRED/.test(e.message));
+ await assert.rejects(run({},cfg,{kind:'card',confirmationOnly:true}),e=>!e.skipped&&/campaign payment was blocked/.test(e.message));
+ assert.deepEqual(calls,['probe']);env.EPP_RUN_ID='campaign-b';
+ await assert.rejects(run({},cfg,{kind:'card',confirmationOnly:true}),/CURRENT_RUN_ORDER_REQUIRED/);assert.deepEqual(calls,['probe']);
+});
 
 test('explicit new MX card order preserves unrelated cash while same-method and other scopes stay guarded',async()=>{
  const old={market:'MX',environment:'S2',kind:'cash',status:'SUBMITTING',runId:'previous-cash'},calls=[];

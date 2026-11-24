@@ -5,11 +5,24 @@ test('a tutorial detached during its close action is already dismissed, not a lo
  const notice={locator:()=>close,isVisible:async()=>false};
  assert.equal(await dismissEppNotificationTutorial({url:()=>config.rootUrl.href,locator:()=>notice},config),true);
 });
+
+test('a tutorial still visible after a failed close remains an error',async()=>{
+ const close={isVisible:async()=>true,click:async()=>{throw Error('not actionable');},filter(){return this;},first(){return this;}};
+ const notice={locator:()=>close,isVisible:async()=>true};
+ await assert.rejects(dismissEppNotificationTutorial({url:()=>config.rootUrl.href,locator:()=>notice},config),/remained visible/);
+});
 const config={rootUrl:new URL('https://stg2.shop.samsung.com/mx/multistore/pymesmx/pymesmx/')};let browser;
 test.before(async()=>{browser=await chromium.launch({headless:true});});test.after(async()=>browser?.close());
 async function fixture(action,{url=config.rootUrl.href,html=''}={}){const context=await browser.newContext();try{const page=await context.newPage();await page.route('**/*',r=>r.fulfill({contentType:'text/html',body:html}));await page.goto(url);await action(page);}finally{await context.close();}}
 const notice='<div id="ins-web-opt-in-reminder-container"><span class="ins-web-opt-in-reminder-close-button" onclick="this.parentElement.remove()">×</span><button onclick="window.enabled=true">Enable notifications</button></div>';
 test('EPP closes the exact tutorial without accepting notification permission',()=>fixture(async page=>{assert.equal(await dismissEppNotificationTutorial(page,config),true);assert.equal(await page.locator('#ins-web-opt-in-reminder-container').count(),0);assert.equal(await page.evaluate(()=>window.enabled),undefined);},{html:notice}));
+
+test('EPP waits for an entering tutorial to settle before its native close',()=>fixture(async page=>{
+ await page.locator('.ins-web-opt-in-reminder-close-button').evaluate(node=>{node.style.display='inline-block';node.animate([{transform:'translateX(0)'},{transform:'translateX(60px)'}],{duration:3500,fill:'forwards'});});
+ assert.equal(await dismissEppNotificationTutorial(page,config),true);
+ assert.equal(await page.locator('#ins-web-opt-in-reminder-container').count(),0);
+ assert.equal(await page.evaluate(()=>window.enabled),undefined);
+},{html:notice}));
 test('EPP does not close unrelated business, CAPTCHA or payment dialogs',()=>fixture(async page=>{assert.equal(await dismissEppNotificationTutorial(page,config),false);assert.equal(await page.getByRole('dialog').count(),1);},{html:'<div role="dialog"><button class="close" onclick="this.parentElement.remove()">Close</button>Business error</div>'}));
 test('matching markup outside the configured EPP programme is untouched',()=>fixture(async page=>{assert.equal(await dismissEppNotificationTutorial(page,config),false);assert.equal(await page.locator('#ins-web-opt-in-reminder-container').count(),1);},{url:'https://stg2.shop.samsung.com/cl/',html:notice}));
 test('late notification blocking profile is dismissed before the profile action',()=>fixture(async page=>{await installEppOverlayDismissal(page,config);await page.locator('body').evaluate((body,html)=>body.insertAdjacentHTML('beforeend',html),'<div id="ins-web-opt-in-reminder-container" style="position:fixed;inset:0;z-index:1000;background:white"><span class="ins-web-opt-in-reminder-close-button" onclick="this.parentElement.remove()">×</span></div>');await page.getByRole('button',{name:'Profile'}).click();assert.equal(await page.evaluate(()=>window.opened),true);},{html:'<button onclick="window.opened=true">Profile</button>'}));
