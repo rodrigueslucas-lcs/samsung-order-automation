@@ -121,6 +121,22 @@ export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProvi
 
 export async function runEppPaymentPrerequisiteCase(page,cfg,options){
   test.setTimeout(420000);
+  const prior=attempts.pendingEppOrderAttempt(cfg,'card');
+  if(options?.kind==='card'&&!options?.confirmationOnly&&process.env.EPP_RESUME_PENDING_ORDER!=='1'&&cfg.market==='MX'&&cfg.environment==='S2'&&cfg.program==='pymesmx'&&prior?.status==='SUBMITTING'&&prior.providerBusinessCode===601){
+    // Read-only recovery of a recorded rejection precedes any cart mutation.
+    const proof=server.watchEppServerProof(page.context(),cfg,{expectedEmail:session.getPrimaryEppCredentials(cfg).email});
+    try{
+      await openEppStore(page,{...cfg,entryUrl:cfg.pdpUrl});await proof.settle();
+      if(!proof.accepted())throw new Error('AUTH_OR_ENTITLEMENT_REQUIRED: rejection reconciliation needs verified identity.');
+      const site=cfg.apiSite||cfg.rootUrl.pathname.split('/').filter(Boolean)[2];
+      const origin=`https://${cfg.environment.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com`;
+      const responsePromise=page.waitForResponse(r=>r.request().method()==='GET'&&new URL(r.url()).origin===origin&&new URL(r.url()).pathname===`/tokocommercewebservices/v2/${site}/users/current/carts/current`,{timeout:60000});
+      const [response]=await Promise.all([responsePromise,page.goto(cfg.cartUrl.href,{waitUntil:'domcontentloaded',timeout:60000})]);
+      const reader=await causalReadback.createEppReadbackFromCartResponse(page,cfg,response);
+      const history=await reader.proveNoOrderSince(prior.at);
+      if(history)attempts.archiveRejectedEppOrderAttempt(cfg,'card',{...history,providerBusinessCode:601});
+    }finally{proof.stop();}
+  }
   const kinds=cfg.market==='CL'?['card','transfer']:['card','cash'];
   const allPendingRecords=kinds.map(kind=>attempts.pendingEppOrderAttempt(cfg,kind)).filter(Boolean);
   // Explicit operator authorization for a NEW card checkout is not a retry or

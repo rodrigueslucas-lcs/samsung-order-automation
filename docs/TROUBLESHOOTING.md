@@ -268,6 +268,23 @@ A follow-up local run also exposed both receipt choices unchecked, with required
 
 For MX S2 `pymesmx`, one native Payment reload is allowed before the financial adapter only when the exact current-cart `paymentmodes` GET failed without an HTTP response after at least 55 seconds. A short bounded settle permits the native one-minute request deadline to finish; an in-flight read is never canceled. HTTP errors, successful reads with missing UI, other programmes and other routes do not qualify. The reloaded page must render providers and retain independent identity proof before proceeding. This recovery never repeats a payment submission.
 
+The replacement GET can start several seconds after reload bootstrap. If the
+60-second provider UI wait ends while that GET is still pending, recovery allows
+up to 15 more seconds for that same read and then up to 15 seconds for rendering.
+There is no second reload. Persistent missing controls still fail before card
+entry; a loading skeleton is never payment confirmation.
+
+On November 24 at 20:04 UTC, an authenticated, read-only comparison reproduced
+the native GET failing after 60.4 seconds with `net::ERR_FAILED` and browser
+CORS/missing-allow-origin errors. A direct request to the same exact programme
+URL returned HTTP 502 after 60.9 seconds. The affected route was
+`/tokocommercewebservices/v2/pymesmx/users/current/carts/current/paymentmodes`.
+Identity and programme access were accepted. No card or financial submit was
+involved. This signature needs staging API/gateway investigation; it must not
+be mapped to the Cash defect or hidden by disabling browser CORS protections.
+Revalidate the actual Payment controls and a new causal card order after the
+endpoint recovers. A successful read-only diagnostic is not a SAM-25045 PASS.
+
 MX S2 now obtains its programme-bound order reader from the accepted current-cart response, so it records order history before every card submit. For a 601 response, only a new order absent from that baseline, with the same programme, SKU, quantity and creation window, followed by genuine confirmation UI, can satisfy the frontend contract. A 601 alone never passes the TC. Unconfirmed attempts remain guarded until read-only reconciliation proves either their causal order or the existing rejected-attempt archival contract.
 
 The MX S2 `pymesmx` credit-card case selects the native Crédito panel, as the proven MX Base Store credit flow does. Its submit capture is restricted to the programme's `mx-mercadoCC` endpoint; the combined Débito/Crédito panel is not a fallback for this TC. Other markets and programme selections are preserved.
@@ -277,13 +294,27 @@ accepts that casing only in the final two mode characters, retaining exact
 programme and operation paths. The November 23 native-credit run displayed the
 transaction-failure banner after one submit, without confirmation. Its response
 body was missed by the earlier case-sensitive matcher: HTTP 200 alone does not
-identify its business outcome. The durable attempt remains unresolved; do not
-infer 601, mark PASS, delete its marker, or retry from that screenshot alone.
-Read-only current-cart inspection exposed no terminal payment result. The first
-S2 BackOffice lookup found no Cart entry under Order; this does not prove that
-Cart is absent from every navigation area or role. Obtain the terminal
-gateway/backend outcome for that attempt before another financial submission.
-This card failure is separate from the known Cash defect RT-779284.
+identify its business outcome. Do not infer 601, mark PASS, delete its marker,
+or retry from that screenshot alone. On November 24, a separate operator-authorized
+staging incident review combined that original failure capture with fresh accepted
+primary identity/entitlement and every detail in the complete 18-order history.
+No order had been created since the attempt. The original record was preserved
+unchanged in a reviewed-no-order archive with hashed evidence and a separate
+review; its financial outcome remains explicitly unconfirmed, and it is not a
+rejected-payment or PASS record. This exceptional legacy review is not a runner
+flag or an automatic expiry policy. This card failure is separate from the known
+Cash defect RT-779284.
+
+New MX S2 card attempts persist a captured 601 outcome before reconciliation.
+If no new causal order can be confirmed, the adapter reads every history page
+and checks each order's identity/creation time, then rereads the history head
+and totals to detect an order arriving during that scan. Only complete, stable history
+with no order since the attempt permits archival as rejected. The current TC
+still fails and never submits twice. If a read is unavailable, the persisted
+outcome stays guarded; the next run first performs the same authenticated,
+read-only reconciliation before any cart change. Unknown responses, incomplete
+history and any potentially new order remain blocked. Local and Jenkins runs
+use the same programme-bound ledger. Interrupted archival resumes safely.
 
 ### Selected EPP tests must expose operational failures
 

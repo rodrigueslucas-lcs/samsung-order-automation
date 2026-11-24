@@ -12,6 +12,13 @@ test('confirmation recovery reads only a validated causal record in its own prog
 const cfg={market:'MX',environment:'S2'};
 function memory(){const files=new Map();return{files,mkdirSync(){},writeFileSync(file,body,options){if(options?.flag==='wx'&&files.has(file))throw Object.assign(new Error(),{code:'EEXIST'});files.set(file,body);},renameSync(from,to){files.set(to,files.get(from));files.delete(from);}};}
 test('ambiguous submit stays blocked across attempts',()=>{const io=memory();beginEppOrderAttempt(cfg,'card',{io});assert.throws(()=>beginEppOrderAttempt(cfg,'card',{io}),/AMBIGUOUS/);assert.equal(io.files.size,1);assert.equal(JSON.parse([...io.files.values()][0]).status,'SUBMITTING');});
+test('provider rejection persists without releasing a marker before authoritative reconciliation',()=>{
+ const io=memory(),a=beginEppOrderAttempt(cfg,'card',{io,now:()=> '2026-11-24T12:00:00Z'});
+ assert.throws(()=>a.recordProviderRejection(500),/Unproven/);
+ a.recordProviderRejection(601);const record=JSON.parse([...io.files.values()][0]);
+ assert.equal(record.providerBusinessCode,601);assert.equal(record.at,a.at);assert.equal(record.status,'SUBMITTING');
+ assert.throws(()=>beginEppOrderAttempt(cfg,'card',{io}),/AMBIGUOUS/);
+});
 test('confirmation selects only this campaign and never promotes historical orders',()=>{
  const {confirmedEppOrderForRun}=require('../../utils/eppOrderAttempt.cjs'),io=memory();
  io.existsSync=f=>io.files.has(f)||[...io.files.keys()].some(key=>key.startsWith(f));
@@ -50,4 +57,14 @@ test('only a conclusive rejection plus complete causal history can archive an un
 });
 
 test('confirmed order archival tolerates Windows busy without another financial attempt',()=>{const io=memory(),rename=io.renameSync;let count=0;io.renameSync=(a,b)=>{if(++count===1)throw Object.assign(new Error('busy'),{code:'EBUSY'});rename(a,b);};beginEppOrderAttempt(cfg,'card',{io}).confirm('MX261106-12345678');assert.equal(count,2);assert.equal(JSON.parse([...io.files.values()][0]).status,'CONFIRMED');});
+test('interrupted rejection archival resumes without reopening financial ambiguity or overwriting an audit',()=>{
+ const io=memory();io.existsSync=f=>io.files.has(f);io.readFileSync=f=>io.files.get(f);
+ beginEppOrderAttempt(cfg,'card',{io,now:()=> '2026-11-24T12:00:00Z'});
+ const key=[...io.files.keys()][0],record=JSON.parse(io.files.get(key));
+ io.files.set(key,JSON.stringify({...record,status:'REJECTED',reason:'PAYMENT_REJECTED_601',providerBusinessCode:601,historyComplete:true,reconciledAt:'2026-11-24T12:01:00Z'}));
+ const pending=require('../../utils/eppOrderAttempt.cjs').pendingEppOrderAttempt;
+ assert.equal(pending(cfg,'card',io),null);assert.equal(io.files.size,1);assert.ok([...io.files.keys()][0].includes('rejected-card-'));
+ io.files.set(key,JSON.stringify({...record,status:'REJECTED',reason:'PAYMENT_REJECTED_601',historyComplete:true}));
+ assert.throws(()=>pending(cfg,'card',io),/invalid/);
+});
 test('interrupted archival of a proven confirmed record resumes locally, never becoming an invalid financial state',()=>{const io=memory();io.existsSync=p=>io.files.has(p);io.readFileSync=p=>io.files.get(p);const a=beginEppOrderAttempt(cfg,'card',{io});const key=[...io.files.keys()][0];io.files.set(key,JSON.stringify({...JSON.parse(io.files.get(key)),status:'CONFIRMED',orderCode:'MX261106-12345678'}));assert.equal(require('../../utils/eppOrderAttempt.cjs').pendingEppOrderAttempt(cfg,'card',io),null);assert.equal(io.files.size,1);assert.ok([...io.files.keys()][0].includes('confirmed-card-'));});

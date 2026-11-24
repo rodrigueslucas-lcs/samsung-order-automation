@@ -37,6 +37,13 @@ test('a still-pending GET is never canceled by recovery',async()=>{
  const watch=watchMxEppPaymentRead(page,cfg);page.emit('request',req());
  assert.equal(await recoverMxEppPaymentRead(page,{},watch,{settleTimeoutMs:10}),false);watch.stop();
 });
+test('a replacement read that remains pending fails within its bound and is never reloaded again',async()=>{
+ let reloaded=false,reloads=0;
+ const page={reload:async()=>{reloaded=true;reloads++;}},offers={first:()=>({waitFor:async()=>{throw Error('Still loading');}})};
+ const read={pending:()=>reloaded,claimRecovery:()=>true};
+ assert.equal(await recoverMxEppPaymentRead(page,offers,read,{settleTimeoutMs:10}),false);
+ assert.equal(reloads,1);
+});
 
 test('a failed native GET recovers through one browser navigation, without financial POSTs',async()=>{
  const browser=await chromium.launch({headless:true,channel:'chrome'});let watch;
@@ -53,5 +60,25 @@ test('a failed native GET recovers through one browser navigation, without finan
   assert.equal(await recoverMxEppPaymentRead(page,offers,watch),true);assert.equal(reads,2);
   assert.equal(await recoverMxEppPaymentRead(page,offers,watch),false);assert.equal(reads,2);
   assert.ok(methods.every(method=>method==='GET'));
+ }finally{watch?.stop();await browser.close();}
+});
+test('recovery lets its replacement GET finish after the provider UI deadline without another reload',async()=>{
+ const browser=await chromium.launch({headless:true,channel:'chrome'});let watch;
+ try{
+  const page=await browser.newPage();let clock=0,reads=0,reloads=0;const methods=[];
+  await page.route('**/*',async route=>{
+   methods.push(route.request().method());
+   if(new URL(route.request().url()).origin+new URL(route.request().url()).pathname===api){
+    if(++reads===1){clock+=61000;return route.abort();}
+    await new Promise(resolve=>setTimeout(resolve,700));
+    return route.fulfill({contentType:'application/json',body:'{}'});
+   }
+   return route.fulfill({contentType:'text/html',body:`<div id="payment">Loading</div><script>fetch('${api}').then(r=>{if(r.ok)document.querySelector('#payment').innerHTML='<button>Tarjeta de Crédito</button>'}).catch(()=>{});</script>`});
+  });
+  watch=watchMxEppPaymentRead(page,cfg,{now:()=>clock});await page.goto(payment);
+  await expect.poll(()=>reads===1&&!watch.pending()).toBe(true);
+  const reload=page.reload.bind(page);page.reload=async options=>{reloads++;return reload(options);};
+  assert.equal(await recoverMxEppPaymentRead(page,page.getByRole('button',{name:/Tarjeta/}),watch,{providerTimeoutMs:100,settleTimeoutMs:3000,renderSettleTimeoutMs:3000}),true);
+  assert.equal(reloads,1);assert.equal(reads,2);assert.ok(methods.every(method=>method==='GET'));
  }finally{watch?.stop();await browser.close();}
 });

@@ -30,7 +30,7 @@ function watchMxEppPaymentRead(page,config,{now=Date.now}={}){
   };
 }
 
-async function recoverMxEppPaymentRead(page,offers,read,{settleTimeoutMs=15000}={}){
+async function recoverMxEppPaymentRead(page,offers,read,{settleTimeoutMs=15000,providerTimeoutMs=60000,renderSettleTimeoutMs=15000}={}){
   // Angular's payment-mode GET can fail at its own one-minute deadline just
   // after the provider UI wait. Never reload an in-flight request or replay
   // an HTTP rejection. The caller is still before its financial callback.
@@ -38,7 +38,14 @@ async function recoverMxEppPaymentRead(page,offers,read,{settleTimeoutMs=15000}=
   if(!read.claimRecovery())return false;
   console.log('[epp-payment] MX S2 payment-mode read timed out; one native Payment reload before any submit.');
   await page.reload({waitUntil:'domcontentloaded',timeout:60000});
-  return offers.first().waitFor({timeout:60000}).then(()=>true,()=>false);
+  const rendered=await offers.first().waitFor({timeout:providerTimeoutMs}).then(()=>true,()=>false);
+  if(rendered||!read.pending())return rendered;
+  // The replacement GET starts after reload bootstrap. Its own deadline may
+  // therefore outlive the UI wait; do not tear down a still-running read at
+  // that boundary. This settles the same GET, never a second navigation.
+  await expect.poll(()=>read.pending(),{timeout:settleTimeoutMs}).toBe(false).catch(()=>{});
+  if(read.pending())return false;
+  return offers.first().waitFor({timeout:renderSettleTimeoutMs}).then(()=>true,()=>false);
 }
 
 module.exports={watchMxEppPaymentRead,recoverMxEppPaymentRead};

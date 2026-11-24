@@ -89,6 +89,7 @@ async function submitEppMercadoCard(page,cfg,capture,reconciliation=null,confirm
   orderResponsePathPattern:new RegExp(`^/tokocommercewebservices/v2/${site}/users/[^/]+/orders/${cfg.market}\\d{6}-\\d{8}(?:_\\d+)?$`)});
  }catch(error){
   const businessCode=String(error.message).match(/business code (\d{3})/)?.[1];
+  if(mxCredit&&businessCode==='601')attempt.recordProviderRejection(601);
   // Preserve a useful submit outcome without leaking raw request/provider data.
   const outcome=String(error.message).match(/completed with ([A-Z_]+)/)?.[1]||'UNCONFIRMED';
   let network=[];
@@ -111,6 +112,13 @@ async function submitEppMercadoCard(page,cfg,capture,reconciliation=null,confirm
    }
   }
   if(!result){
+  if(mxCredit&&businessCode==='601'&&typeof reconciliation?.proveNoOrderSince==='function'){
+   const proof=await reconciliation.proveNoOrderSince(attempt.at);
+   if(proof){
+    attemptModule.archiveRejectedEppOrderAttempt(cfg,'card',{...proof,providerBusinessCode:601});
+    throw new Error('EPP_PAYMENT_REJECTED_601: complete history proves no order; rejection archived, this execution failed, no retry.');
+   }
+  }
   throw new Error(`EPP_SINGLE_SUBMIT_UNCONFIRMED${businessCode?' businessCode='+businessCode:''}; attempt marker preserved, no retry. Raw provider details suppressed.`);
   }
  }
