@@ -1,9 +1,34 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {jobXml,runtimePolicy,provision,ownership}=require('../../utils/eppJenkinsProvision.cjs');
-const template='<flow-definition><definition class="org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition"><scm><url>https://github.com/rodrigueslucas-lcs/samsung-order-automation.git</url><name>*/agent/mx-qst-p1-finish</name></scm><scriptPath>Jenkinsfile</scriptPath></definition></flow-definition>';
+const template='<flow-definition><definition class="org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition"><scm class="hudson.plugins.git.GitSCM"><userRemoteConfigs><hudson.plugins.git.UserRemoteConfig><url>https://git.corporate.example.invalid/qa/samsung-smb-qa-automation.git</url><credentialsId>synthetic-corporate-scm</credentialsId></hudson.plugins.git.UserRemoteConfig></userRemoteConfigs><branches><hudson.plugins.git.BranchSpec><name>*/main</name></hudson.plugins.git.BranchSpec></branches></scm><scriptPath>Jenkinsfile</scriptPath></definition></flow-definition>';
 const response=(status,text='')=>({status,ok:status>=200&&status<300,text:async()=>text,json:async()=>({crumbRequestField:'Jenkins-Crumb',crumb:'synthetic'})});
 test('dedicated job copies only SCM definition, stays manual and cannot change Base Store',()=>{
- const config=jobXml(template);assert.match(config,/<scriptPath>Jenkinsfile.epp<\/scriptPath>/);assert.match(config,/<triggers\/>/);assert.match(config,/DisableConcurrentBuilds/);assert.match(config,/P1_TARGET_IDS/);assert.match(template,/<scriptPath>Jenkinsfile<\/scriptPath>/);assert.throws(()=>jobXml(template.replace('agent/mx-qst-p1-finish','main')));
+ const config=jobXml(template);assert.match(config,/<scriptPath>Jenkinsfile.epp<\/scriptPath>/);assert.match(config,/<triggers\/>/);assert.match(config,/DisableConcurrentBuilds/);assert.match(config,/P1_TARGET_IDS/);assert.match(template,/<scriptPath>Jenkinsfile<\/scriptPath>/);
+ assert.ok(config.includes('<credentialsId>synthetic-corporate-scm</credentialsId>'));assert.ok(config.includes('<name>*/main</name>'));
+});
+
+test('SCM inheritance preserves approved corporate branches and existing development configuration',()=>{
+ for(const [repo,branch] of [['samsung-smb-qa-automation.git','release/qa'],['samsung-order-automation.git','agent/mx-qst-p1-finish']]){
+  const input=template.replace('samsung-smb-qa-automation.git',repo).replace('*/main','*/'+branch);
+  const expected=input.match(/<definition\b[\s\S]*?<\/definition>/)[0].replace('<scriptPath>Jenkinsfile</scriptPath>','<scriptPath>Jenkinsfile.epp</scriptPath>');
+  assert.ok(jobXml(input).includes(expected));
+ }
+});
+test('SCM validation rejects inline, ambiguous and credential-bearing templates',()=>{
+ const syntheticUserInfo=['synthetic-user','synthetic-password'].join(':');
+ const credentialBearingOrigin=['https://',syntheticUserInfo,'@git.corporate.example.invalid'].join('');
+ for(const input of [
+  '',template.replace('CpsScmFlowDefinition','CpsFlowDefinition'),template.replace('hudson.plugins.git.GitSCM','unexpected.SCM'),
+  template.replace('https://git.corporate.example.invalid','http://git.corporate.example.invalid'),
+  template.replace('https://git.corporate.example.invalid',credentialBearingOrigin),
+  template.replace('.git</url>','.git?parameter=synthetic</url>'),
+  template.replace('</url>','</url><url>https://other.example.invalid/qa/framework.git</url>'),
+  template.replace('</name>','</name><name>*/other</name>'),template.replace('*/main','${BRANCH}'),
+  template.replace('*/main','../unsafe'),template.replace('Jenkinsfile</scriptPath>','other.groovy</scriptPath>'),
+  template.replace('</scriptPath>','</scriptPath><scriptPath>other.groovy</scriptPath>'),
+  template.replace('</definition>','<scm class="hudson.plugins.git.GitSCM"></scm></definition>'),
+  template.replace('</definition>','<script>synthetic</script></definition>'),template+template,
+ ])assert.throws(()=>jobXml(input),/Approved SCM template unavailable/);
 });
 test('runtime policy contains only approved S2 market data',()=>{
  const io={readFileSync:()=>JSON.stringify({S1:{MX:{sensitive:'other-env'}},S2:{MX:{product:{sku:'synthetic'}},PE:{sensitive:'other-market'}}})};

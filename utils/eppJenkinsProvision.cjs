@@ -13,8 +13,22 @@ function runtimePolicy(market,{workspace=process.cwd(),io=fs,hostname=os.hostnam
  return policy;
 }
 function jobXml(template){
- const definition=template.match(/<definition\b[^>]*>[\s\S]*?<\/definition>/)?.[0];
- if(!definition||!definition.includes('<scriptPath>Jenkinsfile</scriptPath>')||!definition.includes('agent/mx-qst-p1-finish')||!definition.includes('samsung-order-automation.git'))throw new Error('Approved SCM template unavailable.');
+ // The authenticated Base Store job is the SCM authority. Validate its native
+ // definition instead of pinning an operator's repository name or feature branch.
+ const definitions=[...template.matchAll(/<definition\b[^>]*>[\s\S]*?<\/definition>/g)];
+ const definition=definitions[0]?.[0];
+ const scm=definition?.match(/<scm\b[^>]*>[\s\S]*?<\/scm>/)?.[0];
+ const urls=[...(scm||'').matchAll(/<url>([^<]+)<\/url>/g)];
+ const branches=scm?.match(/<branches\b[^>]*>([\s\S]*?)<\/branches>/)?.[1]||'';
+ const names=[...branches.matchAll(/<name>([^<]+)<\/name>/g)];
+ const scriptPaths=[...(definition||'').matchAll(/<scriptPath>([^<]+)<\/scriptPath>/g)];
+ let repository;try{repository=new URL(urls[0]?.[1]);}catch{}
+ const branch=names[0]?.[1]||'';
+ if(definitions.length!==1||!/^<definition\b[^>]*class=["']org\.jenkinsci\.plugins\.workflow\.cps\.CpsScmFlowDefinition["']/.test(definition||'')||
+   !/^<scm\b[^>]*class=["']hudson\.plugins\.git\.GitSCM["']/.test(scm||'')||
+   (definition.match(/<scm\b/g)||[]).length!==1||scriptPaths.length!==1||scriptPaths[0][1]!=='Jenkinsfile'||/<script\b/.test(definition)||
+   urls.length!==1||names.length!==1||repository?.protocol!=='https:'||!repository.hostname||repository.username||repository.password||repository.search||repository.hash||!repository.pathname.endsWith('.git')||
+   /\s/.test(urls[0]?.[1]||'')||!/^(?:\*\/)?[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(branch)||branch.includes('..')||branch.endsWith('/')||branch.endsWith('.lock'))throw new Error('Approved SCM template unavailable.');
  return `<?xml version="1.0" encoding="UTF-8"?><flow-definition><description>${ownership}. Manual execution; existing Base Store configuration unchanged.</description><keepDependencies>false</keepDependencies><properties><org.jenkinsci.plugins.workflow.job.properties.DisableConcurrentBuildsJobProperty/><hudson.model.ParametersDefinitionProperty><parameterDefinitions><hudson.model.BooleanParameterDefinition><name>CO_EPP_ALLOW_PRIMARY_MARKETING</name><description>Operator-authorized required CO EPP S2 QA FIRST marketing consent; unused in other markets</description><defaultValue>true</defaultValue></hudson.model.BooleanParameterDefinition><hudson.model.BooleanParameterDefinition><name>ALLOW_PAYMENT_SUBMIT</name><description>Authorize new single-shot staging orders</description><defaultValue>true</defaultValue></hudson.model.BooleanParameterDefinition><hudson.model.StringParameterDefinition><name>P1_TARGET_IDS</name><description>Optional official EPP SAM IDs</description><defaultValue></defaultValue><trim>true</trim></hudson.model.StringParameterDefinition></parameterDefinitions></hudson.model.ParametersDefinitionProperty></properties>${definition.replace('<scriptPath>Jenkinsfile</scriptPath>','<scriptPath>Jenkinsfile.epp</scriptPath>')}<triggers/><disabled>false</disabled></flow-definition>`;
 }
 function credentialXml(market,policy){

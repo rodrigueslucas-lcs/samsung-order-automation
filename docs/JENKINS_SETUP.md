@@ -98,7 +98,7 @@ Recommended: Pipeline or Multibranch Pipeline from SCM.
 Repository:
 
 ```text
-rodrigueslucas-lcs/samsung-order-automation
+https://code.sdsdev.co.kr/lucas-afonso/samsung-smb-qa-automation.git
 ```
 
 Script path:
@@ -107,13 +107,20 @@ Script path:
 Jenkinsfile
 ```
 
-Current development branch:
+Branch:
 
 ```text
-agent/mx-qst-p1-finish
+<approved-corporate-branch>
 ```
 
 ## Execution parameters
+
+Use the branch approved for the corporate checkout. Base Store and EPP pipelines
+use Jenkins `checkout scm`; repository access is configured on the job with the
+approved corporate credential. EPP provisioning preserves the Base Store SCM
+definition, including its branch and credential reference. No personal repository,
+additional Git remote or repository-synchronization tool is required to install
+the project, run local QA or execute these pipelines.
 
 ### MARKET / ENVIRONMENT
 

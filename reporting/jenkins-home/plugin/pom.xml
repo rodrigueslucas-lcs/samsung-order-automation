@@ -12,7 +12,7 @@
   <version>2.0.0</version>
   <packaging>hpi</packaging>
   <name>Samsung SMB QA Control Center</name>
-  <url>https://github.com/rodrigueslucas-lcs/samsung-order-automation</url>
+  <url>https://code.sdsdev.co.kr/lucas-afonso/samsung-smb-qa-automation</url>
   <licenses>
     <license>
       <name>Internal QA tooling</name>
@@ -20,9 +20,9 @@
     </license>
   </licenses>
   <scm>
-    <connection>scm:git:https://github.com/rodrigueslucas-lcs/samsung-order-automation.git</connection>
-    <developerConnection>scm:git:https://github.com/rodrigueslucas-lcs/samsung-order-automation.git</developerConnection>
-    <url>https://github.com/rodrigueslucas-lcs/samsung-order-automation</url>
+    <connection>scm:git:https://code.sdsdev.co.kr/lucas-afonso/samsung-smb-qa-automation.git</connection>
+    <developerConnection>scm:git:https://code.sdsdev.co.kr/lucas-afonso/samsung-smb-qa-automation.git</developerConnection>
+    <url>https://code.sdsdev.co.kr/lucas-afonso/samsung-smb-qa-automation</url>
   </scm>
   <properties>
     <jenkins.version>2.568.3</jenkins.version>

@@ -132,7 +132,7 @@ pipeline {
           env.GIT_COMMIT = isUnix()
             ? sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
             : bat(script: '@git rev-parse HEAD', returnStdout: true).trim()
-          env.GIT_BRANCH = env.BRANCH_NAME ?: 'agent/mx-qst-p1-finish'
+          env.GIT_BRANCH = env.BRANCH_NAME ?: env.GIT_BRANCH ?: "detached@${env.GIT_COMMIT.take(10)}"
           echo " Runtime ref  : ${env.GIT_BRANCH} @ ${env.GIT_COMMIT.take(10)}"
         }
       }
