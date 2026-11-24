@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Samsung LATAM SMB QA automation, governance and CI reporting platform",
   "scripts": {
+    "git:sync:samsung": "node scripts/sync-samsung-repository.cjs",
     "repo:architecture:validate": "node scripts/validate-repository-architecture.cjs && node scripts/validate-test-mirrors.cjs",
     "repo:legacy:audit": "node scripts/audit-legacy-boundaries.cjs",
     "repo:legacy:audit:strict": "node scripts/audit-legacy-boundaries.cjs --strict",
