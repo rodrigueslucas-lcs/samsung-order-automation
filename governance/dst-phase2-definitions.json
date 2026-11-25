@@ -1,0 +1,421 @@
+{
+  "schemaVersion": 1,
+  "phase": 2,
+  "phase1Commit": "24344554d3381b4e5e6650dcffccb060017ef0e3",
+  "officialScenarioCount": 362,
+  "p1": 144,
+  "p2": 218,
+  "connector": {
+    "status": "USER_NOT_LOGGED_IN",
+    "checkedOn": "2026-11-25"
+  },
+  "sourcePolicy": "Exact SAM ID, supplied workbook cells and current DST source crosswalk. Historic PASS is never imported as runtime PASS. Original workbooks unchanged.",
+  "exportCoverage": {
+    "kind": "QST_P1_FIELD_EXPORTS",
+    "marketRows": {
+      "MX": 37,
+      "PE": 34,
+      "CO": 35,
+      "CL": 38
+    },
+    "total": 144,
+    "p2DefinitionsAvailable": 0
+  },
+  "cases": [
+    {
+      "id": "SAM-25081",
+      "market": "PE",
+      "store": "BASE_STORE",
+      "priority": "P1",
+      "sourceRowKey": "PE-BASE_STORE-28",
+      "scenario": "User is able to click on checkout button on cart page",
+      "officialScopeSource": "docs/smb_priority_templates/STG-PE-Smoke-Test-Template.md",
+      "identitySource": "utils/officialRowEvidence.js",
+      "definitionStatus": "OFFLINE_FIELDS_AVAILABLE",
+      "sourceAuthority": "OPERATOR_SUPPLIED_OFFLINE_ZEPHYR_FIELDS",
+      "connectorVerified": false,
+      "source": {
+        "file": "Samsung_PE_QST_34_TCs_Detalhados (1).xlsx",
+        "sha256": "5e1197b3968286a7e2bb586fe0cc02808373d41e8e343f09296d56e95d9ca3c9",
+        "sheet": "PE_QST_34",
+        "range": "A22:J22",
+        "cells": {
+          "ID": "A22",
+          "Description": "G22",
+          "Test Step": "H22",
+          "Test Data / Preconditions": "I22",
+          "Expected Result": "J22"
+        }
+      },
+      "fields": {
+        "description": "User is able to click on checkout button on cart page",
+        "steps": "Add any product to cart goto checkout page",
+        "preconditions": "Pre Requisite:\n1) Base store is accessible.\n2) PLP is accessible.\n3) User is on cart page\n4) Any guest/registered user",
+        "expectedResults": "User should able to click on checkout button on cart page and should navigate to checkout page"
+      },
+      "historicalStatus": "PASS",
+      "historicalStatusIsRuntimeEvidence": false,
+      "csvCorroboration": {
+        "file": "PE_QST_34.csv",
+        "record": 125,
+        "fieldsMatch": true
+      },
+      "definitionGaps": [],
+      "additionalPhase1Requirements": []
+    },
+    {
+      "id": "SAM-25065",
+      "market": "PE",
+      "store": "BASE_STORE",
+      "priority": "P1",
+      "sourceRowKey": "PE-BASE_STORE-12",
+      "scenario": "RW text is displayed properly on cart/ checkout/ payment page",
+      "officialScopeSource": "docs/smb_priority_templates/STG-PE-Smoke-Test-Template.md",
+      "identitySource": "utils/officialRowEvidence.js",
+      "definitionStatus": "OFFLINE_FIELDS_AVAILABLE",
+      "sourceAuthority": "OPERATOR_SUPPLIED_OFFLINE_ZEPHYR_FIELDS",
+      "connectorVerified": false,
+      "source": {
+        "file": "Samsung_PE_QST_34_TCs_Detalhados (1).xlsx",
+        "sha256": "5e1197b3968286a7e2bb586fe0cc02808373d41e8e343f09296d56e95d9ca3c9",
+        "sheet": "PE_QST_34",
+        "range": "A29:J29",
+        "cells": {
+          "ID": "A29",
+          "Description": "G29",
+          "Test Step": "H29",
+          "Test Data / Preconditions": "I29",
+          "Expected Result": "J29"
+        }
+      },
+      "fields": {
+        "description": "RW text is displayed properly on cart/ checkout/ payment page",
+        "steps": "Add any product to cart",
+        "preconditions": "Pre Requisite:\n1) Base store is accessible.\n2) PLP is accessible.\n3) User is on cart page\n4) Any guest/registered user",
+        "expectedResults": "User is able to see RW text and tooltip text on cart/ checkout/ payment page."
+      },
+      "historicalStatus": "PASS",
+      "historicalStatusIsRuntimeEvidence": false,
+      "csvCorroboration": {
+        "file": "PE_QST_34.csv",
+        "record": 118,
+        "fieldsMatch": true
+      },
+      "definitionGaps": [],
+      "additionalPhase1Requirements": [
+        "Visible Rewards tooltip text on cart, checkout and payment"
+      ]
+    },
+    {
+      "id": "SAM-25064",
+      "market": "PE",
+      "store": "BASE_STORE",
+      "priority": "P1",
+      "sourceRowKey": "PE-BASE_STORE-11",
+      "scenario": "The order summary is displayed on the right side<br>Coupon code field, View Avaialble coupon<br>Order Summary (Subtotal, Total savings)<br>Total<br>Info text",
+      "officialScopeSource": "docs/smb_priority_templates/STG-PE-Smoke-Test-Template.md",
+      "identitySource": "utils/officialRowEvidence.js",
+      "definitionStatus": "OFFLINE_FIELDS_AVAILABLE",
+      "sourceAuthority": "OPERATOR_SUPPLIED_OFFLINE_ZEPHYR_FIELDS",
+      "connectorVerified": false,
+      "source": {
+        "file": "Samsung_PE_QST_34_TCs_Detalhados (1).xlsx",
+        "sha256": "5e1197b3968286a7e2bb586fe0cc02808373d41e8e343f09296d56e95d9ca3c9",
+        "sheet": "PE_QST_34",
+        "range": "A30:J30",
+        "cells": {
+          "ID": "A30",
+          "Description": "G30",
+          "Test Step": "H30",
+          "Test Data / Preconditions": "I30",
+          "Expected Result": "J30"
+        }
+      },
+      "fields": {
+        "description": "The order summary is displayed on the right side\nCoupon code field, View Avaialble coupon\nOrder Summary (Subtotal, Total savings)\nTotal\nInfo text",
+        "steps": "Check the order summary on cart page",
+        "preconditions": "Pre Requisite:\n1) Base store is accessible.\n2) PLP is accessible.\n3) User is on cart page\n4) Any guest/registered user",
+        "expectedResults": "User should be able to see the order summary section on the right side and all the details present is correct\nCoupon code field, View Avaialble coupon\nOrder Summary (Subtotal, Total savings)\nTotal\nInfo text"
+      },
+      "historicalStatus": "PASS",
+      "historicalStatusIsRuntimeEvidence": false,
+      "csvCorroboration": {
+        "file": "PE_QST_34.csv",
+        "record": 117,
+        "fieldsMatch": true
+      },
+      "definitionGaps": [],
+      "additionalPhase1Requirements": []
+    },
+    {
+      "id": "SAM-24988",
+      "market": "MX",
+      "store": "BASE_STORE",
+      "priority": "P1",
+      "sourceRowKey": "MX-BASE_STORE-28",
+      "scenario": "User is able to click on checkout button on cart page",
+      "officialScopeSource": "docs/smb_priority_templates/STG-MX-Smoke-Test-Template.md",
+      "identitySource": "utils/officialRowEvidence.js",
+      "definitionStatus": "OFFLINE_FIELDS_AVAILABLE",
+      "sourceAuthority": "OPERATOR_SUPPLIED_OFFLINE_ZEPHYR_FIELDS",
+      "connectorVerified": false,
+      "source": {
+        "file": "Samsung_MX_QST_37_TCs_Detalhados.xlsx",
+        "sha256": "5ec4fc42801f468b2b562cac0e11deacb12975805543365e58031096ec37ef50",
+        "sheet": "MX_QST_37",
+        "range": "A26:I26",
+        "cells": {
+          "ID": "A26",
+          "Description": "F26",
+          "Test Step": "G26",
+          "Test Data / Preconditions": "H26",
+          "Expected Result": "I26"
+        }
+      },
+      "fields": {
+        "description": "User is able to click on checkout button on cart page",
+        "steps": "Add any product to cart goto checkout page",
+        "preconditions": "Pre Requisite:\n1) Base store is accessible.\n2) PLP is accessible.\n3) User is on cart page\n4) Any guest/registered user",
+        "expectedResults": "User should able to click on checkout button on cart page and should navigate to checkout page"
+      },
+      "historicalStatus": "PASS",
+      "historicalStatusIsRuntimeEvidence": false,
+      "csvCorroboration": {
+        "file": "PE_QST_34.csv",
+        "record": 87,
+        "fieldsMatch": true
+      },
+      "definitionGaps": [],
+      "additionalPhase1Requirements": []
+    },
+    {
+      "id": "SAM-24972",
+      "market": "MX",
+      "store": "BASE_STORE",
+      "priority": "P1",
+      "sourceRowKey": "MX-BASE_STORE-12",
+      "scenario": "' The user is able to Increase/decrease/delete the quantity",
+      "officialScopeSource": "docs/smb_priority_templates/STG-MX-Smoke-Test-Template.md",
+      "identitySource": "utils/officialRowEvidence.js",
+      "definitionStatus": "OFFLINE_FIELDS_AVAILABLE",
+      "sourceAuthority": "OPERATOR_SUPPLIED_OFFLINE_ZEPHYR_FIELDS",
+      "connectorVerified": false,
+      "source": {
+        "file": "Samsung_MX_QST_37_TCs_Detalhados.xlsx",
+        "sha256": "5ec4fc42801f468b2b562cac0e11deacb12975805543365e58031096ec37ef50",
+        "sheet": "MX_QST_37",
+        "range": "A32:I32",
+        "cells": {
+          "ID": "A32",
+          "Description": "F32",
+          "Test Step": "G32",
+          "Test Data / Preconditions": "H32",
+          "Expected Result": "I32"
+        }
+      },
+      "fields": {
+        "description": "The user is able to Increase/decrease/delete the quantity",
+        "steps": "Increase/decrease/delete the product quantity",
+        "preconditions": "Pre Requisite:\n1) Base store is accessible.\n2) PLP is accessible.\n3) User is on cart page\n4) Any guest/registered user",
+        "expectedResults": "User should be able to Increase/decrease/delete the particular product"
+      },
+      "historicalStatus": "PASS",
+      "historicalStatusIsRuntimeEvidence": false,
+      "csvCorroboration": {
+        "file": "PE_QST_34.csv",
+        "record": 81,
+        "fieldsMatch": true
+      },
+      "definitionGaps": [],
+      "additionalPhase1Requirements": []
+    },
+    {
+      "id": "SAM-24971",
+      "market": "MX",
+      "store": "BASE_STORE",
+      "priority": "P1",
+      "sourceRowKey": "MX-BASE_STORE-11",
+      "scenario": "The cart page is displayed properly<br>-SKU name<br>-Item Price<br>-Product thumbnail<br>-Available services (if any)<br>-Order summary<br>-Info icons<br>-Footer section",
+      "officialScopeSource": "docs/smb_priority_templates/STG-MX-Smoke-Test-Template.md",
+      "identitySource": "utils/officialRowEvidence.js",
+      "definitionStatus": "OFFLINE_FIELDS_AVAILABLE",
+      "sourceAuthority": "OPERATOR_SUPPLIED_OFFLINE_ZEPHYR_FIELDS",
+      "connectorVerified": false,
+      "source": {
+        "file": "Samsung_MX_QST_37_TCs_Detalhados.xlsx",
+        "sha256": "5ec4fc42801f468b2b562cac0e11deacb12975805543365e58031096ec37ef50",
+        "sheet": "MX_QST_37",
+        "range": "A33:I33",
+        "cells": {
+          "ID": "A33",
+          "Description": "F33",
+          "Test Step": "G33",
+          "Test Data / Preconditions": "H33",
+          "Expected Result": "I33"
+        }
+      },
+      "fields": {
+        "description": "The cart page is displayed properly\n-SKU name\n-Item Price\n-Product thumbnail\n-Available services (if any)\n-Order summary\n-Info icons\n-Footer section",
+        "steps": "Cart page is displayed properly",
+        "preconditions": "Pre Requisite:\n1) Base store is accessible.\n2) User is able to add a product to cart.\n3) Any guest user/Register user",
+        "expectedResults": "Cart page should displayed properly\n-SKU name\n-Item Price\n-Product thumbnail\n-Available services (if any)\n-Order summary\n-Info icons\n-Footer section"
+      },
+      "historicalStatus": "PASS",
+      "historicalStatusIsRuntimeEvidence": false,
+      "csvCorroboration": {
+        "file": "PE_QST_34.csv",
+        "record": 80,
+        "fieldsMatch": true
+      },
+      "definitionGaps": [],
+      "additionalPhase1Requirements": []
+    },
+    {
+      "id": "SAM-24969",
+      "market": "MX",
+      "store": "BASE_STORE",
+      "priority": "P1",
+      "sourceRowKey": "MX-BASE_STORE-9",
+      "scenario": "Able to add product to the cart from BC Page",
+      "officialScopeSource": "docs/smb_priority_templates/STG-MX-Smoke-Test-Template.md",
+      "identitySource": "utils/officialRowEvidence.js",
+      "definitionStatus": "OFFLINE_FIELDS_AVAILABLE",
+      "sourceAuthority": "OPERATOR_SUPPLIED_OFFLINE_ZEPHYR_FIELDS",
+      "connectorVerified": false,
+      "source": {
+        "file": "Samsung_MX_QST_37_TCs_Detalhados.xlsx",
+        "sha256": "5ec4fc42801f468b2b562cac0e11deacb12975805543365e58031096ec37ef50",
+        "sheet": "MX_QST_37",
+        "range": "A34:I34",
+        "cells": {
+          "ID": "A34",
+          "Description": "F34",
+          "Test Step": "G34",
+          "Test Data / Preconditions": "H34",
+          "Expected Result": "I34"
+        }
+      },
+      "fields": {
+        "description": "Able to add product to the cart from BC Page",
+        "steps": "Click on any product from PLP and navigate to PDP page and select variant product:\n1. Add to cart button\n2. Price\n3. colour",
+        "preconditions": "Pre Requisite:\n1) Base store is accessible.\n2) PLP is accessible.\n3) Any guest/registered user",
+        "expectedResults": "User should be able to add product to cart"
+      },
+      "historicalStatus": "PASS",
+      "historicalStatusIsRuntimeEvidence": false,
+      "csvCorroboration": {
+        "file": "PE_QST_34.csv",
+        "record": 79,
+        "fieldsMatch": true
+      },
+      "definitionGaps": [],
+      "additionalPhase1Requirements": [
+        "BC/PDP price and colour attributes from the official Test Step"
+      ]
+    },
+    {
+      "id": "SAM-24920",
+      "market": "CO",
+      "store": "BASE_STORE",
+      "priority": "P1",
+      "sourceRowKey": "CO-BASE_STORE-45",
+      "scenario": "BO is working fine (able to search the order/product by basic/advance search)",
+      "officialScopeSource": "docs/smb_priority_templates/STG-CO-Smoke-Test-Template.md",
+      "identitySource": "utils/officialRowEvidence.js",
+      "definitionStatus": "OFFLINE_FIELDS_AVAILABLE",
+      "sourceAuthority": "OPERATOR_SUPPLIED_OFFLINE_ZEPHYR_FIELDS",
+      "connectorVerified": false,
+      "source": {
+        "file": "Samsung_CO_QST_35_TCs_Detalhados.xlsx",
+        "sha256": "b2518547a16c5cd4d174bf4e5977ae4835fc564e9f2d0b0b841abcdb9dd6bcdf",
+        "sheet": "CO_QST_35",
+        "range": "A9:J9",
+        "cells": {
+          "ID": "A9",
+          "Description": "G9",
+          "Test Step": "H9",
+          "Test Data / Preconditions": "I9",
+          "Expected Result": "J9"
+        }
+      },
+      "fields": {
+        "description": "BO is working fine (able to search the order/product by basic/advance search)",
+        "steps": "Able to search orders in BO",
+        "preconditions": "Pre Requisite:\n1) Base store is accessible.\n2) User is able to add a product to cart.\n3) User is on payment page\n4) Any guest/Registered user",
+        "expectedResults": "BO should work fine (able to search the order/product by basic/advance search)"
+      },
+      "historicalStatus": "PASS",
+      "historicalStatusIsRuntimeEvidence": false,
+      "csvCorroboration": {
+        "file": "PE_QST_34.csv",
+        "record": 67,
+        "fieldsMatch": true
+      },
+      "definitionGaps": [],
+      "additionalPhase1Requirements": [],
+      "preconditionClarification": {
+        "originalTextPreserved": true,
+        "operatorAnswer": "É texto genérico do export",
+        "appliesTo": "Customer checkout/payment precondition template; BackOffice search is read-only.",
+        "recordedOn": "2026-11-25"
+      },
+      "operationalPreconditions": [
+        "Environment-scoped BackOffice Admin access",
+        "Existing market order and configured existing product; no creation",
+        "Basic and advanced search for both order and product"
+      ]
+    },
+    {
+      "id": "SAM-24830",
+      "market": "CL",
+      "store": "BASE_STORE",
+      "priority": "P1",
+      "sourceRowKey": "CL-BASE_STORE-48",
+      "scenario": "BO is working fine (able to search the order/product by basic/advance search)",
+      "officialScopeSource": "docs/smb_priority_templates/STG-CL-Smoke-Test-Template.md",
+      "identitySource": "utils/officialRowEvidence.js",
+      "definitionStatus": "OFFLINE_FIELDS_AVAILABLE",
+      "sourceAuthority": "OPERATOR_SUPPLIED_OFFLINE_ZEPHYR_FIELDS",
+      "connectorVerified": false,
+      "source": {
+        "file": "Samsung_CL_QST_38_TCs_Detalhados.xlsx",
+        "sha256": "fa275fe9d4dde6b21047212c978456abc17e86f635b4d791ff5e7c556925026f",
+        "sheet": "CL_QST_38",
+        "range": "A10:J10",
+        "cells": {
+          "ID": "A10",
+          "Description": "G10",
+          "Test Step": "H10",
+          "Test Data / Preconditions": "I10",
+          "Expected Result": "J10"
+        }
+      },
+      "fields": {
+        "description": "BO is working fine (able to search the order/product by basic/advance search)",
+        "steps": "Able to search orders in BO",
+        "preconditions": "Pre Requisite:\n1) Base store is accessible.\n2) User is able to add a product to cart.\n3) User is on payment page\n4) Any guest/Registered user",
+        "expectedResults": "BO should work fine (able to search the order/product by basic/advance search)"
+      },
+      "historicalStatus": "PASS",
+      "historicalStatusIsRuntimeEvidence": false,
+      "csvCorroboration": {
+        "file": "PE_QST_34.csv",
+        "record": 31,
+        "fieldsMatch": true
+      },
+      "definitionGaps": [],
+      "additionalPhase1Requirements": [],
+      "preconditionClarification": {
+        "originalTextPreserved": true,
+        "operatorAnswer": "É texto genérico do export",
+        "appliesTo": "Customer checkout/payment precondition template; BackOffice search is read-only.",
+        "recordedOn": "2026-11-25"
+      },
+      "operationalPreconditions": [
+        "Environment-scoped BackOffice Admin access",
+        "Existing market order and configured existing product; no creation",
+        "Basic and advanced search for both order and product"
+      ]
+    }
+  ]
+}

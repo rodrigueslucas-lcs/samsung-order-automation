@@ -13,7 +13,7 @@ async function installPilotSafety(page, testInfo, id, environment) {
   // calls for this pilot page so previous QST/legacy artifacts remain intact.
   const screenshot = page.screenshot.bind(page);
   page.screenshot = options => screenshot(pilotScreenshotOptions(options, testInfo));
-  testInfo.annotations.push({ type: 'official-definition-gap', description: 'Current source contains scenario text only; formal preconditions/steps/expected results remain unverified.' });
+  testInfo.annotations.push({ type: 'official-definition-source', description: 'Offline operator-supplied Zephyr fields are cross-referenced in governance/dst-phase2-definitions.json. Historic export PASS is not runtime evidence.' });
   const guard = async route => {
     const request = route.request();
     if (isFinancialSubmission(request.method(), request.url())) {

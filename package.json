@@ -126,7 +126,13 @@
     "auth:keepalive:epp:install": "node scripts/auth-epp-keepalive-task.cjs --install",
     "auth:operations:resource:check": "node scripts/auth-operations-resource.cjs",
     "dst:pilot": "node scripts/run-dst-pilot.cjs",
-    "dst:pilot:gate": "node --test governance/tests/dstPilot.test.cjs"
+    "dst:pilot:gate": "node --test governance/tests/dstPilot.test.cjs",
+    "dst:run": "node scripts/run-dst.cjs",
+    "dst:mx": "node scripts/run-dst.cjs MX",
+    "dst:pe": "node scripts/run-dst.cjs PE",
+    "dst:co": "node scripts/run-dst.cjs CO",
+    "dst:cl": "node scripts/run-dst.cjs CL",
+    "dst:phase2:gate": "node --test governance/tests/dstPhase2.test.cjs"
   },
   "keywords": [
     "playwright",

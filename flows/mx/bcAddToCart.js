@@ -190,6 +190,7 @@ export async function addMxBcProductToCart(testInfo, options = {}) {
       // before configuring services. Never substitute another product.
       variantEvidence = await bcVariant.selectMxBcVariant(page, PRE_QA_MODEL_CODE);
       await expect(preQaAddToCart(page)).toHaveAttribute("data-modelcode", PRE_QA_MODEL_CODE);
+      await options.validatePdpAttributes?.(page, PRE_QA_MODEL_CODE);
     });
 
     let addResponse;

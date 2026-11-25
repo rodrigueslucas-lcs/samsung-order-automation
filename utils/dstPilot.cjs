@@ -1,9 +1,10 @@
 const fs = require('node:fs');
 const crypto = require('node:crypto');
 const registry = require('../governance/dst-pilot.json');
+const phase2 = require('../governance/dst-phase2-pilot.json');
 
 function pilotCase(id) {
-  const entry = registry.cases.find(entry => entry.id === id);
+  const entry = phase2.cases.find(entry => entry.id === id) || registry.cases.find(entry => entry.id === id);
   if (!entry) throw new Error(`DST_PILOT_UNKNOWN_ID: ${id}`);
   return entry;
 }

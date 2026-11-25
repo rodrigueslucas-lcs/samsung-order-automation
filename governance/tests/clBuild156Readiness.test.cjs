@@ -18,9 +18,10 @@ test('Products navigation completes its AU before accessing the replacement sear
   const Catalog = load('pages/BackOfficeCatalogPage.js', 'BackOfficeCatalogPage',
     { BackOfficePage: class {}, expect: {} });
   const catalog = Object.create(Catalog.prototype);
-  catalog.page = { getByRole: () => row, getByPlaceholder: () => ({
+  catalog.page = { getByRole: () => row, locator: () => ({ first() { return this; },
+    waitFor: async () => { assert.equal(ready, true); throw new Error('Advanced mode is not rendered in this basic-mode fixture'); } }), getByPlaceholder: () => ({
     filter() { return this; }, last() { assert.equal(ready, true); return this; },
-    waitFor: async () => events.push('toolbar') }) };
+    isVisible: async () => true, waitFor: async () => events.push('toolbar') }) };
   catalog.waitForZkUpdate = async action => { await action(); ready = true; events.push('AU-complete'); };
   await catalog.openAdminProducts();
   assert.deepEqual(events, ['navigate', 'AU-complete', 'toolbar']);

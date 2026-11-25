@@ -25,6 +25,8 @@ DST is being reconciled against the current 362-scenario official catalog. Histo
 
 Only explicit pilot IDs are accepted by `npm run dst:pilot -- MX|PE`. The pilot disables payment submission and retries, preserves existing authentication, and writes separate artifacts. It does not launch a full DST campaign or configure Jenkins jobs.
 
+Phase 2 adds detailed offline definition checks, Rewards tooltip assertions and read-only CO/CL BackOffice pilots. Use `npm run dst:co -- --store BASE_STORE --priority P1 --ids SAM-24920` (or `dst:mx`, `dst:pe`, `dst:cl` with their approved IDs); add `--list` for non-destructive discovery. See [Phase 2 sources, results, blockers and Jenkins preparation](docs/DST_PHASE2_VALIDATION.md). These targeted commands do not run full DST campaigns.
+
 ## Project snapshot
 
 ### Supported markets
@@ -90,8 +92,8 @@ tests/
 | --- | --- |
 | MX | `dst/base-store/`, `dst/backoffice/` |
 | PE | `dst/base-store/`, `dst/epp/`, `dst/backoffice/` |
-| CO | No DST test directory yet (`dst/README.md` only) |
-| CL | No DST test directory yet (`dst/README.md` only) |
+| CO | `dst/base-store/` — targeted read-only BackOffice pilot only |
+| CL | `dst/base-store/` — targeted read-only BackOffice pilot only |
 
 The long-term convention for any new DST coverage is likewise `tests/markets/<market>/dst/<store-or-domain>/`. **Do not create empty folders or claim coverage simply to make the tree visually symmetric.** The QST paths above are backed by existing test files for all four markets.
 

@@ -19,11 +19,18 @@ export default class BackOfficeCatalogPage extends BackOfficePage {
     // Do not fill/click that stale toolbar before the navigation AU finishes.
     await this.waitForZkUpdate(() => productRow.click());
 
-    await this.page
-      .getByPlaceholder("Type to search", { exact: true })
-      .filter({ visible: true })
-      .last()
-      .waitFor({ state: "visible", timeout: 30000 });
+    // Search mode survives navigation between Orders and Products.
+    const basic = this.page.getByPlaceholder("Type to search", { exact: true }).filter({ visible: true }).last();
+    const advanced = this.page.locator(".yw-advancedsearch:visible").first();
+    await Promise.any([
+      basic.waitFor({ state: "visible", timeout: 30000 }),
+      advanced.waitFor({ state: "visible", timeout: 30000 }),
+    ]);
+    if (!(await basic.isVisible())) {
+      const toggle = this.page.locator('button.yw-toggle-advanced-search[title="Switch search mode"]:visible').first();
+      await this.waitForZkUpdate(() => toggle.click());
+      await basic.waitFor({ state: "visible", timeout: 30000 });
+    }
   }
 
   async searchAdminProductBasic(productCode) {

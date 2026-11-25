@@ -4,6 +4,7 @@ import { verifyExistingPeIdentity } from '../../../../../flows/pe/existingIdenti
 import { reachPeRegisteredPayment } from '../../../../../flows/pe/storefrontCheckout';
 import assertions from '../../../../../flows/smb/dstCartAssertions';
 import safety from '../../../../../flows/smb/dstPilotSafety';
+import evidenceContext from '../../../../../reporting/evidence/evidenceContext';
 
 test('SAM-25065 @dst @pe @base-store @pilot @registered - Rewards on cart checkout and payment', async ({ page }, testInfo) => {
   test.setTimeout(420000);
@@ -13,7 +14,8 @@ test('SAM-25065 @dst @pe @base-store @pilot @registered - Rewards on cart checko
   await verifyExistingPeIdentity(page, config);
   const observed = [];
   await reachPeRegisteredPayment(page, config, { observeStage: async (stage, target) => {
-    await test.step(`Validate Rewards text on ${stage}`, () => assertions.validateRewardsText(target, stage));
+    const proof = await test.step(`Validate Rewards text and hovered tooltip on ${stage}`, () => assertions.validateRewardsText(target, stage));
+    evidenceContext.recordBusinessEvidence(testInfo, { suite: 'DST', market: 'PE', zephyrId: 'SAM-25065', ...proof });
     observed.push(stage);
   } });
   if (observed.join(',') !== 'cart,checkout,payment') throw new Error('DST_REWARDS_STAGE_MISSING');

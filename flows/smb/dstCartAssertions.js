@@ -45,9 +45,24 @@ async function validatePeDstSummary(page, cart) {
 }
 
 async function validateRewardsText(page, stage) {
-  const text = page.getByRole('main').getByText(/Samsung Rewards|Rewards|puntos/i).filter({ visible: true }).first();
+  const panel = page.locator('.summary-rewards-benefit').filter({ visible: true }).first();
+  const text = panel.getByText(/Gana.*puntos.*Samsung Rewards/i).first();
   await expect(text, `Rewards text on ${stage}`).toBeVisible({ timeout: 30000 });
-  expect((await text.innerText()).trim().length).toBeGreaterThan(0);
+  // Observed native structures differ: Cart uses delivery-info-tooltip;
+  // Checkout uses order-summary-reward-tooltip inside the same Rewards panel.
+  const trigger = panel.locator('.delivery-info-tooltip, .order-summary-reward-tooltip');
+  await expect(trigger, `Rewards tooltip trigger on ${stage}`).toBeVisible();
+  await trigger.hover();
+  const tooltip = page.getByRole('tooltip').filter({ visible: true });
+  await expect(tooltip, `Rendered Rewards tooltip on ${stage}`).toBeVisible();
+  // The export requires meaningful tooltip text, but does not prescribe copy.
+  // Prove Rewards membership/points content, not the static disclaimer or SVG title.
+  await expect(tooltip).toContainText(/Rewards/i);
+  await expect(tooltip).toContainText(/puntos|miembro|inscrib/i);
+  const tooltipText = (await tooltip.innerText()).trim();
+  expect(tooltipText.length).toBeGreaterThan(20);
+  await page.mouse.move(0, 0);
+  return { stage, rewardsText: (await text.innerText()).trim(), tooltipText };
 }
 
 module.exports = { validateMxDstCart, validatePeDstSummary, validateRewardsText };
