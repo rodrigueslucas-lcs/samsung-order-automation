@@ -39,7 +39,7 @@ test("SAM-24964 @qst @mx @base-store @safe - Store GNB matches Samsung.com", asy
       await dismissLocationBanner(page);
 
       if (/\/apps\/samsung\/login\//i.test(page.url())) {
-        throw new Error(`The Chrome attached at ${PRE_QA_CDP_URL} is not authenticated for PreQA2.`);
+        throw new Error(`PREQA_AUTH_REQUIRED: The Chrome attached at ${PRE_QA_CDP_URL} is not authenticated for PreQA2.`);
       }
       await expect(page).toHaveURL(new RegExp("p6-pre-qa2\\.samsung\\.com/mx/?", "i"), { timeout: 30000 });
 
@@ -98,7 +98,7 @@ test("SAM-24968 @qst @mx @base-store @safe - PLP facets are displayed and filter
       await dismissLocationBanner(page);
 
       if (/\/apps\/samsung\/login\//i.test(page.url())) {
-        throw new Error(`The Chrome attached at ${PRE_QA_CDP_URL} is not authenticated for PreQA2.`);
+        throw new Error(`PREQA_AUTH_REQUIRED: The Chrome attached at ${PRE_QA_CDP_URL} is not authenticated for PreQA2.`);
       }
 
       const resultCount = page.getByText(/\d+\s*Resultado/i).first();

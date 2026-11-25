@@ -2,6 +2,21 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const { buildMxQstRuntimeSummary, safeArtifact } = require("../../utils/mxQstRuntimeSummary.cjs");
 
+test('late WMC expiration blocks only the three PreQA cases and preserves raw failed evidence', () => {
+  const cases = ['SAM-24964', 'SAM-24968', 'SAM-24969', 'SAM-24995'];
+  const report = { suites: [{ specs: cases.map(id => ({ title: id, tests: [{ results: [{ status: 'failed', errors: [{ message: 'PREQA_AUTH_REQUIRED: The Chrome attached at http://127.0.0.1:9223 is not authenticated for PreQA2.' }] }] }] })) }] };
+  const result = buildMxQstRuntimeSummary(report, { officialIds: cases, environment: 'S2/STG2' });
+  assert.deepEqual(result.tests.map(row => row.status), ['SKIPPED-BLOCKED', 'SKIPPED-BLOCKED', 'SKIPPED-BLOCKED', 'FAIL']);
+  assert.equal(result.tests[0].failureType, 'AUTH_BLOCKED');
+  assert.equal(report.suites[0].specs[0].tests[0].results[0].status, 'failed');
+  report.suites[0].specs[1].tests[0].results[0].errors.push({ message: 'locator: unexpected GNB validation failure' });
+  assert.equal(buildMxQstRuntimeSummary(report, { officialIds: cases }).tests[1].status, 'FAIL', 'an unrelated failure must not be hidden by an auth gate');
+  report.suites[0].specs[1].tests[0].results[0].errors.pop();
+  report.suites[0].specs[0].tests[0].results[0].errors[0].message = 'locator: expected the GNB mobile link to be visible';
+  assert.equal(buildMxQstRuntimeSummary(report, { officialIds: cases }).tests[0].status, 'FAIL');
+  assert.equal(buildMxQstRuntimeSummary(report, { officialIds: cases, market: 'PE' }).tests[1].status, 'FAIL');
+});
+
 test("MX failure classification ignores business metadata and distinguishes stock rejection from outages", () => {
   const cases = [
     ["SAM-1", "Configured PDP add-to-cart returned HTTP 400.", "FUNCTIONAL_FAIL"],

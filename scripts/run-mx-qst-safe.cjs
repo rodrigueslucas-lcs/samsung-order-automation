@@ -226,12 +226,13 @@ for (const target of executionArtifacts) fs.rmSync(target, { recursive: true, fo
 // the safe speed-up for stabilization work.
 const playwrightArgs = [
   playwrightCli, "test", "tests/markets/mx/qst/base-store",
+  ...(targetEnvironment === 'S2' ? ['--project=mx-preqa-priority'] : []),
   "--project=mx-auth-priority", "--project=chromium",
   "--workers=1", "--retries=0",
   "--grep", p1Pattern, "--output", path.join(artifactDir, "playwright"),
 ];
 if (!headless) playwrightArgs.push("--headed");
-console.log(`[mx-qst] Execution projects: mx-auth-priority -> chromium; workers=1; ${targetedRun ? "targeted stabilization" : "full official P1"}.`);
+console.log(`[mx-qst] Execution projects: ${targetEnvironment === 'S2' ? 'mx-preqa-priority -> ' : ''}mx-auth-priority -> chromium; workers=1; ${targetedRun ? "targeted stabilization" : "full official P1"}.`);
 
 const result = spawnSync(process.execPath, playwrightArgs, {
   env: qstExecutionEnv,

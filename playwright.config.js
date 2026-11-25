@@ -8,13 +8,16 @@ const traceAll = process.env.PW_TRACE === '1';
 const headless = process.env.MX_QST_HEADLESS === '1' ||
   (!!process.env.CI && process.env.MX_QST_HEADLESS !== '0');
 const mxOfficialP1 = process.env.TEST_MARKET === 'MX' && process.env.TEST_SUITE === 'P1/QST';
+const mxPreqaFirst = mxOfficialP1 && process.env.MX_QST_ENVIRONMENT === 'S2';
+const mxPreqaPattern = /SAM-(?:24964|24968|24969)\b/;
 const peOfficialP1 = process.env.TEST_MARKET === 'PE' && process.env.TEST_SUITE === 'P1/QST';
 const coOfficialP1 = process.env.TEST_MARKET === 'CO' && process.env.TEST_SUITE === 'P1/QST';
 const clOfficialP1 = process.env.TEST_MARKET === 'CL' && process.env.TEST_SUITE === 'P1/QST' && process.env.TEST_STORE === 'BASE_STORE';
 const { MX_BASE_P1_IDS } = mxQstScope;
 const mxActiveP1Pattern = new RegExp(`(?:${MX_BASE_P1_IDS.join('|')})\\b`);
 
-// Authenticated/registered scenarios run first for the official MX P1 campaign.
+// S2 WMC cases run immediately after preflight, before lengthy payment cases
+// consume that independent session. Registered cases retain their next priority.
 // Runtime acceptance proved the canonical market-first paths, so no legacy MX
 // compatibility matching remains.
 const mxAuthenticatedPriorityFiles = [
@@ -82,6 +85,14 @@ export default defineConfig({
 
   projects: mxOfficialP1
     ? [
+        ...(mxPreqaFirst ? [{
+          name: 'mx-preqa-priority',
+          testMatch: ['**/markets/mx/qst/base-store/bc-add-safe.spec.js', '**/markets/mx/qst/base-store/official-p1-gaps.spec.js'],
+          grep: mxPreqaPattern,
+          // Preserve the partition even when a targeted CLI --grep is supplied.
+          grepInvert: /SAM-(?!(?:24964|24968|24969)\b)\d+/,
+          use: chromiumUse
+        }] : []),
         {
           name: 'mx-auth-priority',
           testMatch: mxAuthenticatedPriorityFiles,
@@ -92,6 +103,7 @@ export default defineConfig({
           name: 'chromium',
           testIgnore: mxAuthenticatedPriorityFiles,
           grep: mxActiveP1Pattern,
+          ...(mxPreqaFirst ? { grepInvert: mxPreqaPattern } : {}),
           use: chromiumUse
         }
       ]

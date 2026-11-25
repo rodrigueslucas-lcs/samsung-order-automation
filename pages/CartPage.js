@@ -483,7 +483,7 @@ export default class CartPage extends BasePage {
       // cart. Reload once and use the same interceptor handling on retry.
       // Retry only from the cart, preserving the registered/guest mode.
       console.log(`[mx-checkout] ${registered ? 'Registered' : 'Guest'} checkout remained on cart; reloading once before retrying.`);
-      await this.page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
+      await require('../utils/mxCartCheckoutRecovery.cjs').reloadMxCartForCheckout(this.page, this.cartUrl);
       return this.clickCheckoutAndResolveInterceptors({ registered, recoverMxCart: false });
     }
 

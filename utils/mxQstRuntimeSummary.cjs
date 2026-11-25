@@ -4,6 +4,8 @@ const { execFileSync } = require("node:child_process");
 const { sanitize } = require("../reporting/evidence/sanitizer");
 
 const TERMINAL_FAILURES = new Set(["failed", "timedOut", "interrupted"]);
+const PREQA_CASES = new Set(['SAM-24964', 'SAM-24968', 'SAM-24969']);
+const PREQA_AUTH_REQUIRED = /PREQA_AUTH_REQUIRED|The Chrome attached at https?:\/\/(?:127\.0\.0\.1|localhost):\d+ is not authenticated for PreQA2\./i;
 const BLOCKED_PATTERN = /SystemParking|maintenance|auth(?:enticated)? state|credentials? (?:are|is) required|EPERM|environment prerequisite/i;
 const AUTH_FAILURE_PATTERN = /auth|session|login|logged|credential|account/i;
 const PAYMENT_OUTCOME_PATTERN = /PAYMENT_OUTCOME_UNCONFIRMED|ambiguous payment|confirmation remains unproven|existing order remains pending|do not create another order/i;
@@ -89,7 +91,9 @@ function buildMxQstRuntimeSummary(report, {
         ["skip", "qst-blocker"].includes(String(item?.type || "").toLowerCase()));
       const reason = [...blockerNotes.map((item) => item.description), ...errors].filter(Boolean).join(" | ");
       const failed = statuses.some((status) => TERMINAL_FAILURES.has(status));
-      const blocked = (statuses.length > 0 && statuses.every((status) => status === "skipped")) || (failed && BLOCKED_PATTERN.test(reason));
+      const preqaAuthBlocked = failed && market === 'MX' && samIds.every(id => PREQA_CASES.has(id)) &&
+        errors.length > 0 && errors.every(error => PREQA_AUTH_REQUIRED.test(error));
+      const blocked = (statuses.length > 0 && statuses.every((status) => status === "skipped")) || (failed && BLOCKED_PATTERN.test(reason)) || preqaAuthBlocked;
       const status = !statuses.length ? "NOT_RUN" : blocked ? "SKIPPED-BLOCKED" : failed ? "FAIL" : "PASS";
       const last = results.at(-1) || {};
       const attachments = results.flatMap((result) => result.attachments || []).map((attachment) => ({

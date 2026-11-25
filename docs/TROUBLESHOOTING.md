@@ -380,3 +380,25 @@ mismatched model still fails as `MX_BC_VARIANT_CONTROL_UNAVAILABLE`.
 The official TC retains its intended-SKU, successful native Add, exact quantity
 increase and persistence-after-reload assertions. WMC authentication alone
 does not establish that a product is selectable or was added successfully.
+
+### MX S2 Base Store build #24: three distinct failure causes
+
+Build #24 ran commit `b6ec2be` and finished with 23 PASS / 6 FAIL. Its archived
+results remain unchanged:
+
+| Cases | Observed cause | Resolution / remaining prerequisite |
+| --- | --- | --- |
+| SAM-24964, SAM-24968, SAM-24969 | WMC preflight passed at 01:47 UTC, but dependent cases started at 02:15–02:34 after long payment cases and reached the WMC login gate. | MX S2 now runs these three cases first in `mx-preqa-priority`, then the existing authenticated and Chromium projects. An actual expired WMC session still requires legitimate operator authentication. Exact auth-gate errors are reported BLOCKED; unrelated errors still FAIL. No Playwright skip or dependent-project skip is introduced. |
+| SAM-24995 | The single cart-recovery document GET waited 105,677 ms for response headers; the previous 60-second reload deadline abandoned it with an empty main. Native cart API immediately before it returned 200 in 619 ms. | Bound that existing MX S2 Base Store cart reload to 120 seconds. No extra reload or checkout click was added, and no payment is replayed. S1 retains 60 seconds; other markets and EPP are unchanged. A server exceeding the new bound still fails. |
+| SAM-25002, SAM-25010 | Submit returned business code 601 and the actual payment screen displayed an unsuccessful-transaction message, without success confirmation. Track Order failed while creating its prerequisite order, before tracking. | Requires Samsung commerce/payment-provider investigation and reconciliation before another financial submission. This is not the Cash defect or proof of a Track Order defect. HTTP success alone cannot pass payment. |
+
+Validation: SAM-24995 passed in a real S2 headless targeted execution without
+payment (`test-results/mx-build24-fix-1795616755043/results.json`). Twenty focused
+tests cover recovery/navigation/reporting, three real Playwright discovery tests
+prove 29 unique official cases and targeted/S1 isolation, and 39 reporting tests
+pass. Architecture, official scope and business-step gates pass. The 105.7-second
+incident is retained in the Jenkins trace; the bounded timing regression uses
+controlled completion rather than waiting 105 seconds in a unit test.
+
+The full 29-case Jenkins campaign was not rerun for this fix: WMC renewal and
+the rejected payment prerequisites are still distinct from automation validation.

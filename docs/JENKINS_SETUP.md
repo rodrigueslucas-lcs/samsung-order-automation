@@ -192,7 +192,7 @@ The active runner:
 
 - validates primary auth before execution;
 - validates second-account auth only when `SAM-24986` is selected;
-- executes `mx-auth-priority` before the remaining chromium project;
+- on MX S2, executes the three WMC-dependent cases in `mx-preqa-priority` immediately after preflight, then `mx-auth-priority` and the remaining chromium project; S1 preserves its authenticated-first order;
 - uses one worker and zero retries for the controlled campaign;
 - enables approved destructive flags only inside the authorized non-Production runner;
 - reconciles actual Playwright output into runtime summary/reporting.

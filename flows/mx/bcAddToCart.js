@@ -154,7 +154,7 @@ export async function addMxBcProductToCart(testInfo, options = {}) {
 
       if (/\/apps\/samsung\/login\//i.test(page.url())) {
         throw new Error(
-          `The Chrome attached at ${PRE_QA_CDP_URL} is not authenticated for PreQA2. Keep the WMC-authenticated preqa2:bootstrap Chrome open.`
+          `PREQA_AUTH_REQUIRED: The Chrome attached at ${PRE_QA_CDP_URL} is not authenticated for PreQA2. Keep the WMC-authenticated preqa2:bootstrap Chrome open.`
         );
       }
 
