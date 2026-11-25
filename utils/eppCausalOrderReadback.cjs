@@ -34,16 +34,29 @@ function createEppCausalOrderReadback(config,{read,sku,quantity=1}){
  };
  return reader;
 }
-async function createEppReadbackFromCartResponse(page,config,response){
+async function createEppReadbackFromCartResponse(page,config,response,{latestCartResponse=()=>response}={}){
  const site=config.apiSite||config.rootUrl.pathname.split('/').filter(Boolean)[2];
  const origin=`https://${config.environment.toLowerCase()}-smb-api-cdn.ecom-stg.samsung.com`;
  const url=new URL(response.url());
  if(response.request().method()!=='GET'||!response.ok()||url.origin!==origin||url.pathname!==`/tokocommercewebservices/v2/${site}/users/current/carts/current`)throw new Error('EPP order readback requires its own observed programme cart.');
- const authorization=await response.request().headerValue('authorization');
+ const mx=config.market==='MX'&&config.environment==='S2'&&config.program==='pymesmx';
  return createEppCausalOrderReadback(config,{sku:config.sku,read:async suffix=>{
-  const result=await page.context().request.get(`${origin}/tokocommercewebservices/v2/${site}${suffix}`,{headers:{origin:config.rootUrl.origin,referer:config.rootUrl.href,...(authorization?{authorization}:{})},maxRedirects:0,timeout:30000}).catch(()=>{throw new Error('EPP order readback unavailable; provider details suppressed.');});
-  if(!result.ok())throw new Error('EPP order readback not accepted.');
-  return result.json();
+  for(let attempt=0;attempt<(mx?2:1);attempt++){
+   const latest=latestCartResponse();
+   if(!latest||latest.request().method()!=='GET'||!latest.ok()||new URL(latest.url()).origin!==origin||new URL(latest.url()).pathname!==`/tokocommercewebservices/v2/${site}/users/current/carts/current`)throw new Error('EPP order readback requires its own observed programme cart.');
+   const authorization=await latest.request().headerValue('authorization');
+   let result;
+   try{result=await page.context().request.get(`${origin}/tokocommercewebservices/v2/${site}${suffix}`,{headers:{origin:config.rootUrl.origin,referer:config.rootUrl.href,...(authorization?{authorization}:{})},maxRedirects:0,timeout:mx?75000:30000});}
+   catch{
+    if(mx&&attempt===0){console.log('[epp-readback] MX programme order GET transport failed; one GET-only retry before deciding its outcome.');continue;}
+    throw new Error('EPP_ORDER_READBACK_UNAVAILABLE: order GET transport failed; provider details suppressed.');
+   }
+   if(!result.ok()){
+    if(mx&&attempt===0&&[502,503,504].includes(result.status())){console.log('[epp-readback] MX programme order GET returned a gateway error; one GET-only retry.');continue;}
+    throw new Error(`EPP_ORDER_READBACK_NOT_ACCEPTED: order GET HTTP ${result.status()}; no financial retry.`);
+   }
+   return result.json().catch(()=>{throw new Error('EPP_ORDER_READBACK_INVALID_JSON: no unproven order outcome accepted.');});
+  }
  }});
 }
 module.exports={createEppCausalOrderReadback,createEppReadbackFromCartResponse};

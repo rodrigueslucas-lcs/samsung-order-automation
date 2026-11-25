@@ -64,7 +64,7 @@ export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProvi
     if(cfg.market==='MX')await cart.validateControlledSingleSku(cfg.sku);
     if(cfg.market==='MX'&&cfg.environment==='S2'){
       if(!observedCartResponse)throw new Error('MX EPP cart evidence not observed; no unproven checkout.');
-      reconciliation=await causalReadback.createEppReadbackFromCartResponse(page,cfg,observedCartResponse);
+      reconciliation=await causalReadback.createEppReadbackFromCartResponse(page,cfg,observedCartResponse,{latestCartResponse:()=>observedCartResponse});
     }
     if(cfg.market==='PE')reconciliation=await normalizeEppPaymentCart(page,cfg,cart,{observedResponse:observedCartResponse});
     if(cfg.market==='CL'){
@@ -106,6 +106,7 @@ export async function probeEppPaymentPrerequisites(page,cfg,{kind='card',onProvi
     const offers=page.getByRole('button',{name:pattern}).filter({visible:true});
     let rendered=await offers.first().waitFor({timeout:60000}).then(()=>true,()=>false);
     if(!rendered)rendered=await paymentReadiness.recoverMxEppPaymentRead(page,offers,paymentRead);
+    if(cfg.market==='MX'&&cfg.environment==='S2')await test.info().attach('EPP payment read readiness',{body:JSON.stringify(paymentRead.snapshot()),contentType:'application/json'});
     await capture('epp-payment-provider-discovery');
     if(!rendered)return blocked('EPP_COMMERCE_NOT_RENDERED','Payment step opened, but no payment-provider controls rendered.','PAYMENT');
     const providers=await offers.evaluateAll(es=>es.map(e=>e.textContent.trim().replace(/\d{4,}/g,'[digits]').slice(0,100)));

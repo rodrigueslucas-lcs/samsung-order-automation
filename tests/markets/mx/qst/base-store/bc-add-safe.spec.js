@@ -5,6 +5,7 @@ import { test, expect } from "./mxQst.fixture";
 import preQaCustomerState from "../../../../../utils/preQaCustomerState.js";
 import bcCareChoice from "../../../../../utils/mxBcCareChoice.cjs";
 import bcCatalog from "../../../../../utils/mxBcCatalog.cjs";
+import bcVariant from "../../../../../utils/mxBcVariantReadiness.cjs";
 
 const { recordBusinessEvidence } = evidenceContext;
 const { getMxQstEvidenceMetadata } = qstEvidenceMetadata;
@@ -194,10 +195,7 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
       await expect(page.getByText(PRE_QA_PRODUCT_NAME, { exact: true }).filter({ visible: true }).first()).toBeVisible({ timeout: 60000 });
       // The catalog's family URL defaults to another color. Select the exact
       // catalog model through its rendered label before configuring services.
-      const color = page.locator(`input[name="basic-color"][data-modelcode="${PRE_QA_MODEL_CODE}"]`);
-      await color.waitFor({ state: "attached", timeout: 30000 });
-      await color.locator("xpath=..").locator("label").click();
-      await expect(color).toBeChecked();
+      await bcVariant.selectMxBcVariant(page, PRE_QA_MODEL_CODE);
       await expect(preQaAddToCart(page)).toHaveAttribute("data-modelcode", PRE_QA_MODEL_CODE);
     });
 

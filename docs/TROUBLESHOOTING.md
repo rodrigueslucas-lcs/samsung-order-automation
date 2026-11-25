@@ -318,6 +318,24 @@ use the same programme-bound ledger. Interrupted archival resumes safely.
 
 ### Selected EPP tests must expose operational failures
 
+For a controlled MX S2 `pymesmx` credit-card comparison, set
+`MX_EPP_TEST_CARD_FILE` to an approved JSON fixture below the ignored
+`playwright/.auth/epp/cards/` directory and run the normal `SAM-25045` command.
+The fixture must identify `market`, `environment`, `program`, `provider`,
+`type`, `scenario`, `brand` and a non-sensitive `id`, with its complete `card`
+fields supplied locally. The accepted context is MX/S2/pymesmx/mercadopago,
+credit/approved, with Mastercard, Visa or Amex. Other programmes/environments
+are rejected; other markets keep their existing configuration. The default
+card, contact and delivery fixtures are preserved. Reports attach only the
+fixture ID, brand and execution scope, never card values.
+
+Use the provider's current [Mexico test-card reference](https://www.mercadopago.com.mx/developers/es/docs/your-integrations/test/cards).
+Do not commit card fixtures or infer expiry/security codes. Run brand variants
+sequentially after any existing MX campaign releases its shared market lane.
+Every variant is a separate normal execution with its own outcome; an uncertain
+submission must be reconciled before trying the next card. Several declined
+cards alone do not distinguish merchant configuration from an application defect.
+
 The storefront and payment prerequisite helpers throw their concrete error code
 instead of skipping a selected TC. Missing identity, entitlement, product/contact
 data, submit authorization or reconciliation therefore produces a visible test
@@ -329,3 +347,29 @@ The exact EPP notification tutorial close uses a bounded ten-second native click
 wait so first paint/entrance animation can finish. It still requires the tutorial
 to disappear, never forces a click, and never accepts notification permission or
 closes business/payment/CAPTCHA dialogs.
+
+### MX S2 Base Store: account-menu animation and Payment readiness
+
+The account menu can retain a visible closing Angular overlay while the active
+menu is open. Authentication checks use the active, settled profile menu and
+bounded hover attempts; an old closing Logout entry cannot authenticate an
+otherwise signed-out page. S1 keeps its existing behavior. Targeted S2
+`SAM-24963` passed after this correction on November 24, 2026.
+
+The Payment heading alone does not prove that its provider controls or address
+summary have rendered. The S2 Base Store transition now observes the exact
+payment-method GET, preserves an in-flight read, and requires actual provider
+controls before running the unchanged address/postcode/footer assertions.
+One document GET recovery is permitted before financial submission, with no
+replayed Delivery POST. Unauthorized reads and permanently empty UI still
+fail. Targeted `SAM-24991` passed creation, edit and cleanup in the same run.
+These targeted results do not replace the full Jenkins campaign result.
+
+The PreQA Galaxy Z Fold6 catalog can contain `SM-F956BDBMLTM` in its configuration
+while its buying tool offers only another model and omits the native
+`basic-color` controls. The BC test preserves the catalog SKU and exact cart
+assertions. It reloads the missing module once before service choices or Add;
+continued absence fails as `MX_BC_VARIANT_CONTROL_UNAVAILABLE`, without silently
+selecting the default product. Revalidate after the PreQA buying-tool owner
+restores the configured variant's native control. WMC authentication alone does
+not establish that the variant is selectable.

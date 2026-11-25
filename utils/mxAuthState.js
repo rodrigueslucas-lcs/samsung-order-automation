@@ -25,9 +25,15 @@ const baseAuthState = createAuthState({
   refreshInstruction:
     `Run the MX auth bootstrap with MX_QST_ENVIRONMENT=${target.name}${requestedSlot === "second" ? " MX_AUTH_SLOT=second" : ""}; complete Samsung Account verification manually when required.`,
   profileMenuTrigger: "hover",
+  profileMenuOpenAttempts: target.name === "S2" ? 3 : 1,
   logoutLinkName: null,
   logoutTextName: /Cerrar Sesi[oó]n/i,
-  authenticatedMenuSelector: '[role="menu"].profile-menu',
+  authenticatedMenuSelector: target.name === "S2"
+    ? '[role="menu"].profile-menu:not(.mat-menu-panel-exit-animation):not(.mat-menu-panel-animating)'
+    : '[role="menu"].profile-menu',
+  profileMenuReadySelector: target.name === "S2"
+    ? '[role="menu"].profile-menu:not(.mat-menu-panel-exit-animation):not(.mat-menu-panel-animating)'
+    : undefined,
 });
 
 const authState = withRegisteredSessionRecovery(baseAuthState, {

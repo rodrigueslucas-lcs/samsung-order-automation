@@ -60,8 +60,10 @@ async function submitEppMercadoCard(page,cfg,capture,reconciliation=null,confirm
  if(!['MX','PE','CL','CO'].includes(cfg.market)||!origins[cfg.environment]||cfg.rootUrl.origin!==origins[cfg.environment]||(['PE','CL','CO'].includes(cfg.market)&&cfg.environment!=='S2'))return{status:'BLOCKED',reason:'PAYMENT_FLOW_NOT_PROVEN',stage:'PROVIDER',detail:'This adapter requires an approved staging market/environment and a runtime-verified Mercado Pago contract.'};
  assertions.assertStoreRoute(page.url(),cfg,/^checkout\//);
  guards.requirePaymentSubmitOptIn();
- const card=cfg.market==='CL'?clTestCard.getClTestCard():cfg.market==='CO'?coTestCard.getCoTestCard({...process.env,CO_QST_ENVIRONMENT:cfg.environment}):runtime.getEppRuntimeData(cfg)?.payment?.card;
+ const paymentData=['MX','PE'].includes(cfg.market)?runtime.getEppRuntimeData(cfg)?.payment:null;
+ const card=cfg.market==='CL'?clTestCard.getClTestCard():cfg.market==='CO'?coTestCard.getCoTestCard({...process.env,CO_QST_ENVIRONMENT:cfg.environment}):paymentData?.card;
  if(!card||!['number','holderName','expiry','cvv','document'].every(k=>typeof card[k]==='string'&&card[k]))return{status:'BLOCKED',reason:'PAYMENT_FLOW_NOT_PROVEN',stage:'DATA',detail:'Approved same-market/provider card fixture is unavailable in ignored EPP runtime data.'};
+ if(cfg.market==='MX'&&paymentData?.cardFixture)await test.info().attach('EPP credit fixture identity',{body:JSON.stringify({market:cfg.market,environment:cfg.environment,program:cfg.program,...paymentData.cardFixture}),contentType:'application/json'});
  const mxCredit=cfg.market==='MX'&&cfg.environment==='S2'&&cfg.program==='pymesmx';
  const payment=['CL','CO'].includes(cfg.market)||mxCredit?new MarketPaymentPage(page,{market:cfg.market,...(mxCredit?{cardPanel:'credit'}:{})}):new PaymentPage(page);payment.screenshot=capture;
  if(cfg.market==='MX'&&!mxCredit)payment.creditCardOption=cfg.environment==='S2'?page.getByRole('button',{name:/^Tarjeta de D[eé]bito/i}).filter({visible:true}).first():page.getByRole('button',{name:/^Tarjeta de (?:Cr[eé]dito|D[eé]bito)/i}).filter({visible:true});
@@ -79,7 +81,7 @@ async function submitEppMercadoCard(page,cfg,capture,reconciliation=null,confirm
  try{
   await payment.fillCardData(card);
   await payment.validateCreditCardReady(card);
- }catch{throw new Error('EPP card entry/readiness failed before submit; sensitive provider details suppressed.');}
+ }catch{throw new Error('EPP_CARD_ENTRY_NOT_READY: EPP card entry/readiness failed before submit; sensitive provider details suppressed.');}
  const site=cfg.apiSite||cfg.rootUrl.pathname.split('/').filter(Boolean)[2];
  const baseline=reconciliation?await reconciliation.beforeSubmit():null;
  const attempt=attemptModule.beginEppOrderAttempt(cfg,'card');

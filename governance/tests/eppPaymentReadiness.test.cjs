@@ -6,6 +6,14 @@ const cfg={market:'MX',environment:'S2',program:'pymesmx',rootUrl:new URL('https
 const payment=new URL('checkout/one?step=CHECKOUT_STEP_PAYMENT',cfg.rootUrl).href;
 const api='https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/pymesmx/users/current/carts/current/paymentmodes';
 const req=(url=api,method='GET')=>({url:()=>url,method:()=>method});
+test('readiness diagnostics expose only read status and ignored transition step',()=>{
+ const page=new EventEmitter();let url=payment.replace('PAYMENT','DELIVERY');page.url=()=>url;
+ const watch=watchMxEppPaymentRead(page,cfg);page.emit('request',req(api+'?private=not-for-report'));
+ assert.equal(watch.snapshot().ignoredOwnReadStep,'CHECKOUT_STEP_DELIVERY');
+ assert.equal(watch.snapshot().observed,false);assert.equal(watch.claimRecovery(),false);
+ url=payment;page.emit('request',req());assert.equal(watch.snapshot().pending,true);
+ assert.equal(JSON.stringify(watch.snapshot()).includes('not-for-report'),false);watch.stop();
+});
 
 test('only a long failed exact Payment GET permits one recovery, with listener cleanup',()=>{
  const page=new EventEmitter();page.url=()=>payment;let clock=0;

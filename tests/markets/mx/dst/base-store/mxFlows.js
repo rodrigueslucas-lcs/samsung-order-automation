@@ -3,6 +3,7 @@ import ProductPage from "../../../../../pages/ProductPage";
 import CartPage from "../../../../../pages/CartPage";
 import MxCheckoutPage from "../../../../../pages/MxCheckoutPage";
 import mxCartReadback from "../../../../../utils/mxCartReadback.cjs";
+import mxPaymentUiReadiness from "../../../../../utils/mxPaymentUiReadiness.cjs";
 
 function configuredProduct(page, config) {
   return new ProductPage(page, {
@@ -103,6 +104,10 @@ async function fillGuestContactWithRecovery(page, checkout, email) {
 }
 
 export async function continueMxDeliveryToPaymentWithRecovery(page, checkout, { postalCode = "01000" } = {}) {
+  if(mxPaymentUiReadiness.isMxS2BaseCheckout(page.url())){
+    return mxPaymentUiReadiness.continueToReadyMxBasePayment(page,
+      ()=>checkout.selectDeliveryAndContinue(),()=>checkout.validatePaymentPage({postalCode}));
+  }
   let transitionError = null;
   try {
     await checkout.selectDeliveryAndContinue();
