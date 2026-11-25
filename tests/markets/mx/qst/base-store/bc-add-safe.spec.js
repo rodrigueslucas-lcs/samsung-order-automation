@@ -13,7 +13,7 @@ const { resolveMxBcCareChoice } = bcCareChoice;
 
 const PRE_QA_ORIGIN = "https://p6-pre-qa2.samsung.com";
 const PRE_QA_PLP = `${PRE_QA_ORIGIN}/mx/smartphones/all-smartphones/`;
-const PRE_QA_MODEL_CODE = "SM-F956BDBMLTM";
+const PRE_QA_MODEL_CODE = "SM-F956BAKMLTM";
 const PRE_QA_PRODUCT_NAME = "Galaxy Z Fold6";
 const PRE_QA_PDP_PATH = "/mx/smartphones/galaxy-z-fold6/buy/";
 const PRE_QA_CDP_URL = process.env.PREQA2_CDP_URL || "http://127.0.0.1:9223";
@@ -139,6 +139,7 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
     .getByRole("textbox", { name: "Quantity", exact: true });
   let cartCountBefore = 0;
   let careEvidence;
+  let variantEvidence;
 
   try {
     await test.step("Bootstrap S2 and read the selected SKU quantity before BC add", async () => {
@@ -193,9 +194,9 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
       );
       await dismissLocationBanner(page);
       await expect(page.getByText(PRE_QA_PRODUCT_NAME, { exact: true }).filter({ visible: true }).first()).toBeVisible({ timeout: 60000 });
-      // The catalog's family URL defaults to another color. Select the exact
-      // catalog model through its rendered label before configuring services.
-      await bcVariant.selectMxBcVariant(page, PRE_QA_MODEL_CODE);
+      // Prove the selected native variant or choose its rendered color label
+      // before configuring services. Never substitute another product.
+      variantEvidence = await bcVariant.selectMxBcVariant(page, PRE_QA_MODEL_CODE);
       await expect(preQaAddToCart(page)).toHaveAttribute("data-modelcode", PRE_QA_MODEL_CODE);
     });
 
@@ -256,6 +257,7 @@ test("SAM-24969 @qst @mx @base-store @safe - Add product from BC page", async ({
       plpPath: "/mx/smartphones/all-smartphones/",
       pdpPath: PRE_QA_PDP_PATH,
       modelCode: PRE_QA_MODEL_CODE,
+      variantSelection: variantEvidence.selection,
       cdpUrl: PRE_QA_CDP_URL,
       skuQuantityBefore: cartCountBefore,
       skuQuantityAfter: cartCountAfter,

@@ -365,11 +365,18 @@ replayed Delivery POST. Unauthorized reads and permanently empty UI still
 fail. Targeted `SAM-24991` passed creation, edit and cleanup in the same run.
 These targeted results do not replace the full Jenkins campaign result.
 
-The PreQA Galaxy Z Fold6 catalog can contain `SM-F956BDBMLTM` in its configuration
-while its buying tool offers only another model and omits the native
-`basic-color` controls. The BC test preserves the catalog SKU and exact cart
-assertions. It reloads the missing module once before service choices or Add;
-continued absence fails as `MX_BC_VARIANT_CONTROL_UNAVAILABLE`, without silently
-selecting the default product. Revalidate after the PreQA buying-tool owner
-restores the configured variant's native control. WMC authentication alone does
-not establish that the variant is selectable.
+The PreQA Galaxy Z Fold6 catalog can contain the Navy `SM-F956BDBMLTM` while
+the buying tool omits its native color control. Following operator approval,
+`SAM-24969` now explicitly selects the separate catalog card for Crafted Black
+512 GB, `SM-F956BAKMLTM`, which is also offered by the native buying tool.
+This changes the test fixture; it does not establish that the missing Navy
+control has been repaired.
+
+An already selected variant is accepted only when the checked native device,
+checked storage and visible Add action all carry that exact configured SKU.
+Otherwise the helper requires its native color control, with one bounded
+document GET recovery before service choices or Add. An unavailable or
+mismatched model still fails as `MX_BC_VARIANT_CONTROL_UNAVAILABLE`.
+The official TC retains its intended-SKU, successful native Add, exact quantity
+increase and persistence-after-reload assertions. WMC authentication alone
+does not establish that a product is selectable or was added successfully.
