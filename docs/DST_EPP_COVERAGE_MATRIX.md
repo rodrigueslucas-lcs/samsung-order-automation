@@ -1,5 +1,7 @@
 # DST EPP Peru Coverage Matrix
 
+> Historical reference retained without rewriting prior results. Current official DST scope (362 scenarios), canonical ownership and Phase 1 evidence are documented in [DST Phase 1 reconciliation](DST_PHASE1_RECONCILIATION.md) and [the current coverage matrix](../governance/dst-phase1-coverage.json). Historical counts/paths below are not the current scope.
+
 This matrix is independent from the 83-case DST Base Store matrix and from both QST matrices. The supplied historical Peru result is recorded as context only:
 
 > **Historic manual Pass is not current automation evidence.** `Automated` requires a successful execution against a verified non-Production EPP environment.

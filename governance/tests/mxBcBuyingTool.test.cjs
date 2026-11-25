@@ -7,7 +7,7 @@ const { chromium } = require('@playwright/test');
 
 test('BC Continue banner cannot submit cart; native cart action selects only the intended SKU', async () => {
   const source = fs.readFileSync(path.resolve(__dirname,
-    '../../tests/markets/mx/qst/base-store/bc-add-safe.spec.js'), 'utf8');
+    '../../flows/mx/bcAddToCart.js'), 'utf8');
   const start = source.indexOf('function preQaAddToCart(');
   const end = source.indexOf('async function getAuthenticatedPreQaPage(');
   assert.ok(start >= 0 && end > start);

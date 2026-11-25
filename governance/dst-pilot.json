@@ -1,0 +1,217 @@
+{
+  "schemaVersion": 1,
+  "suite": "DST",
+  "phase": 1,
+  "fullCampaignAllowed": false,
+  "paymentSubmissionAllowed": false,
+  "sourceHashes": {
+    "docs/smb_priority_templates/STG-MX-Smoke-Test-Template.md": "c3eb045c79a8cfb2df0b9a82001a6e56497cefd9ea5cf2170384d4023446faaa",
+    "docs/smb_priority_templates/STG-PE-Smoke-Test-Template.md": "5b34dd5f2a6de8e9434cdf3f9ae448be6510c590d0a22fe323bd6d9bccf233a1",
+    "docs/smb_priority_templates/STG-CO-Smoke-Test-Template.md": "ddfda2f21ed65c90362e77dbe55724100b876d780ce90d767f23947f3ff241ae",
+    "docs/smb_priority_templates/STG-CL-Smoke-Test-Template.md": "03c7208c3796b9d408ec27f9882340b9eeaebc4edcfb89f8376022d6a78a74b2"
+  },
+  "cases": [
+    {
+      "id": "SAM-24969",
+      "market": "MX",
+      "store": "BASE_STORE",
+      "sourceRowKey": "MX-BASE_STORE-9",
+      "priority": "P1",
+      "scenario": "Able to add product to the cart from BC Page",
+      "sourceFile": "docs/smb_priority_templates/STG-MX-Smoke-Test-Template.md",
+      "identityMappingSource": "utils/officialRowEvidence.js",
+      "definitionStatus": "SCENARIO_ONLY",
+      "missingOfficialFields": [
+        "preconditions",
+        "steps",
+        "expectedResults"
+      ],
+      "acceptanceBasis": "Explicit current source scenario clauses plus local acceptance controls; formal Jira definition unavailable (read-only 401).",
+      "criteria": [
+        "Native BC catalog and exact configured variant",
+        "Successful native Add response",
+        "SKU quantity increases by one",
+        "Quantity persists after cart reload"
+      ],
+      "spec": "tests/markets/mx/dst/base-store/bc-add.spec.js",
+      "runtime": "NOT_RUN",
+      "formalHomologation": "PENDING_OFFICIAL_DEFINITION",
+      "authRequired": false,
+      "environmentRequired": "S2_AND_PREQA2"
+    },
+    {
+      "id": "SAM-24971",
+      "market": "MX",
+      "store": "BASE_STORE",
+      "sourceRowKey": "MX-BASE_STORE-11",
+      "priority": "P1",
+      "scenario": "The cart page is displayed properly<br>-SKU name<br>-Item Price<br>-Product thumbnail<br>-Available services (if any)<br>-Order summary<br>-Info icons<br>-Footer section",
+      "sourceFile": "docs/smb_priority_templates/STG-MX-Smoke-Test-Template.md",
+      "identityMappingSource": "utils/officialRowEvidence.js",
+      "definitionStatus": "SCENARIO_ONLY",
+      "missingOfficialFields": [
+        "preconditions",
+        "steps",
+        "expectedResults"
+      ],
+      "acceptanceBasis": "Explicit current source scenario clauses plus local acceptance controls; formal Jira definition unavailable (read-only 401).",
+      "criteria": [
+        "SKU name",
+        "Item price",
+        "Product thumbnail",
+        "Available services if any",
+        "Order summary",
+        "Info icons",
+        "Footer section"
+      ],
+      "spec": "tests/markets/mx/dst/base-store/storefront.spec.js",
+      "runtime": "NOT_RUN",
+      "formalHomologation": "PENDING_OFFICIAL_DEFINITION",
+      "authRequired": false,
+      "environmentRequired": "STAGING"
+    },
+    {
+      "id": "SAM-24972",
+      "market": "MX",
+      "store": "BASE_STORE",
+      "sourceRowKey": "MX-BASE_STORE-12",
+      "priority": "P1",
+      "scenario": "' The user is able to Increase/decrease/delete the quantity",
+      "sourceFile": "docs/smb_priority_templates/STG-MX-Smoke-Test-Template.md",
+      "identityMappingSource": "utils/officialRowEvidence.js",
+      "definitionStatus": "SCENARIO_ONLY",
+      "missingOfficialFields": [
+        "preconditions",
+        "steps",
+        "expectedResults"
+      ],
+      "acceptanceBasis": "Explicit current source scenario clauses plus local acceptance controls; formal Jira definition unavailable (read-only 401).",
+      "criteria": [
+        "Increase quantity",
+        "Decrease quantity",
+        "Delete product",
+        "Persisted empty cart"
+      ],
+      "spec": "tests/markets/mx/dst/base-store/storefront.spec.js",
+      "runtime": "NOT_RUN",
+      "formalHomologation": "PENDING_OFFICIAL_DEFINITION",
+      "authRequired": false,
+      "environmentRequired": "STAGING"
+    },
+    {
+      "id": "SAM-24988",
+      "market": "MX",
+      "store": "BASE_STORE",
+      "sourceRowKey": "MX-BASE_STORE-28",
+      "priority": "P1",
+      "scenario": "User is able to click on checkout button on cart page",
+      "sourceFile": "docs/smb_priority_templates/STG-MX-Smoke-Test-Template.md",
+      "identityMappingSource": "utils/officialRowEvidence.js",
+      "definitionStatus": "SCENARIO_ONLY",
+      "missingOfficialFields": [
+        "preconditions",
+        "steps",
+        "expectedResults"
+      ],
+      "acceptanceBasis": "Explicit current source scenario clauses plus local acceptance controls; formal Jira definition unavailable (read-only 401).",
+      "criteria": [
+        "Native checkout CTA click",
+        "Correct market checkout entry visible"
+      ],
+      "spec": "tests/markets/mx/dst/base-store/storefront.spec.js",
+      "runtime": "NOT_RUN",
+      "formalHomologation": "PENDING_OFFICIAL_DEFINITION",
+      "authRequired": false,
+      "environmentRequired": "STAGING"
+    },
+    {
+      "id": "SAM-25064",
+      "market": "PE",
+      "store": "BASE_STORE",
+      "sourceRowKey": "PE-BASE_STORE-11",
+      "priority": "P1",
+      "scenario": "The order summary is displayed on the right side<br>Coupon code field, View Avaialble coupon<br>Order Summary (Subtotal, Total savings)<br>Total<br>Info text",
+      "sourceFile": "docs/smb_priority_templates/STG-PE-Smoke-Test-Template.md",
+      "identityMappingSource": "utils/officialRowEvidence.js",
+      "definitionStatus": "SCENARIO_ONLY",
+      "missingOfficialFields": [
+        "preconditions",
+        "steps",
+        "expectedResults"
+      ],
+      "acceptanceBasis": "Explicit current source scenario clauses plus local acceptance controls; formal Jira definition unavailable (read-only 401).",
+      "criteria": [
+        "Summary on right of cart items",
+        "Coupon code field",
+        "View available coupons control",
+        "Subtotal",
+        "Total savings",
+        "Total",
+        "Info text"
+      ],
+      "spec": "tests/markets/pe/dst/base-store/cart/cart.spec.js",
+      "runtime": "NOT_RUN",
+      "formalHomologation": "PENDING_OFFICIAL_DEFINITION",
+      "authRequired": true,
+      "environmentRequired": "STAGING",
+      "operationalPreconditions": [
+        "Existing PE registered identity verified live; same-cart read-only comparison proved available-coupon control and savings absent in guest, present in registered context."
+      ]
+    },
+    {
+      "id": "SAM-25065",
+      "market": "PE",
+      "store": "BASE_STORE",
+      "sourceRowKey": "PE-BASE_STORE-12",
+      "priority": "P1",
+      "scenario": "RW text is displayed properly on cart/ checkout/ payment page",
+      "sourceFile": "docs/smb_priority_templates/STG-PE-Smoke-Test-Template.md",
+      "identityMappingSource": "utils/officialRowEvidence.js",
+      "definitionStatus": "SCENARIO_ONLY",
+      "missingOfficialFields": [
+        "preconditions",
+        "steps",
+        "expectedResults"
+      ],
+      "acceptanceBasis": "Explicit current source scenario clauses plus local acceptance controls; formal Jira definition unavailable (read-only 401).",
+      "criteria": [
+        "Rewards text on cart",
+        "Rewards text on checkout",
+        "Rewards text on payment",
+        "No payment submission"
+      ],
+      "spec": "tests/markets/pe/dst/base-store/rewards.spec.js",
+      "runtime": "NOT_RUN",
+      "formalHomologation": "PENDING_OFFICIAL_DEFINITION",
+      "authRequired": true,
+      "environmentRequired": "STAGING"
+    },
+    {
+      "id": "SAM-25081",
+      "market": "PE",
+      "store": "BASE_STORE",
+      "sourceRowKey": "PE-BASE_STORE-28",
+      "priority": "P1",
+      "scenario": "User is able to click on checkout button on cart page",
+      "sourceFile": "docs/smb_priority_templates/STG-PE-Smoke-Test-Template.md",
+      "identityMappingSource": "utils/officialRowEvidence.js",
+      "definitionStatus": "SCENARIO_ONLY",
+      "missingOfficialFields": [
+        "preconditions",
+        "steps",
+        "expectedResults"
+      ],
+      "acceptanceBasis": "Explicit current source scenario clauses plus local acceptance controls; formal Jira definition unavailable (read-only 401).",
+      "criteria": [
+        "Native checkout CTA click",
+        "Correct market checkout entry visible"
+      ],
+      "spec": "tests/markets/pe/dst/base-store/cart/cart.spec.js",
+      "runtime": "NOT_RUN",
+      "formalHomologation": "PENDING_OFFICIAL_DEFINITION",
+      "authRequired": false,
+      "environmentRequired": "STAGING"
+    }
+  ],
+  "sourceHashNormalization": "UTF8_LF"
+}

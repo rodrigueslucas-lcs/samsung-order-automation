@@ -2,6 +2,11 @@ import { test, expect } from "@playwright/test";
 
 import ProductPage from "../../../../../../pages/ProductPage";
 import CartPage from "../../../../../../pages/CartPage";
+import peConfig from "../../../../../../config/markets/pe";
+import { addConfiguredProductToPeCart } from "../../../../../../flows/pe/storefrontCheckout";
+import assertions from "../../../../../../flows/smb/dstCartAssertions";
+import safety from "../../../../../../flows/smb/dstPilotSafety";
+import { verifyExistingPeIdentity } from "../../../../../../flows/pe/existingIdentity";
 
 test.describe("ST2 - Base Store - Cart Page", () => {
 
@@ -20,22 +25,13 @@ test.describe("ST2 - Base Store - Cart Page", () => {
   });
 
 
-  test("TC18 - Customer able to see order summary is displayed correctly on right side (without taxes)", async ({ page }) => {
-    test.setTimeout(120000);
-
-    const productPage = new ProductPage(page);
-    const cartPage = new CartPage(page);
-
-    await productPage.validateProductLoaded();
-    await productPage.addToCart();
-
-    await cartPage.validateProductInCart();
-
-    const summary = await cartPage.validateOrderSummary();
-
-    expect(summary.subtotal).toBeTruthy();
-    expect(summary.total).toBeTruthy();
-    expect(summary.total).toBe(summary.subtotal);
+  test("SAM-25064 @dst @pe @base-store @pilot - Complete cart order summary", async ({ page }, testInfo) => {
+    test.setTimeout(240000);
+    const config = peConfig.getPeQstConfig();
+    await safety.installPilotSafety(page, testInfo, "SAM-25064", config.environment);
+    await verifyExistingPeIdentity(page, config);
+    const cart = await addConfiguredProductToPeCart(page, config);
+    await assertions.validatePeDstSummary(page, cart);
   });
 
 
@@ -77,24 +73,15 @@ test.describe("ST2 - Base Store - Cart Page", () => {
     await cartPage.validateProductInCart();
   });
 
-  test("TC33 - Customer able to navigate to Checkout Page, when click the Checkout Button", async ({ page }) => {
-    test.setTimeout(150000);
-
-    const productPage = new ProductPage(page);
-    const cartPage = new CartPage(page);
-
-    await productPage.validateProductLoaded();
-    await productPage.addToCart();
-
-    await cartPage.validateProductInCart();
-    await cartPage.proceedToCheckout();
-
-    await page
-      .getByPlaceholder(/ingresa tu correo/i)
-      .waitFor({
-        state: "visible",
-        timeout: 30000
-      });
+  test("SAM-25081 @dst @pe @base-store @pilot - Checkout button enters checkout", async ({ page }, testInfo) => {
+    test.setTimeout(240000);
+    const config = peConfig.getPeQstConfig();
+    await safety.installPilotSafety(page, testInfo, "SAM-25081", config.environment);
+    const cart = await addConfiguredProductToPeCart(page, config);
+    await cart.validateProductInCart();
+    await cart.proceedToCheckout();
+    expect(new URL(page.url()).hostname).toBe(config.baseUrl.hostname);
+    await expect(page.getByPlaceholder(/ingresa tu correo/i)).toBeVisible({ timeout: 30000 });
   });
 
 

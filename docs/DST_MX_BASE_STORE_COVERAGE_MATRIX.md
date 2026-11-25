@@ -1,5 +1,7 @@
 # DST MX Base Store Coverage Matrix
 
+> Historical reference retained without rewriting prior results. Current official DST scope (362 scenarios), canonical ownership and Phase 1 evidence are documented in [DST Phase 1 reconciliation](DST_PHASE1_RECONCILIATION.md) and [the current coverage matrix](../governance/dst-phase1-coverage.json). Historical counts/paths below are not the current scope.
+
 **Environment:** Mexico S1  
 **Source of truth:** supplied official MX Base Store manual matrix  
 **Rule:** historical Pass is manual history only and never implies Automated.

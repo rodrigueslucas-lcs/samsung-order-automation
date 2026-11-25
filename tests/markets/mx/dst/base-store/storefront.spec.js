@@ -2,6 +2,8 @@ import HomePage from "../../../../../pages/HomePage";
 import ProductPage from "../../../../../pages/ProductPage";
 import CartPage from "../../../../../pages/CartPage";
 import { test, expect } from "./mx.fixture";
+import assertions from "../../../../../flows/smb/dstCartAssertions";
+import safety from "../../../../../flows/smb/dstPilotSafety";
 
 async function openMxCart(page, config) {
   const product = new ProductPage(page, {
@@ -73,15 +75,11 @@ test("MX-DISCOVERY PDP @dst @mx @base-store - configured product is purchasable"
   await expect(page.getByRole("button", { name: /Agregar al carrito|Add to cart|Add to basket/i }).filter({ visible: true }).first()).toBeVisible({ timeout: 60000 });
 });
 
-test("MX-DISCOVERY TC15 TC16 TC18 TC20 @dst @mx @base-store - Cart structure", async ({ page, mxConfig }) => {
+test("SAM-24971 @dst @mx @base-store @pilot - Cart structure", async ({ page, mxConfig }, testInfo) => {
   test.setTimeout(240000);
+  await safety.installPilotSafety(page, testInfo, "SAM-24971", mxConfig.environment);
   const cart = await openMxCart(page, mxConfig);
-  await cart.validateCartPage();
-  await cart.validateProductInCart();
-  const summary = await cart.validateOrderSummary();
-  expect(summary.subtotal).toBeTruthy();
-  expect(summary.total).toBeTruthy();
-  await cart.validateCheckoutButton();
+  await assertions.validateMxDstCart(page, cart, mxConfig.sku);
 });
 
 test("MX TC22 @dst @mx @base-store - Cart footer is visible", async ({ page, mxConfig }) => {
@@ -93,14 +91,17 @@ test("MX TC22 @dst @mx @base-store - Cart footer is visible", async ({ page, mxC
   expect(await footer.getByRole("link").filter({ visible: true }).count()).toBeGreaterThan(0);
 });
 
-test("MX-DISCOVERY TC17 @dst @mx @base-store - Cart quantity can change and restore", async ({ page, mxConfig }) => {
+test("SAM-24972 @dst @mx @base-store @pilot - Increase decrease and delete quantity", async ({ page, mxConfig }, testInfo) => {
   test.setTimeout(240000);
+  await safety.installPilotSafety(page, testInfo, "SAM-24972", mxConfig.environment);
   const cart = await openMxCart(page, mxConfig);
   await cart.validateQuantityCanChange();
+  await cart.clearMxCartAndConfirmEmpty();
 });
 
-test("MX-DISCOVERY TC33 TC34 @dst @mx @base-store - Cart reaches Checkout login safely", async ({ page, mxConfig }) => {
+test("SAM-24988 @dst @mx @base-store @pilot - Cart reaches Checkout login safely", async ({ page, mxConfig }, testInfo) => {
   test.setTimeout(240000);
+  await safety.installPilotSafety(page, testInfo, "SAM-24988", mxConfig.environment);
   const cart = await openMxCart(page, mxConfig);
   await cart.proceedToCheckout();
   expect(new URL(page.url()).hostname).toBe(mxConfig.hostname);

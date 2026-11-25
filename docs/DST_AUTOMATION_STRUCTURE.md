@@ -1,5 +1,7 @@
 # DST Automation Structure
 
+> Historical reference retained without rewriting prior results. Current official DST scope (362 scenarios), canonical ownership and Phase 1 evidence are documented in [DST Phase 1 reconciliation](DST_PHASE1_RECONCILIATION.md) and [the current coverage matrix](../governance/dst-phase1-coverage.json). Historical counts/paths below are not the current scope.
+
 ## Current ownership
 
 The existing DST suite is the 83-case ST2 Peru automation currently stored under:

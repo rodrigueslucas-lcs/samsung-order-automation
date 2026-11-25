@@ -6,6 +6,9 @@ const strict = process.argv.includes("--strict");
 
 const ignoredDirs = new Set([
   ".git",
+  // Local agent instructions/audit artifacts are not framework consumers.
+  ".agent",
+  ".codex",
   "node_modules",
   "test-results",
   "playwright-report",

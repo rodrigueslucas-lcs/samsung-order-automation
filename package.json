@@ -124,7 +124,9 @@
     "auth:refresh:epp:all": "node scripts/auth-refresh-all-epp.cjs",
     "auth:keepalive:epp": "node scripts/auth-epp-keepalive-once.cjs",
     "auth:keepalive:epp:install": "node scripts/auth-epp-keepalive-task.cjs --install",
-    "auth:operations:resource:check": "node scripts/auth-operations-resource.cjs"
+    "auth:operations:resource:check": "node scripts/auth-operations-resource.cjs",
+    "dst:pilot": "node scripts/run-dst-pilot.cjs",
+    "dst:pilot:gate": "node --test governance/tests/dstPilot.test.cjs"
   },
   "keywords": [
     "playwright",

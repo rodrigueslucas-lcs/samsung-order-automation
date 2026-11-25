@@ -19,6 +19,12 @@ The repository is designed so that a QA can move from an official Samsung TC to 
 
 ---
 
+## DST Phase 1 pilot
+
+DST is being reconciled against the current 362-scenario official catalog. Historical test counts and QST results are not DST runtime approval. See [reconciliation, source limitations and pilot commands](docs/DST_PHASE1_RECONCILIATION.md).
+
+Only explicit pilot IDs are accepted by `npm run dst:pilot -- MX|PE`. The pilot disables payment submission and retries, preserves existing authentication, and writes separate artifacts. It does not launch a full DST campaign or configure Jenkins jobs.
+
 ## Project snapshot
 
 ### Supported markets
