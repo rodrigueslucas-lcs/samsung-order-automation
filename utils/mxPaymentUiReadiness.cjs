@@ -2,6 +2,14 @@ const {expect}=require('@playwright/test');
 function isMxS2BaseCheckout(value){
  try{const u=new URL(value);return u.origin==='https://stg2.shop.samsung.com'&&u.pathname==='/mx/checkout/one'&&/^CHECKOUT_STEP_(DELIVERY|PAYMENT)$/.test(u.searchParams.get('step')||'');}catch{return false;}
 }
+// Address persistence/editing needs the accepted Delivery transition and its
+// checkout summary, not a completed third-party payment-method request.
+async function continueToMxBaseDeliverySummary(page,transition,validateSummary){
+ if(!isMxS2BaseCheckout(page.url()))throw new Error('MX_PAYMENT_SCOPE_INVALID: S2 Base Store checkout required.');
+ try{await transition();}catch(error){if(new URL(page.url()).searchParams.get('step')!=='CHECKOUT_STEP_PAYMENT')throw error;}
+ if(!isMxS2BaseCheckout(page.url())||new URL(page.url()).searchParams.get('step')!=='CHECKOUT_STEP_PAYMENT')throw new Error('MX_PAYMENT_ROUTE_NOT_REACHED');
+ await validateSummary();
+}
 async function continueToReadyMxBasePayment(page,transition,validate,{uiTimeoutMs=60000,settleTimeoutMs=15000}={}){
  if(!isMxS2BaseCheckout(page.url()))throw new Error('MX_PAYMENT_SCOPE_INVALID: S2 Base Store checkout required.');
  for(const value of [uiTimeoutMs,settleTimeoutMs])if(!Number.isFinite(value)||value<=0)throw new Error('MX payment readiness deadline must be finite and positive.');
@@ -44,4 +52,4 @@ async function continueToReadyMxBasePayment(page,transition,validate,{uiTimeoutM
   await validate();
  }finally{for(const [event,handler] of hooks)page.off(event,handler);}
 }
-module.exports={isMxS2BaseCheckout,continueToReadyMxBasePayment};
+module.exports={isMxS2BaseCheckout,continueToReadyMxBasePayment,continueToMxBaseDeliverySummary};

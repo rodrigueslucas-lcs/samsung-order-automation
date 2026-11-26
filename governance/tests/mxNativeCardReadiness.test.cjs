@@ -17,6 +17,10 @@ test('MX S2 Base capture excludes saved-card details and order history while pre
     getByRole: () => ({ filter() { return this; }, first() { return this; } }) };
   const payment = new Page(page, { market: 'MX' });
   const options = await payment.placeOrderAndCapture();
+  const submit='/tokocommercewebservices/v2/mx/users/current/carts/current/paymentmodes/';
+  for(const mode of ['mx-mercadoCC','mx-mercadoCC-noMSI'])assert.equal(options.submitResponsePathPattern.test(submit+mode+'/submitOrder'),true);
+  for(const mode of ['mx-cash','mx-mercadoCC-other','cl-mercadoCC'])assert.equal(options.submitResponsePathPattern.test(submit+mode+'/submitOrder'),false);
+  assert.equal(options.submitResponsePathPattern.test((submit+'mx-mercadoCC-noMSI/submitOrder').replace('/mx/','/pymesmx/')),false);
   assert.equal(options.orderResponsePathPattern.test('/tokocommercewebservices/v2/mx/users/current/orders/MX261119-78896156_261119223444729'), true);
   for (const path of ['/tokocommercewebservices/v2/mx/users/current/carts/current/paymentmodes/mx-mercadoCc/details',
     '/tokocommercewebservices/v2/mx/users/current/orders',
@@ -25,6 +29,7 @@ test('MX S2 Base capture excludes saved-card details and order history while pre
   }
   page.url = () => 'https://stg2.shop.samsung.com/mx/multistore/pymesmx/pymesmx/checkout/one';
   assert.equal((await payment.placeOrderAndCapture()).orderResponsePathPattern, undefined);
+  assert.equal((await payment.placeOrderAndCapture()).submitResponsePathPattern, undefined);
 });
 
 test('MX confirmation waits for its own receipt and rejects missing UI or foreign scopes without submitting', async () => {

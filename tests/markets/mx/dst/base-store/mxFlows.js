@@ -103,8 +103,11 @@ async function fillGuestContactWithRecovery(page, checkout, email) {
   }
 }
 
-export async function continueMxDeliveryToPaymentWithRecovery(page, checkout, { postalCode = "01000" } = {}) {
+export async function continueMxDeliveryToPaymentWithRecovery(page, checkout, { postalCode = "01000", paymentMethodsRequired = true } = {}) {
   if(mxPaymentUiReadiness.isMxS2BaseCheckout(page.url())){
+    if(typeof paymentMethodsRequired!=='boolean')throw new Error('MX payment readiness requirement must be explicit.');
+    if(!paymentMethodsRequired)return mxPaymentUiReadiness.continueToMxBaseDeliverySummary(page,
+      ()=>checkout.selectDeliveryAndContinue(),()=>checkout.validatePaymentPage({postalCode}));
     return mxPaymentUiReadiness.continueToReadyMxBasePayment(page,
       ()=>checkout.selectDeliveryAndContinue(),()=>checkout.validatePaymentPage({postalCode}));
   }

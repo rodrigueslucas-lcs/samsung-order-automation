@@ -76,8 +76,8 @@ test("SAM-24991 @destructive @qst @mx @base-store @registered - Add or edit save
       return currentAddress;
     });
 
-    await test.step("Continue to Payment with bounded recovery for a stuck payment skeleton", async () => {
-      await continueMxDeliveryToPaymentWithRecovery(page, checkout, { postalCode: "01000" });
+    await test.step("Persist Delivery and validate its checkout summary before editing the saved address", async () => {
+      await continueMxDeliveryToPaymentWithRecovery(page, checkout, { postalCode: "01000", paymentMethodsRequired: false });
     });
 
     await test.step("Prove the saved address persisted and return to Delivery edit mode", async () => {

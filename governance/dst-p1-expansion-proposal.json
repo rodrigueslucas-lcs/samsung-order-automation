@@ -8418,13 +8418,13 @@
       "qstOwner": {
         "file": "tests/markets/mx/qst/base-store/profile-address-destructive.spec.js",
         "line": 44,
-        "sourceSha256": "3d7988655647aa2b2e96604d69282954631a53f89c37eab28c0e9384af44463e",
+        "sourceSha256": "49dd9feb3c74b6af328b668aebae4cc5bf49d1f31a48e7928670c41703f06d3a",
         "reviewSurface": "LEXICAL_OWNER_AND_FILE_IMPORTS_NOT_SEMANTIC_PROOF",
         "explicitStepLabels": [
           "Clean stale QA-only address data and reach registered Delivery",
           "Prepare authenticated checkout and open a new address form",
           "Fill a valid MX address and opt in to save it",
-          "Continue to Payment with bounded recovery for a stuck payment skeleton",
+          "Persist Delivery and validate its checkout summary before editing the saved address",
           "Prove the saved address persisted and return to Delivery edit mode",
           "Edit the saved address and verify the updated value",
           "Cleanup QA-only address data"
@@ -8456,6 +8456,14 @@
           "tests/markets/mx/dst/base-store/mx.auth.fixture.js",
           "tests/markets/mx/qst/base-store/mxQstFlows.js",
           "tests/markets/mx/dst/base-store/mxFlows.js"
+        ],
+        "sourceRevisions": [
+          {
+            "previousCommit": "ca76a95e9a73c8340c556d68a042c476721c7449",
+            "previousSha256": "3d7988655647aa2b2e96604d69282954631a53f89c37eab28c0e9384af44463e",
+            "currentSha256": "49dd9feb3c74b6af328b668aebae4cc5bf49d1f31a48e7928670c41703f06d3a",
+            "reason": "MX build25 SAM24991 validates saved/edited address and Delivery summary independently of payment-method GET; default card readiness and every address persistence/edit assertion remain required. No DST runtime result imported."
+          }
         ]
       },
       "family": "CHECKOUT",

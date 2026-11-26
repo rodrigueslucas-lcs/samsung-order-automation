@@ -208,6 +208,22 @@ export default class MxCheckoutPage extends BasePage {
         if (await checkbox.isChecked()) await checkbox.uncheck({ force: true });
       }
     }
+    // S2 Base Store can clear the colonia while the remaining address/invoice
+    // fields settle. Do not continue with a populated district but empty ward.
+    // Re-select only the exact native option accepted above; never substitute.
+    if (!this.storefront && typeof this.page.url === "function" &&
+        /^https:\/\/stg2\.shop\.samsung\.com\/mx\/checkout\/one(?:\?|$)/.test(this.page.url())) {
+      if (!(await colonia.innerText()).trim()) {
+        await colonia.click();
+        const sameOption = this.page.getByRole("option", { name: selectedColonia, exact: true })
+          .filter({ visible: true });
+        await sameOption.first().waitFor({ state: "visible", timeout: 30000 });
+        await sameOption.first().click();
+      }
+      if ((await colonia.innerText()).trim() !== selectedColonia) {
+        throw new Error("MX Delivery colonia was not retained after address completion.");
+      }
+    }
     return result;
   }
 

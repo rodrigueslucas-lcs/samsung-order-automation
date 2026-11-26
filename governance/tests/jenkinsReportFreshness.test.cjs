@@ -42,3 +42,16 @@ test('session rejection stays gating and no interactive renewal is enabled in CI
   }
   assert.match(source, /CL_AUTH_AUTO_RENEW = '0'/);
 });
+
+test('an interrupted P1 run preserves only current raw evidence without publishing a stale completed report',()=>{
+ const publish=section("if (env.PREQA2_PREFLIGHT_FAILED == '1') {\n          echo 'PREQA2 PREFLIGHT FAILURE: no Official", '\n    success {');
+ const partial=publish.slice(publish.indexOf("} else if (env.OFFICIAL_P1_NO_RESULTS == '1') {"),publish.indexOf("} else {"));
+ assert.match(partial,/archiveArtifacts artifacts: "\$\{env\.JENKINS_ARTIFACT_DIR\}\/playwright\/\*\*\/\*"/);
+ assert.match(partial,/NO COMPLETED CURRENT REPORT/);
+ assert.match(partial,/if \(env\.P1_ARTIFACTS_CURRENT == '1'\)/);
+ assert.match(source,/env\.P1_ARTIFACTS_CURRENT = '0'/);
+ const clean=section("stage('03 · Validate Request')", "stage('04");
+ assert.ok(clean.indexOf("dir(expectedDir) { deleteDir() }")<clean.indexOf("env.P1_ARTIFACTS_CURRENT = '1'"));
+ assert.doesNotMatch(partial,/publishHTML|allure\(|test-results\/\*\*|playwright\/\.auth/);
+ assert.doesNotMatch(source,/No current TC result is available/,'Missing final JSON is not proof that no TC ran');
+});

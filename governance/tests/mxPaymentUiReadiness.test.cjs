@@ -1,7 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {EventEmitter}=require('node:events');
 const {chromium}=require('@playwright/test');
-const {continueToReadyMxBasePayment,isMxS2BaseCheckout}=require('../../utils/mxPaymentUiReadiness.cjs');
+const {continueToReadyMxBasePayment,isMxS2BaseCheckout,continueToMxBaseDeliverySummary}=require('../../utils/mxPaymentUiReadiness.cjs');
 const delivery='https://stg2.shop.samsung.com/mx/checkout/one?step=CHECKOUT_STEP_DELIVERY';
 const payment=delivery.replace('DELIVERY','PAYMENT');
 const api='https://s2-smb-api-cdn.ecom-stg.samsung.com/tokocommercewebservices/v2/mx/users/current/carts/current/paymentmodes';
@@ -45,4 +45,15 @@ for(const status of [401,403])test('HTTP '+status+' cannot become a recovery or 
 });
 test('a permanently empty provider UI still fails after exactly one completed-read recovery',async()=>{
  const f=fake();await assert.rejects(continueToReadyMxBasePayment(f.page,f.transition,f.validate,{uiTimeoutMs:10,settleTimeoutMs:10}),/MX_PAYMENT_UI_NOT_READY/);assert.deepEqual(f.counts(),{reloads:1,validations:0});assert.equal(f.page.eventNames().length,0);
+});
+
+test('address summary validation does not wait for an unrelated pending payment-method read',async()=>{
+ const f=fake({pending:true});await continueToMxBaseDeliverySummary(f.page,f.transition,f.validate);
+ assert.deepEqual(f.counts(),{reloads:0,validations:1});assert.equal(f.page.eventNames().length,0);
+});
+test('address summary remains mandatory and route/transition failures cannot be accepted',async()=>{
+ const f=fake();await assert.rejects(continueToMxBaseDeliverySummary(f.page,f.transition,async()=>{throw Error('address summary absent');}),/summary absent/);
+ await assert.rejects(continueToMxBaseDeliverySummary({url:()=>delivery},async()=>{throw Error('delivery rejected');},()=>assert.fail()),/delivery rejected/);
+ await assert.rejects(continueToMxBaseDeliverySummary({url:()=>delivery},async()=>{},()=>assert.fail()),/ROUTE_NOT_REACHED/);
+ await assert.rejects(continueToMxBaseDeliverySummary({url:()=>delivery.replace('stg2.','')},()=>assert.fail(),()=>assert.fail()),/SCOPE_INVALID/);
 });

@@ -4,20 +4,22 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const source=fs.readFileSync('pages/MxCheckoutPage.js','utf8').replace(/^import .*;\r?\n/gm,'').replace('export default class MxCheckoutPage','class MxCheckoutPage');
 const Checkout=vm.runInNewContext(source+'\nMxCheckoutPage;',{BasePage:class{},contactTransition:{}});
-function fixture({epp=true,same=true,resolved=true,status=200}={}){
+function fixture({epp=true,same=true,resolved=true,status=200,baseS2=false,coloniaCleared=false,retained=true}={}){
  const calls=[];const values={postal:same?'01000':'99999',line1:'',line2:''};
  const field=key=>({waitFor:async()=>{},inputValue:async()=>values[key],fill:async value=>{calls.push('fill:'+key+':'+value);values[key]=value;},press:async()=>calls.push('blur')});
+ let coloniaText=coloniaCleared?'':'QA colonia';
  const option={waitFor:async()=>{},innerText:async()=>'QA colonia',click:async()=>calls.push('colonia')};
- const combo={waitFor:async()=>{},click:async()=>{},};
+ const sameOption={waitFor:async()=>{},click:async()=>{calls.push('reselect-colonia');if(retained)coloniaText='QA colonia';}};
+ const combo={waitFor:async()=>{},click:async()=>{},innerText:async()=>coloniaText};
  const checkout=Object.create(Checkout.prototype);checkout.storefront=epp?{}:null;
  checkout.readField=async()=>resolved?'resolved':null;
  checkout.page={getByRole:(role,{name}={})=>{
   if(role==='textbox')return field(name==='line1'||name==='line2'?name:'postal');
   if(role==='combobox')return combo;
-  if(role==='option')return{filter:()=>({first:()=>option})};
+  if(role==='option')return{filter:()=>({first:()=>name?sameOption:option})};
   if(role==='radio')return{getAttribute:async()=>'no-invoice',isChecked:async()=>true};
   if(role==='checkbox')return{filter:()=>({count:async()=>0})};
- },locator:()=>({waitFor:async()=>{},click:async()=>{}}),waitForFunction:async()=>{},
+ },...(baseS2?{url:()=> 'https://stg2.shop.samsung.com/mx/checkout/one?step=CHECKOUT_STEP_DELIVERY'}:{}),locator:()=>({waitFor:async()=>{},click:async()=>{}}),waitForFunction:async()=>{},
  waitForResponse:async()=>{calls.push('lookup');return{status:()=>status};}};
  return {calls,run:()=>checkout.fillDelivery({postalCode:'01000',street:'QA',exteriorNumber:'1'},{registered:true})};
 }
@@ -28,6 +30,16 @@ for(const options of [{epp:false},{same:false},{resolved:false}])test('unresolve
  const f=fixture(options);if(options.resolved===false)await assert.rejects(f.run(),/populate district/);else await f.run();assert.ok(f.calls.includes('lookup'));assert.ok(f.calls.includes('blur'));if(options.epp===false||options.same===false)assert.ok(!f.calls.includes('fill:postal:'));
 });
 test('postal lookup rejection remains a failure',async()=>{await assert.rejects(fixture({same:false,status:500}).run(),/HTTP 500/);});
+
+test('S2 Base restores only its already selected native colonia when address completion clears it',async()=>{
+ const f=fixture({epp:false,baseS2:true,coloniaCleared:true});await f.run();assert.equal(f.calls.filter(c=>c==='reselect-colonia').length,1);
+});
+test('S2 Base fails when the exact colonia still does not persist',async()=>{
+ await assert.rejects(fixture({epp:false,baseS2:true,coloniaCleared:true,retained:false}).run(),/colonia was not retained/);
+});
+test('retained Base colonia and EPP do not receive another selection',async()=>{
+ for(const options of [{epp:false,baseS2:true},{epp:true,baseS2:true,coloniaCleared:true}]){const f=fixture(options);await f.run();assert.ok(!f.calls.includes('reselect-colonia'));}
+});
 
 function marketplaceFixture({duplicate=false,epp=true,status=200}={}){
  const calls=[];

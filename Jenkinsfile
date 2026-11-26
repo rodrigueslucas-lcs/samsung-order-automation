@@ -15,7 +15,10 @@ pipeline {
     timestamps()
     disableConcurrentBuilds()
     buildDiscarder(logRotator(numToKeepStr: '30', artifactNumToKeepStr: '15'))
-    timeout(time: 75, unit: 'MINUTES')
+    // MX #25 reached 28/29 cases before the 75-minute global limit, after
+    // successful auth. Keep individual TC deadlines; budget the full campaign
+    // plus preflight/reporting separately from targeted and other-market runs.
+    timeout(time: params.MARKET == 'MX' && params.ENVIRONMENT == 'S2' && params.TEST_SUITE == 'official-p1' && !params.P1_TARGET_IDS?.trim() ? 120 : 75, unit: 'MINUTES')
     skipDefaultCheckout(true)
     preserveStashes(buildCount: 5)
   }
@@ -72,6 +75,7 @@ pipeline {
           env.JENKINS_SUITE_LABEL = suiteLabel
           env.JENKINS_ARTIFACT_DIR = artifactDir
           env.OFFICIAL_P1_NO_RESULTS = params.TEST_SUITE == 'official-p1' ? '1' : '0'
+          env.P1_ARTIFACTS_CURRENT = '0'
           env.OFFICIAL_P1_RESULT_FILE = "${artifactDir}/${params.MARKET == 'MX' ? 'mx-qst-safe-results.json' : 'results.json'}"
           env.MX_JENKINS_ARTIFACT_DIR = artifactDir
           env.MX_QST_ARTIFACT_DIR = artifactDir
@@ -159,6 +163,7 @@ pipeline {
             if (params.MARKET == 'MX') {
               dir('playwright-report') { deleteDir() }
             }
+            env.P1_ARTIFACTS_CURRENT = '1'
           }
         }
       }
@@ -616,7 +621,7 @@ pipeline {
           if (params.TEST_SUITE == 'official-p1') {
             if (!fileExists(env.OFFICIAL_P1_RESULT_FILE)) {
               currentBuild.result = 'FAILURE'
-              echo 'NO CURRENT RUNTIME RESULTS: check authentication/preflight or runner startup. Previous reports will not be published.'
+              echo 'NO COMPLETED CURRENT REPORT: execution may not have started or may have been interrupted. Previous reports will not be published.'
               return
             }
             env.OFFICIAL_P1_NO_RESULTS = '0'
@@ -668,7 +673,12 @@ pipeline {
         if (env.PREQA2_PREFLIGHT_FAILED == '1') {
           echo 'PREQA2 PREFLIGHT FAILURE: no Official P1 runtime/report artifacts published because no TCs were executed.'
         } else if (env.OFFICIAL_P1_NO_RESULTS == '1') {
-          echo 'NO CURRENT RUNTIME RESULTS: no test reports archived or published. Check authentication/preflight or runner startup in the console.'
+          // An aborted worker may have real per-TC traces/errors even though
+          // the final JSON reporter never ran. Preserve only this run folder.
+          if (env.P1_ARTIFACTS_CURRENT == '1') {
+            archiveArtifacts artifacts: "${env.JENKINS_ARTIFACT_DIR}/playwright/**/*", allowEmptyArchive: true, fingerprint: true
+          }
+          echo 'NO COMPLETED CURRENT REPORT: partial current traces/errors archived when present; no previous dashboard or completed TC summary is published.'
         } else {
           archiveArtifacts artifacts: 'test-results/**/*, playwright-report/**/*', allowEmptyArchive: true, fingerprint: true
           if (params.TEST_SUITE == 'allure-smoke') {
@@ -723,7 +733,7 @@ pipeline {
         } else if (env.OFFICIAL_P1_NO_RESULTS == '1') {
           currentBuild.displayName = "#${env.BUILD_NUMBER} · ${params.MARKET} · ${params.ENVIRONMENT} · ${suiteLabel} · NO CURRENT RESULTS"
           currentBuild.description = "${currentBuild.currentResult} | No current P1 results: check authentication/preflight or runner startup. Previous reports were not published."
-          echo 'NO CURRENT RESULTS · The campaign did not produce a current result file. No current TC result is available; inspect authentication/preflight or runner startup.'
+          echo 'NO CURRENT RESULTS · No completed result file. Inspect partial current artifacts and console: the run may have stopped before execution or been interrupted after executing TCs.'
         } else {
           currentBuild.displayName = "#${env.BUILD_NUMBER} · ${params.MARKET} · ${params.ENVIRONMENT} · ${suiteLabel} · ${currentBuild.currentResult}"
           currentBuild.description = "${currentBuild.currentResult} | Samsung SMB | ${params.MARKET} ${params.ENVIRONMENT} | ${suiteLabel} | Review Executive Dashboard / Playwright / Allure"

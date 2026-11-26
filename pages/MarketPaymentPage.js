@@ -76,7 +76,7 @@ export default class MarketPaymentPage extends PaymentPage {
         // Card details can reference saved-card orders. Only the actual order
         // detail response may establish the identity of this submission.
         orderResponsePathPattern: /^\/tokocommercewebservices\/v2\/mx\/users\/[^/]+\/orders\/[^/]+$/i,
-        submitResponsePathPattern: /^\/tokocommercewebservices\/v2\/mx\/users\/[^/]+\/carts\/[^/]+\/paymentmodes\/mx-mercadoCC\/submitOrder$/i,
+        submitResponsePathPattern: /^\/tokocommercewebservices\/v2\/mx\/users\/[^/]+\/carts\/[^/]+\/paymentmodes\/mx-mercadoCC(?:-noMSI)?\/submitOrder$/i,
       } : {};
     return super.placeOrderAndCapture({
       ...clCapture,
