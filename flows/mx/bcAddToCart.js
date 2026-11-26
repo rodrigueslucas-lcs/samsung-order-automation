@@ -131,8 +131,11 @@ export async function addMxBcProductToCart(testInfo, options = {}) {
   let cartCountBefore = 0;
   let careEvidence;
   let variantEvidence;
+  let finishTrace;
+  let businessError;
 
   try {
+    finishTrace = await options.startTrace?.(page.context(), testInfo);
     await options.preparePage?.(page);
     await test.step("Bootstrap S2 and read the selected SKU quantity before BC add", async () => {
       await page.goto("https://stg2.shop.samsung.com/getcookie.html", { waitUntil: "domcontentloaded", timeout: 60000 });
@@ -259,6 +262,9 @@ export async function addMxBcProductToCart(testInfo, options = {}) {
       careServiceStatuses,
       ...careEvidence,
     });
+  } catch (error) {
+    businessError = error;
+    throw error;
   } finally {
     // Capture the actual CDP page before closing it, on success or failure.
     // Do not capture a WMC/login screen if the authenticated session expired.
@@ -268,7 +274,15 @@ export async function addMxBcProductToCart(testInfo, options = {}) {
         contentType: "image/png",
       })).catch(() => {});
     }
-    await page.close().catch(() => {});
-    await cdpBrowser.close().catch(() => {});
+    try {
+      await finishTrace?.();
+    } catch (traceError) {
+      if (businessError) throw new AggregateError([businessError, traceError],
+        `${businessError.message}; DST_CDP_TRACE_ARCHIVE_FAILED: ${traceError.message}`);
+      throw traceError;
+    } finally {
+      await page.close().catch(() => {});
+      await cdpBrowser.close().catch(() => {});
+    }
   }
 }

@@ -15,15 +15,27 @@ function probeOwnedProfile(profileDir, { includeListeners = true } = {}) {
 // cause another --new-window launch into an already running dedicated profile.
 async function recoverAuthBrowserEndpoint(profileDir, {
   platform = process.platform, probe = probeOwnedProfile, request = fetch,
-  write = fs.writeFileSync,
+  write = fs.writeFileSync, pause = ms => new Promise(resolve => setTimeout(resolve, ms)),
 } = {}) {
   if (platform !== 'win32') return { occupied: false };
   const folder = path.resolve(profileDir);
   if (!/^s[12]-(mx|pe|co|cl)-(qa|second)$/.test(path.basename(folder))) throw Error('Invalid dedicated auth profile.');
   const unavailable = () => Object.assign(new Error('Dedicated auth profile is running but its connection cannot be verified; no additional window was opened.'),
     { code: 'AUTH_BROWSER_ENDPOINT_UNAVAILABLE', exitCode: 73 });
-  const snapshot = await probe(folder);
-  if (snapshot.known !== true || !Array.isArray(snapshot.browsers)) throw unavailable();
+  // Windows can return an inconclusive process snapshot during browser churn.
+  // Re-read only; uncertainty never authorizes a pointer removal or launch.
+  // Each native probe remains bounded by its existing 20-second timeout.
+  const inspect = async (includeListeners = true) => {
+    let state;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      state = await probe(folder, includeListeners ? undefined : { includeListeners: false });
+      if (state?.known === true && Array.isArray(state.browsers)) return state;
+      if (attempt < 2) await pause(200);
+    }
+    return state;
+  };
+  const snapshot = await inspect();
+  if (snapshot?.known !== true || !Array.isArray(snapshot.browsers)) throw unavailable();
   if (!snapshot.browsers.length) return { occupied: false, absent: true };
   if (snapshot.browsers.length !== 1) throw unavailable();
   const owner = snapshot.browsers[0];
@@ -45,8 +57,8 @@ async function recoverAuthBrowserEndpoint(profileDir, {
   // Recheck exact profile PID + creation time before replacing stale metadata.
   // The connection uses the verified browser-specific WS path, so a later port
   // reuse rejects the handshake instead of attaching to a different browser.
-  const current = await probe(folder, { includeListeners: false });
-  const same = current.known === true && current.browsers?.length === 1 && current.browsers[0];
+  const current = await inspect(false);
+  const same = current?.known === true && current.browsers?.length === 1 && current.browsers[0];
   const found = endpoints[0];
   if (!same || same.pid !== owner.pid || same.createdAt !== owner.createdAt) throw unavailable();
   write(path.join(folder, 'DevToolsActivePort'), `${found.port}\n${found.browserPath}\n`, 'utf8');

@@ -27,6 +27,8 @@ Only explicit pilot IDs are accepted by `npm run dst:pilot -- MX|PE`. The pilot 
 
 Phase 2 adds detailed offline definition checks, Rewards tooltip assertions and read-only CO/CL BackOffice pilots. Use `npm run dst:co -- --store BASE_STORE --priority P1 --ids SAM-24920` (or `dst:mx`, `dst:pe`, `dst:cl` with their approved IDs); add `--list` for non-destructive discovery. See [Phase 2 sources, results, blockers and Jenkins preparation](docs/DST_PHASE2_VALIDATION.md). These targeted commands do not run full DST campaigns.
 
+Expansion now prioritizes the 144 P1 definitions; the 218 P2 remain inventory-only pending approved detailed requirements. See the [P1 proposal by market/store](docs/DST_P1_EXPANSION_PROPOSAL.md) and [MX revalidation, BC trace correction and remaining fixture gap](docs/DST_PHASE3_ASSESSMENT.md). The proposal preserves the nine pilot results and does not enable mass implementation or additional executable cases.
+
 ## Project snapshot
 
 ### Supported markets

@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "scope": "DST_PHASE3_TARGETED_VALIDATION_NOT_FULL_CAMPAIGN",
+  "baselineCommit": "d3145f5fc7564d1b3e11b6deaf15cf5f5fd97b5d",
+  "sourceStateAtRuntime": "TRACE_CAPTURE_FIX_WIP_ON_BASELINE",
+  "sourceHashes": {
+    "utils/dstCdpTrace.cjs": "6c8665a6e515e357c1a4cf959f86dbb6c8b3d854dbd9dc2d8ade4cc3478b88f9",
+    "flows/mx/bcAddToCart.js": "1168dbc0a18d0cfa04639e1d4139f08daef61becfe3f4f51dd8501a5391aabb7",
+    "tests/markets/mx/dst/base-store/bc-add.spec.js": "9b4aa30f424c7e6d25ecfcba1be136bef8ab3badc3f4f4e28183891e1982c7a0"
+  },
+  "historicalPilotResultsPreserved": true,
+  "fullSuiteApproval": false,
+  "paymentSubmitted": false,
+  "orderCreated": false,
+  "authRenewed": false,
+  "mxBuild24Revalidation": {
+    "suite": "QST",
+    "phase": "BEFORE_TRACE_HOOK_CHANGE",
+    "results": [
+      {
+        "id": "SAM-24969",
+        "status": "passed"
+      },
+      {
+        "id": "SAM-24964",
+        "status": "passed"
+      },
+      {
+        "id": "SAM-24968",
+        "status": "passed"
+      },
+      {
+        "id": "SAM-24995",
+        "status": "passed"
+      }
+    ],
+    "evidence": {
+      "file": "test-results/mx-build24-revalidation/1795639899034-65148/results.json",
+      "sha256": "2e766c82ae9a72d94ad4f6e2b33a3737f00d3e8fbc3bfc85ac0a2a6195218651"
+    }
+  },
+  "mxBcPostChangeRegression": {
+    "suite": "QST",
+    "phase": "AFTER_TRACE_HOOK_CHANGE",
+    "results": [
+      {
+        "id": "SAM-24969",
+        "status": "passed"
+      }
+    ],
+    "evidence": {
+      "file": "test-results/mx-bc-trace-hook-revalidation/1795643153520-28680/results.json",
+      "sha256": "0e9ac1eb41ef91708961af0dfdb6c93dc250f9a9b4fbf070eac22f326733e874"
+    }
+  },
+  "mxDstBcFollowUp": {
+    "suite": "DST",
+    "runtime": "FAIL",
+    "formalHomologation": "NOT_DECLARED",
+    "reason": "DST_BC_COLOUR_NOT_RENDERED",
+    "traceArchiveValidated": true,
+    "evidence": {
+      "file": "test-results/dst/mx/base_store/p1/1795643040697-89544/results.json",
+      "sha256": "929caba6093dcd7302f917283cdf5ae31ad09ece17a3d3e225afd888f0c8ece8"
+    },
+    "trace": {
+      "file": "test-results/dst/mx/base_store/p1/1795643040697-89544/playwright/markets-mx-dst-base-store--b42e8----Add-product-from-BC-page-chromium/attachments/trace-a7fe53f3b822bf9332860bc560a2cce90ee3476c.zip",
+      "bytes": 16403169,
+      "sha256": "1211f05f7cdff2ed6144a48917dd5f0407523af56c2384cb16907340586263a5",
+      "entries": [
+        "trace.trace",
+        "trace.network"
+      ]
+    }
+  },
+  "isolatedTraceValidation": {
+    "officialTc": false,
+    "passed": 2,
+    "failed": 0,
+    "archivesValidated": 2
+  },
+  "authProbeValidation": {
+    "officialTc": false,
+    "temporaryProfilesOnly": true,
+    "unitPassed": 17,
+    "unitFailed": 0,
+    "inconclusiveSnapshotReadsMaximum": 3,
+    "unknownOwnerStillBlocked": true,
+    "sourceHashes": {
+      "utils/authBrowserEndpoint.cjs": "1b3835e9f6103636495a91f605624271ac62735fe4dea04a320d7fb2f4937a1c",
+      "governance/tests/authBrowserEndpoint.test.cjs": "94d7696e302eafb425b59c49843d653bc7269cb290e7fc60308cecf60450dc44"
+    }
+  },
+  "focusedValidation": {
+    "passed": 29,
+    "failed": 0,
+    "skipped": 0,
+    "log": ".agent/dst-phase3/all-final-focused.log",
+    "latestProposalRecheck": {
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "log": ".agent/dst-phase3/proposal-clause-final-tests.log"
+    }
+  },
+  "currentDstBaseline": {
+    "executedUnique": 9,
+    "pass": 8,
+    "fail": 1,
+    "p1NotRun": 135,
+    "p2NotRun": 218
+  },
+  "unresolved": [
+    "SAM-24969 DST compatible mass requires native main-product colour/price and full services/CTA/cart proof.",
+    "MX Base payment SAM-25002/SAM-25010 and EPP SAM-25045 not financially rerun or approved in this phase.",
+    "P2 detailed definitions remain unapproved; no official P2 implementation."
+  ],
+  "integratedValidation": {
+    "command": "npm run repo:refactor:gate",
+    "result": "PASS",
+    "governancePassed": 1789,
+    "executivePassed": 4,
+    "mxReportingPassed": 39,
+    "failed": 0,
+    "skipped": 0,
+    "evidence": ".agent/dst-phase3/refactor-gate-final.log",
+    "evidenceSha256": "050d3f026530a543aa1f65c9a637cb70d52b85f7d4fb93c818d1deeb10d4f006"
+  }
+}

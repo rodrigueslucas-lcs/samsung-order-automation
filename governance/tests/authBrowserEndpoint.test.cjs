@@ -23,6 +23,37 @@ test('a positively absent profile can launch normally', async () => {
   assert.deepEqual(await recoverAuthBrowserEndpoint(folder, { platform: 'win32', probe: () => ({ known: true, browsers: [] }),
     request: () => assert.fail('no listener to inspect'), write: () => assert.fail('no pointer to repair') }), { occupied: false, absent: true });
 });
+
+test('an inconclusive Windows snapshot is re-read before proving the profile absent', async () => {
+  let reads=0; const pauses=[];
+  const result=await recoverAuthBrowserEndpoint(folder,{platform:'win32',
+    probe:()=>++reads<3?{known:false}:{known:true,browsers:[]},pause:async ms=>pauses.push(ms),
+    request:()=>assert.fail('no listener to inspect'),write:()=>assert.fail('no endpoint to repair')});
+  assert.deepEqual(result,{occupied:false,absent:true});
+  assert.equal(reads,3);assert.deepEqual(pauses,[200,200]);
+});
+
+test('persistent Windows uncertainty stays bounded and cannot authorize a launch or pointer change', async () => {
+  let reads=0;
+  await assert.rejects(recoverAuthBrowserEndpoint(folder,{platform:'win32',probe:()=>{reads++;return {known:false};},pause:async()=>{},
+    request:()=>assert.fail('unknown owner'),write:()=>assert.fail('unverified pointer')}),error=>error.exitCode===73);
+  assert.equal(reads,3);
+});
+
+test('transient uncertainty during final owner recheck still requires the same PID and creation time', async () => {
+  let reads=0;const writes=[];
+  const result=await recoverAuthBrowserEndpoint(folder,{platform:'win32',probe:()=>++reads===2?{known:false}:snapshot(),
+    request:async()=>response(),pause:async()=>{},write:(...args)=>writes.push(args)});
+  assert.equal(result.occupied,true);assert.equal(reads,3);assert.equal(writes.length,1);
+});
+
+test('a replacement owner after an inconclusive recheck cannot repair the original endpoint', async () => {
+  let reads=0;
+  await assert.rejects(recoverAuthBrowserEndpoint(folder,{platform:'win32',probe:()=>{
+    reads++;return reads===1?snapshot():reads===2?{known:false}:{known:true,browsers:[{...owner,pid:9876}]};
+  },request:async()=>response(),pause:async()=>{},write:()=>assert.fail('owner changed')}),error=>error.exitCode===73);
+  assert.equal(reads,3);
+});
 for (const [name, state] of [['unknown owner', { known: false }], ['multiple owners', { known: true, browsers: [owner, owner] }],
   ['live owner without listener', { known: true, browsers: [{ ...owner, ports: [] }] }]]) {
   test(name + ' cannot authorize a duplicate window', async () => {
