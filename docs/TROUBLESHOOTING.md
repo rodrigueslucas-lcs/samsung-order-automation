@@ -403,7 +403,7 @@ controlled completion rather than waiting 105 seconds in a unit test.
 The full 29-case Jenkins campaign was not rerun for this fix: WMC renewal and
 the rejected payment prerequisites are still distinct from automation validation.
 
-### MX S2 Base Store build #25: interrupted campaign and separate card refusal
+### MX S2 Base Store build #25: historical interruption and subsequent card PASS
 
 See [the build 25 stabilization record](MX_BASE_STORE_BUILD25_STABILIZATION.md)
 for the partial 25 PASS / 3 FAIL / one incomplete result, address readiness and
@@ -411,3 +411,8 @@ colonia corrections, current-artifact preservation, full-campaign budget and
 the separately reconciled card/guest-order attempts. A missing final JSON must
 not be interpreted as proof that no TCs ran. A 601 response must not be treated
 as a passing payment or incorrectly attributed to Cash or Track Order.
+
+Subsequent official SAM-25002 execution on 26 November passed with new order
+`MX261126-78917085` and native confirmation in 3.6 minutes. The historical 601
+does not constitute a current blanket card blocker. Guest ordering/tracking
+and a full campaign still need their own results; preserve historical failures.

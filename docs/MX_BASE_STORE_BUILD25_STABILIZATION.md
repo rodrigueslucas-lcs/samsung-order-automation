@@ -1,5 +1,25 @@
 # MX S2 Base Store — build 25 stabilization
 
+## Latest official validation — 26 November 2026
+
+The subsequent normal targeted execution of **SAM-25002 passed**, creating
+the new order **MX261126-78917085** and validating its native confirmation.
+The local Playwright result records one PASS, zero FAIL/SKIP, starting at
+11:41:31 UTC and completing in approximately 3.6 minutes. Its order evidence
+records `paymentMode: mx-mercadoCC` and `outcome: CONFIRMATION`.
+
+```bash
+MX_QST_ENVIRONMENT=S2 MX_QST_TARGET_IDS=SAM-25002 MX_QST_HEADLESS=0 ALLOW_PAYMENT_SUBMIT=1 npm run qst:mx:base-store
+```
+
+This supersedes a blanket current assertion that MX card ordering is blocked.
+The earlier 601 failures below remain historical evidence; their underlying
+cause and the difference between executions have not been established.
+Do not impose a provider-fix prerequisite on the normal card TC from those
+older failures. No successful old order may substitute for a new run's order.
+SAM-25010 still requires its own new guest order and tracking validation; this
+registered-card PASS does not prove that case or the complete campaign.
+
 ## Observed execution
 
 Jenkins `Samsung-SMB-MX` build 25 ran revision
@@ -96,7 +116,7 @@ No complete MX campaign has been revalidated by these targeted checks. Card
 and guest-order results must be assessed separately from this successful
 address and pipeline correction.
 
-## Payment escalation prerequisite
+## Historical payment escalation context
 
 The observed 601 is a commerce/provider refusal, not proof of its underlying
 cause. Request the server-side reason and correlation for the exact QA submit
@@ -106,6 +126,8 @@ configuration. SDK token creation is not proof that those merchant settings
 are correct. Do not publish card numbers, security codes, tokens, cookies or
 authenticated request bodies with that handoff.
 
-Payment and Track Order remain unproven until a new, causally identified order
-and its own native confirmation succeed, followed by the required tracking
-checks. Do not apply a Cash or Track Order known-defect label to this refusal.
+The latest official SAM-25002 PASS above proves a new registered order and its
+native confirmation. Guest ordering and Track Order require their own execution
+evidence. If 601 recurs, investigate that exact attempt rather than retaining a
+generic current blocker. Do not apply a Cash or Track Order known-defect label
+to a card refusal.
