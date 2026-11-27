@@ -5,6 +5,7 @@ import preQaCustomerState from "../../utils/preQaCustomerState.js";
 import bcCareChoice from "../../utils/mxBcCareChoice.cjs";
 import bcCatalog from "../../utils/mxBcCatalog.cjs";
 import bcVariant from "../../utils/mxBcVariantReadiness.cjs";
+import bcCartHeadroom from "../../utils/mxBcCartHeadroom.cjs";
 
 const { recordBusinessEvidence } = evidenceContext;
 const { resolveMxBcCareChoice } = bcCareChoice;
@@ -146,10 +147,11 @@ export async function addMxBcProductToCart(testInfo, options = {}) {
         page.getByRole("main").getByRole("textbox", { name: "Quantity", exact: true }).first().waitFor({ timeout: 60000 }),
         page.getByRole("heading", { name: /carrito.*vac[ií]o|no hay productos/i }).waitFor({ timeout: 60000 }),
       ]);
-      if (await quantity().count()) {
-        cartCountBefore = Number(await quantity().inputValue());
-        expect(Number.isInteger(cartCountBefore) && cartCountBefore > 0).toBe(true);
-      }
+      const cartPreparation = await bcCartHeadroom.prepareMxBcCartHeadroom(page, PRE_QA_MODEL_CODE);
+      cartCountBefore = cartPreparation.quantityBefore;
+      await testInfo.attach("MX BC cart headroom", {
+        body: Buffer.from(JSON.stringify(cartPreparation)), contentType: "application/json",
+      });
     });
     await test.step("Open the authenticated PreQA BC product listing", async () => {
       await page.goto(PRE_QA_PLP, { waitUntil: "domcontentloaded", timeout: 60000 });

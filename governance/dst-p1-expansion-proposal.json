@@ -7452,7 +7452,7 @@
       "qstOwner": {
         "file": "tests/markets/mx/qst/base-store/bc-add-safe.spec.js",
         "line": 8,
-        "sourceSha256": "7a37f7804654e99f9462e18a00dc990a07da7dabdbe36932a9e52addf48056f6",
+        "sourceSha256": "c95b2d2e30537c603ff640161f6c885413643b144c1aa3721864ee261f1f2e55",
         "reviewSurface": "LEXICAL_OWNER_AND_FILE_IMPORTS_NOT_SEMANTIC_PROOF",
         "explicitStepLabels": [
           "Add the configured BC product and verify its persisted cart quantity"
@@ -7466,7 +7466,15 @@
           "tests/markets/mx/qst/base-store/mxQst.fixture.js",
           "reporting/evidence/evidenceContext.js",
           "utils/qstEvidenceMetadata.js",
-          "flows/mx/bcAddToCart.js"
+          "flows/smb/preQaBcCart.js"
+        ],
+        "sourceRevisions": [
+          {
+            "previousCommit": "db0ecb24bd40ff154c69f7381754687278049480",
+            "previousSha256": "7a37f7804654e99f9462e18a00dc990a07da7dabdbe36932a9e52addf48056f6",
+            "currentSha256": "c95b2d2e30537c603ff640161f6c885413643b144c1aa3721864ee261f1f2e55",
+            "reason": "Official source permits any PLP product with variant, price and colour. Observed Fold6 buy404; use catalog-listed A06 native buy200 with exact colour/storage/price and native Add+1/reload. No DST runtime result changed."
+          }
         ]
       },
       "family": "CART_PROMOTION",

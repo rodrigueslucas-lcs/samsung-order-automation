@@ -1,10 +1,13 @@
 import { chromium, expect, test } from "@playwright/test";
+import mxCartHeadroom from "../../utils/mxBcCartHeadroom.cjs";
+import mxClassicPdp from "../../utils/mxClassicBcPdp.cjs";
 
 const PREQA_ORIGIN = "https://p6-pre-qa2.samsung.com";
 const SHOP_ORIGIN = "https://stg2.shop.samsung.com";
 const COMMERCE_HOSTS = new Set(['s2-api-cdn.ecom-stg.samsung.com', 's2-smb-api-cdn.ecom-stg.samsung.com']);
 
-export async function addProductFromPreQaBc({ market, sku, plpPath, testInfo }) {
+export async function addProductFromPreQaBc({ market, sku, plpPath, testInfo, pdpBuyingTool = false }) {
+  if (typeof pdpBuyingTool !== 'boolean' || pdpBuyingTool && market !== 'mx') throw new Error('Classic BC PDP mode requires MX.');
   if (!/^[a-z]{2}$/.test(market) || !/^[a-z0-9-]+$/i.test(sku)) throw new Error("Invalid BC market or model code.");
   const plp = new URL(plpPath, PREQA_ORIGIN);
   if (plp.origin !== PREQA_ORIGIN || !plp.pathname.startsWith(`/${market}/`)) {
@@ -39,7 +42,11 @@ export async function addProductFromPreQaBc({ market, sku, plpPath, testInfo }) 
         main.getByRole("textbox", { name: "Quantity", exact: true }).first().waitFor({ state: "visible", timeout: 60000 }),
         main.getByRole("heading", { name: /carrito.*vac[ií]o|no hay productos/i }).waitFor({ state: "visible", timeout: 60000 }),
       ]);
-      if (await quantity().count()) {
+      if (pdpBuyingTool) {
+        const preparation = await mxCartHeadroom.prepareMxBcCartHeadroom(page, sku);
+        before = preparation.quantityBefore;
+        await testInfo.attach('MX BC cart headroom', { body: Buffer.from(JSON.stringify(preparation)), contentType: 'application/json' });
+      } else if (await quantity().count()) {
         before = Number(await quantity().inputValue());
         expect(Number.isInteger(before) && before > 0).toBe(true);
       }
@@ -56,6 +63,7 @@ export async function addProductFromPreQaBc({ market, sku, plpPath, testInfo }) 
     };
     let card;
     let pdpPath;
+    let pdp;
     await test.step("Open the authenticated PreQA BC catalog and its controlled product", async () => {
       await page.goto(plp.href, { waitUntil: "domcontentloaded", timeout: 60000 });
       await dismissBanner();
@@ -69,10 +77,21 @@ export async function addProductFromPreQaBc({ market, sku, plpPath, testInfo }) 
       expect(destination.origin, "BC PDP must not navigate to Production.").toBe(PREQA_ORIGIN);
       expect(destination.pathname).toMatch(new RegExp(`^/${market}/`));
       pdpPath = destination.pathname;
+      if (pdpBuyingTool) {
+        await page.goto(destination.href, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        const buy = page.locator(`a[href="${destination.pathname}buy/"]`).filter({ visible: true }).first();
+        await expect(buy, 'Use the buy URL actually offered for this catalog product.').toBeVisible({ timeout: 30000 });
+        const buyingUrl = new URL(await buy.getAttribute('href'), PREQA_ORIGIN);
+        expect(buyingUrl.origin).toBe(PREQA_ORIGIN);
+        const response = await page.goto(buyingUrl.href, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        expect(response?.ok(), 'The observed native buying page must load successfully.').toBe(true);
+        pdpPath = buyingUrl.pathname;
+        pdp = await mxClassicPdp.prepareMxClassicBcPdp(page, sku);
+      }
     });
     let mutation;
-    await test.step("Add from the BC card and prove the intended SKU increases in the S2 cart", async () => {
-      const add = card.getByText("Agregar al carrito", { exact: true });
+    await test.step(pdpBuyingTool ? "Add from the BC PDP and prove the intended SKU increases in the S2 cart" : "Add from the BC card and prove the intended SKU increases in the S2 cart", async () => {
+      const add = pdpBuyingTool ? pdp.add : card.getByText("Agregar al carrito", { exact: true });
       await expect(add, "The controlled BC card must offer Add to Cart.").toBeVisible({ timeout: 30000 });
       const pending = page.waitForResponse(response => {
         const url = new URL(response.url());
@@ -91,7 +110,8 @@ export async function addProductFromPreQaBc({ market, sku, plpPath, testInfo }) 
       await expect(page).toHaveURL(cartUrl, { timeout: 30000 });
       await expect(quantity()).toHaveValue(String(before + 1), { timeout: 60000 });
     });
-    return { source: "PreQA BC card -> S2 storefront cart", market, modelCode: sku, plpPath: plp.pathname,
+    return { source: pdpBuyingTool ? "PreQA BC PLP -> PDP -> S2 storefront cart" : "PreQA BC card -> S2 storefront cart", market, modelCode: sku, plpPath: plp.pathname,
+      ...(pdpBuyingTool ? { variantSelection: pdp.evidence } : {}),
       pdpPath, commerceOrigin: new URL(mutation.url()).origin, commerceEnvironment: "S2",
       skuQuantityBefore: before, skuQuantityAfter: before + 1, addToCartStatus: mutation.status() };
   } finally {

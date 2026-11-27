@@ -11,6 +11,13 @@ function guardedFlow() {
   });
 }
 
+test('classic PDP mode is explicitly boolean and cannot change another market before browser access', async()=>{
+ const run=guardedFlow();
+ for(const options of [{market:'co',pdpBuyingTool:true},{market:'cl',pdpBuyingTool:true},{market:'mx',pdpBuyingTool:'true'}]){
+  await assert.rejects(run({sku:'SM-QATEST',plpPath:'/mx/smartphones/all-smartphones/',...options}),/Classic BC PDP mode requires MX/);
+ }
+});
+
 test('BC refuses Production, foreign markets and insecure URLs before opening any browser', async () => {
   const addProductFromPreQaBc = guardedFlow();
   for (const plpPath of ['https://www.samsung.com/co/refrigerators/', 'https://p6-pre-qa2.samsung.com/pe/refrigerators/', 'http://p6-pre-qa2.samsung.com/co/refrigerators/']) {

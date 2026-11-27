@@ -125,5 +125,14 @@
     "skipped": 0,
     "evidence": ".agent/dst-phase3/refactor-gate-final.log",
     "evidenceSha256": "050d3f026530a543aa1f65c9a637cb70d52b85f7d4fb93c818d1deeb10d4f006"
-  }
+  },
+  "subsequentSourceRevisions": [
+    {
+      "file": "flows/mx/bcAddToCart.js",
+      "previousCommit": "db0ecb24bd40ff154c69f7381754687278049480",
+      "previousSha256": "1168dbc0a18d0cfa04639e1d4139f08daef61becfe3f4f51dd8501a5391aabb7",
+      "currentSha256": "a1cb2aaaa58b4c60b6d06cf088f14e3f3d4b6ac5d7dd5eb8f14650fb1d4b5415",
+      "reason": "Jenkins MX26 proved persistent BC target quantity5 at native max5; reserve one exact-SKU slot before Add, preserve native mutation success, +1 increment and reload persistence. Historical DST colour FAIL, trace proof and all pilot results remain unchanged."
+    }
+  ]
 }
