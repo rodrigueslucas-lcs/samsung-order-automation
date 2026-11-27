@@ -53,6 +53,15 @@ test('an expired Samsung authorization error fails immediately without another c
     pause() { assert.fail('error page must not enter the human wait loop'); }, log() {},
   }), error => error.code === 'AUTH_PROVIDER_ERROR' && error.exitCode === 78);
 });
+for(const [closed,passwordAttempted,expected] of [[true,false,76],[false,false,78],[true,true,78]])test(`ended retained challenge classifies restart only after closure and before password: ${closed}/${passwordAttempted}`,async()=>{
+ let closes=0;
+ const locator={filter(){return this;},first(){return this;}};
+ const page={isClosed:()=>false,url:()=> 'https://account.samsung.com/iam/error/authorize',locator:()=>locator,
+ close:async()=>{closes++;if(!closed)throw Error('fixture close failed');}};
+ await assert.rejects(completeAccountLogin(page,{market:'mx',hostname:'stg2.shop.samsung.com',resumeOnly:true,resumeEmailPhase:'CHALLENGE',passwordAlreadySubmitted:passwordAttempted,
+ credentials:()=>assert.fail('terminal page must not read credentials'),log(){}}),error=>error.code==='AUTH_PROVIDER_ERROR'&&error.exitCode===expected&&error.authorizationClosed===closed);
+ assert.equal(closes,1);
+});
 test('CAPTCHA waits for human completion without another email or Next click', async () => {
   const s = scenario({ captcha: true }); await s.run();
   assert.deepEqual(s.calls, ['fill-email', 'click-email', 'fill-password', 'click-password']);

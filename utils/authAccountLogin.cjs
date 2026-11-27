@@ -71,10 +71,11 @@ async function completeAccountLogin(page, { market, hostname, credentials, timeo
       error.code = 'AUTH_SECURITY_BLOCKED';error.exitCode = 78;throw error;
     }
     if (/^\/iam\/error(?:\/|$)/i.test(url.pathname)) {
-      await closeRejectedAccountWindow(page).catch(()=>{});
+      const authorizationClosed = await closeRejectedAccountWindow(page).catch(()=>false);
       const error = new Error('AUTHORIZATION_EXPIRED: Samsung Account rejected the current authorization. No credential step will be repeated on this error page; start a fresh authorized refresh.');
       error.code = 'AUTH_PROVIDER_ERROR';
-      error.exitCode = 78;
+      error.authorizationClosed = authorizationClosed;
+      error.exitCode = authorizationClosed && !passwordSubmitted && (human || emailChallengePending) ? 76 : 78;
       throw error;
     }
     let {visual:visualChallenge,pending:challenge,checkbox:captchaCheckbox}=await captchaGate();

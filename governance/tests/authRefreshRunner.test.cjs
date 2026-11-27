@@ -46,6 +46,14 @@ test('manual/second-account verification never restarts the login', async () => 
   const s = await scenario({ slot: 'second', manual: true, statuses: [75] });
   assert.ok(s.error); assert.equal(s.calls.length, 1); assert.doesNotMatch(s.output, /READY/);
 });
+test('closed pre-password human-gate authorization renews once, never loops or publishes an unresolved attempt',async()=>{
+ const recovered=await scenario({statuses:[76,0,0,0]});
+ assert.equal(recovered.error,undefined);assert.equal(recovered.calls.length,4);
+ const repeated=await scenario({statuses:[76,76],publish:true});
+ assert.ok(repeated.error);assert.equal(repeated.calls.length,2);assert.doesNotMatch(repeated.output,/READY/);
+ const manual=await scenario({slot:'second',manual:true,statuses:[76]});
+ assert.ok(manual.error);assert.equal(manual.calls.length,1);
+});
 
 test('human verification stops before verify/package without a false READY', async () => {
   const s = await scenario({ statuses: [79] });

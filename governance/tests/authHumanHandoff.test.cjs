@@ -4,6 +4,20 @@ const {resumeHumanHandoff,credentialsForHandoff}=require('../../utils/authHumanH
 const {resumeIdentity,runKeepAliveCycle}=require('../../utils/authKeepAliveRunner.cjs');
 const id={market:'mx',environment:'S2',slot:'primary'};
 const missing=()=>{throw Object.assign(new Error('missing'),{code:'ENOENT'});};
+for(const closed of [true,false])test(`authorization ending during continuation releases handoff only after proven closure: ${closed}`,async()=>{
+ const s=fixture({account:true,password:true});
+ s.deps.complete=async()=>{throw Object.assign(new Error('provider authorization ended'),{code:'AUTH_PROVIDER_ERROR',exitCode:78,authorizationClosed:closed});};
+ const result=await resumeHumanHandoff({...id,passwordAttempted:false,emailPhase:'CHALLENGE'},s.deps);
+ assert.equal(result.status,closed?'AUTHORIZATION_EXPIRED':'UNPROVEN');
+ assert.equal(s.written.length,0);
+ assert.equal(s.calls.filter(call=>call==='connect').length,1);
+});
+test('security denial during continuation never permits a fresh automatic authorization',async()=>{
+ const s=fixture({account:true,password:true});
+ s.deps.complete=async()=>{throw Object.assign(new Error('security denial'),{code:'AUTH_SECURITY_BLOCKED',exitCode:78,authorizationClosed:true});};
+ const result=await resumeHumanHandoff({...id,passwordAttempted:false},s.deps);
+ assert.equal(result.status,'UNPROVEN');assert.equal(s.written.length,0);
+});
 function fixture({account=false,password=false,terms=false,authenticated=true,cookie=true,hostname='stg2.shop.samsung.com'}={}) {
  const calls=[],written=[];let accountOpen=account;
  const storefront={url:()=>`https://${hostname}/mx/`,evaluate:async()=>({fixture:'private-session'})};

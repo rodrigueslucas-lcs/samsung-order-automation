@@ -90,10 +90,11 @@ async function refreshAuth({ market, environment, slot = 'primary', env, publish
       const phaseEnv = phase === 'verify' ? { ...env, [`${market.toUpperCase()}_AUTH_AUTO_RENEW`]: '0' } : env;
       if (phase === 'login') loginStarted = true;
       let status = await runChild(script, phaseEnv, { label, log: report, timeoutMs, interactive: phase === 'login' });
-      // Only a classified lost browser/page may restart, once. Invalid sessions,
-      // DNS/configuration failures and human verification never restart login.
-      if (phase === 'login' && status === 75 && !manual) {
-        report('Browser/page was lost; reconnecting once to the same dedicated profile.');
+      // One restart for a lost page or a positively closed authorization that
+      // ended at the human gate before any password. A live human gate,
+      // security denial and unclassified provider failure never restart.
+      if (phase === 'login' && [75,76].includes(status) && !manual) {
+        report(status === 76 ? 'Human-gate authorization ended and its window closed; requesting fresh authorization once.' : 'Browser/page was lost; reconnecting once to the same dedicated profile.');
         status = await runChild(script, env, { label, log: report, timeoutMs, interactive: true });
       }
       if (status !== 0) {

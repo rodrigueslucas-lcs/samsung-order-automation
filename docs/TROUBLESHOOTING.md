@@ -416,3 +416,23 @@ Subsequent official SAM-25002 execution on 26 November passed with new order
 `MX261126-78917085` and native confirmation in 3.6 minutes. The historical 601
 does not constitute a current blanket card blocker. Guest ordering/tracking
 and a full campaign still need their own results; preserve historical failures.
+
+### Samsung Account authorization ending after a delayed challenge
+
+A terminal `/iam/error` page (including the observed Spanish login-error
+page with code 400) cannot complete its old authorization. The owned auth
+window is closed; a retained handoff then releases the existing keepalive
+recovery lane instead of remaining inconclusive. If the error appears during
+a live challenge before any password submission, the refresh requests fresh
+authorization once, only after confirmed closure. A repeated failure stops.
+
+This classification uses the official provider route and tracked login phase,
+not a generic HTTP 400 match. Failed closure, unknown identity, an already
+submitted password and `/iam/blocked` security denials do not authorize that
+retry. Live CAPTCHA/MFA remains a human gate. Session health still requires
+fresh verification, export and packaging; closing a window alone is not READY.
+
+On 27 November the active scheduled recovery reported MX and CO FIRST as
+RECOVERED and closed their dedicated windows. Focused auth regression:
+169 tests passed without skips. This does not imply that SECOND identities or
+a full market campaign have passed.

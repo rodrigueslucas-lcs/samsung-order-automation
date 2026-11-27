@@ -58,7 +58,14 @@ async function resumeHumanHandoff({market,environment,slot,passwordAttempted=tru
           if(String(line).startsWith('AUTH_HANDOFF_AUDIT ')) {try{const audit=JSON.parse(String(line).slice(19));attempted=audit.passwordAttempted===true;phase=['READY','CHALLENGE'].includes(audit.emailPhase)?audit.emailPhase:'NONE';}catch{attempted=true;phase='NONE';}}
           else log(line);
         }});
-      } catch(error) {return{status:error.exitCode===79?'HUMAN_REQUIRED':'UNPROVEN',passwordAttempted:attempted,emailPhase:phase};}
+      } catch(error) {
+        // The provider can end authorization while the retained continuation
+        // is running, after the initial route check. Only proven closure may
+        // release this handoff for the existing bounded recovery lane.
+        if(error.code==='AUTH_PROVIDER_ERROR'&&error.authorizationClosed===true)
+          return{status:'AUTHORIZATION_EXPIRED',passwordAttempted:attempted,emailPhase:'NONE'};
+        return{status:error.exitCode===79?'HUMAN_REQUIRED':'UNPROVEN',passwordAttempted:attempted,emailPhase:phase};
+      }
     }
     const pages=context.pages().filter(page=>{try{const url=new URL(page.url());return url.protocol==='https:'&&url.hostname===host&&(url.pathname===`/${market}`||url.pathname.startsWith(`/${market}/`));}catch{return false;}}).reverse();
     let unproven=false;
